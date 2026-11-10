@@ -14,6 +14,7 @@ button{font-family:Georgia,serif;color:var(--ink);cursor:pointer}
 .bar i{position:absolute;left:0;top:0;bottom:0;width:50%;background:#7c6;border-radius:4px;transition:width .15s}
 #hud{position:fixed;inset:0;pointer-events:none;display:none}
 #top{position:absolute;left:10px;top:10px;display:flex;flex-direction:column;gap:5px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 10px;min-width:220px;font-size:13px}
+#top.kapali{min-width:0;padding:6px 10px;cursor:pointer}#top.kapali>*{display:none!important}#top.kapali::after{content:"📊";font-size:18px}
 #top .row{display:flex;align-items:center;gap:8px}
 #res,#res2{display:flex;gap:9px;font-size:13px;flex-wrap:wrap}
 #res2{font-size:12px;color:#d8ccb4;gap:7px}
@@ -203,5 +204,10 @@ summary{cursor:pointer;color:#e8d4b0}
 <script src="js/oyun.js"></script>
 <script src="js/cizim.js"></script>
 <script src="js/arayuz.js"></script>
+<script>
+(function(){const t=document.getElementById('top');try{if(localStorage.getItem('sonAtesTop')==='0')t.classList.add('kapali')}catch(e){}
+t.style.pointerEvents='auto';t.addEventListener('click',function(e){e.stopPropagation();t.classList.toggle('kapali');try{localStorage.setItem('sonAtesTop',t.classList.contains('kapali')?'0':'1')}catch(e){}});
+t.addEventListener('touchstart',function(e){e.stopPropagation()},{passive:true});})();
+</script>
 </body>
 </html>
