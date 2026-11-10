@@ -92,6 +92,22 @@ button{font-family:Georgia,serif;color:var(--ink);cursor:pointer}
 .card button.no{opacity:.45}
 .card .ok{color:#9e9;font-size:18px}
 #sideBody{touch-action:pan-y}
+.modalw{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:4;pointer-events:auto}
+#charBox{background:#15110c;border:1px solid #6a5030;border-radius:12px;width:min(520px,94vw);max-height:88vh;display:flex;flex-direction:column;font-size:13px}
+#charBox button,.ctabs button,.obtns button{background:#2b2419;border:1px solid #5a4a30;border-radius:6px;padding:4px 9px;font-size:12px}
+#charBox button.on,.ctabs button.on{border-color:var(--fire);background:#4a2a10}
+#charBox button.no{opacity:.45}
+.cgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px}
+.story2{font-style:italic;color:#c8b898;margin:8px 0 2px}
+.skills{display:grid;grid-template-columns:1fr 1fr;gap:4px 12px}
+.sk{display:grid;grid-template-columns:1fr auto;gap:2px 6px;font-size:12px}
+.sk .bar{grid-column:1/3;height:4px}
+.sk.cur span{color:#ffd27a}
+.gsel{display:flex;flex-wrap:wrap;gap:4px}
+button.wide{width:100%;margin-top:6px}
+.ctabs{display:flex;gap:6px;padding:8px 12px 0}
+.obtns{display:flex;gap:3px;flex:none;flex-wrap:wrap;justify-content:flex-end;max-width:46%}
+.card .obtns button{padding:4px 7px;background:#2b2419;border-color:#5a4a30}
 #touch{display:none;position:fixed;inset:0;pointer-events:none}
 #joy{position:absolute;left:0;bottom:0;width:50%;height:62%;pointer-events:auto}
 #knobBase{position:absolute;width:110px;height:110px;border-radius:50%;border:2px solid rgba(255,255,255,.18);display:none}
@@ -158,6 +174,7 @@ summary{cursor:pointer;color:#e8d4b0}
 </div>
 
 <div id="craft"><div id="craftBox"></div></div>
+<div id="charM" class="modalw"><div id="charBox"></div></div>
 <div id="toast"></div>
 
 <div id="touch">
@@ -172,6 +189,7 @@ summary{cursor:pointer;color:#e8d4b0}
 <div id="screen"><div class="box" id="screenBox"></div></div>
 
 <script src="js/temel.js"></script>
+<script src="js/ses.js"></script>
 <script src="js/dunya.js"></script>
 <script src="js/halk.js"></script>
 <script src="js/yaratik.js"></script>

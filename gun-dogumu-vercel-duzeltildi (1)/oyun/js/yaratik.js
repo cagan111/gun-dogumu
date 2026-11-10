@@ -80,6 +80,8 @@ function hurt(t, dmg, src, poison, isProj) {
   if (t.isRescue) { t.hp -= dmg * DIFF[G.diff].dmg; t.hurtT = 0.2; if (t.hp <= 0) rescueDies(t); return; }
   if (t.type) {
     if (t.type === 'kanatli' && t.alt > 0.4 && !isProj) return;
+    if (t.type === 'zirhli' && src && !t.tamed) { const ad = angDiff(t.ang, angTo(t, src)); if (!(ad > 0.9 && ad < 2.3)) { dmg *= 0.3; if (Math.random() < 0.3) ftext(t.x, t.y - t.r, 'zırh!', '#ccc'); } }
+    if (t.type === 'taklitci' && !t.revealed) reveal(t);
     t.hp -= dmg; t.hurt = 0.15; if (poison) t.poison = 5;
     for (let i = 0; i < 5; i++) G.parts.push({ x: t.x, y: t.y, vx: rand(-120, 120), vy: rand(-120, 120), life: rand(0.3, 0.7), col: '#7a0d0d', s: rand(2, 4) });
     if (t.carry && src && src.leader) { t.carryDmg += dmg; if (t.carryDmg >= 70) dropCarry(t, true); }
@@ -89,6 +91,8 @@ function hurt(t, dmg, src, poison, isProj) {
         if (t.ko > 0) t.hp = 0;
         else { t.angry = 18; t.tgt = src; if (!t.koDone && t.hp > 0 && t.hp < t.maxhp * 0.3) { t.ko = 30; t.koDone = true; t.angry = 0; msg('Boynuzlu bayıldı! [E] basılı tut: 15🍖 ile evcilleştir — ya da vur ve et al.', '#fe9', 6); } }
       } else if (t.type === 'uzunboyun') { t.angry = 15; t.tgt = src; }
+      else if (t.type === 'ordek') alarmHerd(t, src || L);
+      else if (t.type === 'gurleyen' || t.type === 'zirhli') { t.angry = 12; t.tgt = src || L; }
       else if (t.type === 'kanatli') { t.st = 'fly'; t.home = { x: clamp(t.x + rand(-900, 900), 200, WORLD - 200), y: clamp(t.y + rand(-900, 900), 200, WORLD - 200) }; }
       else if (src && !t.leave && src.kind !== 'build') { t.tgt = src; t.engaged = true; }
       if (t.type === 'kucuk' && t.hp < t.maxhp * 0.5) t.leave = true;
@@ -99,8 +103,7 @@ function hurt(t, dmg, src, poison, isProj) {
   // ---- insan
   if (src && src.type) dmg *= DIFF[G.diff].dmg;
   if (t === L && G.mount && !G.mount.dead) { const m = G.mount, md = dmg * 0.6; dmg -= md; m.hp -= md; m.hurt = 0.15; if (m.hp <= 0) killDino(m, src); }
-  if (t === L && G.tech.has('deriZirh')) dmg *= 0.7;
-  else if (t !== L && G.tech.has('halkZirhi')) dmg *= 0.75;
+  if (t.eq && t.eq.zirh) dmg *= 0.7;
   if (t.downed > 0) { killPerson(t, src); return; }
   t.hp -= dmg; t.hurtT = 0.2; t.lastHurt = 0; t.fear = Math.min(100, t.fear + 12);
   for (let i = 0; i < 6; i++) G.parts.push({ x: t.x, y: t.y, vx: rand(-100, 100), vy: rand(-100, 100), life: rand(0.3, 0.8), col: '#9a1010', s: rand(2, 4) });
@@ -114,9 +117,14 @@ function killDino(d, src) {
   const def = DINO[d.type];
   if (!d.tamed) {
     G.kills++;
-    if (d.type !== 'kucuk' || dist(d, G.fire) < 1500 || (L && dist(d, L) < 600)) {
-      let k = 0; for (const r in def.drop) addStock(r, r === 'food' ? Math.round(def.drop[r] * rafBonus()) : def.drop[r], d.x, d.y + 14 * k++);
-    }
+    const hunted = G.hunt && G.hunt.t === d;
+    if (hunted || (src && src.group === 'avci')) { G.stats.hunts = (G.stats.hunts || 0) + 1; if (G.stats.hunts >= 10) unlock('avci10'); }
+    if (hunted) { G.hunt = null; msg(`🎯 Av başarılı: ${def.ad}! ${members('kasap').length ? 'Et ustaları leşe gidiyor.' : 'Leşi temizleyecek bir 🔪 Et Ustası ata!'}`, '#ffd27a', 5); }
+    const dr = def.drop;
+    if (dr.meat) G.carcs.push({ x: d.x, y: d.y, r: Math.max(10, d.r), type: d.type, ang: d.ang, meat: dr.meat, bone: dr.bone || 0, hide: dr.hide || 0, age: 0, carc: true, rotten: false });
+    else { let k = 0; for (const r in dr) addStock(r, dr[r], d.x, d.y + 14 * k++); }
+    if (dr.poison) addStock('poison', dr.poison, d.x, d.y);
+    if (d.type === 'taklitci') { unlock('benzeyen'); msg('Benzeyen yere yığıldı. Yüzü... kimsenin yüzü değildi artık.', '#ddd', 7); moraleAdd(15); }
   } else msg(`Evcil ${def.ad}${d.pet ? ' yavrusu' : ''} öldü...`, '#f99', 5);
   if (d.type === 'dev' && !d.tamed) { msg('DEV KAFA DÜŞTÜ! Halkın sana hayranlıkla bakıyor.', '#ffb060', 7); for (const p of G.people) p.fear = 0; moraleAdd(25); unlock('dev'); SFX.roar(0.4); }
   for (let i = 0; i < 16; i++) G.parts.push({ x: d.x, y: d.y, vx: rand(-150, 150), vy: rand(-150, 150), life: rand(0.5, 1.2), col: '#6a0808', s: rand(2, 6) });
@@ -139,10 +147,14 @@ function rescueDies(t) {
 
 // ---- oklar
 function shootArrow(src, tx, ty, dmg) {
+  let poison = false;
+  if ((G.stock.zok || 0) > 0) { G.stock.zok--; poison = true; }
+  else if ((G.stock.ok || 0) > 0) G.stock.ok--;
+  else { if (src === L && !G.flags.noArrow) { G.flags.noArrow = 1; msg('Ok kalmadı! Zanaatkârlara ok ürettir (C).', '#e99', 3); } return false; }
   const a = Math.atan2(ty - src.y, tx - src.x) + rand(-0.04, 0.04);
-  G.proj.push({ x: src.x + Math.cos(a) * 16, y: src.y + Math.sin(a) * 16, vx: Math.cos(a) * 640, vy: Math.sin(a) * 640, dmg,
-    poison: G.tech.has('zehirliOk') && (src.leader || src.kind === 'build'), life: 0.7, src: src.kind === 'build' ? null : src, ang: a });
+  G.proj.push({ x: src.x + Math.cos(a) * 16, y: src.y + Math.sin(a) * 16, vx: Math.cos(a) * 640, vy: Math.sin(a) * 640, dmg, poison, life: 0.7, src: src.kind === 'build' ? null : src, ang: a });
   if (L && dist(src, L) < 600) SFX.arrow();
+  return true;
 }
 function updProj(dt) {
   for (const q of G.proj) {
@@ -185,6 +197,8 @@ function isBold(d) {
     return (G.day >= 3 && pack >= 5) || G.fire.fuel < 18;
   }
   if (d.type === 'dev') return G.fire.fuel < 40 || d.rush > 0;
+  if (d.type === 'yelken') return G.fire.fuel < 30 || d.rush > 0;
+  if (d.type === 'geceavcisi') { if (d.rush > 0) return true; let pack = 0; for (const o of G.dinos) if (o.type === 'geceavcisi' && !o.leave && dist(o, d) < 260) pack++; return (G.day >= 3 && pack >= 5) || G.fire.fuel < 25; }
   return false;
 }
 
@@ -202,6 +216,8 @@ function updDino(d, dt, prey, zones) {
   if (d.type === 'kanatli') return updFlyer(d, dt);
   if (d.type === 'batakci') return updCroc(d, dt, prey);
   if (d.type === 'yamyam') return updCannibal(d, dt, prey);
+  if (d.type === 'ordek' || d.type === 'gurleyen' || d.type === 'zirhli') return updGrazer(d, dt);
+  if (d.type === 'taklitci') return updMimicC(d, dt, prey);
   if (d.pet) return updPet(d, dt);
   return updPred(d, dt, prey, zones);
 }
@@ -209,6 +225,11 @@ function updDino(d, dt, prey, zones) {
 function updPred(d, dt, prey, zones) {
   const def = DINO[d.type], night = isNight() || !!G.finale;
   if (d.mother) { d.motherT -= dt; if (d.motherT <= 0) d.mother = false; }
+  if (d.retreat > 0) { d.retreat -= dt; const fr = d.tgt && !d.tgt.dead ? d.tgt : G.fire, a = angTo(fr, d); steer(d, d.x + Math.cos(a) * 100, d.y + Math.sin(a) * 100, def.spd, dt, true); d.anim += dt * 12; return; }
+  if (d.type === 'geceavcisi' && !isNight() && !G.finale) d.leave = true;
+  if (d.type === 'yelken' && d.home && d.tgt && !d.tgt.dead && Math.hypot(d.tgt.x - d.home.x, d.tgt.y - d.home.y) > 750) { d.tgt = null; d.wx = d.home.x; d.wy = d.home.y; }
+  if (d.type === 'yelken' && L) { d.growlT = (d.growlT || rand(5, 10)) - dt; if (d.growlT <= 0) { d.growlT = rand(10, 20); const dd = dist(d, L); if (dd < 1100) SFX.growl(clamp(1 - dd / 1100, 0.1, 0.9), panOf(d.x)); } }
+  if (d.type === 'geceavcisi' && L && Math.random() < dt * 0.15 && dist(d, L) < 800) SFX.chitter(clamp(1 - dist(d, L) / 800, 0.05, 0.5), panOf(d.x));
   // dev ayak sesleri ve kükreme
   if (d.type === 'dev' && L) {
     if (d.moving) { d.stepT -= dt * (d.spdNow || def.spd) / def.spd; if (d.stepT <= 0) { d.stepT = 0.75; const dd = dist(d, L); if (dd < 1300) { const v = 1 - dd / 1300; SFX.thump(0.5 * v * v + 0.03); G.shake = Math.max(G.shake, 7 * v * v); } } }
@@ -250,7 +271,7 @@ function updPred(d, dt, prey, zones) {
       if (t.downed > 0) s -= 120;
       if (s < bs) { bs = s; best = t; }
     }
-    if (!best && d.type === 'dev' && bold) for (const b of G.builds) if (b.type === 'kulube' && b.occ.length) { const s = dist(d, b); if (s < sense) { best = b; break; } }
+    if (!best && d.type === 'dev' && bold) for (const b of G.builds) if (b.type === 'cadir' && b.occ.length) { const s = dist(d, b); if (s < sense) { best = b; break; } }
     if (best && !d.engaged) {
       d.engaged = true;
       if (!d.silent)
@@ -277,7 +298,7 @@ function updPred(d, dt, prey, zones) {
       d.spitCd = (d.spitCd || 0) - dt;
       if (d.type === 'tukurgec' && dd > 70 && dd < 240 && d.spitCd <= 0) {
         d.spitCd = rand(2.5, 4); d.frill = 0.7; d.ang = angTo(d, t);
-        const a = angTo(d, t); G.eproj.push({ x: d.x + Math.cos(a) * d.r, y: d.y + Math.sin(a) * d.r, vx: Math.cos(a) * 330, vy: Math.sin(a) * 330, dmg: 7, life: 0.9, src: d });
+        const a = angTo(d, t); G.eproj.push({ x: d.x + Math.cos(a) * d.r, y: d.y + Math.sin(a) * d.r, vx: Math.cos(a) * 330, vy: Math.sin(a) * 330, dmg: 5, life: 0.9, src: d });
         SFX.spit(volOf(d, 700) + 0.05, panOf(d.x)); tx = undefined; d.moving = false;
       } else if (dd < reach) {
         d.moving = false; d.ang = angLerp(d.ang, angTo(d, t), Math.min(1, dt * 8));
@@ -298,13 +319,13 @@ function updPred(d, dt, prey, zones) {
     d.spdNow = spd;
     steer(d, tx, ty, spd, dt, true); d.anim += dt * spd / 22;
     if (!bold) for (const z of zones) { const dx = d.x - z.x, dy = d.y - z.y, dd = Math.hypot(dx, dy) || 1; if (dd < z.r) { d.x = z.x + dx / dd * z.r; d.y = z.y + dy / dd * z.r; } }
-    if (d.bash && d.atkCd <= 0) { const b = d.bash; d.atkCd = def.cd; b.hp -= def.dmg * (d.type === 'dev' ? 2 : 1); b.hit = 0.2; SFX.hit(L ? clamp(1 - dist(b, L) / 700, 0, 0.5) : 0.2); if (b.hp <= 0) destroyBuild(b); }
+    if (d.bash && d.atkCd <= 0 && ((t && !inSafe(t.x, t.y, zones)) || d.type === 'dev' || bold)) { const b = d.bash; d.atkCd = def.cd; b.hp -= def.dmg * (d.type === 'dev' ? 2 : 1); b.hit = 0.2; SFX.hit(L ? clamp(1 - dist(b, L) / 700, 0, 0.5) : 0.2); if (b.hp <= 0) destroyBuild(b); }
   }
   checkTraps(d);
 }
 function checkTraps(d) {
   if (d.trapCd > 0 || d.fly) return;
-  for (const b of G.builds) if (b.type === 'tuzak' && Math.hypot(b.x - d.x, b.y - d.y) < b.r + d.r) {
+  for (const b of G.builds) if (b.type === 'tuzak' && b.built && Math.hypot(b.x - d.x, b.y - d.y) < b.r + d.r) {
     d.trapCd = 1; hurt(d, 45, null); b.uses--; SFX.hit(0.5);
     if (d.type === 'kucuk') d.leave = true;
     if (b.uses <= 0) { b.dead = true; G.builds.splice(G.builds.indexOf(b), 1); }
@@ -327,6 +348,7 @@ function dinoAttack(d, t) {
   if (d.hitrun) { d.leave = true; d.rush = 0; }
   if (L && dist(d, L) < 700) SFX.hit(0.4);
   if (d.type === 'yirtici' && Math.random() < 0.3) { const a = angTo(t, d); d.x += Math.cos(a) * 30; d.y += Math.sin(a) * 30; }
+  if (d.type === 'geceavcisi') d.retreat = rand(0.8, 1.6);
 }
 
 // ---- otoburlar
@@ -500,7 +522,7 @@ function spawnPack(type, n, pos) {
   if (pos === undefined) pos = spawnPos();
   if (!pos) return [];
   const out = [];
-  for (let i = 0; i < n; i++) { const d = mkDino(type, pos.x + rand(-60, 60), pos.y + rand(-60, 60)); pushOut(d, true); G.dinos.push(d); out.push(d); }
+  for (let i = 0; i < n; i++) { const d = mkDino(type, pos.x + rand(-60, 60), pos.y + rand(-60, 60)); pushOut(d, true); G.dinos.push(d); out.push(d); d.herdL = out[0]; }
   return out;
 }
 function spawnFlyer(pos) {
@@ -525,7 +547,10 @@ function spawner() {
     if (c('uzunboyun') < 2 && Math.random() < 0.06) spawnPack('uzunboyun', 1, spawnPosBiome([0, 2], 700, 1100));
     if (c('kanatli') < 3 && Math.random() < 0.2) { const pos = spawnPosBiome([1], 500, 1100); if (pos) spawnFlyer(pos); }
     if (c('kucuk') < (3 + day) * sm && Math.random() < 0.12) spawnPack('kucuk', ri(2, 5));
-    if (c('tukurgec') < 2 + day / 3 && Math.random() < 0.05 * sm) spawnPack('tukurgec', ri(1, 2), spawnPosBiome([0, 2]));
+    if (c('ordek') < 9 && Math.random() < 0.14) spawnPack('ordek', ri(3, 6), spawnPosBiome([0, 2], 700, 1200));
+    if (c('gurleyen') < 5 && Math.random() < 0.06) spawnPack('gurleyen', ri(2, 4), spawnPosBiome([0, 1], 700, 1200));
+    if (c('zirhli') < 2 && Math.random() < 0.03) spawnPack('zirhli', 1, spawnPosBiome([0, 1], 800, 1200));
+    if (c('tukurgec') < 1 + day / 4 && Math.random() < 0.03 * sm) spawnPack('tukurgec', ri(1, 2), spawnPosBiome([0, 2]));
     if (lb === 3 && c('yirtici') < 4 * sm && Math.random() < 0.1) spawnPack('yirtici', ri(2, 3), spawnPos(500, 800));
     // nadir gündüz pususu: kamptan uzaktaki birine
     if (day >= 2 && Math.random() < 0.006 * sm) {
@@ -536,6 +561,11 @@ function spawner() {
     if (c('kucuk') < (3 + day / 2) * sm && Math.random() < 0.08) spawnPack('kucuk', ri(2, 4));
     if (c('yirtici') < Math.min(1 + day * 0.5, 4) * sm && Math.random() < 0.035) spawnPack('yirtici', ri(1, 2));
     if (c('tukurgec') < 2 && Math.random() < 0.015 * sm) spawnPack('tukurgec', 1, spawnPosBiome([0, 2]));
+    if (day >= 2 && c('geceavcisi') < Math.min(day, 8) * sm && Math.random() < 0.04) spawnPack('geceavcisi', ri(2, 3 + Math.floor(day / 4)));
+  }
+  if (day >= 3 && c('yelken') < 1 && Math.random() < 0.012 * sm) {
+    const W = G.pools.concat(G.lakes).filter(w => { const d = Math.hypot(w.x - L.x, w.y - L.y); return d > 700 && d < 1500; });
+    if (W.length) { const w = pick(W), a = rand(0, TAU), d = mkDino('yelken', w.x + Math.cos(a) * (w.r + 40), w.y + Math.sin(a) * (w.r + 40)); d.home = { x: w.x, y: w.y }; pushOut(d, true); G.dinos.push(d); }
   }
   if (c('batakci') < 5 && Math.random() < 0.3) {
     const pools = G.pools.filter(pl => !pl.croc && Math.hypot(pl.x - L.x, pl.y - L.y) < 1300 && Math.hypot(pl.x - L.x, pl.y - L.y) > 450);
@@ -683,4 +713,109 @@ function updCannibal(d, dt, prey) {
   }
   hurt(t, def.dmg * rand(0.8, 1.2), d);
   if (L && dist(d, L) < 700) SFX.hit(0.4);
+}
+
+// =============================================================
+//  OTLAYANLAR: Ördekgaga (sürü, kaçar), Kafakalkan (bölgeci, toslar), Zırhlı (kuyruk topuzu)
+// =============================================================
+function alarmHerd(d, thr) {
+  if (!thr) return;
+  let any = false;
+  for (const o of G.dinos) if (o.type === d.type && !o.tamed && dist(o, d) < 320) { if (!(o.flee > 0)) any = true; o.flee = rand(4, 7); o.fleeFrom = thr; }
+  if (any) SFX.honk(volOf(d, 900) + 0.03, panOf(d.x));
+}
+function updGrazer(d, dt) {
+  const def = DINO[d.type];
+  d.swing = Math.max(0, (d.swing || 0) - dt);
+  if (isNight() && !d.leave && Math.random() < dt * 0.03) d.leave = true;
+  if (d.leave) { const a = angTo(G.fire, d); steer(d, d.x + Math.cos(a) * 150, d.y + Math.sin(a) * 150, def.spd * 0.9, dt, true); d.anim += dt * 5; if (!L || dist(d, L) > 1700) removeDino(d); return; }
+  if (d.flee > 0) {
+    d.flee -= dt; const from = d.fleeFrom && !d.fleeFrom.dead ? d.fleeFrom : G.fire, a = angTo(from, d) + Math.sin(G.now + d.id) * 0.3;
+    steer(d, d.x + Math.cos(a) * 200, d.y + Math.sin(a) * 200, def.spd * 2, dt, true); d.anim += dt * 12; return;
+  }
+  const dc = dist(d, G.fire);
+  if (dc < 430 && !(d.angry > 0)) { const a = angTo(G.fire, d); steer(d, d.x + Math.cos(a) * 120, d.y + Math.sin(a) * 120, def.spd, dt, true); d.anim += dt * 5; return; }
+  d.lookT = (d.lookT || 0) - dt;
+  if (d.lookT <= 0) {
+    d.lookT = 0.5;
+    if (d.type === 'ordek') {
+      let thr = null;
+      for (const p of G.people) if (!p.inHut && !p.bed && dist(p, d) < (p.moving ? 230 : 150)) { thr = p; break; }
+      if (!thr) for (const o of G.dinos) if (DINO[o.type].pred && !o.tamed && dist(o, d) < 300) { thr = o; break; }
+      if (thr) alarmHerd(d, thr);
+    } else if (d.type === 'gurleyen' && !(d.angry > 0) && dc > 500) {
+      for (const p of G.people) if (!p.inHut && !p.bed && dist(p, d) < 115) { d.angry = 6; d.tgt = p; SFX.honk(volOf(d, 700) * 0.6, panOf(d.x)); break; }
+    }
+  }
+  if (d.angry > 0) {
+    d.angry -= dt; const t = d.tgt;
+    if (!t_dead(t)) {
+      if (d.type === 'gurleyen') {
+        if (dist(d, G.fire) < 380 && !(d.tgt && G.hunt && G.hunt.t === d)) { d.angry = 0; return; }
+        if (d.hp < d.maxhp * 0.35) { d.flee = 6; d.fleeFrom = t; d.angry = 0; return; }
+        const reach = d.r + bodyR(t) + 6;
+        if (dist(d, t) > reach) { steer(d, t.x, t.y, def.spd * 2.2, dt, true); d.anim += dt * 12; }
+        else if (d.atkCd <= 0) { d.atkCd = def.cd; hurt(t, def.dmg, d); if (!t.type) { const a = angTo(d, t); t.x += Math.cos(a) * 50; t.y += Math.sin(a) * 50; pushOut(t, false); } SFX.thump(0.4); d.angry = Math.min(d.angry, 2.5); }
+        return;
+      }
+      // zırhlı: kuyruğunu saldırgana çevirir
+      const dd = dist(d, t);
+      d.ang = angLerp(d.ang, angTo(d, t) + Math.PI, Math.min(1, dt * 2)); d.moving = true; d.anim += dt * 2;
+      if (dd > d.r + bodyR(t) + 60) { const a = angTo(t, d); steer(d, d.x + Math.cos(a) * 40, d.y + Math.sin(a) * 40, def.spd * 0.5, dt, true); d.ang = angLerp(d.ang, angTo(d, t) + Math.PI, 0.5); }
+      if (dd < d.r + bodyR(t) + 48 && angDiff(d.ang + Math.PI, angTo(d, t)) < 0.9 && d.atkCd <= 0) {
+        d.atkCd = def.cd; d.swing = 0.4; hurt(t, def.dmg, d);
+        if (!t.type) { const a = angTo(d, t); t.x += Math.cos(a) * 70; t.y += Math.sin(a) * 70; pushOut(t, false); }
+        SFX.thump(0.7); G.shake = Math.max(G.shake, L && dist(d, L) < 400 ? 6 : 0);
+      }
+      return;
+    }
+  }
+  const hl = d.herdL && !d.herdL.dead && d.herdL !== d ? d.herdL : null;
+  if (hl && dist(d, hl) > 70 + d.r) { steer(d, hl.x + Math.cos(d.id) * 50, hl.y + Math.sin(d.id) * 50, def.spd * 0.7, dt, true); d.anim += dt * 4; return; }
+  wanderSlow(d, dt, def.spd * 0.4);
+}
+// =============================================================
+//  BENZEYEN — kamptan birinin kılığına giren şey
+// =============================================================
+function reveal(d) {
+  if (d.revealed) return;
+  d.revealed = true;
+  SFX.shriek(1, panOf(d.x));
+  jumpAt(d.x, d.y, `O ${d.disguise.name.toLocaleUpperCase('tr')} DEĞİL!`);
+  for (const p of G.people) p.fear = Math.min(100, p.fear + (dist(p, d) < 500 ? 45 : 20));
+}
+function spawnMimicCreature() {
+  const vs = G.people.filter(p => !p.leader && !p.child); if (!vs.length) return null;
+  const v = pick(vs), pos = spawnPos(650, 800, G.fire); if (!pos) return null;
+  const d = mkDino('taklitci', pos.x, pos.y);
+  d.disguise = { name: v.name, skin: v.skin, hair: v.hair, group: v.group }; d.revealed = false; d.kills = 0;
+  G.dinos.push(d); return d;
+}
+function updMimicC(d, dt, prey) {
+  const def = DINO.taklitci;
+  if (d.leave) { const a = angTo(G.fire, d); steer(d, d.x + Math.cos(a) * 200, d.y + Math.sin(a) * 200, 230, dt, true); d.anim += dt * 14; if (!L || dist(d, L) > 1300) removeDino(d); return; }
+  if (!isNight() && !d.revealed) { d.leave = true; return; }
+  if (!d.revealed) {
+    d.jerk = (d.jerk || 0) - dt;
+    if (d.jerk <= 0) { d.jerk = rand(0.4, 1.4); d.pause = Math.random() < 0.3 ? rand(0.3, 1.4) : 0; d.tilt = rand(-0.7, 0.7); }
+    if (d.pause > 0) { d.pause -= dt; d.moving = false; return; }
+    let best = null, bs = 1e9;
+    for (const t of prey) { if (t.type || t.isRescue) continue; const s = dist(d, t) - (dist(t, G.fire) > fireR() * 0.7 ? 300 : 0) + (t.leader ? 200 : 0); if (s < bs) { bs = s; best = t; } }
+    d.tgt = best;
+    steer(d, best ? best.x : G.fire.x, best ? best.y : G.fire.y, 72, dt, true); d.anim += dt * 7;
+    if (best && dist(d, best) < 58) reveal(d);
+    return;
+  }
+  let t = !t_dead(d.tgt) && !d.tgt.type ? d.tgt : null;
+  if (!t) { let bd = 520; for (const q of prey) { if (q.type) continue; const dd = dist(q, d); if (dd < bd) { bd = dd; t = q; } } d.tgt = t; }
+  if (!t) { d.leave = true; return; }
+  const reach = d.r + bodyR(t) + 8;
+  if (dist(d, t) > reach) { steer(d, t.x, t.y, def.spd * 2.2, dt, true); d.anim += dt * 16; return; }
+  d.moving = false; d.ang = angTo(d, t);
+  if (d.atkCd <= 0) {
+    d.atkCd = def.cd; d.swing = 0.3;
+    hurt(t, def.dmg * rand(0.9, 1.1), d); SFX.hit(0.8);
+    if (t.dead || t.downed > 0) d.kills++;
+    if (d.kills >= 2 || d.hp < d.maxhp * 0.4) { d.leave = true; msg('Benzeyen karanlığa geri süzüldü... Bir gün yine gelecek.', '#bbb', 6); }
+  }
 }

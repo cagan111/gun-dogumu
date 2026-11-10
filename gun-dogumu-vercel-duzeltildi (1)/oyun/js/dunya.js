@@ -173,8 +173,8 @@ function lights() {
   const lm = lightMul(), out = [];
   if (G.fire.fuel > 0) out.push({ x: G.fire.x, y: G.fire.y, r: fireR() * (0.96 + Math.sin(G.now * 13) * 0.02 + Math.random() * 0.03), safe: true, warm: 1 });
   for (const b of G.builds) {
-    if (b.type === 'mesale') out.push({ x: b.x, y: b.y - 20, r: 150 * lm * (0.97 + Math.random() * 0.04), warm: 0.6 });
-    if (b.type === 'kule') out.push({ x: b.x, y: b.y - 10, r: 220 * lm * (0.97 + Math.random() * 0.03), warm: 0.6 });
+    if (b.type === 'mesale' && b.built) out.push({ x: b.x, y: b.y - 20, r: 150 * lm * (0.97 + Math.random() * 0.04), warm: 0.6 });
+    if (b.type === 'kule' && b.built) out.push({ x: b.x, y: b.y - 10, r: 220 * lm * (0.97 + Math.random() * 0.03), warm: 0.6 });
   }
   if (L && G.torchOn && L.hp > 0) out.push({ x: L.x, y: L.y, r: 175 * lm * (0.95 + Math.random() * 0.06), warm: 0.7 });
   if (G.rift) out.push({ x: G.rift.x, y: G.rift.y, r: G.finale ? 420 : 240, warm: 0, blue: 1 });
@@ -189,9 +189,9 @@ function visionSources() {
   const sb = abilOn('kasif') ? 1.6 : 1;
   for (const p of G.people) { if (p === L || p.inHut || p.grabbed) continue; out.push({ x: p.x, y: p.y, r: (p.group === 'kasif' ? 330 * sb : p.child ? 120 : 220) * f(p.x, p.y), who: p }); }
   for (const d of G.dinos) if (d.tamed) out.push({ x: d.x, y: d.y, r: (d.fly ? 460 : 200) * (n ? 0.7 : 1), who: d });
-  for (const b of G.builds) { if (b.type === 'kule') out.push({ x: b.x, y: b.y, r: 480 * (n ? 0.75 : 1) }); else if (b.type !== 'tuzak') out.push({ x: b.x, y: b.y, r: 110 }); }
+  for (const b of G.builds) { if (b.type === 'kule' && b.built) out.push({ x: b.x, y: b.y, r: 480 * (n ? 0.75 : 1) }); else if (b.built && !BUILD[b.type].flat) out.push({ x: b.x, y: b.y, r: 110 }); }
   out.push({ x: G.fire.x, y: G.fire.y, r: G.fire.fuel > 0 ? Math.max(fireR() * 1.05, n ? 0 : 260) : 110 });
-  for (const b of G.builds) if (b.type === 'mesale') out.push({ x: b.x, y: b.y, r: 150 * lightMul() });
+  for (const b of G.builds) if (b.type === 'mesale' && b.built) out.push({ x: b.x, y: b.y, r: 150 * lightMul() });
   if (G.torchOn && L) out.push({ x: L.x, y: L.y, r: 190 * lightMul() });
   return out;
 }
@@ -202,7 +202,7 @@ function safeZones() {
   const z = [], n = isNight(), lm = lightMul();
   if (G.fire.fuel > 0) z.push({ x: G.fire.x, y: G.fire.y, r: n ? fireR() * 0.88 : Math.max(fireR(), 320) });
   if (n) {
-    for (const b of G.builds) { if (b.type === 'mesale') z.push({ x: b.x, y: b.y, r: 125 * lm }); if (b.type === 'kule') z.push({ x: b.x, y: b.y, r: 180 * lm }); }
+    for (const b of G.builds) { if (b.type === 'mesale' && b.built) z.push({ x: b.x, y: b.y, r: 125 * lm }); if (b.type === 'kule' && b.built) z.push({ x: b.x, y: b.y, r: 180 * lm }); }
     if (G.torchOn && L) z.push({ x: L.x, y: L.y, r: 135 * lm });
   }
   return z;

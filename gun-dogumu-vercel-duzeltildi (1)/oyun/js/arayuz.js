@@ -1,11 +1,12 @@
 'use strict';
 // =============================================================
-//  ARAYÜZ — girdi, HUD, halk paneli, zanaat, ekranlar, döngü
+//  ARAYÜZ — girdi, HUD, halk paneli, karakter kartı, üretim,
+//           av emri, ekranlar, ana döngü
 // =============================================================
 const keys = {}; const mouse = { x: 0, y: 0, down: false, right: false, used: false };
 const touch = { jx: 0, jy: 0, atk: false, act: false, run: false, shoot: false, id: null, ox: 0, oy: 0 };
 const isTouch = matchMedia('(pointer:coarse)').matches || 'ontouchstart' in window;
-const UI = { tab: 'g', sel: new Set(), filter: 'all', open: new Set(), sideT: 0, hudT: 0, miniT: 0, toolT: 0, craftT: 0, diff: 'normal' };
+const UI = { tab: 'g', sel: new Set(), filter: 'all', sideT: 0, hudT: 0, miniT: 0, toolT: 0, craftT: 0, charT: 0, diff: 'normal', char: 0, craftBy: {}, craftTab: 'zanaat' };
 const playing = () => G.started && !G.over && L;
 
 // ---- klavye / fare
@@ -19,15 +20,23 @@ addEventListener('keydown', e => {
   if (e.code === 'KeyC') toggleCraft();
   if (e.code === 'KeyM') toggleMap();
   if (e.code === 'KeyH') toggleSide();
-  if (e.code === 'Escape') { if (G.modal) toggleCraft(false); else if (G.placing) cancelPlace(); else togglePause(); }
+  if (e.code === 'KeyG') toggleHunt();
+  if (e.code === 'Escape') { if (UI.char) closeChar(); else if (G.modal) toggleCraft(false); else if (G.placing) cancelPlace(); else if (G.huntMode) G.huntMode = false; else togglePause(); }
   if (e.code === 'KeyP') togglePause();
   const n = parseInt(e.key);
   if (n >= 1 && n <= 9) { const list = BORDER.filter(buildUnlocked); if (list[n - 1]) startPlace(list[n - 1]); }
 });
 addEventListener('keyup', e => { keys[e.code] = false; });
 cv.addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.clientY; mouse.used = true; });
-cv.addEventListener('mousedown', e => {
-  audioInit(); mouse.x = e.clientX; mouse.y = e.clientY; mouse.used = true;
+cv.addEventListener('pointerdown', e => {
+  audioInit();
+  if (e.pointerType === 'mouse') { mouse.x = e.clientX; mouse.y = e.clientY; mouse.used = true; }
+  if (!playing()) return;
+  if (G.huntMode && e.button !== 2) { pickHuntTarget(e.clientX, e.clientY); return; }
+  if (e.pointerType !== 'mouse') {
+    if (G.placing) { const w = screenToWorld(e.clientX, e.clientY); if (Math.hypot(w.x - L.x, w.y - L.y) < 260) { G.tapPlace = w; tryPlace(); G.tapPlace = null; } }
+    return;
+  }
   if (e.button === 2) { if (G.placing) cancelPlace(); else mouse.right = true; return; }
   if (G.placing) { tryPlace(); return; }
   mouse.down = true;
@@ -37,11 +46,29 @@ cv.addEventListener('contextmenu', e => e.preventDefault());
 document.addEventListener('visibilitychange', () => { if (document.hidden && playing()) { saveGame('auto'); if (!G.paused) togglePause(); } });
 function togglePause() { if (!playing()) return; G.paused = !G.paused; $('pause').style.display = G.paused ? 'flex' : 'none'; }
 
+// ---- av emri
+function toggleHunt() {
+  if (!playing()) return;
+  if (G.hunt) { G.hunt = null; G.huntMode = false; msg('Av emri iptal edildi.', '#ccc', 2); return; }
+  G.huntMode = !G.huntMode; if (G.placing) cancelPlace();
+  if (G.huntMode) msg('🎯 Avlanacak hayvana dokun / tıkla.', '#ffd27a', 3);
+}
+function pickHuntTarget(sx, sy) {
+  const w = screenToWorld(sx, sy); let best = null, bd = 90;
+  for (const d of G.dinos) { if (d.tamed || d.hidden || (d.type === 'taklitci' && !d.revealed)) continue; if (!visible(d.x, d.y, d.r)) continue; const dd = Math.hypot(d.x - w.x, d.y - w.y) - d.r; if (dd < bd) { bd = dd; best = d; } }
+  G.huntMode = false;
+  if (!best) { msg('Orada avlanacak bir şey yok.', '#ccc', 2); return; }
+  G.hunt = { t: best };
+  const n = members('avci').length;
+  msg(n ? `🎯 ${n} avcı ${DINO[best.type].ad} için yola çıktı.${members('takip').length ? ' Takipçilerin de saldıracak.' : ''}` : `🎯 Hedef: ${DINO[best.type].ad}. Ama hiç 🏹 Avcın yok!`, n ? '#ffd27a' : '#e99', 4);
+  SFX.pickup();
+}
+
 // ---- dokunmatik
 if (isTouch) {
   $('touch').style.display = 'block';
   const joy = $('joy'), base = $('knobBase'), knob = $('knob');
-  joy.addEventListener('pointerdown', e => { audioInit(); touch.id = e.pointerId; touch.ox = e.clientX; touch.oy = e.clientY; base.style.display = 'block'; base.style.left = (e.clientX - 55) + 'px'; base.style.top = (e.clientY - 55 - (innerHeight - joy.offsetHeight)) + 'px'; joy.setPointerCapture(e.pointerId); });
+  joy.addEventListener('pointerdown', e => { audioInit(); if (G.huntMode) { pickHuntTarget(e.clientX, e.clientY); return; } touch.id = e.pointerId; touch.ox = e.clientX; touch.oy = e.clientY; base.style.display = 'block'; base.style.left = (e.clientX - 55) + 'px'; base.style.top = (e.clientY - 55 - (innerHeight - joy.offsetHeight)) + 'px'; joy.setPointerCapture(e.pointerId); });
   joy.addEventListener('pointermove', e => { if (e.pointerId !== touch.id) return; let dx = e.clientX - touch.ox, dy = e.clientY - touch.oy; const m = Math.hypot(dx, dy); if (m > 45) { dx *= 45 / m; dy *= 45 / m; } touch.jx = dx / 45; touch.jy = dy / 45; knob.style.left = (31 + dx) + 'px'; knob.style.top = (31 + dy) + 'px'; });
   const end = e => { if (e.pointerId !== touch.id) return; touch.id = null; touch.jx = touch.jy = 0; base.style.display = 'none'; knob.style.left = knob.style.top = '31px'; };
   joy.addEventListener('pointerup', end); joy.addEventListener('pointercancel', end);
@@ -62,12 +89,14 @@ $('tools').addEventListener('pointerdown', e => {
   if (b.dataset.x === 'craft') toggleCraft();
   if (b.dataset.x === 'map') toggleMap();
   if (b.dataset.x === 'torch') toggleTorch();
+  if (b.dataset.x === 'hunt') toggleHunt();
 });
 function buildTools() {
-  const t = $('tools');
-  t.innerHTML = BORDER.filter(buildUnlocked).map(k => `<button data-b="${k}" class="${G.placing === k ? 'on' : ''} ${canAfford(BUILD[k].cost) ? '' : 'no'}" title="${BUILD[k].desc}">${BUILD[k].ic} ${BUILD[k].ad}<br><small>${costTxt(BUILD[k].cost)}</small></button>`).join('')
-    + `<button data-x="craft" class="hl">⚒️ Zanaat<br><small>[C]</small></button>`
-    + (G.tech.has('elMesalesi') ? `<button data-x="torch" class="${G.torchOn ? 'on' : ''}">🔥 Meşale<br><small>[T]</small></button>` : '')
+  const bl = bestLvl('insaat');
+  $('tools').innerHTML = `<button data-x="hunt" class="hl ${G.huntMode || G.hunt ? 'on' : ''}">🎯 ${G.hunt ? 'Avı bırak' : 'Av Emri'}<br><small>[G]</small></button>`
+    + `<button data-x="craft" class="hl">⚒️ Üretim<br><small>[C]${G.orders.length ? ' · ' + G.orders.length + ' emir' : ''}</small></button>`
+    + BORDER.map(k => { const lk = BUILD[k].lvl > bl; return `<button data-b="${k}" class="${G.placing === k ? 'on' : ''} ${lk || !canAfford(BUILD[k].cost) ? 'no' : ''}" title="${BUILD[k].desc}">${BUILD[k].ic} ${BUILD[k].ad}<br><small>${lk ? '🔒 📐' + BUILD[k].lvl : costTxt(BUILD[k].cost)}</small></button>`; }).join('')
+    + ((G.stock.mesale || 0) > 0 ? `<button data-x="torch" class="${G.torchOn ? 'on' : ''}">🔥 Meşale<br><small>[T]</small></button>` : '')
     + `<button data-x="map">🗺️ Harita<br><small>[M]</small></button>`;
   G.toolsDirty = false;
 }
@@ -97,8 +126,8 @@ $('side').addEventListener('pointerdown', e => {
   e.preventDefault(); audioInit();
   if (el.dataset.tab) { UI.tab = el.dataset.tab; renderSide(); return; }
   if (el.dataset.f) { UI.filter = el.dataset.f; renderSide(); return; }
-  if (el.dataset.bulk) { for (const id of UI.sel) { const p = G.people.find(q => q.id === id); if (p) setGroup(p, el.dataset.bulk); } msg(`${UI.sel.size} kişi → ${GROUPS[el.dataset.bulk].ic} ${GROUPS[el.dataset.bulk].ad}`, '#cde', 2); UI.sel.clear(); renderSide(); return; }
-  const a = el.dataset.a, g = el.closest('[data-g]') && el.closest('[data-g]').dataset.g, idEl = el.closest('[data-id]'), p = idEl && G.people.find(q => q.id === +idEl.dataset.id);
+  if (el.dataset.bulk) { let n = 0; for (const id of UI.sel) { const p = G.people.find(q => q.id === id); if (p) { setGroup(p, el.dataset.bulk); n++; } } msg(`${n} kişi → ${GROUPS[el.dataset.bulk].ic} ${GROUPS[el.dataset.bulk].ad}`, '#cde', 2); UI.sel.clear(); renderSide(); return; }
+  const a = el.dataset.a, gEl = el.closest('[data-g]'), g = gEl && gEl.dataset.g, idEl = el.closest('[data-id]'), p = idEl && G.people.find(q => q.id === +idEl.dataset.id);
   if (a === 'plus') plusGroup(g);
   else if (a === 'minus') minusGroup(g);
   else if (a === 'mgr') cycleManager(g);
@@ -108,50 +137,53 @@ $('side').addEventListener('pointerdown', e => {
     else if (g === 'kasif') { const b = $('miniBox'); b.style.display = 'block'; b.classList.add('big'); drawMini(); msg('Haritada bir yere dokun: kâşifler oraya gider.', '#ffd27a', 4); }
     else setZone(g);
   }
-  else if (a === 'newg') { const opts = GORDER; G.newGroup = opts[(opts.indexOf(G.newGroup) + 1) % opts.length]; }
+  else if (a === 'newg') G.newGroup = GORDER[(GORDER.indexOf(G.newGroup) + 1) % GORDER.length];
   else if (a === 'all') { for (const q of listPeople()) if (!q.child) UI.sel.add(q.id); }
   else if (a === 'none') UI.sel.clear();
   else if (p && a === 'sel') { if (UI.sel.has(p.id)) UI.sel.delete(p.id); else if (!p.child) UI.sel.add(p.id); }
-  else if (p && a === 'job') setGroup(p, GORDER[(GORDER.indexOf(p.group) + 1) % GORDER.length]);
-  else if (p && a === 'mk') setManager(p.group, p);
-  else if (p && a === 'info') { if (UI.open.has(p.id)) UI.open.delete(p.id); else UI.open.add(p.id); }
+  else if (p && a === 'info') { openChar(p.id); return; }
   renderSide();
 });
 function listPeople() { return G.people.filter(p => !p.leader && (UI.filter === 'all' || (UI.filter === 'cocuk' ? p.child : p.group === UI.filter && !p.child))); }
 function statusOf(p) {
-  if (p.grabbed) return '😱 kapıldı!'; if (p.desert > 0) return '🏃 kaçıyor'; if (p.downed > 0) return `🩸 yerde ${Math.ceil(p.downed)}sn`;
-  let s = ''; if (p.inHut) s += '💤'; if (p.injury) s += p.injury.type === 'kanama' ? '🩸' : p.injury.type === 'kirik' ? '🦴' : '🤢'; if (p.tired) s += '😴'; if (p.fear >= 80) s += '😨'; if (p.post) s += '🗼'; if (p.group === 'kasif' && !p.inHut && dist(p, G.fire) > 700) s += '🧭' + Math.round(dist(p, G.fire) / 100) * 100 + 'm';
+  if (p.grabbed) return '😱'; if (p.desert > 0) return '🏃'; if (p.downed > 0) return `🩸${Math.ceil(p.downed)}`;
+  let s = '';
+  if (p.bed) s += '⛑️'; else if (p.inHut) s += '💤';
+  if (p.injury) s += p.injury.type === 'kanama' ? '🩸' : p.injury.type === 'kirik' ? '🦴' : '🤢';
+  if (p.sick) s += '🤒'; if (p.tired) s += '😴'; if (p.fear >= 80) s += '😨'; if (p.post) s += '🗼';
+  if (!p.leader && !homeOf(p)) s += '🏚️';
   return s;
 }
+const topSkill = p => { let b = null, bl = 0; for (const s in SKILLS) { const l = lvl(p, s); if (l > bl) { bl = l; b = s; } } return bl > 1 ? `${SKILLS[b].ic}${bl}` : ''; };
 function renderSide() {
   if ($('side').classList.contains('closed')) return;
-  $('popTxt').textContent = `${G.people.length}/${popCap()}`;
+  $('popTxt').textContent = `${G.people.length} · ⛺${emptyTents()} boş`;
   for (const b of document.querySelectorAll('#tabs button')) b.classList.toggle('on', b.dataset.tab === UI.tab);
+  const S = sifahaneler(), beds = S.reduce((n, s) => n + s.beds.filter(Boolean).length, 0);
   const tamed = G.dinos.filter(d => d.tamed);
   const tm = tamed.length ? `<div class="note">🦕 Evcil: ${Object.entries(tamed.reduce((a, d) => { const k = d.pet ? 'Yırtıcı yavrusu' : DINO[d.type].ad; a[k] = (a[k] || 0) + 1; return a; }, {})).map(([k, v]) => `${k} ×${v}`).join(', ')}</div>` : '';
   if (UI.tab === 'g') {
-    let h = `<div class="note">Moral: <b style="color:${G.morale > 70 ? '#9e9' : G.morale < 30 ? '#f88' : '#eed'}">${Math.round(G.morale)}</b> · Lider: <b>${L.name}</b></div>`;
+    let h = `<div class="note">Moral <b style="color:${G.morale > 70 ? '#9e9' : G.morale < 30 ? '#f88' : '#eed'}">${Math.round(G.morale)}</b> · ⛑️ ${S.length ? beds + '/' + S.length * 4 + ' yatak' : 'şifahane yok'} · 🤒 ${G.people.filter(p => p.sick).length} · 🏚️ ${homelessCount()}</div>`;
     for (const g of GORDER) {
       const m = members(g), mg = mgr(g), ab = G.abil[g];
-      h += `<div class="grp" data-g="${g}"><div class="gh"><span>${GROUPS[g].ic} ${GROUPS[g].ad} <b>${m.length}</b></span><span class="gm">${mg ? '★ ' + mg.name + (tr(mg, 'onder') ? ' ⭐' : '') : (g === 'bos' ? '' : '<i>yönetici yok</i>')}</span></div>`;
-      h += `<div class="gb">${g !== 'bos' ? `<button data-a="minus" title="Bir kişiyi boşa al">−</button><button data-a="plus" title="Bir kişi ekle (önce boştakiler)">+</button><button data-a="mgr" title="Yönetici ata / değiştir">★</button>` : '<span class="hint">Ateşi besler, dinlenir</span>'}`;
+      h += `<div class="grp" data-g="${g}"><div class="gh"><span title="${GROUPS[g].desc}">${GROUPS[g].ic} ${GROUPS[g].ad} <b>${m.length}</b></span><span class="gm">${mg ? '★ ' + mg.name + (tr(mg, 'onder') ? ' ⭐' : '') : (g === 'bos' ? '' : '<i>yönetici yok</i>')}</span></div><div class="gb">`;
+      if (g !== 'bos') h += `<button data-a="minus">−</button><button data-a="plus">+</button><button data-a="mgr" title="Yönetici ata / değiştir">★</button>`;
+      else h += `<span class="hint">Ateşi besler, inşaata ve taşımaya yardım eder</span>`;
       if (ABIL[g]) h += `<button data-a="abil" class="ab ${mg && ab.cd <= 0 ? '' : 'no'} ${ab.act > 0 ? 'on' : ''}" title="${ABIL[g].desc}">⚡ ${ABIL[g].ad}${ab.act > 0 ? ' ' + Math.ceil(ab.act) : ab.cd > 0 ? ' ⏳' + Math.ceil(ab.cd) : ''}</button>`;
-      if (['odun', 'tas', 'yiyecek', 'sifaci', 'muhafiz', 'kasif'].includes(g)) h += `<button data-a="zone" class="${mg || g === 'kasif' ? '' : 'no'} ${G.zone[g] ? 'on' : ''}" title="${G.zone[g] ? 'Hedefi kaldır' : g === 'kasif' ? 'Haritadan keşif hedefi seç' : 'Grubu şu an bulunduğun yere gönder (yönetici gerekir)'}">${g === 'kasif' ? '🗺️' : '📍'}${G.zone[g] ? '✕' : ''}</button>`;
+      if (['odun', 'tas', 'yiyecek', 'sifaci', 'muhafiz', 'kasif'].includes(g)) h += `<button data-a="zone" class="${mg || g === 'kasif' ? '' : 'no'} ${G.zone[g] ? 'on' : ''}">${g === 'kasif' ? '🗺️' : '📍'}${G.zone[g] ? '✕' : ''}</button>`;
       h += `</div></div>`;
     }
     h += `<div class="grp"><div class="gb"><span class="hint">Yeni gelenler →</span><button data-a="newg">${GROUPS[G.newGroup].ic} ${GROUPS[G.newGroup].ad}</button></div></div>`;
     $('tabG').innerHTML = h + tm; $('tabG').style.display = 'block'; $('tabK').style.display = 'none';
   } else {
     const list = listPeople();
-    let h = `<div class="chips"><button data-f="all" class="${UI.filter === 'all' ? 'on' : ''}">Tümü</button>${GORDER.map(g => `<button data-f="${g}" class="${UI.filter === g ? 'on' : ''}">${GROUPS[g].ic}</button>`).join('')}<button data-f="cocuk" class="${UI.filter === 'cocuk' ? 'on' : ''}">👶</button></div>`;
-    h += `<div class="bulk"><button data-a="all">Tümünü seç</button><button data-a="none">Temizle</button>${UI.sel.size ? `<span>Seçili ${UI.sel.size} →</span>${GORDER.map(g => `<button data-bulk="${g}" title="${GROUPS[g].ad}">${GROUPS[g].ic}</button>`).join('')}` : '<span class="hint">Seçip toplu aktar</span>'}</div>`;
+    let h = `<div class="chips"><button data-f="all" class="${UI.filter === 'all' ? 'on' : ''}">Tümü</button>${GORDER.map(g => `<button data-f="${g}" class="${UI.filter === g ? 'on' : ''}" title="${GROUPS[g].ad}">${GROUPS[g].ic}</button>`).join('')}<button data-f="cocuk" class="${UI.filter === 'cocuk' ? 'on' : ''}">👶</button></div>`;
+    h += `<div class="bulk"><button data-a="all">Tümünü seç</button><button data-a="none">Temizle</button>${UI.sel.size ? `<span>Seçili ${UI.sel.size} →</span>${GORDER.map(g => `<button data-bulk="${g}" title="${GROUPS[g].ad}">${GROUPS[g].ic}</button>`).join('')}` : '<span class="hint">Seçip toplu aktar · ⓘ karakter kartı</span>'}</div>`;
     for (const p of list) {
-      const isM = G.managers[p.group] === p.id && !p.child, pt = p.partner && G.people.find(q => q.id === p.partner);
-      h += `<div class="pr ${UI.sel.has(p.id) ? 'sel' : ''}" data-id="${p.id}"><span data-a="sel" class="nmw"><span class="ck">${p.child ? '👶' : UI.sel.has(p.id) ? '☑' : '☐'}</span> <span class="nm">${isM ? '★ ' : ''}${p.name}</span> <span class="trs">${p.traits.map(t => TRAITS[t].ic).join('')}</span> <span class="st">${statusOf(p)}</span></span>`;
-      h += p.child ? `<span class="hint">çocuk · ${p.age}/3 gün</span>` : `<span class="btns"><button data-a="job" class="job" title="Grubu değiştir">${GROUPS[p.group].ic}</button><button data-a="mk" class="${isM ? 'on' : ''}" title="Grubunun yöneticisi yap">★</button><button data-a="info">ⓘ</button></span>`;
-      h += `<div class="bars"><div class="bar"><i style="width:${p.hp / p.maxhp * 100}%;background:#c44"></i></div><div class="bar fear"><i style="width:${p.fear}%"></i></div></div>`;
-      if (UI.open.has(p.id)) h += `<div class="info">${p.story ? `<i>${p.story}</i><br>` : ''}${p.traits.map(t => `${TRAITS[t].ic} <b>${TRAITS[t].ad}</b>: ${TRAITS[t].desc}`).join('<br>')}${pt ? `<br>❤ ${pt.name} ile birlikte` : ''}${p.injury ? `<br>Yara: ${{ kanama: 'kanama', kirik: 'kırık bacak', enfeksiyon: 'enfeksiyon (ilaç gerek)' }[p.injury.type]}` : ''}</div>`;
-      h += `</div>`;
+      const isM = !p.child && G.managers[p.group] === p.id;
+      h += `<div class="pr ${UI.sel.has(p.id) ? 'sel' : ''}" data-id="${p.id}"><span data-a="sel" class="nmw"><span class="ck">${p.child ? '👶' : UI.sel.has(p.id) ? '☑' : '☐'}</span> <span class="nm">${isM ? '★ ' : ''}${p.name}</span> <span class="trs">${p.child ? '' : GROUPS[p.group].ic} ${topSkill(p)}</span> <span class="st">${statusOf(p)}</span></span>`;
+      h += `<span class="btns"><button data-a="info">ⓘ</button></span>`;
+      h += `<div class="bars"><div class="bar"><i style="width:${p.hp / p.maxhp * 100}%;background:#c44"></i></div><div class="bar fear"><i style="width:${p.fear}%"></i></div></div></div>`;
     }
     if (!list.length) h += '<div class="note">Burada kimse yok.</div>';
     $('tabK').innerHTML = h + tm; $('tabK').style.display = 'block'; $('tabG').style.display = 'none';
@@ -159,30 +191,91 @@ function renderSide() {
   G.uiDirty = false;
 }
 
-// ---- zanaat
+// ---- karakter kartı
+function openChar(id) { UI.char = id; $('charM').style.display = 'flex'; G.modal = true; renderChar(); }
+function closeChar() { UI.char = 0; $('charM').style.display = 'none'; G.modal = $('craft').style.display === 'flex'; }
+$('charM').addEventListener('pointerdown', e => {
+  if (e.target.id === 'charM') { closeChar(); return; }
+  const b = e.target.closest('[data-c]'); if (!b) return; e.preventDefault();
+  const p = G.people.find(q => q.id === UI.char); if (!p) { closeChar(); return; }
+  const c = b.dataset.c, v = b.dataset.v;
+  if (c === 'close') return closeChar();
+  if (c === 'grp') setGroup(p, v);
+  if (c === 'mgr') setManager(p.group, p);
+  if (c === 'ord') addOrder(v, 1, p.id);
+  if (c === 'prev' || c === 'next') { const L2 = G.people.filter(q => !q.leader); const i = L2.findIndex(q => q.id === p.id); const n = L2[(i + (c === 'next' ? 1 : -1) + L2.length) % L2.length]; if (n) UI.char = n.id; }
+  renderChar(); G.uiDirty = true;
+});
+function renderChar() {
+  const p = G.people.find(q => q.id === UI.char); if (!p) { closeChar(); return; }
+  const pt = p.partner && G.people.find(q => q.id === p.partner), home = homeOf(p);
+  const kids = G.people.filter(q => q.child && (q.parentA === p.id || q.parentB === p.id));
+  const eq = Object.keys(p.eq || {}).filter(k => p.eq[k]).map(k => `${ITEMS[k].ic} ${ITEMS[k].ad}`).join(', ') || '—';
+  const task = p.bed ? 'Şifahanede tedavi görüyor' : p.inHut ? 'Uyuyor' : p.carrying ? `${acc(p.carrying.name)} şifahaneye taşıyor` : p.downed > 0 ? 'Yerde, yardım bekliyor!' : p.child ? 'Ateş başında oynuyor' : GROUPS[p.group].desc;
+  let h = `<div class="ch"><button data-c="prev">◀</button><b style="font-size:17px">${p.name}</b>${p.child ? ' <span class="hint">çocuk · ' + p.age + '/3 gün</span>' : ''}<span class="res">${statusOf(p)}</span><button data-c="next">▶</button><button data-c="close">✕</button></div><div class="cl">`;
+  h += `<div class="cgrid"><div><div class="bar"><i style="width:${p.hp / p.maxhp * 100}%;background:#c44"></i></div><small>Can ${Math.round(p.hp)}/${p.maxhp}</small></div><div><div class="bar fear"><i style="width:${p.fear}%"></i></div><small>Korku ${Math.round(p.fear)}</small></div></div>`;
+  if (p.story) h += `<p class="story2">${p.story}</p>`;
+  h += `<p><small>${task}</small></p>`;
+  h += `<div class="cat">Özellikler</div>` + (p.traits.length ? p.traits.map(t => `<div>${TRAITS[t].ic} <b>${TRAITS[t].ad}</b> — <small>${TRAITS[t].desc}</small></div>`).join('') : '<small>—</small>');
+  h += `<div class="cat">Beceriler</div><div class="skills">`;
+  for (const s in SKILLS) {
+    const l = lvl(p, s), xp = p.sk[s] || 0, a = XPL[l - 1], b = XPL[l] || XPL[9] + 500, f = l >= 10 ? 1 : (xp - a) / (b - a);
+    const cur = GROUPS[p.group] && GROUPS[p.group].sk === s;
+    h += `<div class="sk ${cur ? 'cur' : ''}"><span>${SKILLS[s].ic} ${SKILLS[s].ad}</span><b>${l}</b><div class="bar"><i style="width:${Math.round(f * 100)}%;background:#d9a94a"></i></div></div>`;
+  }
+  h += `</div><div class="cat">Hayatı</div><div><small>⛺ ${home ? (home.owners.length > 1 ? 'Çadırını paylaşıyor' : 'Kendi çadırı var') : 'Çadırı yok — ateş başında uyuyor'}${pt ? ` · ❤ ${pt.name}` : ''}${kids.length ? ` · 👶 ${kids.map(k => k.name).join(', ')}` : ''}</small></div>`;
+  h += `<div><small>Kuşandığı: ${eq}</small></div>`;
+  if (p.injury || p.sick) h += `<div><small>Sağlık: ${p.injury ? { kanama: 'kanama', kirik: 'kırık bacak', enfeksiyon: 'enfeksiyon (ilaç gerek)' }[p.injury.type] : ''} ${p.sick ? '· hastalık (' + p.sick.d + '. gün)' : ''}${p.bed ? ' · şifahanede, ' + Math.max(0, p.bedUntil - G.day) + ' gün daha' : ''}</small></div>`;
+  if (!p.child) {
+    h += `<div class="cat">Görev</div><div class="gsel">${GORDER.map(g => `<button data-c="grp" data-v="${g}" class="${p.group === g ? 'on' : ''}" title="${GROUPS[g].desc}">${GROUPS[g].ic} ${GROUPS[g].ad}${GROUPS[g].sk ? ' ' + lvl(p, GROUPS[g].sk) : ''}</button>`).join('')}</div>`;
+    h += `<button data-c="mgr" class="wide ${G.managers[p.group] === p.id ? 'on' : ''}">★ ${GROUPS[p.group].ad} grubunun yöneticisi yap</button>`;
+    const by = p.group === 'zanaat' ? 'zanaat' : p.group === 'sifaci' ? 'sifa' : null;
+    if (by) {
+      h += `<div class="cat">${p.name} için üretim emri</div><div class="gsel">`;
+      for (const k of IORDER) { const it = ITEMS[k]; if (it.by !== by) continue; const ok = lvl(p, by) >= it.lvl; h += `<button data-c="ord" data-v="${k}" class="${ok ? '' : 'no'}" title="${it.desc} · ${costTxt(it.cost)}">${it.ic} ${it.ad}${ok ? '' : ' 🔒' + it.lvl}</button>`; }
+      h += `</div>`;
+      const mine = G.orders.filter(o => o.by === p.id);
+      if (mine.length) h += `<div><small>Sırası: ${mine.map(o => `${ITEMS[o.item].ic}×${o.left >= 999 ? '∞' : o.left}`).join(' ')}</small></div>`;
+    }
+  }
+  $('charBox').innerHTML = h + '</div>';
+}
+
+// ---- üretim menüsü
 function toggleCraft(force) {
   if (!playing()) return;
   const open = force !== undefined ? force : $('craft').style.display !== 'flex';
-  $('craft').style.display = open ? 'flex' : 'none'; G.modal = open;
+  $('craft').style.display = open ? 'flex' : 'none'; G.modal = open || !!UI.char;
   if (open) { if (G.placing) cancelPlace(); renderCraft(); }
 }
 $('craft').addEventListener('pointerdown', e => {
-  const b = e.target.closest('[data-t],[data-close]'); if (!b) { if (e.target.id === 'craft') toggleCraft(false); return; }
+  const b = e.target.closest('[data-o],[data-close],[data-x2],[data-who],[data-ct]'); if (!b) { if (e.target.id === 'craft') toggleCraft(false); return; }
   e.preventDefault();
   if (b.dataset.close !== undefined) { toggleCraft(false); return; }
-  craft(b.dataset.t); renderCraft();
+  if (b.dataset.ct) { UI.craftTab = b.dataset.ct; renderCraft(); return; }
+  if (b.dataset.who) { const k = b.dataset.who, list = [0].concat(crafters(ITEMS[k].by).filter(p => lvl(p, ITEMS[k].by) >= ITEMS[k].lvl).map(p => p.id)); const cur = list.indexOf(UI.craftBy[k] || 0); UI.craftBy[k] = list[(cur + 1) % list.length]; renderCraft(); return; }
+  if (b.dataset.x2) { cancelOrder(+b.dataset.x2); renderCraft(); return; }
+  const [k, n] = b.dataset.o.split(':'); addOrder(k, +n, UI.craftBy[k] || 0); renderCraft();
 });
 function renderCraft() {
-  const cats = {};
-  for (const id of TORDER) (cats[TECH[id].kat] = cats[TECH[id].kat] || []).push(id);
-  let h = `<div class="ch"><b>⚒️ Zanaat ve Bilgi</b><span class="res">${Object.keys(RES).map(k => `${RES[k]}${G.stock[k]}`).join(' ')}</span><button data-close>✕</button></div><div class="cl">`;
-  for (const [cat, ids] of Object.entries(cats)) {
-    h += `<div class="cat">${cat}</div>`;
-    for (const id of ids) {
-      const t = TECH[id], s = techState(id);
-      const cost = Object.entries(t.cost).map(([k, v]) => `<span class="${(G.stock[k] || 0) >= v ? '' : 'bad'}">${v}${RES[k]}</span>`).join(' ');
-      h += `<div class="card ${s}"><div><b>${t.ad}</b> <small>${cost}</small><br><small>${t.desc}</small>${s === 'locked' ? `<br><small class="bad">🔒 ${lockReason(id)}</small>` : ''}</div>${s === 'done' ? '<span class="ok">✓</span>' : `<button data-t="${id}" class="${s === 'ok' ? '' : 'no'}">${t.repeat ? 'Yap' : 'Öğren'}</button>`}</div>`;
+  const by = UI.craftTab;
+  let h = `<div class="ch"><b>⚒️ Üretim</b><span class="res">${Object.keys(RES).map(k => `${RES[k]}${G.stock[k] || 0}`).join(' ')}</span><button data-close>✕</button></div>`;
+  h += `<div class="ctabs"><button data-ct="zanaat" class="${by === 'zanaat' ? 'on' : ''}">🔨 Zanaatkârlar (${crafters('zanaat').length})</button><button data-ct="sifa" class="${by === 'sifa' ? 'on' : ''}">🌿 Şifacılar (${crafters('sifa').length})</button></div><div class="cl">`;
+  if (G.orders.length) {
+    h += `<div class="cat">Emirler</div>`;
+    for (const o of G.orders) {
+      const it = ITEMS[o.item], w = o.worker && G.people.find(p => p.id === o.worker), who = o.by && G.people.find(p => p.id === o.by);
+      const wait = !w ? (!o.paid && !canAfford(it.cost) ? 'malzeme bekliyor' : itemBlock(o.item) || 'usta bekliyor') : `${w.name} çalışıyor`;
+      h += `<div class="card"><div>${it.ic} <b>${it.ad}</b> ×${o.left >= 999 ? '∞' : o.left}${who ? ' · <small>' + who.name + '</small>' : ''}<div class="bar" style="margin-top:4px"><i style="width:${Math.round(o.prog / it.work * 100)}%;background:#d9a94a"></i></div><small>${wait}</small></div><button data-x2="${o.id}">✕</button></div>`;
     }
+  }
+  h += `<div class="cat">${by === 'zanaat' ? 'Atölye ürünleri' : 'Şifa ürünleri'}</div>`;
+  for (const k of IORDER) {
+    const it = ITEMS[k]; if (it.by !== by) continue;
+    const block = itemBlock(k), who = UI.craftBy[k] ? G.people.find(p => p.id === UI.craftBy[k]) : null;
+    const cost = Object.entries(it.cost).map(([r, v]) => `<span class="${(G.stock[r] || 0) >= v ? '' : 'bad'}">${v}${icOf(r)}</span>`).join(' ');
+    h += `<div class="card ${block ? 'locked' : ''}"><div><b>${it.ic} ${it.ad}</b> <small>stok ${G.stock[k] || 0} · ${SKILLS[it.by].ic}${it.lvl} · ${cost}</small><br><small>${it.desc}</small>${block ? `<br><small class="bad">🔒 ${block}</small>` : ''}</div>
+      <div class="obtns"><button data-who="${k}" title="Kim yapsın?">${who ? who.name : 'Herkes'}</button><button data-o="${k}:1">+1</button><button data-o="${k}:5">+5</button><button data-o="${k}:999" title="Sürekli üret">∞</button></div></div>`;
   }
   $('craftBox').innerHTML = h + '</div>';
   G.craftDirty = false;
@@ -199,14 +292,14 @@ function updateHUD() {
   $('dayTxt').textContent = `${G.day}. Gün`;
   $('todTxt').textContent = (n ? '🌑 Gece' : p > 0.42 ? '🌇 Akşam' : '☀️ Gündüz') + ' ' + WIC[G.weather.type] + (G.finale ? ' 🌀' : '');
   $('todBar').style.width = (p * 100) + '%';
-  $('res').innerHTML = ['wood', 'stone', 'food'].map(k => `<span>${RES[k]} <b>${G.stock[k]}</b></span>`).join('') + `<span>👥 <b>${G.people.length}/${popCap()}</b></span>`;
-  $('res2').innerHTML = ['bone', 'hide', 'herb', 'poison', 'crystal', 'med'].filter(k => G.stock[k] > 0 || ['herb', 'med'].includes(k)).map(k => `<span title="${RESN[k]}">${RES[k]}${G.stock[k]}</span>`).join('');
+  $('res').innerHTML = ['wood', 'stone', 'food'].map(k => `<span>${RES[k]} <b>${G.stock[k]}</b></span>`).join('') + `<span title="Halk · boş çadır">👥 <b>${G.people.length}</b><small>/⛺${emptyTents()}</small></span>`;
+  $('res2').innerHTML = ['bone', 'hide', 'herb', 'poison', 'crystal'].filter(k => G.stock[k] > 0 || k === 'herb').map(k => `<span title="${RESN[k]}">${RES[k]}${G.stock[k]}</span>`).join('') + ` <span title="Ok">➶${arrows()}</span><span title="İlaç">💊${G.stock.ilac || 0}</span><span title="Sargı">🩹${G.stock.bandaj || 0}</span>`;
   $('fireBar').style.width = G.fire.fuel + '%';
   $('morBar').style.width = G.morale + '%';
   $('hpBar').style.width = clamp(L.hp / L.maxhp * 100, 0, 100) + '%';
   $('stBar').style.width = L.stam + '%';
   const it = G.interact;
-  $('prompt').textContent = G.placing ? `${BUILD[G.placing].ad} yerleştiriliyor` : it ? (isTouch ? '[Topla] ' : '[E] ') + it.label : G.carryEgg ? '🥚 Yumurtayı ateşe götür!' : '';
+  $('prompt').textContent = G.huntMode ? '🎯 Avlanacak hayvana dokun / tıkla' : G.placing ? `${BUILD[G.placing].ad} planlanıyor` : G.lcarry ? `🩺 ${acc(G.lcarry.name)} taşıyorsun — şifahaneye götür (E: bırak)` : it ? (isTouch ? '[Topla] ' : '[E] ') + it.label : G.carryEgg ? '🥚 Yumurtayı ateşe götür!' : '';
   if (G.tut.on && G.tut.step < TUT.length) { $('tutBox').style.display = 'block'; $('tutBox').innerHTML = `<b>Öğretici ${G.tut.step + 1}/${TUT.length}</b> ${TUT[G.tut.step].t} <button id="tutSkip">Geç</button>`; }
   else $('tutBox').style.display = 'none';
 }
@@ -217,28 +310,32 @@ function hudTick(dt) {
   UI.sideT -= dt; if (UI.sideT <= 0 || (G.uiDirty && UI.sideT < 0.45)) { UI.sideT = 0.6; renderSide(); }
   UI.miniT -= dt; if (UI.miniT <= 0) { UI.miniT = 0.25; drawMini(); }
   UI.toolT -= dt; if (UI.toolT <= 0 || G.toolsDirty) { UI.toolT = 1; buildTools(); }
-  if (G.modal) { UI.craftT -= dt; if (UI.craftT <= 0) { UI.craftT = 0.6; renderCraft(); } }
+  if ($('craft').style.display === 'flex') { UI.craftT -= dt; if (UI.craftT <= 0 || G.craftDirty) { UI.craftT = 0.6; renderCraft(); } }
+  if (UI.char) { UI.charT -= dt; if (UI.charT <= 0) { UI.charT = 0.7; renderChar(); } }
 }
 
 // ---- ekranlar
-function saveInfo() { const s = store.get('sonAtesKayit'); if (!s) return null; try { const d = JSON.parse(s); return { day: d.day, diff: d.diff, s }; } catch (e) { return null; } }
+function saveInfo() { const s = store.get('sonAtesKayit'); if (!s) return null; try { const d = JSON.parse(s); if (d.v !== 3) return null; return { day: d.day, diff: d.diff, s }; } catch (e) { return null; } }
 function startScreen() {
   G.started = false; $('hud').style.display = 'none';
   const sv = saveInfo(), tutDone = store.get('sonAtesTutDone');
   const achList = Object.entries(ACH).map(([k, a]) => `<div class="${ACHSET.has(k) ? 'got' : ''}">${ACHSET.has(k) ? '🏆' : '🔒'} <b>${a.ad}</b> — ${a.desc}</div>`).join('');
   const best = +(store.get('sonAtesRekor') || 0);
   $('screenBox').innerHTML = `<h1>SON ATEŞ</h1>
-  <p class="story">Bir fırtına. Kör edici bir ışık. Uyandığınızda gökyüzünde tanımadığınız kanatlar,<br>ormanda tanımadığınız sesler vardı. Dört kişisiniz. Bir ateşiniz var.<br>Uzaklarda bir yerde, sizi buraya getiren yarık hâlâ parlıyor.<br><b>Ve gece yaklaşıyor.</b></p>
+  <p class="story">Bir fırtına. Kör edici bir ışık. Uyandığınızda gökyüzünde tanımadığınız kanatlar,<br>ormanda tanımadığınız sesler vardı. Altı kişisiniz. Bir ateşiniz var.<br>Uzaklarda bir yerde, sizi buraya getiren yarık hâlâ parlıyor.<br><b>Ve gece yaklaşıyor.</b></p>
   ${sv ? `<button id="cont" class="big">DEVAM ET <small>(${sv.day}. gün · ${DIFF[sv.diff] ? DIFF[sv.diff].ad : ''})</small></button><br>` : ''}
   <div class="diffs">${Object.entries(DIFF).map(([k, d]) => `<button data-d="${k}" class="${UI.diff === k ? 'on' : ''}">${d.ad}</button>`).join('')}</div>
   <p class="ddesc" id="ddesc">${DIFF[UI.diff].desc}</p>
   <label class="chk"><input type="checkbox" id="tutChk" ${tutDone ? '' : 'checked'}> Öğretici ile başla</label><br>
   <button id="go" class="big">${sv ? 'YENİ OYUN' : 'ATEŞİ YAK'}</button>
   ${best ? `<p>En uzun hayatta kalma: <b>${best} gün</b></p>` : ''}
-  <details><summary>Nasıl oynanır?</summary><div class="keys">${isTouch ? `<b>Sol taraf</b> hareket · <b>Saldır</b> mızrak · <b>Ok</b> yay · <b>Topla/Kullan</b> toplama, ateş, tedavi, evcilleştirme, binme` : `<b>WASD</b> hareket · <b>Shift</b> koş · <b>Fare/Boşluk</b> mızrak · <b>F / sağ tık</b> ok<br><b>E</b> (basılı) topla · ateşe odun · tedavi · evcilleştir · kurtar · bin/in<br><b>1-8</b> inşa · <b>C</b> zanaat · <b>M</b> harita · <b>H</b> halk paneli · <b>T</b> meşale · <b>P</b> duraklat`}<br>
-  <b>Halk</b>: sağ panelde gruplar (Odun, Taş, Yiyecek, Şifacı, Muhafız, Takip, Boşta). <b>+/−</b> ile kişi aktar, <b>★</b> ile yönetici ata. Yöneticisi olan grup daha hızlı çalışır, <b>⚡ özel yetenek</b> ve <b>📍 bölge emri</b> kullanabilir. Kişiler sekmesinde çoklu seçip toplu aktarabilirsin.<br>
-  <b>Bilinmezlik</b>: sadece halkının gördüğünü görürsün. Karanlık yerlere 🧭 kâşif gönder. Geceler çoğu zaman sessizdir... ama her zaman değil.<br>
-  <b>Hedef</b>: haritada zaman yarığını bul, halkını 12 kişiye çıkar, Yarık Taşı yap ve son savaşı kazan.</div></details>
+  <details><summary>Nasıl oynanır?</summary><div class="keys">${isTouch ? `<b>Sol taraf</b> hareket · <b>Saldır</b> mızrak · <b>Ok</b> yay · <b>Topla/Kullan</b> toplama, ateş, tedavi, taşıma, evcilleştirme, binme` : `<b>WASD</b> hareket · <b>Shift</b> koş · <b>Fare/Boşluk</b> mızrak · <b>F / sağ tık</b> ok<br><b>E</b> (basılı) topla · ateşe odun · tedavi · inşaata yardım · kurtar · (bas) bin/in, yaralı taşı<br><b>G</b> av emri · <b>C</b> üretim · <b>M</b> harita · <b>H</b> halk paneli · <b>1-9</b> inşa planı · <b>T</b> meşale · <b>P</b> duraklat`}<br>
+  <b>Halk</b>: 13 meslek grubu. Herkes yaptığı işte seviye atlar (1-10). Karakter kartından (ⓘ) becerileri gör, görev ve doğrudan üretim emri ver.<br>
+  <b>Yiyecek</b>: asıl kaynak avcılık. 🎯 ile bir hayvan seç; avcılar mesafeyi koruyarak avlar. Leşi 🔪 Et Ustası temizlemezse çiğ et salgın getirebilir. Tarlalar da ekilebilir.<br>
+  <b>Barınma</b>: her tek kişi ya da çift bir ⛺ çadırda yaşar. Boş çadır yoksa yeni insanlar gelmez.<br>
+  <b>Sağlık</b>: yaralılar şifahaneye taşınır, günlerce tedavi görür. Salgınlar nadiren öldürür ama yayılır.<br>
+  <b>Bilinmezlik</b>: sadece halkının gördüğünü görürsün. Geceler çoğu zaman sessizdir... ama her zaman değil. Yüzü tanıdık gelen her şeye güvenme.<br>
+  <b>Hedef</b>: yarığı bul, halkını 30 kişiye çıkar, 6. seviye bir zanaatkâra Yarık Taşı yaptır ve son savaşı kazan.</div></details>
   <details><summary>Başarımlar (${ACHSET.size}/${Object.keys(ACH).length})</summary><div class="achs">${achList}</div></details>
   <p style="font-size:12px;color:#776">🎧 Kulaklıkla oyna.</p>`;
   $('screen').style.display = 'flex';
@@ -248,8 +345,8 @@ function startScreen() {
 }
 function onGameStart() {
   $('screen').style.display = 'none'; $('hud').style.display = 'block'; $('pause').style.display = 'none';
-  G.started = true; G.paused = false; G.modal = false; $('craft').style.display = 'none';
-  UI.sel.clear(); UI.open.clear(); UI.filter = 'all';
+  G.started = true; G.paused = false; G.modal = false; $('craft').style.display = 'none'; $('charM').style.display = 'none'; UI.char = 0;
+  UI.sel.clear(); UI.filter = 'all';
   if (innerWidth <= 700) { toggleSide(false); $('miniBox').style.display = 'none'; } else { toggleSide(true); $('miniBox').style.display = 'block'; }
   $('miniBox').classList.remove('big');
   buildTools(); renderSide(); updateHUD();
@@ -258,7 +355,7 @@ function showGameOver() {
   const dawn = G.diff === 'kolay' && store.get('sonAtesSafak');
   $('screenBox').innerHTML = `<h1 style="color:#c33;text-shadow:0 0 30px #600">KARANLIK</h1>
   <p class="story">Ateşin son közü de söndü. Ormanın sesleri, sanki hiçbir şey olmamış gibi devam etti.</p>
-  <p><b>${G.day}</b> gün hayatta kaldınız · <b>${G.kills}</b> yaratık avlandı · <b>${G.deaths}</b> kişi öldü · <b>${G.lost}</b> kişi kayboldu</p>
+  <p><b>${G.day}</b> gün hayatta kaldınız · <b>${G.kills}</b> yaratık · <b>${G.stats.hunts || 0}</b> av · <b>${G.deaths}</b> ölü · <b>${G.lost}</b> kayıp</p>
   <p>Rekor: <b>${store.get('sonAtesRekor') || G.day} gün</b></p>
   ${dawn ? '<button id="dawn" class="big">SON ŞAFAKTAN DEVAM</button><br>' : ''}
   <button id="again" class="big">YENİDEN DENE</button><br><button id="menu">Ana menü</button>`;
@@ -272,7 +369,7 @@ function showVictory(saved, left) {
   <p class="story">Yarık bir nefes gibi açıldı ve kapandı. Arkada, ormanın içinde, bir ateş hâlâ yanıyordu.</p>
   <p><b>${saved.length}</b> kişi yarıktan geçti: ${saved.map(p => p.name).join(', ')}.</p>
   ${left ? `<p class="story">${left} kişi geride, kampta kaldı. Onlar bu dünyanın ilk köyünü kuracak.</p>` : ''}
-  <p><b>${G.day}</b> gün · <b>${G.kills}</b> av · <b>${G.deaths}</b> kayıp · ${DIFF[G.diff].ad}</p>
+  <p><b>${G.day}</b> gün · <b>${G.kills}</b> yaratık · <b>${G.deaths}</b> kayıp · ${DIFF[G.diff].ad}</p>
   <button id="menu" class="big">ANA MENÜ</button>`;
   $('screen').style.display = 'flex'; $('hud').style.display = 'none';
   $('menu').onclick = startScreen;

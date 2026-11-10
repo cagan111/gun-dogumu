@@ -8,16 +8,17 @@ function resetState(diff) {
   for (const k of Object.keys(G)) delete G[k];
   Object.assign(G, {
     diff, seed: 0, t: CYCLE * 0.05, day: 1, now: 0, dt: 0,
-    stock: { wood: 22, stone: 6, food: 26, bone: 0, hide: 0, herb: 0, poison: 0, crystal: 0, med: 1 },
+    stock: { wood: 30, stone: 10, food: 34, bone: 3, hide: 6, herb: 3, poison: 0, crystal: 0, mizrak: 1, balta: 1, kazma: 0, sepet: 0, ok: 0, zok: 0, yay: 0, zirh: 0, mesale: 0, eyer: 0, kemikMizrak: 0, yarikTasi: 0, bandaj: 2, ilac: 1 },
     fire: { x: CAMP.x, y: CAMP.y, fuel: 85, out: false },
     builds: [], people: [], dinos: [], parts: [], texts: [], msgs: [], proj: [], stains: [], tracks: [], rainDrops: [],
-    tech: new Set(), managers: {}, zone: {}, abil: {}, morale: 60, newGroup: 'bos',
+    carcs: [], orders: [], hunt: null, huntMode: false, unclean: 0, lcarry: null, oid: 0, eqT: 0, homeT2: 0,
+    managers: {}, zone: {}, abil: {}, morale: 60, newGroup: 'bos',
     mount: null, carryEgg: false, eggs: [], torchOn: false, torchFuel: 0,
     shake: 0, red: 0, flash: 0, over: false, won: false, rescue: null, rescueAt: -1, kills: 0, deaths: 0, lost: 0,
     placing: null, flags: {}, stokeT: 0, spawnT: 0, actT: 0, hbT: 0, ambT: 3, uiT: 0, regrowT: 0, postT: 0, expT: 0, achT: 0, saveT: 45,
     interact: null, usedNames: new Set(), started: true, paused: false, modal: false, danger: 0,
     nightPlan: [], nightWeather: 'acik', eproj: [], raid: null, scare: 0, vis: null, campT: 0, weather: { type: 'acik', t: 0 }, mimic: null, finale: null, dayRainAt: -1,
-    explored: new Uint8Array(MAPN * MAPN), stats: { fireNights: 0, noLoss: 0, tamed: 0 }, lossToday: false, fireOutTonight: false,
+    explored: new Uint8Array(MAPN * MAPN), stats: { fireNights: 0, noLoss: 0, tamed: 0, hunts: 0 }, lossToday: false, fireOutTonight: false,
     tut: { on: false, step: 0 }, idc: 0, devDone: false, leaveDone: false, scoutCd: 0, silent: false, devSeenEver: false, riftHint: false,
     tutMoved: 0, tutWood: 0, tutFire: 0, tutGroup: false, uiDirty: true, toolsDirty: true, msgDirty: true, shootCd: 0
   });
@@ -28,10 +29,13 @@ function newGame(diff, tutOn) {
   G.seed = Math.floor(Math.random() * 1e9);
   genWorld(G.seed);
   L = mkPerson(CAMP.x, CAMP.y + 70, 'Sen', true); G.people.push(L);
-  ['odun', 'yiyecek', 'muhafiz'].forEach((g, i) => {
-    const a = i / 3 * TAU + 0.5, p = mkPerson(CAMP.x + Math.cos(a) * 80, CAMP.y + Math.sin(a) * 80, freshName(), false);
+  ['odun', 'avci', 'kasap', 'mimar', 'muhafiz'].forEach((g, i) => {
+    const a = i / 5 * TAU + 0.5, p = mkPerson(CAMP.x + Math.cos(a) * 80, CAMP.y + Math.sin(a) * 80, freshName(), false);
     p.group = g; G.people.push(p);
+    if (g === 'mimar' && lvl(p, 'insaat') < 2) p.sk.insaat = XPL[1] + 1;
   });
+  for (let i = 0; i < 5; i++) { const a = i / 5 * TAU + 1.2; const b = makeBuild('cadir', CAMP.x + Math.cos(a) * 190, CAMP.y + Math.sin(a) * 170, a + Math.PI); finishBuild(b, true); }
+  assignHomes(); assignEquip();
   G.tut = { on: !!tutOn, step: 0 };
   msg('Ateşi canlı tut. Halkını besle. Gece geldiğinde... ışıktan ayrılma.', '#ffd9a0', 8);
   if (!tutOn) msg('Halkını sağdaki panelden gruplara ayır, yöneticiler ata.', '#bbb', 8);
@@ -111,19 +115,19 @@ function updLeader(dt) {
   G.shootCd -= dt;
   const shoot = keys.KeyF || mouse.right || touch.shoot;
   if (shoot && G.shootCd <= 0) {
-    if (!G.tech.has('yay')) { if (!G.flags.noBow) { G.flags.noBow = 1; msg('Önce Zanaat menüsünden (C) Ok ve Yay yapmalısın.', '#ccc', 3); } }
+    if (!(p.eq && p.eq.yay)) { if (!G.flags.noBow) { G.flags.noBow = 1; msg('Yayın yok. Zanaatkârlara Yay ve Ok ürettir (C).', '#ccc', 3); } }
     else {
       if (!mouseAim) { const best = autoAim(420); if (best) aim = angTo(p, best); p.ang = aim; }
-      G.shootCd = 0.65; shootArrow(p, p.x + Math.cos(aim) * 300, p.y + Math.sin(aim) * 300, 22);
+      G.shootCd = 0.65; if (shootArrow(p, p.x + Math.cos(aim) * 300, p.y + Math.sin(aim) * 300, 22)) p.swing = 0.2;
     }
   }
   // etkileşim
   G.interact = findInteract();
   const act = keys.KeyE || touch.act;
   const it = G.interact;
-  if (act && it && it.kind !== 'mount' && it.kind !== 'info') {
+  if (act && it && it.kind !== 'mount' && it.kind !== 'info' && it.kind !== 'carry' && it.kind !== 'drop') {
     G.actT += dt;
-    const rate = { fire: 0.18, tame: 2.0, tameLong: 2.0, tameFly: 1.5, rescue: 0.6, free: 1.2, revive: 1.5, treat: 1.5, egg: 1.0, rift: 1.5 }[it.kind] || 0.4;
+    const rate = { fire: 0.18, tame: 2.0, tameLong: 2.0, tameFly: 1.5, rescue: 0.6, free: 1.2, revive: 1.5, treat: 1.5, egg: 1.0, rift: 1.5, carc: 0.35, build: 0.25 }[it.kind] || 0.4;
     G.actProg = clamp(G.actT / rate, 0, 1);
     if (G.actT >= rate) { G.actT = 0; doInteract(it); }
     if (it.kind !== 'fire' && it.o) p.ang = angTo(p, it.o);
@@ -137,6 +141,15 @@ function updLeader(dt) {
     else if (p.lastHurt > 8) p.hp = Math.min(p.maxhp, p.hp + 0.3 * dt);
   }
   updInjury(p, dt);
+  // sırtındaki yaralı
+  if (G.lcarry) {
+    const q = G.lcarry;
+    if (q.dead || q.bed) G.lcarry = null;
+    else {
+      q.x = p.x - Math.cos(p.ang) * 12; q.y = p.y - Math.sin(p.ang) * 12; q.carriedBy = -1;
+      if (q.bedRes && dist(p, q.bedRes.s) < q.bedRes.s.r + 40) { G.lcarry = null; putInBed(q); }
+    }
+  }
   // yumurta teslimi
   if (G.carryEgg && L && dist(L, G.fire) < 130) {
     G.carryEgg = false; G.eggs.push({ hatch: G.day + 1 });
@@ -147,19 +160,22 @@ function updLeader(dt) {
 function onActPress() {
   if (!G.started || G.over || !L) return false;
   if (G.mount) { dismount(false); return true; }
+  if (G.lcarry) { const q = G.lcarry; G.lcarry = null; q.carriedBy = 0; msg(`${acc(q.name)} yere bıraktın.`, '#ccc', 2); return true; }
   const it = findInteract();
   if (it && it.kind === 'mount') { mount(it.o); return true; }
+  if (it && it.kind === 'carry') { G.lcarry = it.o; it.o.carriedBy = -1; if (it.o.inHut) leaveHut(it.o); msg(`${acc(it.o.name)} sırtladın. ${it.o.bedRes ? 'Şifahaneye götür.' : 'Boş yatak yok!'}`, '#9fd', 3); return true; }
   return false;
 }
 function findInteract() {
   const p = L; let best = null, bd = 1e9;
   const consider = (o, kind, d, label) => { if (d < bd) { bd = d; best = { o, kind, label }; } };
   if (G.mount) return { o: G.mount, kind: 'mount', label: 'İn' };
-  if (G.tech.has('eyer')) for (const d of G.dinos) if (d.tamed && d.type === 'boynuzlu') { const dd = dist(d, p) - d.r; if (dd < 30) consider(d, 'mount', dd - 50, 'Bin (Boynuzlu)'); }
+  if ((G.stock.eyer || 0) > 0) for (const d of G.dinos) if (d.tamed && d.type === 'boynuzlu') { const dd = dist(d, p) - d.r; if (dd < 30) consider(d, 'mount', dd - 50, 'Bin (Boynuzlu)'); }
   for (const q of G.people) {
     if (q === p || q.inHut || q.grabbed) continue;
     const dd = dist(q, p);
     if (q.downed > 0 && dd < 40) consider(q, 'revive', dd - 60, `${acc(q.name)} kaldır — basılı tut`);
+    else if (q.bedRes && needsCarry(q) && !q.carriedBy && dd < 40) consider(q, 'carry', dd - 50, `${acc(q.name)} şifahaneye taşı (bas)`);
     else if (q.injury && dd < 32 && needsCare(q)) consider(q, 'treat', dd - 20, q.injury.type === 'enfeksiyon' ? `${dat(q.name)} ilaç ver (1💊)` : q.injury.type === 'kirik' ? `${gen(q.name)} kırığını sar` : `${gen(q.name)} yarasını sar`);
   }
   for (const d of G.dinos) {
@@ -170,7 +186,9 @@ function findInteract() {
     if (d.type === 'kanatli' && d.st === 'land' && d.alt < 0.2 && dd < 40) consider(d, 'tameFly', dd - 20, 'Sessizce yaklaş, besle (10🍖)');
   }
   if (!G.carryEgg) for (const n of G.nests) if (n.eggs > 0) { const dd = dist(n, p) - n.r; if (dd < 30) consider(n, 'egg', dd - 10, 'Yumurta çal (anneler gelir!)'); }
-  { const dd = dist(G.rift, p) - G.rift.r; if (dd < 70 && !G.finale) consider(G.rift, 'rift', dd - 10, G.tech.has('yarikTasi') ? 'Yarık Taşı’nı yerleştir — son savaş başlar!' : 'Zaman yarığı. Açmak için Yarık Taşı gerekli.'); }
+  for (const c of G.carcs) { if (c.dead) continue; const dd = dist(c, p) - c.r; if (dd < 20) consider(c, 'carc', dd + 5, c.meat > 0 ? `Leşten çiğ et kes (${c.meat}) — hastalık riski!` : 'Leşten deri/kemik al'); }
+  for (const b of G.builds) if (!b.built) { const dd = dist(b, p) - b.r; if (dd < 24) consider(b, 'build', dd, `${BUILD[b.type].ad} inşasına yardım et (${Math.floor(b.prog / b.need * 100)}%)`); }
+  { const dd = dist(G.rift, p) - G.rift.r; if (dd < 70 && !G.finale) consider(G.rift, 'rift', dd - 10, (G.stock.yarikTasi || 0) > 0 ? 'Yarık Taşı’nı yerleştir — son savaş başlar!' : 'Zaman yarığı. Açmak için Yarık Taşı gerekli.'); }
   if (G.rescue) { const dd = dist(G.rescue, p); if (dd < 55) consider(G.rescue, 'rescue', dd - 40, `${acc(G.rescue.name)} kurtar`); }
   for (const c of G.ccamps) c.captives.forEach((cp, k) => { const x = c.x - 30 + k * 24, y = c.y + 34, dd = Math.hypot(x - p.x, y - p.y); if (dd < 45) consider({ x, y, c, k }, 'free', dd - 40, `${gen(cp.p.name)} iplerini çöz`); });
   { const dd = dist(G.fire, p) - 30; if (dd < 50) consider(G.fire, 'fire', dd, G.stock.wood > 0 ? 'Ateşe odun at' : 'Odun yok!'); }
@@ -195,9 +213,15 @@ function doInteract(it) {
   } else if (it.kind === 'gather') {
     const r = takeRes(o); addStock(r, 1, o.x, o.y);
     if (r === 'wood') { SFX.chop(); o.shake = 0.2; G.tutWood++; } else if (r === 'stone' || r === 'crystal') SFX.rock(); else SFX.pickup();
-  } else if (it.kind === 'tame') {
+  } else if (it.kind === 'carc') {
+    if (o.meat > 0) { o.meat--; addStock('food', 1, o.x, o.y); G.unclean = (G.unclean || 0) + (o.rotten ? 3 : 1); }
+    else if (o.hide > 0) { o.hide--; addStock('hide', 1, o.x, o.y); } else if (o.bone > 0) { o.bone--; addStock('bone', 1, o.x, o.y); }
+    if (o.meat + o.hide + o.bone <= 0) o.dead = true;
+    if (!G.flags.rawWarn) { G.flags.rawWarn = 1; msg('Çiğ et hastalık getirebilir. Leşleri bir 🔪 Et Ustası temizlesin.', '#e9a050', 5); }
+  } else if (it.kind === 'build') { o.prog += 0.6; SFX.hammer(0.4); if (o.prog >= o.need) finishBuild(o); }
+  else if (it.kind === 'tame') {
     if (G.stock.food < 15) { msg('Evcilleştirmek için 15🍖 gerek.', '#e99', 2); return; }
-    G.stock.food -= 15; o.tamed = true; o.ko = 0; o.hp = o.maxhp; o.angry = 0; o.tgt = null; tamed(o, 'Boynuzlu artık senin! Kampı koruyacak.' + (G.tech.has('eyer') ? ' Yanında E ile binebilirsin.' : ' Eyer yaparsan binebilirsin.'));
+    G.stock.food -= 15; o.tamed = true; o.ko = 0; o.hp = o.maxhp; o.angry = 0; o.tgt = null; tamed(o, 'Boynuzlu artık senin! Kampı koruyacak.' + ((G.stock.eyer || 0) > 0 ? ' Yanında E ile binebilirsin.' : ' Bir Eyer ürettirirsen binebilirsin.'));
   } else if (it.kind === 'tameLong') {
     if (G.stock.food < 25) { msg('Uzunboyun için 25🍖 gerek.', '#e99', 2); return; }
     G.stock.food -= 25; o.tamed = true; o.angry = 0; o.wt = 0; tamed(o, 'Uzunboyun sana güvendi. Kampa yük taşıyacak (odun + taş).');
@@ -207,7 +231,7 @@ function doInteract(it) {
   } else if (it.kind === 'revive' || it.kind === 'treat') treat(o, L);
   else if (it.kind === 'egg') takeEgg(o);
   else if (it.kind === 'free') { if (o.c.captives[o.k]) freeCaptive(o.c, o.k); }
-  else if (it.kind === 'rift') { if (G.tech.has('yarikTasi')) startFinale(); else msg(`Yarık Taşı gerekli: 25💎 40🪨 40🪵, Gözetleme Kulesi bilgisi ve en az 12 kişilik halk.`, '#9cf', 5); }
+  else if (it.kind === 'rift') { if ((G.stock.yarikTasi || 0) > 0) startFinale(); else msg('Yarık Taşı gerekli: 6. seviye bir zanaatkâr, 25💎 40🪨 40🪵 ve en az 30 kişilik halk.', '#9cf', 6); }
   else if (it.kind === 'rescue') {
     const r = G.rescue; G.rescue = null;
     const p = mkPerson(r.x, r.y, r.name, false); p.group = 'takip'; p.fear = 40; p.hp = Math.max(10, r.hp); G.people.push(p);
@@ -219,15 +243,16 @@ function tamed(d, text) { G.stats.tamed++; moraleAdd(5); msg(text, '#9f9', 6); S
 // =============================================================
 //  İNŞA ve ZANAAT
 // =============================================================
-const buildUnlocked = t => !BUILD[t].tech || G.tech.has(BUILD[t].tech);
+const buildUnlocked = t => bestLvl('insaat') >= BUILD[t].lvl;
 function startPlace(t) {
-  if (!buildUnlocked(t)) { msg(`${BUILD[t].ad} için önce "${TECH[BUILD[t].tech].ad}" bilgisini edin (Zanaat).`, '#e99', 3); return; }
+  if (!buildUnlocked(t)) { msg(`${BUILD[t].ad} için İnşaat becerisi ${BUILD[t].lvl}. seviyede bir mimar gerekir (şu an en iyi: ${bestLvl('insaat')}).`, '#e99', 4); return; }
   if (!canAfford(BUILD[t].cost)) { msg(`${BUILD[t].ad} için yeterli malzeme yok (${costTxt(BUILD[t].cost)})`, '#e99', 3); return; }
   G.placing = t;
-  msg(isTouch ? `${BUILD[t].ad}: Saldır düğmesiyle önüne yerleştir.` : `${BUILD[t].ad}: tıklayarak yerleştir, sağ tık / Esc iptal.`, '#cde', 3);
+  msg(isTouch ? `${BUILD[t].ad}: Saldır düğmesiyle önüne planla.` : `${BUILD[t].ad}: tıklayarak planla, sağ tık / Esc iptal. Mimarlar inşa eder.`, '#cde', 3);
 }
 function cancelPlace() { G.placing = null; }
 function placePos() {
+  if (G.tapPlace) return G.tapPlace;
   if (mouse.used && !isTouch) { const w = screenToWorld(mouse.x, mouse.y); const dx = w.x - L.x, dy = w.y - L.y, d = Math.hypot(dx, dy); if (d > 220) return { x: L.x + dx / d * 220, y: L.y + dy / d * 220 }; return w; }
   return { x: L.x + Math.cos(L.ang) * (G.mount ? 90 : 60), y: L.y + Math.sin(L.ang) * (G.mount ? 90 : 60) };
 }
@@ -241,9 +266,20 @@ function placeOk(t, p) {
   return true;
 }
 function makeBuild(t, x, y, ang) {
-  const b = { x, y, r: BUILD[t].r, kind: 'build', type: t, hp: BUILD[t].hp, maxhp: BUILD[t].hp, occ: [], uses: 3, ang: ang || 0, guard: null, shootT: 0 };
-  G.builds.push(b); if (t !== 'tuzak') gAdd(b);
+  const b = { x, y, r: BUILD[t].r, kind: 'build', type: t, hp: BUILD[t].hp, maxhp: BUILD[t].hp, occ: [], owners: [], uses: 3, ang: ang || 0, guard: null, shootT: 0, built: false, prog: 0, need: BUILD[t].work, planted: false, g: 0, beds: [0, 0, 0, 0] };
+  G.builds.push(b);
   return b;
+}
+function finishBuild(b, quiet) {
+  if (b.built) return;
+  b.built = true; b.prog = b.need;
+  if (!BUILD[b.type].flat) gAdd(b);
+  for (const p of G.people) if (!p.inHut && Math.hypot(p.x - b.x, p.y - b.y) < b.r + p.r) { const a = angTo(b, p); p.x = b.x + Math.cos(a) * (b.r + p.r + 2); p.y = b.y + Math.sin(a) * (b.r + p.r + 2); }
+  if (!quiet) { msg(`${BUILD[b.type].ic} ${BUILD[b.type].ad} tamamlandı.`, '#cfe', 3); SFX.build(); }
+  if (b.type === 'kule') unlock('kule');
+  if (b.type === 'cadir' || b.type === 'sifahane') { assignHomes(); assignBeds(); }
+  if (b.type === 'cadir' && !quiet) moraleAdd(2);
+  G.uiDirty = true;
 }
 function tryPlace() {
   const t = G.placing; if (!t) return;
@@ -251,52 +287,53 @@ function tryPlace() {
   if (!placeOk(t, p)) { msg('Buraya inşa edilemez.', '#e99', 2); return; }
   if (!canAfford(BUILD[t].cost)) { msg('Malzeme bitti.', '#e99', 2); cancelPlace(); return; }
   pay(BUILD[t].cost); makeBuild(t, p.x, p.y, L.ang); SFX.build();
-  if (t === 'kulube') { msg(`Kulübe kuruldu. Nüfus sınırı: ${popCap()}`, '#cfe', 3); moraleAdd(2); }
-  if (t === 'kule') unlock('kule');
+  if (!members('mimar').length && !G.flags.noMimar) { G.flags.noMimar = 1; msg('Plan hazır. İnşa etmesi için 📐 Mimar ata (boştakiler de yardım eder, sen de E ile yardım edebilirsin).', '#cde', 5); }
   if (!canAfford(BUILD[t].cost) || !['cit', 'duvar', 'tuzak'].includes(t)) cancelPlace();
   G.uiDirty = true;
 }
 function destroyBuild(b) {
   if (b.dead) return;
-  b.dead = true; gDel(b); G.builds.splice(G.builds.indexOf(b), 1);
+  b.dead = true; if (b.built) gDel(b); G.builds.splice(G.builds.indexOf(b), 1);
+  if (b.type === 'sifahane') for (const q of G.people) if ((q.bed && q.bed.s === b) || (q.bedRes && q.bedRes.s === b)) releaseBed(q, true);
+  if (b.type === 'cadir') for (const q of G.people) if (q.homeT === b) q.homeT = null;
   if (b.guard) { b.guard.post = null; b.guard = null; }
   for (let i = 0; i < 14; i++) G.parts.push({ x: b.x + rand(-b.r, b.r), y: b.y + rand(-b.r, b.r), vx: rand(-80, 80), vy: rand(-80, 80), life: rand(0.5, 1), col: '#6a4a2a', s: rand(2, 5) });
   SFX.hit(0.5); noise(0.6, 0.4, 'lowpass', 800, 100);
-  if (b.type === 'kulube') {
-    msg('Bir kulübe parçalandı!', '#f88', 4);
+  if (b.type === 'cadir') {
+    msg('Bir çadır parçalandı!', '#f88', 4);
     for (const p of b.occ) { p.inHut = null; p.x = b.x + rand(-20, 20); p.y = b.y + rand(-20, 20); p.fear = Math.min(100, p.fear + 50); }
     b.occ = [];
   }
   G.uiDirty = true;
 }
-function techState(id) {
-  const t = TECH[id];
-  if (G.tech.has(id) && !t.repeat) return 'done';
-  for (const r of t.req) if (!G.tech.has(r)) return 'locked';
-  if (t.reqTame && !G.dinos.some(d => d.tamed && d.type === t.reqTame)) return 'locked';
-  if (t.reqPop && G.people.length < t.reqPop) return 'locked';
-  return canAfford(t.cost) ? 'ok' : 'poor';
+// ---- üretim emirleri
+function crafters(by) { return G.people.filter(p => !p.child && !p.leader && p.group === (by === 'sifa' ? 'sifaci' : 'zanaat')); }
+function itemBlock(id) {
+  const it = ITEMS[id];
+  if (it.reqPop && G.people.length < it.reqPop) return `halk en az ${it.reqPop} kişi olmalı (${G.people.length})`;
+  const best = crafters(it.by).reduce((m, p) => Math.max(m, lvl(p, it.by)), 0);
+  if (!best) return `${it.by === 'sifa' ? '🌿 Şifacı' : '🔨 Zanaatkâr'} grubunda kimse yok`;
+  if (best < it.lvl) return `${SKILLS[it.by].ad} ${it.lvl}. seviye gerekir (en iyi: ${best})`;
+  if (it.by === 'zanaat' && !G.builds.some(b => b.type === 'atolye' && b.built)) return 'önce bir 🔨 Atölye inşa et';
+  return '';
 }
-function lockReason(id) {
-  const t = TECH[id], out = [];
-  for (const r of t.req) if (!G.tech.has(r)) out.push(`önce ${TECH[r].ad}`);
-  if (t.reqTame && !G.dinos.some(d => d.tamed && d.type === t.reqTame)) out.push(`evcil ${DINO[t.reqTame].ad} gerekli`);
-  if (t.reqPop && G.people.length < t.reqPop) out.push(`halk en az ${t.reqPop} kişi olmalı (${G.people.length})`);
-  return out.join(', ');
+function addOrder(id, n, byId) {
+  const b = itemBlock(id);
+  if (b && !b.startsWith('önce')) { msg(`${ITEMS[id].ad}: ${b}.`, '#e99', 3); }
+  const ex = G.orders.find(o => o.item === id && (o.by || 0) === (byId || 0));
+  if (ex) ex.left = Math.min(999, ex.left + n);
+  else G.orders.push({ id: ++G.oid, item: id, left: n, prog: 0, paid: false, by: byId || 0, worker: 0 });
+  const who = byId ? G.people.find(p => p.id === byId) : null;
+  msg(`📋 Üretim emri: ${ITEMS[id].ad}${n > 1 ? (n >= 999 ? ' (sürekli)' : ' ×' + n) : ''}${who ? ' — ' + who.name : ''}`, '#cde', 3);
+  G.craftDirty = true; G.uiDirty = true;
 }
-function craft(id) {
-  const s = techState(id);
-  if (s === 'done') return;
-  if (s === 'locked') { msg(`${TECH[id].ad}: ${lockReason(id)}.`, '#e99', 3); return; }
-  if (s === 'poor') { msg(`${TECH[id].ad} için malzeme yetersiz (${costTxt(TECH[id].cost)}).`, '#e99', 3); return; }
-  pay(TECH[id].cost);
-  if (id === 'ilac') G.stock.med++; else G.tech.add(id);
-  if (id === 'elMesalesi') { G.torchOn = true; G.torchFuel = 60; }
-  SFX.build(); msg(`${TECH[id].ad} hazır!`, '#cfe', 3);
-  G.uiDirty = true; G.toolsDirty = true; G.craftDirty = true;
+function cancelOrder(oid) {
+  const i = G.orders.findIndex(o => o.id === oid); if (i < 0) return;
+  const o = G.orders[i]; if (o.paid) for (const k in ITEMS[o.item].cost) G.stock[k] += ITEMS[o.item].cost[k];
+  G.orders.splice(i, 1); G.craftDirty = true;
 }
 function toggleTorch() {
-  if (!G.tech.has('elMesalesi')) { msg('Önce Zanaat menüsünden El Meşalesi yap (6🪵).', '#ccc', 3); return; }
+  if (!(G.stock.mesale > 0)) { msg('El meşalen yok. Zanaatkârlara ürettir (C).', '#ccc', 3); return; }
   if (!G.torchOn && G.torchFuel <= 0) { if (G.stock.wood < 1) { msg('Meşale için odun yok!', '#e99', 2); return; } G.stock.wood--; G.torchFuel = 30; }
   G.torchOn = !G.torchOn; SFX.crackle(0.3);
 }
@@ -309,9 +346,9 @@ function newDay() {
   const kids = G.people.filter(p => p.child).length, ad = G.people.length - kids;
   let tn = 0; for (const d of G.dinos) if (d.tamed) tn += d.type === 'boynuzlu' ? 3 : d.type === 'uzunboyun' ? 5 : 1;
   const need = Math.ceil((ad * 2 + kids + tn) * DIFF[G.diff].eat);
-  const rafs = G.builds.filter(b => b.type === 'raf').length;
-  if (rafs) G.stock.food += rafs * 3;
-  if (G.stock.food >= need) { G.stock.food -= need; moraleAdd(4); msg(`☀️ ${G.day}. Gün. Hayattasınız. Halk ${need}🍖 yedi.${rafs ? ` (Raflar +${rafs * 3}🍖)` : ''}`, '#ffe6a0', 6); }
+  const rafs = G.builds.filter(b => b.type === 'raf' && b.built).length;
+  if (rafs) G.stock.food += rafs * 4;
+  if (G.stock.food >= need) { G.stock.food -= need; moraleAdd(4); msg(`☀️ ${G.day}. Gün. Hayattasınız. Halk ${need}🍖 yedi.${rafs ? ` (Raflar +${rafs * 4}🍖)` : ''}`, '#ffe6a0', 6); }
   else {
     G.stock.food = 0; moraleAdd(-20);
     msg(`☀️ ${G.day}. Gün... ama yiyecek yetmedi. Açlık herkesi zayıflattı!`, '#f99', 6);
@@ -322,15 +359,24 @@ function newDay() {
   SFX.bell();
   halkDawn();
   // yeni gelenler
-  if (G.people.length > 0 && G.people.length < popCap() && G.stock.food >= need) {
-    let n = (Math.random() < 0.65 ? 1 : 0) + (G.morale > 70 && Math.random() < 0.5 ? 1 : 0) + (G.day > 3 && Math.random() < 0.3 ? 1 : 0);
-    for (let i = 0; i < n && G.people.length < popCap(); i++) {
+  assignHomes();
+  let free = emptyTents();
+  if (G.people.length > 0 && free > 0 && G.stock.food >= need) {
+    let n = 1 + (Math.random() < 0.5 ? 1 : 0) + (G.morale > 65 ? 1 : 0) + (G.day > 4 && Math.random() < 0.4 ? 1 : 0);
+    let came = 0;
+    while (n > 0 && free > 0) {
+      const couple = n >= 2 && Math.random() < 0.3;
       const a = rand(0, TAU), p = mkPerson(CAMP.x + Math.cos(a) * 380, CAMP.y + Math.sin(a) * 380, freshName(), false);
-      p.fear = 30; p.group = G.newGroup; G.people.push(p);
-      msg(`${p.name} ateşinizi görmüş ve halkınıza katıldı (${GROUPS[p.group].ic} ${GROUPS[p.group].ad}).`, '#9f9', 6);
+      p.fear = 30; p.group = G.newGroup; G.people.push(p); came++; n--;
+      if (couple) {
+        const q = mkPerson(p.x + 20, p.y, freshName(), false); q.fear = 30; q.group = G.newGroup; G.people.push(q); came++; n--;
+        p.partner = q.id; q.partner = p.id;
+        msg(`Bir çift ateşinizi görmüş: ${p.name} ve ${q.name} halkınıza katıldı.`, '#9f9', 6);
+      } else msg(`${p.name} ateşinizi görmüş ve halkınıza katıldı (${GROUPS[p.group].ic} ${GROUPS[p.group].ad}).`, '#9f9', 6);
+      free--; assignHomes();
     }
-    if (n) moraleAdd(2);
-  } else if (G.people.length >= popCap()) msg('Yeni gelenler için yer yok. Kulübe inşa et.', '#ccc', 5);
+    if (came) moraleAdd(2);
+  } else if (!free) msg('Ateşinizi gören yabancılar uzaktan baktı... Boş çadır olmadığı için gelmediler. ⛺ Çadır inşa et.', '#ccc', 6);
   // yumurtalar ve yavrular
   const keep = [];
   for (const e of G.eggs) {
@@ -365,7 +411,7 @@ function planNight() {
   if (d <= 1) { G.nightPlan = ev; return; }
   let n = Math.random() < 0.45 ? 0 : (Math.random() < 0.75 || d < 4 ? 1 : 2);
   if (d === 2 && Math.random() < 0.6) { ev.push({ k: 'dev', at: rand(0.6, 0.8) }); n = Math.max(0, n - 1); }
-  const pool = [['pusu', 30], ['dev', d >= 3 ? 14 : 0], ['yamyam', d >= 3 && G.ccamps.some(c => c.alive) ? 18 : 0], ['sessiz', 14], ['kayip', d >= 3 ? 8 : 0], ['taklit', 10], ['suru', d >= 4 ? 9 : 0]];
+  const pool = [['taklitci', d >= 4 ? 8 : 0], ['pusu', 30], ['dev', d >= 3 ? 14 : 0], ['yamyam', d >= 3 && G.ccamps.some(c => c.alive) ? 18 : 0], ['sessiz', 14], ['kayip', d >= 3 ? 8 : 0], ['taklit', 10], ['suru', d >= 4 ? 9 : 0]];
   for (let i = 0; i < n; i++) {
     const avail = pool.filter(([k, w]) => w > 0 && !ev.some(e => e.k === k)), tot = avail.reduce((a, b) => a + b[1], 0);
     let s = Math.random() * tot;
@@ -387,6 +433,7 @@ function runEvent(e) {
   if (e.k === 'pusu') { const v = edgeVictim(); if (v) ambush(v, ri(2, 3)); }
   else if (e.k === 'dev') spawnDevEvent(Math.random() < 0.4);
   else if (e.k === 'yamyam') startRaid();
+  else if (e.k === 'taklitci') spawnMimicCreature();
   else if (e.k === 'sessiz') {
     const v = edgeVictim(); if (!v) return;
     const a = dist(v, G.fire) > 30 ? angTo(G.fire, v) : rand(0, TAU), d = mkDino('yirtici', v.x + Math.cos(a) * 170, v.y + Math.sin(a) * 170);
@@ -453,7 +500,7 @@ function timeEvents() {
   }
   if (p > 0.93 && !G.leaveDone) {
     G.leaveDone = true;
-    for (const d of G.dinos) if (!d.tamed && !d.finale && (d.type === 'yirtici' || d.type === 'dev') && !d.mother) d.leave = true;
+    for (const d of G.dinos) if (!d.tamed && !d.finale && (d.type === 'yirtici' || d.type === 'dev' || d.type === 'geceavcisi' || d.type === 'taklitci') && !d.mother) d.leave = true;
     for (const d of G.dinos) if (d.type === 'yamyam' && d.raid) d.leave = true;
     if (G.weather.type !== 'acik') setWeather('acik', 0);
     G.silent = false;
@@ -484,7 +531,7 @@ function updMimic(dt) {
 //  FİNAL — zaman yarığı
 // =============================================================
 function startFinale() {
-  G.tech.delete('yarikTasi');
+  G.stock.yarikTasi--;
   G.finale = { t: 100, waveT: 3, devDone: false };
   msg('Yarık Taşı yerine oturdu. Gökyüzü yarıldı! 100 saniye dayan — yarığın yanında kal!', '#9cf', 8);
   SFX.roar(0.7); SFX.sting(); G.shake = 12;
@@ -528,18 +575,19 @@ function gameOver() {
 //  KAYIT
 // =============================================================
 function serialize() {
-  const pf = ['id', 'name', 'x', 'y', 'leader', 'child', 'age', 'traits', 'story', 'group', 'hp', 'maxhp', 'fear', 'skin', 'hair', 'injury', 'downed', 'tired', 'watched', 'partner', 'parentA', 'parentB', 'stam', 'seat', 'r'];
+  const pf = ['id', 'name', 'x', 'y', 'leader', 'child', 'age', 'traits', 'story', 'group', 'hp', 'maxhp', 'fear', 'skin', 'hair', 'injury', 'downed', 'tired', 'watched', 'partner', 'parentA', 'parentB', 'stam', 'seat', 'r', 'sk', 'sick', 'wasDowned', 'bedUntil'];
   let ex = ''; for (let i = 0; i < G.explored.length; i++) ex += G.explored[i] ? '1' : '0';
   return JSON.stringify({
-    v: 2, seed: G.seed, diff: G.diff, t: G.t, day: G.day, stock: G.stock, fuel: G.fire.fuel, morale: G.morale, tech: [...G.tech],
+    v: 3, seed: G.seed, diff: G.diff, t: G.t, day: G.day, stock: G.stock, fuel: G.fire.fuel, morale: G.morale, orders: G.orders.map(o => Object.assign({}, o, { worker: 0 })), oid: G.oid, unclean: G.unclean,
+    carcs: G.carcs.filter(c => !c.dead).map(c => ({ x: c.x, y: c.y, r: c.r, type: c.type, ang: c.ang, meat: c.meat, bone: c.bone, hide: c.hide, age: c.age, rotten: c.rotten })),
     managers: G.managers, zone: G.zone, newGroup: G.newGroup, torchFuel: G.torchFuel, nightPlan: G.nightPlan, nightWeather: G.nightWeather, weather: G.weather,
     eggs: G.eggs, usedNames: [...G.usedNames], stats: G.stats, idc: G.idc, kills: G.kills, deaths: G.deaths, lost: G.lost,
     devSeenEver: G.devSeenEver, riftFound: G.rift.found, riftHint: G.riftHint, rescueAt: G.rescueAt, dayRainAt: G.dayRainAt,
     flags: G.flags, leaveDone: G.leaveDone, devDone: G.devDone, tut: G.tut.on ? G.tut.step : -1,
     trees: G.trees.map(o => o.amt), rocks: G.rocks.map(o => o.dead ? 0 : o.amt), crystals: G.crystals.map(o => o.dead ? 0 : o.amt),
     bushes: G.bushes.map(o => o.amt), herbs: G.herbs.map(o => o.amt), poisons: G.poisons.map(o => o.amt), nests: G.nests.map(n => n.eggs),
-    builds: G.builds.map(b => ({ type: b.type, x: b.x, y: b.y, hp: b.hp, uses: b.uses, ang: b.ang })),
-    people: G.people.filter(p => !p.grabbed).map(p => { const o = {}; for (const k of pf) o[k] = p[k]; o.inHut = p.inHut ? G.builds.indexOf(p.inHut) : -1; return o; }),
+    builds: G.builds.map(b => ({ type: b.type, x: b.x, y: b.y, hp: b.hp, uses: b.uses, ang: b.ang, built: b.built, prog: b.prog, planted: b.planted, g: b.g })),
+    people: G.people.filter(p => !p.grabbed).map(p => { const o = {}; for (const k of pf) o[k] = p[k]; o.inHut = p.inHut ? G.builds.indexOf(p.inHut) : -1; o.homeT = p.homeT ? G.builds.indexOf(p.homeT) : -1; o.bed = p.bed ? [G.builds.indexOf(p.bed.s), p.bed.i] : null; return o; }),
     dinos: G.dinos.filter(d => d.tamed).map(d => ({ type: d.type, x: d.x, y: d.y, hp: d.hp, maxhp: d.maxhp, pet: !!d.pet, growth: d.growth || 0, r: d.r, mounted: G.mount === d })),
     explored: ex,
     ccamps: G.ccamps.map(c => ({ alive: c.alive, totem: c.totem, found: c.found, spDay: c.spDay || 0, captives: c.captives.map(cp => { const o = { eatDay: cp.eatDay }; for (const k of pf) o[k] = cp.p[k]; return o; }) }))
@@ -561,17 +609,19 @@ function loadGame(s) {
     weather: D.weather || { type: 'acik', t: 0 }, eggs: D.eggs || [], stats: Object.assign(G.stats, D.stats || {}), idc: D.idc, kills: D.kills, deaths: D.deaths, lost: D.lost,
     devSeenEver: D.devSeenEver, riftHint: D.riftHint, rescueAt: -1, dayRainAt: D.dayRainAt || -1, flags: D.flags || {}, leaveDone: D.leaveDone, devDone: D.devDone });
   Object.assign(G.stock, D.stock); G.fire.fuel = D.fuel; G.rift.found = !!D.riftFound;
-  G.tech = new Set(D.tech); G.usedNames = new Set(D.usedNames);
+  G.usedNames = new Set(D.usedNames); G.orders = D.orders || []; G.oid = D.oid || 0; G.unclean = D.unclean || 0;
+  G.carcs = (D.carcs || []).map(c => Object.assign({ carc: true }, c));
   for (const g of GORDER) { G.managers[g] = (D.managers || {})[g] || null; G.zone[g] = (D.zone || {})[g] || null; }
   D.trees.forEach((a, i) => { const t = G.trees[i]; if (!t) return; t.amt = a; if (a <= 0) treeDown(t); });
   for (const [arr, src] of [[G.rocks, D.rocks], [G.crystals, D.crystals]]) src.forEach((a, i) => { const o = arr[i]; if (!o) return; o.amt = a; if (a <= 0) { o.dead = true; gDel(o); } });
   for (const [arr, src] of [[G.bushes, D.bushes], [G.herbs, D.herbs], [G.poisons, D.poisons]]) src.forEach((a, i) => { if (arr[i]) arr[i].amt = a; });
   D.nests.forEach((e, i) => { if (G.nests[i]) G.nests[i].eggs = e; });
-  for (const b of D.builds) { const o = makeBuild(b.type, b.x, b.y, b.ang); o.hp = b.hp; o.uses = b.uses; }
+  for (const b of D.builds) { if (!BUILD[b.type]) continue; const o = makeBuild(b.type, b.x, b.y, b.ang); o.hp = b.hp; o.uses = b.uses; o.prog = b.prog || 0; o.planted = !!b.planted; o.g = b.g || 0; if (b.built !== false) finishBuild(o, true); }
   for (const s2 of D.people) {
     const p = mkPerson(s2.x, s2.y, s2.name, s2.leader, s2.child);
-    Object.assign(p, s2); p.inHut = null;
-    if (s2.inHut >= 0) { const h = G.builds[s2.inHut]; if (h && h.type === 'kulube' && h.occ.length < 3) { h.occ.push(p); p.inHut = h; } }
+    Object.assign(p, s2); p.inHut = null; p.homeT = null; p.bed = null; p.eq = {}; p.sk = Object.assign({}, p.sk || {});
+    const ht = G.builds[s2.homeT]; if (s2.homeT >= 0 && ht && ht.type === 'cadir') moveHome(p, ht);
+    if (s2.bed) { const sb = G.builds[s2.bed[0]]; if (sb && sb.type === 'sifahane' && sb.built) { sb.beds[s2.bed[1]] = p.id; p.bed = { s: sb, i: s2.bed[1] }; } }
     G.people.push(p); if (p.leader) L = p;
   }
   if (!L) L = G.people[0];
@@ -588,6 +638,7 @@ function loadGame(s) {
     Object.assign(c, { alive: s3.alive, totem: s3.totem, found: s3.found, spDay: s3.spDay });
     c.captives = (s3.captives || []).map(o => { const p = mkPerson(o.x, o.y, o.name, false, o.child); Object.assign(p, o); delete p.eatDay; p.inHut = null; p.grabbed = false; return { p, eatDay: o.eatDay }; });
   });
+  assignHomes(); assignEquip(); assignBeds();
   G.tut = D.tut >= 0 ? { on: true, step: D.tut } : { on: false, step: 0 };
   msg(`Kayıt yüklendi: ${G.day}. gün.`, '#cfe', 4);
   onGameStart();
@@ -607,7 +658,7 @@ function checkAch() {
   if (G.stats.noLoss >= 10) unlock('kayipsiz');
   if (G.stats.fireNights >= 5) unlock('ates');
   if (G.stats.tamed >= 3) unlock('evcil3');
-  if (G.people.length >= 20) unlock('halk20');
+  if (G.people.length >= 30) unlock('halk30');
   if (exploredPct() >= 0.4) unlock('kasif');
   if (G.day >= 15) unlock('gun15');
   if (G.diff === 'kabus' && G.day >= 10) unlock('kabus');
@@ -625,14 +676,15 @@ function markExplored(x, y, r, who) {
 }
 const TUT = [
   { t: 'Hareket et: WASD / oklar (telefonda ekranın sol yarısı).', done: () => G.tutMoved > 150 },
-  { t: 'Bir ağaca yaklaş ve E basılı tut (telefonda Topla): 5 odun kes.', done: () => G.tutWood >= 5 },
-  { t: 'Ateşin yanında E basılı tut: ateşe odun at.', done: () => G.tutFire > 0 },
-  { t: 'Sağdaki HALK panelinde bir grubun + düğmesine bas: kişi aktar.', done: () => G.tutGroup },
-  { t: 'Bir gruba ★ ile yönetici ata. Yönetici grubu hızlandırır ve özel emir (⚡, 📍) verir.', done: () => GORDER.some(g => G.managers[g]) },
-  { t: 'Kâşif grubuna birini ekle (🧭 +), sonra haritada (M) bilinmeyen bir yere dokun. Görmediğin yerde ne olduğunu bilemezsin.', done: () => !!G.zone.kasif },
-  { t: 'Zanaat menüsünü aç (C ya da ⚒️) ve Taş Mızrak yap.', done: () => G.tech.has('tasMizrak') },
-  { t: 'Bir Kulübe inşa et (alttaki 🛖 ya da 1): +3 nüfus, güvenli uyku.', done: () => G.builds.some(b => b.type === 'kulube') },
-  { t: 'Gece geliyor. Ateşi doldur, halkını ışıkta tut. Haritayı (M) açıp çevreyi keşfet. İyi şanslar.', done: () => isNight() }
+  { t: 'Ateşin yanında E basılı tut: ateşe odun at. Ateş sönerse karanlıktaki her şey cesaretlenir.', done: () => G.tutFire > 0 },
+  { t: 'Sağdaki HALK panelinde gruplara + ile kişi aktar. Her grubun bir becerisi var; çalıştıkça seviye atlarlar.', done: () => G.tutGroup },
+  { t: 'Bir gruba ★ ile yönetici ata: grubu hızlandırır, ⚡ yetenek ve 📍 bölge emri verir.', done: () => GORDER.some(g => G.managers[g]) },
+  { t: 'Alttaki 🎯 Av Emri (G) ile bir hayvana dokun: avcılar onu avlar, et ustaları leşi temizler.', done: () => (G.stats.hunts || 0) > 0 || !!G.hunt },
+  { t: 'Bir 🔨 Atölye planla (alttaki düğmeler). Mimarlar inşa eder.', done: () => G.builds.some(b => b.type === 'atolye') },
+  { t: 'Üretim menüsünü aç (C) ve zanaatkârlara bir emir ver: balta, kazma, ok...', done: () => G.orders.length > 0 || IORDER.some(k => k !== 'mizrak' && k !== 'balta' && k !== 'bandaj' && k !== 'ilac' && G.stock[k] > 0) },
+  { t: 'Kâşif grubuna birini ekle (🧭), sonra haritada (M) bilinmeyen bir yere dokun.', done: () => !!G.zone.kasif },
+  { t: 'Halkın büyümesi için ⛺ çadır gerekir: her tek kişi ya da çift bir çadırda yaşar. Yarığı açmak için 30 kişi lazım.', done: () => G.builds.filter(b => b.type === 'cadir').length >= 5 },
+  { t: 'Gece geliyor. Ateşi doldur, halkını ışıkta tut. İyi şanslar.', done: () => isNight() }
 ];
 function updTut() {
   const T = G.tut; if (!T.on) return;
@@ -654,7 +706,7 @@ function update(dt) {
   G.stokeT -= dt;
   if (G.stokeT <= 0) {
     G.stokeT = 1;
-    if (G.fire.fuel < 70 && G.stock.wood > 0 && G.people.some(p => !p.leader && !p.inHut && !p.grabbed && !p.downed && dist(p, G.fire) < 160 && p.fear < 85)) { G.stock.wood--; G.fire.fuel = Math.min(100, G.fire.fuel + 9); }
+    if (G.fire.fuel < 70 && G.stock.wood > 0 && G.people.some(p => !p.leader && !p.inHut && !p.grabbed && !p.downed && !p.bed && dist(p, G.fire) < 280 && p.fear < 90)) { G.stock.wood--; G.fire.fuel = Math.min(100, G.fire.fuel + 9); }
   }
   if (G.fire.fuel <= 0 && !G.fire.out) { G.fire.out = true; msg('ATEŞ SÖNDÜ! Karanlık her yerde...', '#ff4030', 6); SFX.sting(); if (isNight()) { G.fireOutTonight = true; moraleAdd(-10); } }
   if (G.fire.fuel > 0 && G.fire.out) { G.fire.out = false; msg('Ateş yeniden canlandı.', '#fd9', 3); }
@@ -668,6 +720,12 @@ function update(dt) {
   G.scoutCd -= dt;
   updWeather(dt);
   G.vis = visionSources();
+  G.eqT -= dt; if (G.eqT <= 0) { G.eqT = 1; assignEquip(); }
+  G.homeT2 -= dt; if (G.homeT2 <= 0) { G.homeT2 = 2; assignHomes(); assignBeds(); }
+  for (const b of G.builds) if (b.type === 'tarla' && b.built && b.planted && b.g < 1) { b.g = Math.min(1, b.g + dt / (CYCLE * 1.6) * (wt === 'yagmur' || wt === 'firtina' ? 1.4 : 1)); b.tendT = (b.tendT || 0) - dt; }
+  for (const c of G.carcs) { c.age += dt; if (!c.rotten && c.age > CYCLE * 1.2 && !G.builds.some(b => b.type === 'raf' && b.built && dist(b, c) < 300)) { c.rotten = true; } if (c.age > CYCLE * 2.5) c.dead = true; }
+  G.carcs = G.carcs.filter(c => !c.dead);
+  if (isNight() && G.carcs.length && Math.random() < dt * 0.02) { const c = pick(G.carcs); if (dist(c, G.fire) > fireR() + 100) spawnPack('kucuk', ri(2, 4), { x: c.x + rand(-200, 200), y: c.y + rand(-200, 200) }); }
   updLeader(dt);
   for (const p of G.people.slice()) if (p !== L && !p.dead) updPerson(p, dt, LS);
   if (G.over) return;
@@ -678,7 +736,7 @@ function update(dt) {
   if (G.mount) { L.x = G.mount.x; L.y = G.mount.y; }
   // kuleler
   for (const k of G.builds) {
-    if (k.type !== 'kule') continue;
+    if (k.type !== 'kule' || !k.built) continue;
     k.shootT -= dt;
     if (k.guard && dist(k.guard, k) < 12 && k.shootT <= 0) {
       let foe = null, fd = 320; for (const d of G.dinos) { if (!hostile(d)) continue; const dd = dist(d, k); if (dd < fd) { fd = dd; foe = d; } }
@@ -707,7 +765,7 @@ function update(dt) {
   G.saveT -= dt; if (G.saveT <= 0) { G.saveT = 45; saveGame('auto'); }
   // tehlike → kalp atışı
   let danger = 0;
-  for (const d of G.dinos) { if (!hostile(d)) continue; const rr = d.type === 'dev' ? 900 : d.type === 'yirtici' ? 420 : 220; danger = Math.max(danger, 1 - dist(d, L) / rr); }
+  for (const d of G.dinos) { if (!hostile(d)) continue; const rr = d.type === 'dev' || d.type === 'yelken' ? 900 : d.type === 'taklitci' ? 600 : d.type === 'yirtici' || d.type === 'yamyam' ? 420 : 240; danger = Math.max(danger, 1 - dist(d, L) / rr); }
   G.danger = clamp(danger, 0, 1);
   G.hbT -= dt; if (G.danger > 0.15 && G.hbT <= 0) { G.hbT = 1.1 - G.danger * 0.65; SFX.heart(0.25 + G.danger * 0.5); }
   // ortam sesleri

@@ -6,48 +6,34 @@ Dinozorlar çağında geçen bir hayatta kalma / korku / halk yönetimi oyunu. S
 ## Dosyalar
 | Dosya | İçerik |
 |---|---|
-| `js/temel.js` | yardımcılar, tüm veri tanımları (yaratıklar, yapılar, zanaat, özellikler, gruplar, başarımlar), ses |
-| `js/dunya.js` | biyomlar, tohumlu dünya üretimi, gün/gece, ışık, hava |
-| `js/halk.js` | kişiler, özellikler, gruplar ve yöneticiler, moral, yaralanma/tedavi, çiftler ve çocuklar |
-| `js/yaratik.js` | yaratık yapay zekâsı, evcilleştirme, binme, yumurtalar, oklar, doğurma |
-| `js/oyun.js` | lider, etkileşim, inşa/zanaat, gün döngüsü, korku olayları, final, kayıt, başarımlar, öğretici |
-| `js/cizim.js` | çizim, sis/yağmur/şimşek, mini harita |
-| `js/arayuz.js` | girdi, HUD, halk paneli, zanaat menüsü, ekranlar, ana döngü |
+| `js/temel.js` | yardımcılar ve tüm veri: beceriler, gruplar, yaratıklar, yapılar, üretilebilir eşyalar, başarımlar |
+| `js/ses.js` | sentezlenmiş sesler |
+| `js/dunya.js` | biyomlar, tohumlu dünya üretimi, yamyam kampları, gün/gece, ışık, görüş, hava |
+| `js/halk.js` | kişiler, beceri/seviye, kuşanım, çadırlar, şifahane ve salgın, bütün meslek davranışları |
+| `js/yaratik.js` | yaratık yapay zekâsı, leşler, sürüler, Benzeyen, yamyamlar, doğurma |
+| `js/oyun.js` | lider, etkileşim, inşaat planları, üretim emirleri, gün döngüsü, gece olayları, final, kayıt |
+| `js/cizim.js` | grafikler: güneşe göre gölgeler, dokular, ışık, sis, efektler, harita |
+| `js/arayuz.js` | girdi, halk paneli, karakter kartı, üretim menüsü, av emri, ekranlar |
 
 ## Oynanış
-- **Ateş** her şeydir. Gece yırtıcılar ışığa giremez, kenarında bekler. Yağmurda ateş hızlı söner.
-- **Halk ve gruplar**: Odun, Taş, Yiyecek, Şifacı, Muhafız, Takip, Boşta. Gruplar sekmesinde `+/−` ile hızlı aktarım,
-  Kişiler sekmesinde çoklu seçim ve toplu aktarım, filtreler, kişi kartları (özellikler + geçmiş).
-- **Yöneticiler (★)**: grubu hızlandırır (Önder Ruhlu / Yaşlı Bilge daha iyi), grup yeteneği (⚡) ve bölge emri (📍) verir:
-  Toplu Kesim, Damar Bul, Hasat Bereketi, Şifa Çemberi, Savunma Düzeni, Hücum!
-- **Özellikler**: Cesur, Korkak, İyi Avcı, Uykusuz, Hastalıklı, Yaşlı Bilge, Çevik, Güçlü, Önder Ruhlu, Çalışkan, Şifalı Eller.
-- **Moral**: açlık, ölüm, kaçışlar düşürür; zafer, doğum, evcilleştirme yükseltir. Çok düşerse biri yiyecek çalıp kaçar.
-- **Çiftler ve çocuklar**: yakınlaşan iki kişinin bebeği olabilir; çocuk 3 günde büyür.
-- **Yaralanma**: kanama, kırık bacak, enfeksiyon (ilaç gerekir). Ağır yaralı kişi 25 sn yerde kalır — yanına gidip kaldır.
-- **Gece nöbeti**: muhafızlar ertesi gün yorgun olur (Uykusuz hariç). Kulelere muhafız çıkar ve ok atar.
-- **Zanaat ağacı**: Taş/Kemik Mızrak, Ok-Yay, Zehirli Ok, El Meşalesi, Eyer, Deri Zırh, Halk Zırhı, Taş Duvar, Kule,
-  Et Kurutma, Şifahane, İlaç, Yarık Taşı.
-- **Yaratıklar**: Sürüngeç, Yırtıcı, Dev Kafa, Boynuzlu (bayılt + evcilleştir, eyerle bin), Uzunboyun (besle, yük taşır),
-  Kanatlı (dağlarda konar; sessizce yaklaşıp besle, yaklaşan yırtıcıları haber verir), Batakçı (bataklık havuzlarında pusu kurar).
-  Yırtıcı yuvasından yumurta çal → anneler peşine düşer → ateşe götür → yavru seninle büyür.
-- **Biyomlar**: Orman, Dağlar (kristal), Bataklık (zehirli bitki, çamur yavaşlatır), Sisli Vadi (gündüz bile tehlikeli, yuvalar).
-- **Korku olayları**: Dev ayak izleri (o gece Dev Kafa gelir), kuşların susması (av gecesi), fırtına ve şimşek, sis,
-  ormandan uyuyan birinin sesiyle seni çağıran şey, şafakta boş bulunan yatak.
-- **Hedef**: Zaman yarığını bul, halkını 12 kişiye çıkar, Yarık Taşı yap, yarığı aç ve 100 saniye dayan.
-- **Bilinmezlik / keşif sisi**: dünyayı yalnızca halkının, ışıklarının, kulelerinin ve evcil yaratıklarının gördüğü kadar görürsün.
-  Görülmemiş yerler simsiyah; bir kez görülüp şu an kimsenin bakmadığı yerler soluk ve içlerindeki yaratıklar görünmez.
-  **Kâşif** grubu bilinmeyene gider; büyük haritaya (M) dokunarak hedef ver. Sisli Vadi'de görüş yarıya iner.
-- **Ani gece olayları**: çoğu gece sessiz geçer. Bazı gecelerde, saati bilinmeyen anda: pusu, karanlıktan atılıp kaçan
-  tek yırtıcı, Dev Kafa (uzaktan ya da birden dibinde), yamyam baskını, yırtıcı sürüsü, taklit eden ses, boş yatak.
-  İşaretler (ayak izleri, susan kuşlar, boyalı el izleri) yalnızca bazen önceden görünür. Gündüz de kamptan uzaktakiler nadiren pusuya düşer.
-- **Yamyamlar**: haritada gizli kamplar. Yakınına gidenlere saldırırlar; bazı geceler sessizce yaklaşıp baskın yapar ve
-  insanları sürükleyip götürürler. Esirleri ertesi akşama kadar kurtarmazsan yenir. Totemi yıkarsan kamp dağılır.
-- **Yaratık boyutları**: çoğu küçük (Sürüngeç, Tükürgeç — zehir tükürür), orta tehlikeliler (Yırtıcı, Batakçı), devasa olanlar
-  (Dev Kafa, Uzunboyun — ağaçları devirerek geçer).
-- **Animasyon**: insanlar yürürken bacak/kol sallar, çalışırken balta/kazma kullanır, saldırırken mızrak saplar; yaratıklar nefes alır, başları sallanır.
-- **Kayıt** (otomatik), **zorluk** (Kolay: son şafaktan devam · Normal · Kâbus: tek can), **öğretici**, **mini harita** ve
-  keşif sisi, **13 başarım**.
+- **Halk ve meslekler (13 grup)**: Oduncu, Taşçı, Toplayıcı, Avcı, Et Ustası, Çiftçi, Şifacı, Zanaatkâr, Mimar, Kâşif, Muhafız, Takip, Boşta.
+- **Beceriler ve seviye (1-10)**: herkes yaptığı işte ustalaşır; usta daha hızlı ve daha iyi çalışır, gelişmiş eşya ve yapıları açar.
+  Karakter kartında (ⓘ) beceriler, özellikler, çadır, aile, kuşanım ve sağlık görünür; görev ve doğrudan üretim emri verilir.
+- **Av (ana yiyecek)**: 🎯 Av Emri (G) ile bir hayvan seç. Avcılar okla mesafe korur, mızrakla arkadan/yandan girer, hayvan dönünce geri çekilir.
+  Yiyecek azalınca kendiliğinden ava çıkarlar. Öldürülen hayvan leş bırakır.
+- **Et ustası ve salgın**: leşi Et Ustası temizler (Kasap Tezgâhı +%25). Lider çiğ et keserse salgın riski oluşur. Salgın yayılır, nadiren öldürür.
+- **Tarım**: tarlalar ekilir, bakılır, iki günde hasat edilir.
+- **Çadırlar**: her tek kişi ya da çift bir çadırda yaşar; çiftler aynı çadıra taşınır, çocuklar ebeveynle kalır. Boş çadır yoksa yeni insan gelmez.
+- **Şifahane**: 4 yatak. Yaralılar başkaları tarafından taşınır, günlerce tedavi görür.
+- **Üretim**: Zanaatkârlar atölyede balta, kazma, mızrak, sepet, ok, yay, zırh, zehirli ok, eyer, kemik mızrak ve Yarık Taşı yapar;
+  şifacılar sargı ve ilaç yapar. Aletler otomatik kuşanılır (balta oduncuya, yay avcıya...). Ok harcanır.
+- **İnşaat**: yapılar planlanır, mimarlar (ve boştakiler) inşa eder. Gelişmiş yapılar usta mimar ister.
+- **Yaratıklar**: küçükler (Sürüngeç, Tükürgeç, Gece Avcısı), tehlikeliler (Yırtıcı, Batakçı), devler (Dev Kafa, Yelkensırt),
+  otlayanlar (Ördekgaga sürüleri, Kafakalkan, Zırhlı, Boynuzlu, Uzunboyun), Kanatlı. Geceler gündüzden belirgin şekilde tehlikelidir.
+- **Benzeyen**: halktan birinin kılığına girip kampa yaklaşan şey. Aynı isim iki kez görünür. Yaklaşınca yüzünü gösterir.
+- **Bilinmezlik**: dünyayı yalnızca halkının gördüğü kadar görürsün; Kâşifler bilinmeyene gider. Gece olaylarının zamanı bilinmez.
+- **Hedef**: yarığı bul, halkını 30 kişiye çıkar, 6. seviye bir zanaatkâra Yarık Taşı yaptır, son savaşı kazan.
 
 ## Kontroller
-WASD hareket · Shift koş · Fare/Boşluk mızrak · F/sağ tık ok · E (basılı) topla/kullan/tedavi/evcilleştir · E bin/in ·
-1-8 inşa · C zanaat · M harita · H halk paneli · T meşale · P duraklat. Telefonda sanal kol ve düğmeler.
+WASD hareket · Shift koş · Fare/Boşluk mızrak · F/sağ tık ok · E (basılı) topla/kullan/tedavi/inşaata yardım · E (bas) bin/in, yaralı taşı ·
+G av emri · C üretim · M harita · H halk paneli · 1-9 inşa planı · T meşale · P duraklat. Telefonda sanal kol ve düğmeler.
