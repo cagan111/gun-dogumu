@@ -21,7 +21,11 @@ button{font-family:Georgia,serif;color:var(--ink);cursor:pointer}
 #morBar{background:linear-gradient(90deg,#a44,#cc5,#6c6)}
 #todBar{background:linear-gradient(90deg,#fd6,#88a)}
 #miniBox{position:absolute;left:10px;top:150px;pointer-events:auto;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#000;cursor:pointer}
-#miniBox.big{left:50%;top:50%;transform:translate(-50%,-50%);z-index:3;box-shadow:0 0 40px #000}
+#miniBox.big{left:50%;top:50%;bottom:auto;transform:translate(-50%,-50%);z-index:3;box-shadow:0 0 40px #000;cursor:crosshair}
+#mapClose,#mapHint{display:none;position:absolute;background:rgba(0,0,0,.7);color:#ffd27a;font-size:14px;border-radius:6px}
+#mapClose{right:6px;top:6px;padding:4px 10px;cursor:pointer}
+#mapHint{left:6px;bottom:6px;padding:3px 8px;font-size:12px;pointer-events:none}
+#miniBox.big #mapClose,#miniBox.big #mapHint{display:block}
 #tutBox{position:absolute;left:50%;transform:translateX(-50%);bottom:150px;background:rgba(40,28,10,.92);border:1px solid #c88a40;border-radius:8px;padding:7px 12px;font-size:14px;max-width:min(92vw,560px);pointer-events:auto;display:none;text-align:center}
 #tutBox button{margin-left:8px;background:#3a2810;border:1px solid #7a5a30;border-radius:5px;font-size:12px;padding:2px 8px}
 #msgs{position:absolute;left:50%;top:12px;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:4px;width:min(58vw,560px)}
@@ -135,7 +139,7 @@ summary{cursor:pointer;color:#e8d4b0}
     <div class="row" title="Ateş">🔥<div class="bar"><i id="fireBar"></i></div></div>
     <div class="row" title="Halkın morali">🙂<div class="bar"><i id="morBar"></i></div></div>
   </div>
-  <div id="miniBox"><canvas id="mini"></canvas></div>
+  <div id="miniBox"><canvas id="mini"></canvas><div id="mapClose">✕</div><div id="mapHint">Dokun: 🧭 kâşifleri oraya gönder</div></div>
   <div id="msgs"></div>
   <div id="tutBox"></div>
   <div id="side">

@@ -12,6 +12,10 @@ function pushOut(e, isDino) {
   for (const o of q) {
     if (o.dead) continue;
     if (o.kind === 'build' && !isDino) continue;
+    if (o.kind === 'tree' && e.r >= 55) {
+      if (!o.stump && Math.hypot(e.x - o.x, e.y - o.y) < e.r) { o.shake = 0.3; if (e.moving && Math.random() < 0.012) { treeDown(o); o.amt = 0; SFX.crash(volOf(o, 1100) * 0.7 + 0.02, panOf(o.x)); } }
+      continue;
+    }
     const dx = e.x - o.x, dy = e.y - o.y, d = Math.hypot(dx, dy) || 0.01, m = o.r + e.r;
     if (d < m) { e.x = o.x + dx / d * m; e.y = o.y + dy / d * m; if (o.kind === 'build') blocked = o; }
   }
@@ -111,20 +115,19 @@ function killDino(d, src) {
   if (!d.tamed) {
     G.kills++;
     if (d.type !== 'kucuk' || dist(d, G.fire) < 1500 || (L && dist(d, L) < 600)) {
-      addStock('food', Math.round(def.drop.food * rafBonus()), d.x, d.y);
-      if (def.drop.bone) addStock('bone', def.drop.bone, d.x, d.y + 14);
-      if (def.drop.hide) addStock('hide', def.drop.hide, d.x, d.y + 28);
+      let k = 0; for (const r in def.drop) addStock(r, r === 'food' ? Math.round(def.drop[r] * rafBonus()) : def.drop[r], d.x, d.y + 14 * k++);
     }
   } else msg(`Evcil ${def.ad}${d.pet ? ' yavrusu' : ''} öldü...`, '#f99', 5);
   if (d.type === 'dev' && !d.tamed) { msg('DEV KAFA DÜŞTÜ! Halkın sana hayranlıkla bakıyor.', '#ffb060', 7); for (const p of G.people) p.fear = 0; moraleAdd(25); unlock('dev'); SFX.roar(0.4); }
   for (let i = 0; i < 16; i++) G.parts.push({ x: d.x, y: d.y, vx: rand(-150, 150), vy: rand(-150, 150), life: rand(0.5, 1.2), col: '#6a0808', s: rand(2, 6) });
+  if (d.carry) dropCarry(d, true);
   removeDino(d);
   G.uiDirty = true;
 }
 function dropCarry(d, rescued) {
   const v = d.carry; d.carry = null; if (!v) return;
   v.grabbed = false;
-  if (rescued) { msg(`${v.name} Dev Kafa'nın ağzından kurtuldu!`, '#9f9', 5); v.x = d.x + 30; v.y = d.y; pushOut(v, false); d.leave = true; SFX.roar(0.6); moraleAdd(8); }
+  if (rescued) { msg(d.type === 'yamyam' ? `${acc(v.name)} yamyamların elinden kurtardın!` : `${v.name} Dev Kafa'nın ağzından kurtuldu!`, '#9f9', 5); v.x = d.x + 30; v.y = d.y; pushOut(v, false); d.leave = true; if (d.type === 'dev') SFX.roar(0.6); moraleAdd(8); }
 }
 function rescueDies(t) {
   if (G.rescue !== t) return;
@@ -187,7 +190,7 @@ function isBold(d) {
 
 function updDino(d, dt, prey, zones) {
   d.atkCd -= dt; d.hurt = Math.max(0, d.hurt - dt); d.blink -= dt; if (d.blink < -0.15) d.blink = rand(1.5, 5);
-  d.trapCd = Math.max(0, d.trapCd - dt); d.rush = Math.max(0, d.rush - dt); if (d.scouted > 0) d.scouted -= dt;
+  d.trapCd = Math.max(0, d.trapCd - dt); d.rush = Math.max(0, d.rush - dt); if (d.scouted > 0) d.scouted -= dt; d.frill = Math.max(0, (d.frill || 0) - dt);
   if (d.poison > 0) {
     d.poison -= dt; d.hp -= 6 * dt;
     if (Math.random() < dt * 5) G.parts.push({ x: d.x + rand(-d.r, d.r), y: d.y, vx: 0, vy: -30, life: 0.6, col: '#7c3', s: 3 });
@@ -198,6 +201,7 @@ function updDino(d, dt, prey, zones) {
   if (d.type === 'uzunboyun') return updLong(d, dt);
   if (d.type === 'kanatli') return updFlyer(d, dt);
   if (d.type === 'batakci') return updCroc(d, dt, prey);
+  if (d.type === 'yamyam') return updCannibal(d, dt, prey);
   if (d.pet) return updPet(d, dt);
   return updPred(d, dt, prey, zones);
 }
@@ -249,6 +253,7 @@ function updPred(d, dt, prey, zones) {
     if (!best && d.type === 'dev' && bold) for (const b of G.builds) if (b.type === 'kulube' && b.occ.length) { const s = dist(d, b); if (s < sense) { best = b; break; } }
     if (best && !d.engaged) {
       d.engaged = true;
+      if (!d.silent)
       if (L && dist(d, L) < 1000) { const v = clamp(1 - dist(d, L) / 1000, 0.1, 0.8); if (d.type === 'yirtici') SFX.screech(v, panOf(d.x)); else if (d.type === 'kucuk') SFX.chirp(v, panOf(d.x)); }
     }
     d.tgt = best;
@@ -268,8 +273,13 @@ function updPred(d, dt, prey, zones) {
     } else {
       tx = t.x; ty = t.y;
       if (d.type === 'yirtici') { const side = (d.id % 3 - 1) * 0.6, dd = dist(d, t); if (dd > 120) { const a = angTo(t, d) + side; tx = t.x + Math.cos(a) * dd * 0.5; ty = t.y + Math.sin(a) * dd * 0.5; } }
-      const reach = d.r + bodyR(t) + 8;
-      if (dist(d, t) < reach) {
+      const reach = d.r + bodyR(t) + 8, dd = dist(d, t);
+      d.spitCd = (d.spitCd || 0) - dt;
+      if (d.type === 'tukurgec' && dd > 70 && dd < 240 && d.spitCd <= 0) {
+        d.spitCd = rand(2.5, 4); d.frill = 0.7; d.ang = angTo(d, t);
+        const a = angTo(d, t); G.eproj.push({ x: d.x + Math.cos(a) * d.r, y: d.y + Math.sin(a) * d.r, vx: Math.cos(a) * 330, vy: Math.sin(a) * 330, dmg: 7, life: 0.9, src: d });
+        SFX.spit(volOf(d, 700) + 0.05, panOf(d.x)); tx = undefined; d.moving = false;
+      } else if (dd < reach) {
         d.moving = false; d.ang = angLerp(d.ang, angTo(d, t), Math.min(1, dt * 8));
         if (d.atkCd <= 0) dinoAttack(d, t);
         tx = undefined;
@@ -314,6 +324,7 @@ function dinoAttack(d, t) {
     return;
   }
   hurt(t, (d.pet ? 5 + 10 * d.growth : def.dmg) * rand(0.8, 1.2), d);
+  if (d.hitrun) { d.leave = true; d.rush = 0; }
   if (L && dist(d, L) < 700) SFX.hit(0.4);
   if (d.type === 'yirtici' && Math.random() < 0.3) { const a = angTo(t, d); d.x += Math.cos(a) * 30; d.y += Math.sin(a) * 30; }
 }
@@ -495,36 +506,181 @@ function spawnPack(type, n, pos) {
 function spawnFlyer(pos) {
   const d = mkDino('kanatli', pos.x, pos.y); d.home = { x: pos.x, y: pos.y }; d.alt = 1; d.st = 'fly'; d.flyT = rand(5, 20); G.dinos.push(d); return d;
 }
+function ambush(v, n, type, text) {
+  const a = dist(v, G.fire) > 60 ? angTo(G.fire, v) + rand(-1.3, 1.3) : rand(0, TAU), out = [];
+  for (let i = 0; i < n; i++) {
+    const aa = a + rand(-0.7, 0.7), r = rand(160, 250), d = mkDino(type || 'yirtici', v.x + Math.cos(aa) * r, v.y + Math.sin(aa) * r);
+    pushOut(d, true); d.rush = 6; d.tgt = v; d.engaged = true; d.silent = true; G.dinos.push(d); out.push(d);
+  }
+  jumpAt(v.x, v.y, text || 'PUSU!');
+  SFX.screech(L ? clamp(1 - dist(v, L) / 1000, 0.2, 1) : 0.4, panOf(v.x));
+  return out;
+}
 function spawner() {
-  const cnt = {}; for (const d of G.dinos) if (!d.tamed && !d.leave) cnt[d.type] = (cnt[d.type] || 0) + 1;
+  const cnt = {}; for (const d of G.dinos) if (!d.tamed && !d.leave && d.campI === undefined) cnt[d.type] = (cnt[d.type] || 0) + 1;
   const c = k => cnt[k] || 0;
-  const day = G.day, p = phase(), n = isNight(), sm = DIFF[G.diff].spawn, lb = biomeFast(L.x, L.y);
+  const day = G.day, n = isNight(), sm = DIFF[G.diff].spawn, lb = biomeFast(L.x, L.y);
   if (!n) {
     if (c('boynuzlu') < 4 && Math.random() < 0.25) spawnPack('boynuzlu', 1, spawnPosBiome([0, 2]));
     if (c('uzunboyun') < 2 && Math.random() < 0.06) spawnPack('uzunboyun', 1, spawnPosBiome([0, 2], 700, 1100));
     if (c('kanatli') < 3 && Math.random() < 0.2) { const pos = spawnPosBiome([1], 500, 1100); if (pos) spawnFlyer(pos); }
-    if (c('kucuk') < (2 + day) * sm && Math.random() < 0.1) spawnPack('kucuk', ri(2, 4));
-    if (lb === 3 && c('yirtici') < 4 * sm && Math.random() < 0.12) spawnPack('yirtici', ri(2, 3), spawnPos(500, 800));
-    else if (day >= 3 && c('yirtici') < 2 && Math.random() < 0.015 * sm) spawnPack('yirtici', ri(1, 2));
-  } else {
-    const nt = G.nightType, mult = sm * (nt === 'avci' ? 1.8 : 1);
-    if (c('kucuk') < (4 + day) * sm && Math.random() < 0.18) spawnPack('kucuk', ri(3, 5));
-    const maxR = Math.min(1 + day * 1.5, 14) * mult;
-    if (c('yirtici') < maxR && Math.random() < (0.09 + day * 0.012) * mult) spawnPack('yirtici', ri(2, 2 + Math.floor(day / 3)));
-    const wantDev = nt === 'dev' || (day >= 6 && Math.random() < 0.002);
-    if (wantDev && !G.devDone && p > 0.6 && p < 0.82 && c('dev') === 0 && Math.random() < 0.08) {
-      const pos = spawnPos(1100, 1300);
-      if (pos) {
-        G.devDone = true; spawnPack('dev', 1, pos);
-        SFX.roar(0.5, panOf(pos.x));
-        msg(G.devSeenEver ? 'Dev Kafa geri döndü. Ateşi büyüt!' : 'Yer titriyor. Ağaçlar yarılıyor. Bu... ne?', '#ff7050', 7);
-        G.flags.devSeen = 1; G.devSeenEver = true;
-        for (const q of G.people) q.fear = Math.min(100, q.fear + 25);
-      }
+    if (c('kucuk') < (3 + day) * sm && Math.random() < 0.12) spawnPack('kucuk', ri(2, 5));
+    if (c('tukurgec') < 2 + day / 3 && Math.random() < 0.05 * sm) spawnPack('tukurgec', ri(1, 2), spawnPosBiome([0, 2]));
+    if (lb === 3 && c('yirtici') < 4 * sm && Math.random() < 0.1) spawnPack('yirtici', ri(2, 3), spawnPos(500, 800));
+    // nadir gündüz pususu: kamptan uzaktaki birine
+    if (day >= 2 && Math.random() < 0.006 * sm) {
+      const far = G.people.filter(p => !p.inHut && !p.grabbed && !p.child && !p.downed && dist(p, G.fire) > 750);
+      if (far.length) ambush(pick(far), ri(2, 3), Math.random() < 0.3 ? 'tukurgec' : 'yirtici');
     }
+  } else {
+    if (c('kucuk') < (3 + day / 2) * sm && Math.random() < 0.08) spawnPack('kucuk', ri(2, 4));
+    if (c('yirtici') < Math.min(1 + day * 0.5, 4) * sm && Math.random() < 0.035) spawnPack('yirtici', ri(1, 2));
+    if (c('tukurgec') < 2 && Math.random() < 0.015 * sm) spawnPack('tukurgec', 1, spawnPosBiome([0, 2]));
   }
   if (c('batakci') < 5 && Math.random() < 0.3) {
     const pools = G.pools.filter(pl => !pl.croc && Math.hypot(pl.x - L.x, pl.y - L.y) < 1300 && Math.hypot(pl.x - L.x, pl.y - L.y) > 450);
     if (pools.length) { const pl = pick(pools), d = mkDino('batakci', pl.x, pl.y); d.home = pl; pl.croc = d; d.hidden = true; d.st = 'hide'; G.dinos.push(d); }
   }
+}
+function spawnDevEvent(sudden) {
+  const pos = sudden ? spawnPos(480, 600, G.fire) : spawnPos(1100, 1300);
+  if (!pos) return;
+  const d = spawnPack('dev', 1, pos)[0];
+  if (sudden) { d.rush = 5; jumpAt(d.x, d.y, 'DEV KAFA!'); SFX.roar(1, panOf(d.x)); }
+  else { SFX.roar(0.5, panOf(pos.x)); msg(G.devSeenEver ? 'Yer titriyor. Dev Kafa geri döndü.' : 'Yer titriyor. Ağaçlar yarılıyor. Bu... ne?', '#ff7050', 7); }
+  G.devSeenEver = true;
+  for (const q of G.people) q.fear = Math.min(100, q.fear + 25);
+}
+
+// ---- düşman tükürükleri
+function updEProj(dt) {
+  if (!G.eproj.length) return;
+  const prey = preyList();
+  for (const q of G.eproj) {
+    q.x += q.vx * dt; q.y += q.vy * dt; q.life -= dt;
+    for (const t of prey) {
+      if (Math.hypot(t.x - q.x, t.y - q.y) < bodyR(t) + 5) {
+        hurt(t, q.dmg, q.src);
+        if (!t.type && !t.isRescue && !t.injury && !t.dead && Math.random() < 0.3) { t.injury = { type: 'enfeksiyon', t: 0 }; msg(t === L ? 'Zehirli tükürük! Yaran mikrop kaptı.' : `${dat(t.name)} zehirli tükürük isabet etti!`, '#bf8', 4); }
+        q.life = 0; break;
+      }
+    }
+  }
+  G.eproj = G.eproj.filter(q => q.life > 0);
+}
+
+// =============================================================
+//  YAMYAMLAR
+// =============================================================
+function spawnGuards(c) {
+  const n = 3 + Math.min(3, Math.floor(G.day / 3));
+  for (let i = 0; i < n; i++) { const a = i / n * TAU, d = mkDino('yamyam', c.x + Math.cos(a) * 110, c.y + Math.sin(a) * 110); d.campI = c.i; d.pa = a; G.dinos.push(d); }
+  c.spawned = true;
+}
+function startRaid() {
+  const live = G.ccamps.filter(c => c.alive); if (!live.length) return false;
+  const c = live.sort((a, b) => dist(a, G.fire) - dist(b, G.fire))[0];
+  const a0 = angTo(G.fire, c), n = Math.min(8, 3 + Math.floor(G.day / 3));
+  G.raid = { t: 0, charged: false, grabbed: 0, campI: c.i };
+  for (let i = 0; i < n; i++) {
+    const a = a0 + rand(-0.5, 0.5), r = rand(850, 1000), d = mkDino('yamyam', G.fire.x + Math.cos(a) * r, G.fire.y + Math.sin(a) * r);
+    d.campI = c.i; d.raid = true; d.raidT = 75; d.silent = true; pushOut(d, true); G.dinos.push(d);
+  }
+  if (Math.random() < 0.5) { SFX.drum(0.15, panOf(G.fire.x + Math.cos(a0) * 900)); msg('Uzaklardan... davul sesleri.', '#c98', 4); }
+  return true;
+}
+function updRaid(dt) {
+  const R = G.raid; R.t += dt;
+  const raiders = G.dinos.filter(d => d.type === 'yamyam' && d.raid && !d.leave);
+  if (!raiders.length) { G.raid = null; return; }
+  if (!R.charged) {
+    const near = raiders.filter(d => dist(d, G.fire) < fireR() + 230).length;
+    if (R.t > 28 || near >= Math.ceil(raiders.length * 0.6)) {
+      R.charged = true;
+      for (const d of raiders) d.charge = true;
+      const d0 = raiders[0];
+      SFX.warcry(1, panOf(d0.x)); jumpAt(d0.x, d0.y, 'YAMYAM BASKINI!');
+      for (const p of G.people) p.fear = Math.min(100, p.fear + 30);
+    }
+  }
+}
+function captiveArrive(c, v) {
+  removePerson(v); v.dead = false; v.grabbed = false; v.downed = 0;
+  c.captives.push({ p: v, eatDay: phase() < 0.45 ? G.day : G.day + 1 });
+  c.found = true; moraleAdd(-8);
+  msg(`Yamyamlar ${acc(v.name)} kamplarına götürdü! ☠ Ertesi akşama kadar kurtarmazsan...`, '#ff6a4a', 8);
+}
+function freeCaptive(c, k) {
+  const v = c.captives.splice(k, 1)[0].p;
+  Object.assign(v, { x: c.x - 40 + rand(-10, 10), y: c.y + 50, group: 'takip', fear: 60, hp: Math.max(v.hp, 20), tgt: null, st: 'idle', carry: 0, bag: {}, dead: false, grabbed: false, inHut: null, post: null });
+  G.people.push(v); moraleAdd(8); G.uiDirty = true;
+  msg(`${acc(v.name)} kurtardın! Titreyerek peşinden geliyor.`, '#9f9', 5); SFX.bell();
+}
+function destroyCamp(c) {
+  c.alive = false; c.totem = 0;
+  while (c.captives.length) freeCaptive(c, 0);
+  for (const d of G.dinos) if (d.type === 'yamyam' && d.campI === c.i) { d.leave = true; d.raid = false; }
+  addStock('food', 30, c.x, c.y); addStock('bone', 12, c.x, c.y + 14); addStock('hide', 10, c.x, c.y + 28);
+  moraleAdd(15); SFX.crash(0.8, 0); SFX.bell();
+  msg('Yamyam totemi yıkıldı! Kamp dağıldı. Halkın bu gece biraz daha rahat uyuyacak.', '#ffd27a', 7);
+}
+function updCannibal(d, dt, prey) {
+  const def = DINO.yamyam, c = G.ccamps[d.campI];
+  d.swing = Math.max(0, (d.swing || 0) - dt);
+  if (d.carry) {
+    const v = d.carry;
+    if (!c || !c.alive) { dropCarry(d, true); d.leave = true; return; }
+    steer(d, c.x, c.y, def.spd * 0.95, dt, true); d.anim += dt * 9;
+    v.x = d.x - Math.cos(d.ang) * 12; v.y = d.y - Math.sin(d.ang) * 12;
+    if (Math.random() < dt * 0.4 && L) SFX.scream(clamp(1 - dist(d, L) / 1300, 0.05, 0.5), panOf(d.x));
+    if (dist(d, c) < 60) { d.carry = null; captiveArrive(c, v); d.raid = false; d.charge = false; d.silent = false; }
+    return;
+  }
+  if (d.leave) {
+    if (c && c.alive) { steer(d, c.x, c.y, def.spd, dt, true); d.anim += dt * 10; if (dist(d, c) < 110) { d.leave = false; d.raid = false; d.charge = false; d.silent = false; } }
+    else { const a = angTo(G.fire, d); steer(d, d.x + Math.cos(a) * 200, d.y + Math.sin(a) * 200, def.spd, dt, true); d.anim += dt * 10; if (!L || dist(d, L) > 1600) removeDino(d); }
+    return;
+  }
+  d.think -= dt;
+  let t = !t_dead(d.tgt) ? d.tgt : null;
+  if (d.raid) {
+    d.raidT -= dt; if (d.raidT <= 0) { d.leave = true; return; }
+    if (!d.charge) {
+      const a = angTo(G.fire, d) + Math.sin(G.now * 0.3 + d.id) * 0.3, R = fireR() + 150;
+      steer(d, G.fire.x + Math.cos(a) * R, G.fire.y + Math.sin(a) * R, def.spd * 0.6, dt, true); d.anim += dt * 6;
+      return;
+    }
+    if (d.think <= 0) {
+      d.think = 0.4; let best = null, bs = 1e9;
+      for (const q of prey) { if (q.type) continue; const s = dist(d, q) + (q.leader ? 160 : 0) - (q.child ? 120 : 0); if (s < bs) { bs = s; best = q; } }
+      d.tgt = t = best;
+    }
+  } else {
+    if (!c || !c.alive) { d.leave = true; return; }
+    if (d.think <= 0) {
+      d.think = 0.5; let best = null, bs = def.sense;
+      for (const q of prey) { if (dist(q, c) > 520) continue; const dd = dist(q, d); if (dd < bs) { bs = dd; best = q; } }
+      if (best && !d.tgt) SFX.warcry(volOf(d, 900) * 0.7, panOf(d.x));
+      d.tgt = t = best;
+    }
+    if (!t) { d.pa = (d.pa || 0) + dt * 0.25; steer(d, c.x + Math.cos(d.pa) * 120, c.y + Math.sin(d.pa) * 120, def.spd * 0.35, dt, true); d.anim += dt * 4; return; }
+    if (dist(t, c) > 650) { d.tgt = null; return; }
+  }
+  if (!t) return;
+  const reach = d.r + bodyR(t) + 8;
+  if (dist(d, t) > reach) { steer(d, t.x, t.y, def.spd * (d.charge ? 1.15 : 1), dt, true); d.anim += dt * 11; return; }
+  d.moving = false; d.ang = angTo(d, t);
+  if (d.atkCd > 0) return;
+  d.atkCd = def.cd * rand(0.85, 1.15); d.swing = 0.25;
+  const R = G.raid;
+  if (!t.leader && !t.type && !t.isRescue && Math.random() < (d.raid ? 0.4 : 0.25) && (!R || R.grabbed < 2)) {
+    t.grabbed = true; t.downed = 0; d.carry = t; if (R) R.grabbed++;
+    if (t.tgt && t.tgt.claim === t) t.tgt.claim = null;
+    if (t.inHut) leaveHut(t);
+    msg(`YAMYAMLAR ${acc(t.name).toLocaleUpperCase('tr')} SÜRÜKLÜYOR! Peşlerinden git!`, '#ff5040', 6);
+    SFX.scream(1, panOf(t.x)); for (const p of G.people) p.fear = Math.min(100, p.fear + 20);
+    return;
+  }
+  hurt(t, def.dmg * rand(0.8, 1.2), d);
+  if (L && dist(d, L) < 700) SFX.hit(0.4);
 }

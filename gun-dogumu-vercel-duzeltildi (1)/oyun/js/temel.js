@@ -52,27 +52,31 @@ const GROUPS = {
   yiyecek: { ad: 'Yiyecek', ic: '🫐', col: '#7a3a6a', desc: 'Meyve toplar.' },
   sifaci:  { ad: 'Şifacı',  ic: '🌿', col: '#3a7a5a', desc: 'Yaralıları tedavi eder, ot ve zehir toplar, ilaç yapar.' },
   muhafiz: { ad: 'Muhafız', ic: '🛡️', col: '#2c4f7a', desc: 'Kampı korur, gece nöbet tutar, kulelere çıkar.' },
+  kasif:   { ad: 'Kâşif',   ic: '🧭', col: '#8a7a3a', desc: 'Bilinmeyen yerleri keşfeder. Büyük haritaya (M) dokunarak hedef ver.' },
   takip:   { ad: 'Takip',   ic: '👣', col: '#5c6b2a', desc: 'Seninle gelir, yanında savaşır.' },
   bos:     { ad: 'Boşta',   ic: '💤', col: '#555',    desc: 'Ateş başında dinlenir, ateşi besler.' }
 };
-const GORDER = ['odun', 'tas', 'yiyecek', 'sifaci', 'muhafiz', 'takip', 'bos'];
+const GORDER = ['odun', 'tas', 'yiyecek', 'sifaci', 'kasif', 'muhafiz', 'takip', 'bos'];
 const ABIL = {
   odun:    { ad: 'Toplu Kesim',     desc: '30 sn boyunca odun ×2',                     dur: 30, cd: 120 },
   tas:     { ad: 'Damar Bul',       desc: '30 sn boyunca taş/kristal ×2',              dur: 30, cd: 120 },
   yiyecek: { ad: 'Hasat Bereketi',  desc: 'Kampa yakın bütün çalılar meyveyle dolar',  dur: 0,  cd: 150 },
   sifaci:  { ad: 'Şifa Çemberi',    desc: 'Kamptaki herkes +40 can, kanamalar durur',  dur: 0,  cd: 120 },
   muhafiz: { ad: 'Savunma Düzeni',  desc: '25 sn: muhafızlar korkusuz, +%60 hasar',    dur: 25, cd: 100 },
+  kasif:   { ad: 'Uzak Keşif',      desc: '40 sn: kâşifler daha hızlı, daha uzağı görür', dur: 40, cd: 120 },
   takip:   { ad: 'Hücum!',          desc: '15 sn: takipçiler hızlanır, öfkeyle saldırır', dur: 15, cd: 90 }
 };
 
 const DINO = {
-  kucuk:     { ad: 'Sürüngeç',  r: 10, hp: 18,  spd: 175, dmg: 4,  cd: 0.7, col: '#6b7d3a', eye: '#b6ff5a', drop: { food: 2 },                       sense: 380, nsense: 560,  pred: true },
-  yirtici:   { ad: 'Yırtıcı',   r: 18, hp: 60,  spd: 215, dmg: 12, cd: 0.9, col: '#8a4b2a', eye: '#ffd23a', drop: { food: 8, bone: 2, hide: 1 },    sense: 480, nsense: 850,  pred: true },
-  dev:       { ad: 'Dev Kafa',  r: 44, hp: 520, spd: 118, dmg: 40, cd: 1.6, col: '#3e3b35', eye: '#ff3a1a', drop: { food: 60, bone: 12, hide: 8 }, sense: 700, nsense: 1100, pred: true },
-  boynuzlu:  { ad: 'Boynuzlu',  r: 34, hp: 160, spd: 80,  dmg: 22, cd: 1.3, col: '#a08860', eye: '#ddd',    drop: { food: 25, bone: 4, hide: 3 } },
-  uzunboyun: { ad: 'Uzunboyun', r: 50, hp: 600, spd: 48,  dmg: 30, cd: 2.0, col: '#6f7f62', eye: '#ddd',    drop: { food: 80, bone: 10, hide: 6 } },
-  kanatli:   { ad: 'Kanatlı',   r: 15, hp: 40,  spd: 170, dmg: 6,  cd: 1.0, col: '#8a6a5a', eye: '#9cf',    drop: { food: 4, bone: 1, hide: 1 } },
-  batakci:   { ad: 'Batakçı',   r: 26, hp: 150, spd: 230, dmg: 24, cd: 1.2, col: '#46553a', eye: '#cf6',    drop: { food: 15, bone: 3, hide: 4 } }
+  kucuk:     { ad: 'Sürüngeç',  r: 9,  hp: 16,  spd: 175, dmg: 4,  cd: 0.7, col: '#6b7d3a', eye: '#b6ff5a', drop: { food: 2 },                       sense: 380, nsense: 560,  pred: true },
+  tukurgec:  { ad: 'Tükürgeç',  r: 13, hp: 32,  spd: 160, dmg: 7,  cd: 0.9, col: '#5a6a4a', eye: '#ff9a3a', drop: { food: 4, bone: 1, poison: 2 },  sense: 420, nsense: 600,  pred: true },
+  yirtici:   { ad: 'Yırtıcı',   r: 20, hp: 70,  spd: 215, dmg: 13, cd: 0.9, col: '#8a4b2a', eye: '#ffd23a', drop: { food: 9, bone: 2, hide: 1 },    sense: 480, nsense: 850,  pred: true },
+  dev:       { ad: 'Dev Kafa',  r: 62, hp: 750, spd: 125, dmg: 48, cd: 1.6, col: '#3e3b35', eye: '#ff3a1a', drop: { food: 80, bone: 16, hide: 10 }, sense: 750, nsense: 1150, pred: true },
+  boynuzlu:  { ad: 'Boynuzlu',  r: 40, hp: 200, spd: 80,  dmg: 24, cd: 1.3, col: '#a08860', eye: '#ddd',    drop: { food: 30, bone: 5, hide: 4 } },
+  uzunboyun: { ad: 'Uzunboyun', r: 74, hp: 900, spd: 46,  dmg: 34, cd: 2.0, col: '#6f7f62', eye: '#ddd',    drop: { food: 110, bone: 14, hide: 8 } },
+  kanatli:   { ad: 'Kanatlı',   r: 16, hp: 40,  spd: 170, dmg: 6,  cd: 1.0, col: '#8a6a5a', eye: '#9cf',    drop: { food: 4, bone: 1, hide: 1 } },
+  batakci:   { ad: 'Batakçı',   r: 30, hp: 170, spd: 230, dmg: 26, cd: 1.2, col: '#46553a', eye: '#cf6',    drop: { food: 18, bone: 3, hide: 5 } },
+  yamyam:    { ad: 'Yamyam',    r: 11, hp: 55,  spd: 140, dmg: 11, cd: 1.0, col: '#3a2a20', eye: '#e8d8b0', drop: { bone: 1, hide: 1 },             sense: 420, nsense: 620,  pred: true, human: true }
 };
 
 const BUILD = {
@@ -243,6 +247,11 @@ const SFX = {
   mimic(v, pan) { tone('triangle', 320, 290, 0.5, v * 0.3, { vib: 5, att: 0.1, pan }); tone('triangle', 380, 300, 0.9, v * 0.3, { vib: 6, att: 0.1, delay: 0.6, pan }); },
   baby() { tone('square', 1400, 2000, 0.1, 0.06); tone('square', 1700, 1300, 0.12, 0.05, { delay: 0.12 }); },
   win() { [392, 494, 587, 784].forEach((f, i) => tone('sine', f, f, 2.5, 0.08, { delay: i * 0.25, att: 0.05 })); },
+  jump() { noise(0.35, 0.9, 'highpass', 1800, 900, { att: 0.003 }); [220, 233, 311, 466, 622].forEach(f => tone('sawtooth', f, f * 0.97, 1.3, 0.11, { att: 0.004, dist: true })); tone('sine', 80, 30, 0.6, 0.8, { att: 0.003 }); },
+  drum(v, pan) { for (let i = 0; i < 6; i++) { tone('sine', 95, 55, 0.3, v * (i % 3 === 0 ? 1 : 0.6), { delay: i * 0.38 + (i % 2) * 0.05, att: 0.005, pan }); noise(0.08, v * 0.3, 'lowpass', 400, 100, { delay: i * 0.38, pan }); } },
+  warcry(v, pan) { [310, 360, 420, 480, 390].forEach((f, i) => tone('triangle', f, f * 1.25, 0.9, v * 0.16, { delay: i * 0.07, vib: 9 + i, att: 0.05, pan })); noise(0.8, v * 0.2, 'bandpass', 1200, 900, { q: 2, pan }); },
+  spit(v, pan) { noise(0.15, v * 0.5, 'bandpass', 2500, 800, { q: 3, pan }); tone('square', 600, 300, 0.12, v * 0.1, { pan }); },
+  crash(v, pan) { noise(0.9, v, 'lowpass', 1200, 80, { att: 0.01, pan }); tone('triangle', 120, 40, 0.6, v * 0.4, { pan }); },
   ach() { tone('sine', 880, 880, 0.4, 0.06); tone('sine', 1320, 1320, 0.6, 0.05, { delay: 0.12 }); }
 };
 const panOf = (x) => L ? clamp((x - L.x) / 700, -1, 1) : 0;

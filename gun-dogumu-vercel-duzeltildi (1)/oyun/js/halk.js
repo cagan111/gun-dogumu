@@ -50,6 +50,7 @@ function pSpeed(p) {
   if (p.injury && p.injury.type === 'kirik') s *= 0.5;
   if (p.child) s *= 0.9;
   if (biomeFast(p.x, p.y) === 2) s *= 0.75;
+  if (p.group === 'kasif') s *= abilOn('kasif') ? 1.4 : 1.15;
   return s;
 }
 function moraleMul() { return G.morale > 70 ? 1.15 : G.morale < 30 ? 0.8 : 1; }
@@ -223,7 +224,7 @@ function updInjury(p, dt) {
   if (j) {
     if (j.type === 'kanama') { p.hp -= 1.0 * dt; j.t -= dt; if (j.t <= 0) p.injury = null; }
     else if (j.type === 'enfeksiyon') p.hp -= 0.07 * dt;
-    else if (j.type === 'kirik') { j.t -= dt * (nearSifahane(p) ? 3 : 1) * (j.set ? 2 : 1); if (j.t <= 0) { p.injury = null; msg(`${gen(p.name)} kemiği kaynadı.`, '#9f9', 3); } }
+    else if (j.type === 'kirik') { j.t -= dt * (nearSifahane(p) ? 3 : 1) * (j.set ? 2 : 1); if (j.t <= 0) { p.injury = null; msg(p === L ? 'Kemiğin kaynadı.' : `${gen(p.name)} kemiği kaynadı.`, '#9f9', 3); } }
   }
   if (p.hp <= 0 && !p.dead) { if (p.leader) killPerson(p, null); else downPerson(p); }
 }
@@ -293,7 +294,7 @@ function updFear(p, dt, LS, night) {
   for (const d of G.dinos) {
     if (!hostile(d)) continue;
     const rng = d.type === 'dev' ? 800 : d.type === 'yirtici' ? 450 : 320;
-    const w = d.type === 'dev' ? 45 : d.type === 'yirtici' ? 18 : d.type === 'batakci' ? 15 : d.type === 'kucuk' ? 6 : 10;
+    const w = d.type === 'dev' ? 45 : d.type === 'yirtici' ? 18 : d.type === 'yamyam' ? 16 : d.type === 'batakci' ? 15 : d.type === 'kucuk' ? 6 : 10;
     const dd = dist(d, p); if (dd < rng) inc += w * (1 - dd / rng);
   }
   const lit = lightLevel(p.x, p.y, LS) > 0.4;
@@ -309,7 +310,7 @@ function updFear(p, dt, LS, night) {
 }
 
 // ---- ana kişi güncellemesi
-const HOME_GROUPS = ['odun', 'tas', 'yiyecek', 'sifaci', 'bos'];
+const HOME_GROUPS = ['odun', 'tas', 'yiyecek', 'sifaci', 'kasif', 'bos'];
 function updPerson(p, dt, LS) {
   if (p.grabbed) return;
   p.atkCd -= dt; p.hurtT = Math.max(0, p.hurtT - dt); p.lastHurt += dt; p.swing = Math.max(0, p.swing - dt);
@@ -366,6 +367,7 @@ function updPerson(p, dt, LS) {
     case 'muhafiz': return updGuard(p, dt);
     case 'takip': return updFollow(p, dt);
     case 'sifaci': return updHealer(p, dt, thr);
+    case 'kasif': return updScout(p, dt, thr);
     case 'bos': return updIdle(p, dt);
     default: return updGather(p, dt, p.group, thr);
   }
@@ -425,6 +427,28 @@ function updGather(p, dt, g, thr) {
     if (o.amt < 1 || o.dead) p.tgt = null;
     if (p.carry >= carryCap(p) || !p.tgt) p.st = 'return';
   }
+}
+function pickScoutTarget(p) {
+  const z = G.zone.kasif, c = z || CAMP, R = z ? 900 : 2900;
+  let best = null, bs = 1e9;
+  for (let k = 0; k < 70; k++) {
+    const a = rand(0, TAU), r = Math.sqrt(Math.random()) * R, x = clamp(c.x + Math.cos(a) * r, 100, WORLD - 100), y = clamp(c.y + Math.sin(a) * r, 100, WORLD - 100);
+    if (exploredAt(x, y)) continue;
+    const s = Math.hypot(x - p.x, y - p.y) + Math.hypot(x - c.x, y - c.y) * 0.5;
+    if (s < bs) { bs = s; best = { x, y }; }
+  }
+  if (!best) { const a = rand(0, TAU), r = rand(100, z ? 400 : 1500); best = { x: clamp(c.x + Math.cos(a) * r, 100, WORLD - 100), y: clamp(c.y + Math.sin(a) * r, 100, WORLD - 100) }; }
+  return best;
+}
+function updScout(p, dt, thr) {
+  if (goHome()) { p.stgt = null; return homeBehavior(p, dt); }
+  if (thr && thr.type !== 'kucuk' && dist(thr, p) < 280) { steer(p, G.fire.x, G.fire.y, pSpeed(p) * 1.4, dt, false); p.anim += dt * 14; p.stgt = null; return; }
+  p.stCheck = (p.stCheck || 0) - dt; p.stT = (p.stT || 0) - dt;
+  const t = p.stgt;
+  if (!t || Math.hypot(t.x - p.x, t.y - p.y) < 50 || p.stT <= 0 || (p.stCheck <= 0 && exploredAt(t.x, t.y))) {
+    if (!t || p.stCheck <= 0 || p.stT <= 0 || Math.hypot(t.x - p.x, t.y - p.y) < 50) { p.stgt = pickScoutTarget(p); p.stT = 60; p.stCheck = 2; }
+  }
+  steer(p, p.stgt.x, p.stgt.y, pSpeed(p), dt, false); p.anim += dt * 10;
 }
 function updHealer(p, dt, thr) {
   const pat = findPatient(p);

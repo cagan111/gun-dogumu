@@ -23,7 +23,7 @@ function genWorld(seed) {
   const sr = (a, b) => a + S() * (b - a), sri = (a, b) => Math.floor(sr(a, b + 1)), spick = a => a[Math.floor(S() * a.length)];
   const sg = () => (S() + S() + S() - 1.5) / 1.5;
   grid = new Map();
-  Object.assign(G, { trees: [], rocks: [], crystals: [], bushes: [], herbs: [], poisons: [], nests: [], lakes: [], pools: [], deco: [], blobs: [] });
+  Object.assign(G, { ccamps: [], trees: [], rocks: [], crystals: [], bushes: [], herbs: [], poisons: [], nests: [], lakes: [], pools: [], deco: [], blobs: [] });
   const nearCamp = (x, y, m) => Math.hypot(x - CAMP.x, y - CAMP.y) < m;
   const inW = (x, y, m = 80) => x > m && y > m && x < WORLD - m && y < WORLD - m;
   const polar = (a, r) => ({ x: clamp(CAMP.x + Math.cos(a) * r, 400, WORLD - 400), y: clamp(CAMP.y + Math.sin(a) * r, 400, WORLD - 400) });
@@ -49,7 +49,15 @@ function genWorld(seed) {
     if (k >= 80) continue;
     const o = { x, y, r, kind: 'lake' }; G.lakes.push(o); gAdd(o);
   }
-  const free = (x, y, m) => inW(x, y) && !G.lakes.some(l => Math.hypot(l.x - x, l.y - y) < l.r + m) && Math.hypot(x - G.rift.x, y - G.rift.y) > 120;
+  // ---- yamyam kampları
+  for (let k = 0; k < 80 && G.ccamps.length < 3; k++) {
+    const p = polar(sr(0, TAU), sr(1700, 2600));
+    if (B(p.x, p.y) === 1 || Math.hypot(p.x - G.rift.x, p.y - G.rift.y) < 800 || G.ccamps.some(c => Math.hypot(c.x - p.x, c.y - p.y) < 1400)) continue;
+    if (G.lakes.some(l => Math.hypot(l.x - p.x, l.y - p.y) < l.r + 200)) continue;
+    G.ccamps.push({ x: p.x, y: p.y, r: 90, totem: 250, alive: true, found: false, captives: [], spawned: false, i: G.ccamps.length,
+      huts: [0, 1, 2].map(i => { const a = i / 3 * TAU + sr(-0.3, 0.3); return [Math.cos(a) * sr(55, 75), Math.sin(a) * sr(55, 75)]; }) });
+  }
+  const free = (x, y, m) => inW(x, y) && !G.lakes.some(l => Math.hypot(l.x - x, l.y - y) < l.r + m) && Math.hypot(x - G.rift.x, y - G.rift.y) > 120 && !G.ccamps.some(c => Math.hypot(c.x - x, c.y - y) < 150);
   for (const b of G.blobs) if (b.k === 2) for (let i = 0; i < 9; i++) {
     const a = sr(0, TAU), rr = sr(0, b.r * 0.8), x = b.x + Math.cos(a) * rr, y = b.y + Math.sin(a) * rr;
     if (!free(x, y, 60) || G.pools.some(p => Math.hypot(p.x - x, p.y - y) < 160)) continue;
@@ -170,8 +178,26 @@ function lights() {
   }
   if (L && G.torchOn && L.hp > 0) out.push({ x: L.x, y: L.y, r: 175 * lm * (0.95 + Math.random() * 0.06), warm: 0.7 });
   if (G.rift) out.push({ x: G.rift.x, y: G.rift.y, r: G.finale ? 420 : 240, warm: 0, blue: 1 });
+  for (const c of G.ccamps || []) if (c.alive) out.push({ x: c.x, y: c.y, r: 170 * (0.94 + Math.random() * 0.08), warm: 0.9, red: 1 });
   return out;
 }
+// ---- görüş: dünyayı yalnızca halkının, ışıklarının ve evcil yaratıklarının gördüğü kadar görürsün
+function visionSources() {
+  const out = [], n = isNight(), wf = G.weather.type === 'sis' ? 0.7 : 1;
+  const f = (x, y) => (n ? 0.55 : 1) * wf * (biomeFast(x, y) === 3 ? 0.6 : 1);
+  if (L) out.push({ x: L.x, y: L.y, r: (G.mount ? 440 : 380) * f(L.x, L.y), who: L });
+  const sb = abilOn('kasif') ? 1.6 : 1;
+  for (const p of G.people) { if (p === L || p.inHut || p.grabbed) continue; out.push({ x: p.x, y: p.y, r: (p.group === 'kasif' ? 330 * sb : p.child ? 120 : 220) * f(p.x, p.y), who: p }); }
+  for (const d of G.dinos) if (d.tamed) out.push({ x: d.x, y: d.y, r: (d.fly ? 460 : 200) * (n ? 0.7 : 1), who: d });
+  for (const b of G.builds) { if (b.type === 'kule') out.push({ x: b.x, y: b.y, r: 480 * (n ? 0.75 : 1) }); else if (b.type !== 'tuzak') out.push({ x: b.x, y: b.y, r: 110 }); }
+  out.push({ x: G.fire.x, y: G.fire.y, r: G.fire.fuel > 0 ? Math.max(fireR() * 1.05, n ? 0 : 260) : 110 });
+  for (const b of G.builds) if (b.type === 'mesale') out.push({ x: b.x, y: b.y, r: 150 * lightMul() });
+  if (G.torchOn && L) out.push({ x: L.x, y: L.y, r: 190 * lightMul() });
+  return out;
+}
+function visible(x, y, m = 0) { if (!G.vis) return true; for (const s of G.vis) { const r = s.r + m; if ((x - s.x) ** 2 + (y - s.y) ** 2 < r * r) return true; } return false; }
+function visibleK(x, y, k) { if (!G.vis) return true; for (const s of G.vis) { const r = s.r * k; if ((x - s.x) ** 2 + (y - s.y) ** 2 < r * r) return true; } return false; }
+function exploredAt(x, y) { const i = Math.floor(x / MAPC), j = Math.floor(y / MAPC); return i >= 0 && j >= 0 && i < MAPN && j < MAPN && G.explored[j * MAPN + i] === 1; }
 function safeZones() {
   const z = [], n = isNight(), lm = lightMul();
   if (G.fire.fuel > 0) z.push({ x: G.fire.x, y: G.fire.y, r: n ? fireR() * 0.88 : Math.max(fireR(), 320) });

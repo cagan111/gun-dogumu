@@ -34,6 +34,17 @@ Dinozorlar çağında geçen bir hayatta kalma / korku / halk yönetimi oyunu. S
 - **Korku olayları**: Dev ayak izleri (o gece Dev Kafa gelir), kuşların susması (av gecesi), fırtına ve şimşek, sis,
   ormandan uyuyan birinin sesiyle seni çağıran şey, şafakta boş bulunan yatak.
 - **Hedef**: Zaman yarığını bul, halkını 12 kişiye çıkar, Yarık Taşı yap, yarığı aç ve 100 saniye dayan.
+- **Bilinmezlik / keşif sisi**: dünyayı yalnızca halkının, ışıklarının, kulelerinin ve evcil yaratıklarının gördüğü kadar görürsün.
+  Görülmemiş yerler simsiyah; bir kez görülüp şu an kimsenin bakmadığı yerler soluk ve içlerindeki yaratıklar görünmez.
+  **Kâşif** grubu bilinmeyene gider; büyük haritaya (M) dokunarak hedef ver. Sisli Vadi'de görüş yarıya iner.
+- **Ani gece olayları**: çoğu gece sessiz geçer. Bazı gecelerde, saati bilinmeyen anda: pusu, karanlıktan atılıp kaçan
+  tek yırtıcı, Dev Kafa (uzaktan ya da birden dibinde), yamyam baskını, yırtıcı sürüsü, taklit eden ses, boş yatak.
+  İşaretler (ayak izleri, susan kuşlar, boyalı el izleri) yalnızca bazen önceden görünür. Gündüz de kamptan uzaktakiler nadiren pusuya düşer.
+- **Yamyamlar**: haritada gizli kamplar. Yakınına gidenlere saldırırlar; bazı geceler sessizce yaklaşıp baskın yapar ve
+  insanları sürükleyip götürürler. Esirleri ertesi akşama kadar kurtarmazsan yenir. Totemi yıkarsan kamp dağılır.
+- **Yaratık boyutları**: çoğu küçük (Sürüngeç, Tükürgeç — zehir tükürür), orta tehlikeliler (Yırtıcı, Batakçı), devasa olanlar
+  (Dev Kafa, Uzunboyun — ağaçları devirerek geçer).
+- **Animasyon**: insanlar yürürken bacak/kol sallar, çalışırken balta/kazma kullanır, saldırırken mızrak saplar; yaratıklar nefes alır, başları sallanır.
 - **Kayıt** (otomatik), **zorluk** (Kolay: son şafaktan devam · Normal · Kâbus: tek can), **öğretici**, **mini harita** ve
   keşif sisi, **13 başarım**.
 

@@ -72,7 +72,22 @@ function buildTools() {
   G.toolsDirty = false;
 }
 function toggleMap() { const b = $('miniBox'); if (b.style.display === 'none') { b.style.display = 'block'; b.classList.remove('big'); } else if (!b.classList.contains('big')) b.classList.add('big'); else { b.classList.remove('big'); if (innerWidth <= 700) b.style.display = 'none'; } drawMini(); }
-$('miniBox').addEventListener('pointerdown', e => { e.preventDefault(); toggleMap(); });
+$('miniBox').addEventListener('pointerdown', e => {
+  e.preventDefault(); const b = $('miniBox');
+  if (e.target.id === 'mapClose') { b.classList.remove('big'); if (innerWidth <= 700) b.style.display = 'none'; drawMini(); return; }
+  if (!b.classList.contains('big')) { b.classList.add('big'); drawMini(); return; }
+  const r = $('mini').getBoundingClientRect();
+  sendScouts((e.clientX - r.left) / r.width * WORLD, (e.clientY - r.top) / r.height * WORLD);
+});
+function sendScouts(x, y) {
+  if (!playing()) return;
+  const m = members('kasif');
+  if (!m.length) { msg('Önce Kâşif grubuna kişi ekle (Halk paneli → 🧭 Kâşif → +).', '#e99', 4); return; }
+  G.zone.kasif = { x: clamp(x, 100, WORLD - 100), y: clamp(y, 100, WORLD - 100) };
+  for (const p of m) p.stgt = null;
+  msg(`🧭 ${m.length} kâşif ${compass(angTo(G.fire, G.zone.kasif))} yönüne yola çıktı. Gece olmadan dönerler.`, '#ffd27a', 4);
+  G.uiDirty = true;
+}
 
 // ---- halk paneli
 function toggleSide(force) { const s = $('side'); const closed = force !== undefined ? !force : !s.classList.contains('closed'); s.classList.toggle('closed', closed); $('sideTog').textContent = closed ? '▸' : '▾'; }
@@ -88,7 +103,11 @@ $('side').addEventListener('pointerdown', e => {
   else if (a === 'minus') minusGroup(g);
   else if (a === 'mgr') cycleManager(g);
   else if (a === 'abil') useAbility(g);
-  else if (a === 'zone') { if (G.zone[g]) clearZone(g); else setZone(g); }
+  else if (a === 'zone') {
+    if (G.zone[g]) clearZone(g);
+    else if (g === 'kasif') { const b = $('miniBox'); b.style.display = 'block'; b.classList.add('big'); drawMini(); msg('Haritada bir yere dokun: kâşifler oraya gider.', '#ffd27a', 4); }
+    else setZone(g);
+  }
   else if (a === 'newg') { const opts = GORDER; G.newGroup = opts[(opts.indexOf(G.newGroup) + 1) % opts.length]; }
   else if (a === 'all') { for (const q of listPeople()) if (!q.child) UI.sel.add(q.id); }
   else if (a === 'none') UI.sel.clear();
@@ -101,7 +120,7 @@ $('side').addEventListener('pointerdown', e => {
 function listPeople() { return G.people.filter(p => !p.leader && (UI.filter === 'all' || (UI.filter === 'cocuk' ? p.child : p.group === UI.filter && !p.child))); }
 function statusOf(p) {
   if (p.grabbed) return '😱 kapıldı!'; if (p.desert > 0) return '🏃 kaçıyor'; if (p.downed > 0) return `🩸 yerde ${Math.ceil(p.downed)}sn`;
-  let s = ''; if (p.inHut) s += '💤'; if (p.injury) s += p.injury.type === 'kanama' ? '🩸' : p.injury.type === 'kirik' ? '🦴' : '🤢'; if (p.tired) s += '😴'; if (p.fear >= 80) s += '😨'; if (p.post) s += '🗼';
+  let s = ''; if (p.inHut) s += '💤'; if (p.injury) s += p.injury.type === 'kanama' ? '🩸' : p.injury.type === 'kirik' ? '🦴' : '🤢'; if (p.tired) s += '😴'; if (p.fear >= 80) s += '😨'; if (p.post) s += '🗼'; if (p.group === 'kasif' && !p.inHut && dist(p, G.fire) > 700) s += '🧭' + Math.round(dist(p, G.fire) / 100) * 100 + 'm';
   return s;
 }
 function renderSide() {
@@ -117,7 +136,7 @@ function renderSide() {
       h += `<div class="grp" data-g="${g}"><div class="gh"><span>${GROUPS[g].ic} ${GROUPS[g].ad} <b>${m.length}</b></span><span class="gm">${mg ? '★ ' + mg.name + (tr(mg, 'onder') ? ' ⭐' : '') : (g === 'bos' ? '' : '<i>yönetici yok</i>')}</span></div>`;
       h += `<div class="gb">${g !== 'bos' ? `<button data-a="minus" title="Bir kişiyi boşa al">−</button><button data-a="plus" title="Bir kişi ekle (önce boştakiler)">+</button><button data-a="mgr" title="Yönetici ata / değiştir">★</button>` : '<span class="hint">Ateşi besler, dinlenir</span>'}`;
       if (ABIL[g]) h += `<button data-a="abil" class="ab ${mg && ab.cd <= 0 ? '' : 'no'} ${ab.act > 0 ? 'on' : ''}" title="${ABIL[g].desc}">⚡ ${ABIL[g].ad}${ab.act > 0 ? ' ' + Math.ceil(ab.act) : ab.cd > 0 ? ' ⏳' + Math.ceil(ab.cd) : ''}</button>`;
-      if (['odun', 'tas', 'yiyecek', 'sifaci', 'muhafiz'].includes(g)) h += `<button data-a="zone" class="${mg ? '' : 'no'} ${G.zone[g] ? 'on' : ''}" title="${G.zone[g] ? 'Bölge emrini kaldır' : 'Grubu şu an bulunduğun yere gönder (yönetici gerekir)'}">📍${G.zone[g] ? '✕' : ''}</button>`;
+      if (['odun', 'tas', 'yiyecek', 'sifaci', 'muhafiz', 'kasif'].includes(g)) h += `<button data-a="zone" class="${mg || g === 'kasif' ? '' : 'no'} ${G.zone[g] ? 'on' : ''}" title="${G.zone[g] ? 'Hedefi kaldır' : g === 'kasif' ? 'Haritadan keşif hedefi seç' : 'Grubu şu an bulunduğun yere gönder (yönetici gerekir)'}">${g === 'kasif' ? '🗺️' : '📍'}${G.zone[g] ? '✕' : ''}</button>`;
       h += `</div></div>`;
     }
     h += `<div class="grp"><div class="gb"><span class="hint">Yeni gelenler →</span><button data-a="newg">${GROUPS[G.newGroup].ic} ${GROUPS[G.newGroup].ad}</button></div></div>`;
@@ -218,6 +237,7 @@ function startScreen() {
   ${best ? `<p>En uzun hayatta kalma: <b>${best} gün</b></p>` : ''}
   <details><summary>Nasıl oynanır?</summary><div class="keys">${isTouch ? `<b>Sol taraf</b> hareket · <b>Saldır</b> mızrak · <b>Ok</b> yay · <b>Topla/Kullan</b> toplama, ateş, tedavi, evcilleştirme, binme` : `<b>WASD</b> hareket · <b>Shift</b> koş · <b>Fare/Boşluk</b> mızrak · <b>F / sağ tık</b> ok<br><b>E</b> (basılı) topla · ateşe odun · tedavi · evcilleştir · kurtar · bin/in<br><b>1-8</b> inşa · <b>C</b> zanaat · <b>M</b> harita · <b>H</b> halk paneli · <b>T</b> meşale · <b>P</b> duraklat`}<br>
   <b>Halk</b>: sağ panelde gruplar (Odun, Taş, Yiyecek, Şifacı, Muhafız, Takip, Boşta). <b>+/−</b> ile kişi aktar, <b>★</b> ile yönetici ata. Yöneticisi olan grup daha hızlı çalışır, <b>⚡ özel yetenek</b> ve <b>📍 bölge emri</b> kullanabilir. Kişiler sekmesinde çoklu seçip toplu aktarabilirsin.<br>
+  <b>Bilinmezlik</b>: sadece halkının gördüğünü görürsün. Karanlık yerlere 🧭 kâşif gönder. Geceler çoğu zaman sessizdir... ama her zaman değil.<br>
   <b>Hedef</b>: haritada zaman yarığını bul, halkını 12 kişiye çıkar, Yarık Taşı yap ve son savaşı kazan.</div></details>
   <details><summary>Başarımlar (${ACHSET.size}/${Object.keys(ACH).length})</summary><div class="achs">${achList}</div></details>
   <p style="font-size:12px;color:#776">🎧 Kulaklıkla oyna.</p>`;
