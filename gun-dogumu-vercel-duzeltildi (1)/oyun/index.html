@@ -5,59 +5,123 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Son Ateş</title>
 <style>
-:root{--ink:#f1e6cf;--muted:#a89a80;--panel:rgba(14,12,10,.78);--line:rgba(241,230,207,.14);--fire:#ff8a2a;--blood:#c3271b;--bg:#050505}
+:root{--ink:#f1e6cf;--muted:#a89a80;--panel:rgba(14,12,10,.82);--line:rgba(241,230,207,.14);--fire:#ff8a2a;--bg:#050505}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--ink);font-family:Georgia,"Times New Roman",serif;user-select:none;-webkit-user-select:none;touch-action:none}
 canvas{display:block}
-.bar{position:relative;height:7px;background:rgba(255,255,255,.1);border-radius:4px;overflow:hidden;flex:1;min-width:60px}
-.bar i{position:absolute;inset:0;width:50%;background:#7c6;border-radius:4px;transition:width .15s}
+button{font-family:Georgia,serif;color:var(--ink);cursor:pointer}
+.bar{position:relative;height:7px;background:rgba(255,255,255,.1);border-radius:4px;overflow:hidden;flex:1;min-width:40px}
+.bar i{position:absolute;left:0;top:0;bottom:0;width:50%;background:#7c6;border-radius:4px;transition:width .15s}
 #hud{position:fixed;inset:0;pointer-events:none;display:none}
-#top{position:absolute;left:10px;top:10px;display:flex;flex-direction:column;gap:6px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 10px;min-width:210px;font-size:13px}
+#top{position:absolute;left:10px;top:10px;display:flex;flex-direction:column;gap:5px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 10px;min-width:220px;font-size:13px}
 #top .row{display:flex;align-items:center;gap:8px}
-#res{display:flex;gap:10px;font-size:13px}
+#res,#res2{display:flex;gap:9px;font-size:13px;flex-wrap:wrap}
+#res2{font-size:12px;color:#d8ccb4;gap:7px}
 #fireBar{background:linear-gradient(90deg,#c33,#f80,#fd4)}
+#morBar{background:linear-gradient(90deg,#a44,#cc5,#6c6)}
 #todBar{background:linear-gradient(90deg,#fd6,#88a)}
-#msgs{position:absolute;left:50%;top:12px;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:4px;width:min(92vw,560px)}
-#msgs div{background:rgba(0,0,0,.6);padding:5px 12px;border-radius:6px;font-size:14px;text-align:center;transition:opacity .5s}
-#side{position:absolute;right:10px;top:10px;width:230px;background:var(--panel);border:1px solid var(--line);border-radius:10px;pointer-events:auto;font-size:12px;max-height:60vh;overflow:auto}
-#sideHead{padding:7px 10px;border-bottom:1px solid var(--line);cursor:pointer;display:flex;justify-content:space-between;letter-spacing:.08em}
-#side.closed #plist{display:none}
-.pr{display:grid;grid-template-columns:1fr auto;gap:2px 6px;padding:5px 10px;border-bottom:1px solid rgba(255,255,255,.05)}
+#miniBox{position:absolute;left:10px;top:150px;pointer-events:auto;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#000;cursor:pointer}
+#miniBox.big{left:50%;top:50%;transform:translate(-50%,-50%);z-index:3;box-shadow:0 0 40px #000}
+#tutBox{position:absolute;left:50%;transform:translateX(-50%);bottom:150px;background:rgba(40,28,10,.92);border:1px solid #c88a40;border-radius:8px;padding:7px 12px;font-size:14px;max-width:min(92vw,560px);pointer-events:auto;display:none;text-align:center}
+#tutBox button{margin-left:8px;background:#3a2810;border:1px solid #7a5a30;border-radius:5px;font-size:12px;padding:2px 8px}
+#msgs{position:absolute;left:50%;top:12px;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:4px;width:min(58vw,560px)}
+#msgs div{background:rgba(0,0,0,.62);padding:5px 12px;border-radius:6px;font-size:14px;text-align:center}
+#toast{position:fixed;left:50%;top:40%;transform:translateX(-50%);display:flex;flex-direction:column;gap:6px;z-index:6;pointer-events:none}
+#toast div{background:rgba(50,36,8,.95);border:1px solid #e0b050;color:#ffe2a0;padding:8px 16px;border-radius:8px;font-size:14px;animation:tin .4s}
+@keyframes tin{from{opacity:0;transform:scale(.8)}to{opacity:1;transform:none}}
+#side{position:absolute;right:10px;top:10px;width:300px;background:var(--panel);border:1px solid var(--line);border-radius:10px;pointer-events:auto;font-size:12px;max-height:calc(100vh - 190px);display:flex;flex-direction:column}
+#sideHead{padding:7px 10px;border-bottom:1px solid var(--line);cursor:pointer;display:flex;justify-content:space-between;gap:10px;letter-spacing:.08em;flex:none}
+#sideBody{overflow:auto;flex:1;min-height:0}
+#side.closed #sideBody{display:none}
+#side.closed{width:auto}
+#tabs{display:flex;gap:4px;padding:6px 8px;border-bottom:1px solid var(--line);position:sticky;top:0;background:rgba(14,12,10,.97);z-index:1}
+#tabs button,.chips button,.bulk button,.gb button,.btns button{background:#2b2419;border:1px solid #5a4a30;border-radius:5px;font-size:12px;padding:3px 7px;line-height:1.2}
+#tabs button{flex:1;padding:5px}
+#tabs button.on,.chips button.on,.gb button.on,.btns button.on{border-color:var(--fire);background:#4a2a10}
+.gb button.no{opacity:.45}
+.grp{padding:6px 9px;border-bottom:1px solid rgba(255,255,255,.06)}
+.gh{display:flex;justify-content:space-between;margin-bottom:4px;font-size:13px}
+.gm{color:#ffd27a;font-size:12px}
+.gm i{color:var(--muted)}
+.gb{display:flex;gap:4px;flex-wrap:wrap;align-items:center}
+.gb button{min-width:30px}
+.gb .ab{flex:1;text-align:left}
+.hint{color:var(--muted);font-size:11px}
+.note{padding:6px 9px;color:#cbbd9f;font-size:12px;border-bottom:1px solid rgba(255,255,255,.06)}
+.chips,.bulk{display:flex;gap:3px;flex-wrap:wrap;padding:6px 8px;border-bottom:1px solid rgba(255,255,255,.06);align-items:center}
+.bulk span{font-size:11px;color:#ffd27a;margin:0 2px}
+.pr{display:grid;grid-template-columns:1fr auto;gap:3px 6px;padding:5px 9px;border-bottom:1px solid rgba(255,255,255,.05)}
+.pr.sel{background:rgba(255,160,60,.12)}
+.pr .nmw{cursor:pointer;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .pr .nm{font-weight:bold}
+.pr .trs{font-size:11px}
+.pr .btns{display:flex;gap:3px}
 .pr .bars{grid-column:1/3;display:flex;gap:4px}
 .pr .bars .bar{height:4px}
 .pr .fear i{background:linear-gradient(90deg,#6a6,#d33)}
-.job{pointer-events:auto;background:#2b2419;color:var(--ink);border:1px solid #5a4a30;border-radius:5px;font:11px Georgia,serif;padding:2px 6px;cursor:pointer}
-.job:active{background:#4a3a20}
+.pr .info{grid-column:1/3;font-size:11px;color:#d8ccb4;line-height:1.5;background:rgba(0,0,0,.25);padding:5px;border-radius:5px}
 #bottom{position:absolute;left:0;right:0;bottom:0;display:flex;flex-direction:column;align-items:center;gap:6px;padding:0 8px 8px}
-#prompt{font-size:14px;background:rgba(0,0,0,.55);padding:4px 12px;border-radius:6px;min-height:0}
+#prompt{font-size:14px;background:rgba(0,0,0,.6);padding:4px 12px;border-radius:6px}
 #prompt:empty{display:none}
 #bars{display:flex;gap:8px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:5px 10px;font-size:12px;width:min(420px,94vw)}
 #hpBar{background:linear-gradient(90deg,#922,#e44)}
 #stBar{background:linear-gradient(90deg,#aa7,#ee9)}
 #tools{display:flex;gap:5px;pointer-events:auto;overflow-x:auto;max-width:100%;padding-bottom:2px}
-#tools button{background:var(--panel);color:var(--ink);border:1px solid #5a4a30;border-radius:8px;font:12px Georgia,serif;padding:5px 8px;cursor:pointer;white-space:nowrap;line-height:1.25}
+#tools button{flex:none;background:var(--panel);border:1px solid #5a4a30;border-radius:8px;font-size:12px;padding:5px 8px;white-space:nowrap;line-height:1.25}
 #tools button small{color:var(--muted)}
 #tools button.on{border-color:var(--fire);box-shadow:0 0 8px rgba(255,138,42,.5)}
 #tools button.no{opacity:.45}
+#tools button.hl{border-color:#c88a40}
+#craft{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:4;pointer-events:auto}
+#craftBox{background:#15110c;border:1px solid #6a5030;border-radius:12px;width:min(640px,94vw);max-height:86vh;display:flex;flex-direction:column}
+.ch{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.ch .res{flex:1;font-size:12px;color:#d8ccb4}
+.ch button{background:#2b2419;border:1px solid #5a4a30;border-radius:6px;padding:3px 10px}
+.cl{overflow:auto;padding:6px 12px 12px;touch-action:pan-y}
+.cat{color:#ffb067;font-size:13px;letter-spacing:.1em;margin:10px 0 4px;text-transform:uppercase}
+.card{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:7px 9px;border:1px solid rgba(255,255,255,.08);border-radius:8px;margin-bottom:5px;font-size:13px}
+.card small{color:#cbbd9f}
+.card .bad{color:#f88}
+.card.done{opacity:.55}
+.card.locked{opacity:.6}
+.card button{background:#3a1d0b;border:1px solid #c66a25;border-radius:6px;padding:5px 12px;flex:none}
+.card button.no{opacity:.45}
+.card .ok{color:#9e9;font-size:18px}
+#sideBody{touch-action:pan-y}
 #touch{display:none;position:fixed;inset:0;pointer-events:none}
 #joy{position:absolute;left:0;bottom:0;width:50%;height:62%;pointer-events:auto}
 #knobBase{position:absolute;width:110px;height:110px;border-radius:50%;border:2px solid rgba(255,255,255,.18);display:none}
 #knob{position:absolute;width:48px;height:48px;border-radius:50%;background:rgba(255,255,255,.22);left:31px;top:31px}
-#tbtns{position:absolute;right:12px;bottom:118px;display:grid;grid-template-columns:repeat(2,64px);gap:10px;pointer-events:auto}
-#tbtns div{width:64px;height:64px;border-radius:50%;background:rgba(20,16,12,.7);border:2px solid rgba(255,200,140,.35);display:flex;align-items:center;justify-content:center;font-size:12px;text-align:center}
-#tbtns div.act{background:rgba(120,60,20,.8)}
-#screen{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at 50% 70%,#2a1408 0%,#050403 70%);z-index:5;padding:20px;overflow:auto}
-#screen .box{max-width:560px;text-align:center}
+#tbtns{position:absolute;right:10px;bottom:120px;display:grid;grid-template-columns:repeat(3,58px);gap:8px;pointer-events:auto}
+#tbtns div{width:58px;height:58px;border-radius:50%;background:rgba(20,16,12,.72);border:2px solid rgba(255,200,140,.35);display:flex;align-items:center;justify-content:center;font-size:11px;text-align:center;line-height:1.1}
+#tbtns div.act{background:rgba(120,60,20,.82)}
+#pause{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.6);font-size:32px;z-index:4;letter-spacing:.2em}
+#screen{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at 50% 70%,#2a1408 0%,#050403 70%);z-index:5;padding:20px;overflow:auto;touch-action:pan-y}
+#screen .box{max-width:600px;text-align:center;margin:auto}
 #screen h1{font-size:clamp(44px,11vw,84px);margin:0;letter-spacing:.12em;color:#ffb067;text-shadow:0 0 30px rgba(255,100,20,.6),0 0 4px #000}
 #screen p{color:#d8c8a8;line-height:1.6;font-size:15px}
 #screen .story{font-style:italic;color:#bba98a}
-#screen button{margin-top:14px;background:#3a1d0b;color:#ffd2a0;border:1px solid #c66a25;padding:12px 34px;font:20px Georgia,serif;border-radius:8px;cursor:pointer;letter-spacing:.1em}
+#screen button{margin-top:10px;background:#2a160a;color:#ffd2a0;border:1px solid #8a4a20;padding:8px 22px;font-size:15px;border-radius:8px;letter-spacing:.06em}
+#screen button.big{background:#3a1d0b;border-color:#c66a25;padding:12px 34px;font-size:19px;letter-spacing:.1em}
 #screen button:hover{background:#5a2a0e}
-#screen .keys{font-size:13px;color:#a89a80;text-align:left;display:inline-block;margin-top:6px;line-height:1.7}
-#screen .keys b{color:#e8d4b0}
-#pause{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.6);font-size:32px;z-index:4;letter-spacing:.2em}
-@media (max-width:700px){#side{width:190px;font-size:11px;max-height:45vh}#top{min-width:0;font-size:12px}#res{gap:7px;font-size:12px}#msgs{top:96px}#msgs div{font-size:12px}}
+.diffs{display:flex;gap:6px;justify-content:center;margin-top:14px}
+.diffs button.on{border-color:#ffb067!important;background:#5a2a0e!important}
+.ddesc{font-size:13px!important;color:#a89a80!important;margin:6px 0!important}
+.chk{font-size:14px;color:#d8c8a8}
+details{text-align:left;margin-top:12px;background:rgba(0,0,0,.25);border:1px solid var(--line);border-radius:8px;padding:6px 10px}
+summary{cursor:pointer;color:#e8d4b0}
+.keys{font-size:13px;color:#a89a80;line-height:1.7;margin-top:6px}
+.keys b{color:#e8d4b0}
+.achs{font-size:13px;color:#776;line-height:1.7}
+.achs .got{color:#ffe2a0}
+@media (max-width:700px){
+  #side{width:min(270px,64vw);font-size:11px;max-height:calc(100vh - 260px)}
+  #top{min-width:0;font-size:12px;padding:6px 8px;max-width:46vw}
+  #res{gap:6px;font-size:12px}#res2{font-size:11px}
+  #msgs{top:auto;bottom:250px;width:92vw}#msgs div{font-size:12px}
+  #miniBox{top:auto;bottom:250px}
+  #tutBox{bottom:auto;top:185px;left:8px;transform:none;max-width:46vw;font-size:12px;text-align:left}
+}
 </style>
 </head>
 <body>
@@ -66,1372 +130,49 @@ canvas{display:block}
 <div id="hud">
   <div id="top">
     <div class="row"><b id="dayTxt">1. Gün</b><span id="todTxt">☀️</span><div class="bar"><i id="todBar"></i></div></div>
-    <div id="res"><span>🪵 <b id="rWood">0</b></span><span>🪨 <b id="rStone">0</b></span><span>🍖 <b id="rFood">0</b></span><span>👥 <b id="rPop">0</b></span></div>
-    <div class="row">🔥<div class="bar"><i id="fireBar"></i></div></div>
+    <div id="res"></div>
+    <div id="res2"></div>
+    <div class="row" title="Ateş">🔥<div class="bar"><i id="fireBar"></i></div></div>
+    <div class="row" title="Halkın morali">🙂<div class="bar"><i id="morBar"></i></div></div>
   </div>
+  <div id="miniBox"><canvas id="mini"></canvas></div>
   <div id="msgs"></div>
-  <div id="side"><div id="sideHead"><span>HALKIN</span><span id="sideTog">▾</span></div><div id="plist"></div></div>
+  <div id="tutBox"></div>
+  <div id="side">
+    <div id="sideHead"><span>HALKIN <small id="popTxt"></small></span><span id="sideTog">▾</span></div>
+    <div id="sideBody">
+      <div id="tabs"><button data-tab="g" class="on">Gruplar</button><button data-tab="k">Kişiler</button></div>
+      <div id="tabG"></div>
+      <div id="tabK"></div>
+    </div>
+  </div>
   <div id="bottom">
     <div id="prompt"></div>
     <div id="bars">❤<div class="bar"><i id="hpBar"></i></div>⚡<div class="bar"><i id="stBar"></i></div></div>
-    <div id="tools">
-      <button data-b="kulube">🛖 Kulübe<br><small>15🪵 4🪨</small></button>
-      <button data-b="cit">🪵 Kazık Çit<br><small>4🪵</small></button>
-      <button data-b="mesale">🔦 Meşale Direği<br><small>4🪵 2🪨</small></button>
-      <button data-b="tuzak">⚠️ Kazık Tuzağı<br><small>4🪵 3🪨</small></button>
-      <button data-c="mizrak" id="cMizrak">🗡️ Taş Mızrak<br><small>5🪵 10🪨</small></button>
-      <button data-c="mesale" id="cTorch">🔥 El Meşalesi<br><small>6🪵 · [T]</small></button>
-    </div>
+    <div id="tools"></div>
   </div>
 </div>
+
+<div id="craft"><div id="craftBox"></div></div>
+<div id="toast"></div>
 
 <div id="touch">
   <div id="joy"><div id="knobBase"><div id="knob"></div></div></div>
   <div id="tbtns">
-    <div id="tTorch">Meşale</div><div id="tRun">Koş</div>
-    <div id="tAct">Topla<br>/Kullan</div><div id="tAtk" class="act">Saldır</div>
+    <div id="tTorch">Meşale</div><div id="tMap">Harita</div><div id="tRun">Koş</div>
+    <div id="tShoot">Ok</div><div id="tAct">Topla<br>Kullan</div><div id="tAtk" class="act">Saldır</div>
   </div>
 </div>
 
 <div id="pause">DURAKLATILDI</div>
-
 <div id="screen"><div class="box" id="screenBox"></div></div>
 
-<script>
-'use strict';
-// =============================================================
-//  SON ATEŞ — dinozorlar çağında hayatta kalma / korku / halk yönetimi
-// =============================================================
-const TAU = Math.PI * 2;
-const rand = (a, b) => a + Math.random() * (b - a);
-const ri = (a, b) => Math.floor(rand(a, b + 1));
-const pick = a => a[Math.floor(Math.random() * a.length)];
-const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
-const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
-const angTo = (a, b) => Math.atan2(b.y - a.y, b.x - a.x);
-const gauss = () => (Math.random() + Math.random() + Math.random() - 1.5) / 1.5;
-function angLerp(a, b, t) { let d = ((b - a + Math.PI) % TAU + TAU) % TAU - Math.PI; return a + d * t; }
-const $ = id => document.getElementById(id);
-// Türkçe ek uyumu: gen = 'ın, acc = 'ı, cop = 'sın
-function harm(w) { const m = w.toLocaleLowerCase('tr').match(/[aeıioöuü](?=[^aeıioöuü]*$)/); const v = m ? m[0] : 'e'; return 'aı'.includes(v) ? 'ı' : 'ei'.includes(v) ? 'i' : 'ou'.includes(v) ? 'u' : 'ü'; }
-const endsV = w => /[aeıioöuü]$/i.test(w);
-const gen = w => w + "'" + (endsV(w) ? 'n' : '') + harm(w) + 'n';
-const acc = w => w + "'" + (endsV(w) ? 'y' : '') + harm(w);
-const cop = w => w + "'s" + harm(w) + 'n';
-
-const cv = $('c'), ctx = cv.getContext('2d');
-const dark = document.createElement('canvas'), dctx = dark.getContext('2d');
-let VW, VH, DPR;
-function resize() {
-  DPR = Math.min(2, window.devicePixelRatio || 1);
-  VW = innerWidth; VH = innerHeight;
-  cv.width = dark.width = Math.round(VW * DPR);
-  cv.height = dark.height = Math.round(VH * DPR);
-  cv.style.width = VW + 'px'; cv.style.height = VH + 'px';
-}
-addEventListener('resize', resize); resize();
-
-// ------------------------------------------------------------- sabitler
-const WORLD = 4400, CAMP = { x: 2200, y: 2200 };
-const CYCLE = 280; // bir gün+gece süresi (sn)
-const NAMES = ['Arda','Ece','Toprak','Deniz','Kaya','Ilgın','Bora','Su','Tan','Yağmur','Doruk','Nehir','Çınar','Defne','Alp','Elif','Umut','Ay','Bulut','Duru','Ege','Lale','Oğuz','Selin','Yiğit','Mert','Zeynep','Kuzey','Asya','Poyraz','Rüzgar','Sema','Ozan','Ada','Kartal','Pınar'];
-const JOBS = ['odun', 'tas', 'yiyecek', 'muhafiz', 'takip'];
-const JOBL = { odun: '🪵 Odun', tas: '🪨 Taş', yiyecek: '🫐 Yiyecek', muhafiz: '🛡️ Muhafız', takip: '👣 Takip' };
-const JOBC = { odun: '#8a5a32', tas: '#7c7c7c', yiyecek: '#7a3a6a', muhafiz: '#2c4f7a', takip: '#5c6b2a' };
-const DINO = {
-  kucuk:    { ad: 'Sürüngeç', r: 10, hp: 18,  spd: 175, dmg: 4,  cd: 0.7, col: '#6b7d3a', eye: '#b6ff5a', meat: 2,  sense: 380, nsense: 560 },
-  yirtici:  { ad: 'Yırtıcı',  r: 18, hp: 60,  spd: 215, dmg: 12, cd: 0.9, col: '#8a4b2a', eye: '#ffd23a', meat: 8,  sense: 480, nsense: 850 },
-  dev:      { ad: 'Dev Kafa', r: 44, hp: 520, spd: 118, dmg: 40, cd: 1.6, col: '#3e3b35', eye: '#ff3a1a', meat: 60, sense: 700, nsense: 1100 },
-  boynuzlu: { ad: 'Boynuzlu', r: 34, hp: 160, spd: 80,  dmg: 22, cd: 1.3, col: '#a08860', eye: '#ddd',    meat: 25, sense: 260, nsense: 260 }
-};
-const BUILD = {
-  kulube: { ad: 'Kulübe',        cost: { wood: 15, stone: 4 }, r: 30, hp: 240 },
-  cit:    { ad: 'Kazık Çit',     cost: { wood: 4 },            r: 20, hp: 140 },
-  mesale: { ad: 'Meşale Direği', cost: { wood: 4, stone: 2 },  r: 8,  hp: 70, light: 150 },
-  tuzak:  { ad: 'Kazık Tuzağı',  cost: { wood: 4, stone: 3 },  r: 16, hp: 999 }
-};
-
-// ------------------------------------------------------------- ses (WebAudio, tamamen sentez)
-const A = { ctx: null };
-function audioInit() {
-  if (A.ctx) { if (A.ctx.state === 'suspended') A.ctx.resume(); return; }
-  try {
-    const ac = new (window.AudioContext || window.webkitAudioContext)();
-    A.ctx = ac;
-    A.master = ac.createGain(); A.master.gain.value = 0.7; A.master.connect(ac.destination);
-    const len = ac.sampleRate * 2, buf = ac.createBuffer(1, len, ac.sampleRate), d = buf.getChannelData(0);
-    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
-    A.noise = buf;
-    // brown noise rüzgar
-    const bb = ac.createBuffer(1, len, ac.sampleRate), bd = bb.getChannelData(0); let last = 0;
-    for (let i = 0; i < len; i++) { last = (last + 0.02 * (Math.random() * 2 - 1)) / 1.02; bd[i] = last * 3.5; }
-    const w = ac.createBufferSource(); w.buffer = bb; w.loop = true;
-    const wf = ac.createBiquadFilter(); wf.type = 'lowpass'; wf.frequency.value = 500;
-    A.wind = ac.createGain(); A.wind.gain.value = 0.05;
-    w.connect(wf); wf.connect(A.wind); A.wind.connect(A.master); w.start();
-    // derin uğultu (gece gerilimi)
-    const dr = ac.createOscillator(); dr.type = 'sine'; dr.frequency.value = 43;
-    const dr2 = ac.createOscillator(); dr2.type = 'sine'; dr2.frequency.value = 44.3;
-    A.drone = ac.createGain(); A.drone.gain.value = 0;
-    dr.connect(A.drone); dr2.connect(A.drone); A.drone.connect(A.master); dr.start(); dr2.start();
-    const dist = ac.createWaveShaper(); const c = new Float32Array(256);
-    for (let i = 0; i < 256; i++) { const x = i / 128 - 1; c[i] = Math.tanh(x * 4); }
-    dist.curve = c; A.dist = dist; dist.connect(A.master);
-  } catch (e) { A.ctx = null; }
-}
-function out(pan) {
-  if (pan !== undefined && A.ctx.createStereoPanner) { const p = A.ctx.createStereoPanner(); p.pan.value = clamp(pan, -1, 1); p.connect(A.master); return p; }
-  return A.master;
-}
-function tone(type, f0, f1, dur, vol, opt = {}) {
-  if (!A.ctx || vol < 0.003) return;
-  const ac = A.ctx, t = ac.currentTime + (opt.delay || 0);
-  const o = ac.createOscillator(), g = ac.createGain();
-  o.type = type; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(Math.max(1, f1), t + dur);
-  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + (opt.att || 0.01)); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-  if (opt.vib) { const l = ac.createOscillator(), lg = ac.createGain(); l.frequency.value = opt.vib; lg.gain.value = f0 * 0.06; l.connect(lg); lg.connect(o.frequency); l.start(t); l.stop(t + dur); }
-  o.connect(g); g.connect(opt.dist ? A.dist : out(opt.pan)); o.start(t); o.stop(t + dur + 0.05);
-}
-function noise(dur, vol, ftype, f0, f1, opt = {}) {
-  if (!A.ctx || vol < 0.003) return;
-  const ac = A.ctx, t = ac.currentTime + (opt.delay || 0);
-  const s = ac.createBufferSource(); s.buffer = A.noise; s.playbackRate.value = opt.rate || 1;
-  const f = ac.createBiquadFilter(); f.type = ftype; f.Q.value = opt.q || 1;
-  f.frequency.setValueAtTime(f0, t); f.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t + dur);
-  const g = ac.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + (opt.att || 0.01)); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-  s.connect(f); f.connect(g); g.connect(opt.dist ? A.dist : out(opt.pan)); s.start(t, Math.random()); s.stop(t + dur + 0.05);
-}
-const SFX = {
-  roar(v, pan) { noise(2.4, v * 0.9, 'lowpass', 900, 90, { att: 0.25, q: 4, pan }); tone('sawtooth', 95, 38, 2.3, v * 0.45, { att: 0.3, dist: true, vib: 7 }); tone('square', 190, 70, 1.8, v * 0.12, { att: 0.2, vib: 11, pan }); },
-  screech(v, pan) { tone('sawtooth', 1100, 1700, 0.18, v * 0.25, { pan }); tone('sawtooth', 1600, 600, 0.45, v * 0.25, { delay: 0.16, vib: 30, pan }); noise(0.5, v * 0.25, 'bandpass', 3000, 1500, { q: 3, pan }); },
-  chirp(v, pan) { tone('square', 1800, 2600, 0.08, v * 0.12, { pan }); tone('square', 2200, 1500, 0.1, v * 0.12, { delay: 0.1, pan }); },
-  thump(v) { tone('sine', 70, 28, 0.45, v, { att: 0.005 }); noise(0.25, v * 0.5, 'lowpass', 200, 40); },
-  hit(v) { noise(0.12, v * 0.6, 'highpass', 1200, 600); tone('triangle', 220, 90, 0.1, v * 0.4); },
-  swing() { noise(0.16, 0.12, 'bandpass', 600, 2400, { q: 2 }); },
-  chop() { noise(0.07, 0.25, 'bandpass', 900, 500, { q: 4 }); tone('triangle', 300, 150, 0.06, 0.12); },
-  rock() { noise(0.06, 0.25, 'highpass', 3000, 2000); tone('square', 900, 700, 0.04, 0.05); },
-  pickup() { tone('sine', 600, 900, 0.08, 0.08); },
-  scream(v, pan) { tone('sawtooth', 820, 300, 1.4, v * 0.3, { vib: 9, att: 0.05, pan }); tone('triangle', 1240, 450, 1.3, v * 0.15, { vib: 13, pan }); },
-  heart(v) { tone('sine', 62, 38, 0.18, v); tone('sine', 58, 34, 0.18, v * 0.8, { delay: 0.22 }); },
-  rustle(v, pan) { for (let i = 0; i < 5; i++) noise(0.09, v * rand(0.3, 1), 'bandpass', rand(1500, 4000), 1200, { delay: i * rand(0.06, 0.14), q: 1.5, pan }); },
-  crackle(v) { noise(0.03, v, 'highpass', 2500, 2000); },
-  bird() { const f = rand(2000, 3200); tone('sine', f, f * 1.3, 0.09, 0.025); tone('sine', f * 1.2, f * 0.9, 0.12, 0.025, { delay: 0.12 }); },
-  build() { noise(0.1, 0.25, 'lowpass', 600, 200); tone('triangle', 200, 120, 0.15, 0.15, { delay: 0.12 }); },
-  bell() { tone('sine', 520, 520, 1.2, 0.08); tone('sine', 780, 780, 1.0, 0.05); },
-  sting() { tone('sawtooth', 110, 104, 2.5, 0.12, { att: 0.02, dist: true }); tone('sine', 1300, 1250, 2.0, 0.04, { vib: 6 }); }
-};
-
-// ------------------------------------------------------------- uzaysal ızgara (engeller)
-const CELL = 200; let grid = new Map();
-function cellsOf(o, fn) {
-  const x0 = Math.floor((o.x - o.r) / CELL), x1 = Math.floor((o.x + o.r) / CELL);
-  const y0 = Math.floor((o.y - o.r) / CELL), y1 = Math.floor((o.y + o.r) / CELL);
-  for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) fn(x * 10007 + y);
-}
-function gAdd(o) { cellsOf(o, k => { let a = grid.get(k); if (!a) grid.set(k, a = []); a.push(o); }); }
-function gDel(o) { cellsOf(o, k => { const a = grid.get(k); if (a) { const i = a.indexOf(o); if (i >= 0) a.splice(i, 1); } }); }
-function gQuery(x, y, r) {
-  const res = [];
-  const x0 = Math.floor((x - r) / CELL), x1 = Math.floor((x + r) / CELL), y0 = Math.floor((y - r) / CELL), y1 = Math.floor((y + r) / CELL);
-  for (let cx = x0; cx <= x1; cx++) for (let cy = y0; cy <= y1; cy++) { const a = grid.get(cx * 10007 + cy); if (a) for (const o of a) if (!res.includes(o)) res.push(o); }
-  return res;
-}
-
-// ------------------------------------------------------------- oyun durumu
-const G = {}; let L = null; // L = lider
-let groundPat = null;
-function makeGround() {
-  const c = document.createElement('canvas'); c.width = c.height = 384; const g = c.getContext('2d');
-  g.fillStyle = '#2c3f22'; g.fillRect(0, 0, 384, 384);
-  for (let i = 0; i < 2600; i++) {
-    const x = Math.random() * 384, y = Math.random() * 384;
-    g.fillStyle = pick(['#34492a', '#273a1f', '#3a5030', '#2f4425', '#3d4a28', '#24331b']);
-    g.fillRect(x, y, rand(1, 3), rand(2, 6));
-  }
-  for (let i = 0; i < 14; i++) { g.fillStyle = 'rgba(70,55,30,.18)'; g.beginPath(); g.ellipse(Math.random() * 384, Math.random() * 384, rand(10, 40), rand(6, 22), rand(0, 3), 0, TAU); g.fill(); }
-  groundPat = ctx.createPattern(c, 'repeat');
-}
-
-function mkPerson(x, y, name, leader) {
-  return { id: ++G.idc, name, x, y, r: 11, hp: leader ? 100 : 60, maxhp: leader ? 100 : 60, fear: 0, job: leader ? null : pick(['odun', 'yiyecek', 'odun', 'tas']),
-    st: 'idle', tgt: null, carry: 0, work: 0, ang: rand(0, TAU), anim: 0, leader: !!leader, atkCd: 0, hurtT: 0, lastHurt: 99, inHut: null,
-    skin: pick(['#e0b48a', '#c99068', '#a8754f', '#f0c8a0', '#8a5a3a']), hair: pick(['#2a1a10', '#4a2e18', '#111', '#6a4020', '#8a6a3a']),
-    stam: 100, stuck: 0, detour: 0, seat: rand(0, TAU), grabbed: false, desert: 0, moving: false, lx: x, ly: y };
-}
-function mkDino(type, x, y) {
-  const d = DINO[type];
-  return { type, x, y, r: d.r, hp: d.hp, maxhp: d.hp, ang: rand(0, TAU), anim: rand(0, 9), atkCd: 0, think: 0, tgt: null, wx: x, wy: y, wt: 0,
-    hurt: 0, leave: false, tamed: false, angry: 0, ko: 0, koDone: false, carry: null, carryDmg: 0, orbit: Math.random() < 0.5 ? 1 : -1,
-    engaged: false, stepT: 0, rush: 0, roarT: rand(4, 10), blink: rand(1, 5), moving: false, bash: null, trapCd: 0, id: ++G.idc };
-}
-
-function newGame() {
-  grid = new Map();
-  Object.assign(G, { t: CYCLE * 0.05, day: 1, stock: { wood: 22, stone: 6, food: 26 }, fire: { x: CAMP.x, y: CAMP.y, fuel: 85, r: 300, out: false },
-    trees: [], rocks: [], bushes: [], lakes: [], builds: [], people: [], dinos: [], parts: [], texts: [], msgs: [],
-    spear: 1, torchOwned: false, torchOn: false, torchFuel: 0, shake: 0, over: false, rescue: null, rescueAt: -1, kills: 0, deaths: 0, lost: 0,
-    placing: null, flags: {}, stokeT: 0, spawnT: 0, actT: 0, hbT: 0, devDone: false, leaveDone: false, idc: 0, red: 0, now: 0, paused: false,
-    ambT: 3, uiT: 0, regrowT: 0, interact: null, usedNames: new Set(), started: true, lastHurt: 0, danger: 0 });
-  genWorld();
-  L = mkPerson(CAMP.x, CAMP.y + 70, 'Sen', true);
-  G.people.push(L);
-  const jobs = ['odun', 'yiyecek', 'muhafiz'];
-  for (let i = 0; i < 3; i++) {
-    const a = i / 3 * TAU + 0.5;
-    const p = mkPerson(CAMP.x + Math.cos(a) * 80, CAMP.y + Math.sin(a) * 80, freshName(), false);
-    p.job = jobs[i]; G.people.push(p);
-  }
-  msg('Ateşi canlı tut. Halkını besle. Gece geldiğinde... ışıktan ayrılma.', '#ffd9a0', 8);
-  msg('İnsanlarına sağ paneldeki düğmelerle iş ver.', '#bbb', 8);
-  buildPList();
-  if (innerWidth <= 700) { $('side').classList.add('closed'); $('sideTog').textContent = '▸'; }
-}
-function freshName() {
-  const free = NAMES.filter(n => !G.usedNames.has(n));
-  const n = free.length ? pick(free) : pick(NAMES) + ' ' + ri(2, 9);
-  G.usedNames.add(n); return n;
-}
-
-function genWorld() {
-  const nearCamp = (x, y, m) => Math.hypot(x - CAMP.x, y - CAMP.y) < m;
-  for (let i = 0; i < 8; i++) {
-    let x, y, r, k = 0;
-    do { x = rand(300, WORLD - 300); y = rand(300, WORLD - 300); r = rand(110, 240); } while (nearCamp(x, y, r + 520) && k++ < 60);
-    const o = { x, y, r, kind: 'lake', seed: Math.random() }; G.lakes.push(o); gAdd(o);
-  }
-  const free = (x, y, m) => x > 60 && y > 60 && x < WORLD - 60 && y < WORLD - 60 && !G.lakes.some(l => Math.hypot(l.x - x, l.y - y) < l.r + m);
-  function addTree(x, y) {
-    if (!free(x, y, 30) || nearCamp(x, y, 250)) return;
-    if (gQuery(x, y, 40).some(o => (o.kind === 'tree' || o.kind === 'rock') && Math.hypot(o.x - x, o.y - y) < 40)) return;
-    const t = { x, y, r: 13, kind: 'tree', wood: 18, cr: rand(36, 62), tone: Math.random(), sw: rand(0, TAU) };
-    G.trees.push(t); gAdd(t);
-  }
-  for (let c = 0; c < 55; c++) { const cx = rand(0, WORLD), cy = rand(0, WORLD), n = ri(12, 30); for (let i = 0; i < n; i++) { const a = rand(0, TAU), rr = Math.abs(gauss()) * 280; addTree(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr); } }
-  for (let i = 0; i < 300; i++) addTree(rand(0, WORLD), rand(0, WORLD));
-  for (let i = 0; i < 18; i++) { const a = rand(0, TAU), r = rand(270, 560); addTree(CAMP.x + Math.cos(a) * r, CAMP.y + Math.sin(a) * r); }
-  function addRock(x, y) {
-    if (!free(x, y, 30) || nearCamp(x, y, 220)) return;
-    if (gQuery(x, y, 50).some(o => (o.kind === 'tree' || o.kind === 'rock') && Math.hypot(o.x - x, o.y - y) < 46)) return;
-    const r = rand(16, 28), v = []; const n = ri(6, 9);
-    for (let i = 0; i < n; i++) { const a = i / n * TAU; v.push([Math.cos(a) * r * rand(0.75, 1.15), Math.sin(a) * r * rand(0.75, 1.15)]); }
-    const o = { x, y, r, kind: 'rock', stone: 14, v, shade: rand(0.85, 1.15) }; G.rocks.push(o); gAdd(o);
-  }
-  for (let c = 0; c < 70; c++) { const cx = rand(0, WORLD), cy = rand(0, WORLD), n = ri(1, 4); for (let i = 0; i < n; i++) addRock(cx + rand(-70, 70), cy + rand(-70, 70)); }
-  for (let i = 0; i < 7; i++) { const a = rand(0, TAU), r = rand(300, 600); addRock(CAMP.x + Math.cos(a) * r, CAMP.y + Math.sin(a) * r); }
-  function addBush(x, y) {
-    if (!free(x, y, 20) || nearCamp(x, y, 160)) return;
-    G.bushes.push({ x, y, r: 16, food: 5, max: 5, berries: Array.from({ length: 7 }, () => [rand(-11, 11), rand(-11, 11)]), col: pick(['#b3243a', '#6a2a8a', '#c4382a']) });
-  }
-  for (let i = 0; i < 260; i++) addBush(rand(0, WORLD), rand(0, WORLD));
-  for (let i = 0; i < 12; i++) { const a = rand(0, TAU), r = rand(200, 480); addBush(CAMP.x + Math.cos(a) * r, CAMP.y + Math.sin(a) * r); }
-}
-
-// ------------------------------------------------------------- zaman / ışık
-const phase = () => (G.t % CYCLE) / CYCLE;
-function darkness() {
-  const p = phase();
-  if (p < 0.47) return 0;
-  if (p < 0.6) { const k = (p - 0.47) / 0.13; return 0.95 * k * k * (3 - 2 * k); }
-  if (p < 0.9) return 0.95;
-  const k = (p - 0.9) / 0.1; return 0.95 * (1 - k * k * (3 - 2 * k));
-}
-const isNight = () => darkness() > 0.55;
-const goHome = () => { const p = phase(); return p > 0.46 && p < 0.93; };
-function fireR() { return G.fire.fuel <= 0 ? 0 : 90 + G.fire.fuel * 2.6; }
-function lights() {
-  const L2 = [];
-  if (G.fire.fuel > 0) L2.push({ x: G.fire.x, y: G.fire.y, r: fireR() * (0.96 + Math.sin(G.now * 13) * 0.02 + Math.random() * 0.03), safe: true, warm: 1 });
-  for (const b of G.builds) if (b.type === 'mesale') L2.push({ x: b.x, y: b.y - 20, r: 150 * (0.97 + Math.random() * 0.04), safe: true, warm: 0.6 });
-  if (L && G.torchOn && L.hp > 0) L2.push({ x: L.x, y: L.y, r: 175 * (0.95 + Math.random() * 0.06), safe: true, warm: 0.7 });
-  return L2;
-}
-// gece güvenli bölgeler (yırtıcılar giremez - cesur değillerse)
-function safeZones() {
-  const z = [], n = isNight();
-  if (G.fire.fuel > 0) z.push({ x: G.fire.x, y: G.fire.y, r: n ? fireR() * 0.88 : Math.max(fireR(), 320) });
-  if (n) {
-    for (const b of G.builds) if (b.type === 'mesale') z.push({ x: b.x, y: b.y, r: 125 });
-    if (G.torchOn && L) z.push({ x: L.x, y: L.y, r: 135 });
-  }
-  return z;
-}
-function inSafe(x, y, zones) { for (const s of zones) if ((x - s.x) ** 2 + (y - s.y) ** 2 < s.r * s.r) return s; return null; }
-function lightLevel(x, y, LS) {
-  if (darkness() < 0.45) return 1;
-  let m = 0;
-  for (const l of LS) { const d = Math.hypot(x - l.x, y - l.y); m = Math.max(m, clamp((l.r - d) / (l.r * 0.45), 0, 1)); }
-  return m;
-}
-
-// ------------------------------------------------------------- mesajlar
-function msg(t, col = '#eee', dur = 5) { G.msgs.push({ t, col, life: dur }); if (G.msgs.length > 5) G.msgs.shift(); renderMsgs(); }
-function renderMsgs() { $('msgs').innerHTML = G.msgs.map(m => `<div style="color:${m.col};opacity:${clamp(m.life, 0, 1)}">${m.t}</div>`).join(''); }
-function ftext(x, y, t, col = '#fff') { G.texts.push({ x, y, t, col, life: 1.3 }); }
-function addStock(k, n, x, y) { G.stock[k] += n; if (x !== undefined) ftext(x, y - 16, `+${n} ${k === 'wood' ? '🪵' : k === 'stone' ? '🪨' : '🍖'}`, '#ffe9b0'); }
-
-// ------------------------------------------------------------- girdi
-const keys = {}; const mouse = { x: 0, y: 0, down: false, used: false };
-const touch = { on: false, jx: 0, jy: 0, atk: false, act: false, run: false, id: null, ox: 0, oy: 0 };
-addEventListener('keydown', e => {
-  audioInit();
-  keys[e.code] = true;
-  if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(e.code)) e.preventDefault();
-  if (!G.started || G.over) return;
-  if (e.code === 'KeyT') toggleTorch();
-  if (e.code === 'Escape') { if (G.placing) cancelPlace(); else togglePause(); }
-  if (e.code === 'KeyP') togglePause();
-  const n = parseInt(e.key); if (n >= 1 && n <= 4) startPlace(['kulube', 'cit', 'mesale', 'tuzak'][n - 1]);
-});
-addEventListener('keyup', e => { keys[e.code] = false; });
-cv.addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.clientY; mouse.used = true; });
-cv.addEventListener('mousedown', e => {
-  audioInit(); mouse.x = e.clientX; mouse.y = e.clientY; mouse.used = true;
-  if (e.button === 2) { cancelPlace(); return; }
-  if (G.placing) { tryPlace(); return; }
-  mouse.down = true;
-});
-addEventListener('mouseup', () => { mouse.down = false; });
-cv.addEventListener('contextmenu', e => e.preventDefault());
-document.addEventListener('visibilitychange', () => { if (document.hidden && G.started && !G.over && !G.paused) togglePause(); });
-function togglePause() { if (!G.started || G.over) return; G.paused = !G.paused; $('pause').style.display = G.paused ? 'flex' : 'none'; }
-
-// dokunmatik
-const isTouch = matchMedia('(pointer:coarse)').matches || 'ontouchstart' in window;
-if (isTouch) {
-  $('touch').style.display = 'block';
-  const joy = $('joy'), base = $('knobBase'), knob = $('knob');
-  joy.addEventListener('pointerdown', e => { audioInit(); touch.id = e.pointerId; touch.ox = e.clientX; touch.oy = e.clientY; base.style.display = 'block'; base.style.left = (e.clientX - 55) + 'px'; base.style.top = (e.clientY - 55 - (innerHeight - joy.offsetHeight)) + 'px'; joy.setPointerCapture(e.pointerId); });
-  joy.addEventListener('pointermove', e => { if (e.pointerId !== touch.id) return; let dx = e.clientX - touch.ox, dy = e.clientY - touch.oy; const m = Math.hypot(dx, dy); if (m > 45) { dx *= 45 / m; dy *= 45 / m; } touch.jx = dx / 45; touch.jy = dy / 45; knob.style.left = (31 + dx) + 'px'; knob.style.top = (31 + dy) + 'px'; });
-  const end = e => { if (e.pointerId !== touch.id) return; touch.id = null; touch.jx = touch.jy = 0; base.style.display = 'none'; knob.style.left = knob.style.top = '31px'; };
-  joy.addEventListener('pointerup', end); joy.addEventListener('pointercancel', end);
-  const hold = (id, k) => { const el = $(id); el.addEventListener('pointerdown', e => { audioInit(); e.preventDefault(); touch[k] = true; if (k === 'atk' && G.placing) { tryPlace(); touch[k] = false; } }); const up = () => touch[k] = false; el.addEventListener('pointerup', up); el.addEventListener('pointerleave', up); el.addEventListener('pointercancel', up); };
-  hold('tAtk', 'atk'); hold('tAct', 'act'); hold('tRun', 'run');
-  $('tTorch').addEventListener('pointerdown', e => { e.preventDefault(); toggleTorch(); });
-}
-
-// araç çubuğu
-$('tools').addEventListener('pointerdown', e => {
-  const b = e.target.closest('button'); if (!b) return; e.preventDefault(); audioInit();
-  if (b.dataset.b) { if (G.placing === b.dataset.b) cancelPlace(); else startPlace(b.dataset.b); }
-  if (b.dataset.c === 'mizrak') craftSpear();
-  if (b.dataset.c === 'mesale') { if (G.torchOwned) toggleTorch(); else craftTorch(); }
-});
-$('sideHead').addEventListener('pointerdown', () => { $('side').classList.toggle('closed'); $('sideTog').textContent = $('side').classList.contains('closed') ? '▸' : '▾'; });
-$('plist').addEventListener('pointerdown', e => {
-  const b = e.target.closest('.job'); if (!b) return; e.preventDefault();
-  const p = G.people.find(q => q.id === +b.dataset.id); if (!p) return;
-  p.job = JOBS[(JOBS.indexOf(p.job) + 1) % JOBS.length]; p.st = 'idle'; p.tgt = null;
-  if (p.inHut && !goHome()) leaveHut(p);
-  b.textContent = JOBL[p.job];
-});
-
-function canAfford(c) { for (const k in c) if (G.stock[k] < c[k]) return false; return true; }
-function pay(c) { for (const k in c) G.stock[k] -= c[k]; }
-function costTxt(c) { return Object.entries(c).map(([k, v]) => v + (k === 'wood' ? '🪵' : '🪨')).join(' '); }
-function startPlace(t) { if (!canAfford(BUILD[t].cost)) { msg(`${BUILD[t].ad} için yeterli malzeme yok (${costTxt(BUILD[t].cost)})`, '#e99', 3); return; } G.placing = t; msg(isTouch ? `${BUILD[t].ad}: Saldır düğmesiyle önüne yerleştir.` : `${BUILD[t].ad}: Tıklayarak yerleştir, sağ tık / Esc ile iptal.`, '#cde', 3); }
-function cancelPlace() { G.placing = null; }
-function placePos() {
-  if (mouse.used && !isTouch) { const w = screenToWorld(mouse.x, mouse.y); const dx = w.x - L.x, dy = w.y - L.y, d = Math.hypot(dx, dy); if (d > 220) return { x: L.x + dx / d * 220, y: L.y + dy / d * 220 }; return w; }
-  return { x: L.x + Math.cos(L.ang) * 60, y: L.y + Math.sin(L.ang) * 60 };
-}
-function placeOk(t, p) {
-  const r = BUILD[t].r;
-  if (p.x < 60 || p.y < 60 || p.x > WORLD - 60 || p.y > WORLD - 60) return false;
-  if (Math.hypot(p.x - G.fire.x, p.y - G.fire.y) < 50 + r) return false;
-  for (const o of gQuery(p.x, p.y, r + 10)) if (Math.hypot(o.x - p.x, o.y - p.y) < o.r + r - (o.kind === 'build' && t === 'cit' && o.type === 'cit' ? 14 : 0)) return false;
-  for (const b of G.builds) if (b.type === 'tuzak' && Math.hypot(b.x - p.x, b.y - p.y) < 30 + r) return false;
-  return true;
-}
-function tryPlace() {
-  const t = G.placing; if (!t) return;
-  const p = placePos();
-  if (!placeOk(t, p)) { msg('Buraya inşa edilemez.', '#e99', 2); return; }
-  if (!canAfford(BUILD[t].cost)) { msg('Malzeme bitti.', '#e99', 2); cancelPlace(); return; }
-  pay(BUILD[t].cost);
-  const b = { x: p.x, y: p.y, r: BUILD[t].r, kind: 'build', type: t, hp: BUILD[t].hp, maxhp: BUILD[t].hp, occ: [], uses: 3, ang: L.ang };
-  G.builds.push(b); if (t !== 'tuzak') gAdd(b);
-  SFX.build();
-  if (t === 'kulube') msg(`Kulübe kuruldu. Nüfus sınırı: ${popCap()}`, '#cfe', 3);
-  if (!canAfford(BUILD[t].cost) || t === 'kulube') cancelPlace();
-}
-function destroyBuild(b) {
-  b.dead = true; gDel(b); G.builds.splice(G.builds.indexOf(b), 1);
-  for (let i = 0; i < 14; i++) G.parts.push({ x: b.x + rand(-b.r, b.r), y: b.y + rand(-b.r, b.r), vx: rand(-80, 80), vy: rand(-80, 80), life: rand(0.5, 1), col: '#6a4a2a', s: rand(2, 5) });
-  SFX.hit(0.5); noise(0.6, 0.4, 'lowpass', 800, 100);
-  if (b.type === 'kulube') {
-    msg('Bir kulübe parçalandı!', '#f88', 4);
-    for (const p of b.occ) { p.inHut = null; p.x = b.x + rand(-20, 20); p.y = b.y + rand(-20, 20); p.fear = Math.min(100, p.fear + 50); }
-  }
-}
-const popCap = () => 4 + 2 * G.builds.filter(b => b.type === 'kulube').length;
-function craftSpear() {
-  if (G.spear >= 2) { msg('Zaten taş mızrağın var.', '#ccc', 2); return; }
-  const c = { wood: 5, stone: 10 }; if (!canAfford(c)) { msg('Taş mızrak için 5🪵 10🪨 gerek.', '#e99', 3); return; }
-  pay(c); G.spear = 2; SFX.build(); msg('Taş uçlu mızraklar hazır! Halkın da daha sert vuruyor.', '#cfe', 4);
-}
-function craftTorch() {
-  const c = { wood: 6 }; if (!canAfford(c)) { msg('El meşalesi için 6🪵 gerek.', '#e99', 3); return; }
-  pay(c); G.torchOwned = true; G.torchOn = true; G.torchFuel = 60; SFX.build(); msg('Meşale yandı. [T] ile söndür/yak. Odun tüketir.', '#fda', 4);
-}
-function toggleTorch() {
-  if (!G.torchOwned) { craftTorch(); return; }
-  if (!G.torchOn && G.torchFuel <= 0) { if (G.stock.wood < 1) { msg('Meşale için odun yok!', '#e99', 2); return; } G.stock.wood--; G.torchFuel = 30; }
-  G.torchOn = !G.torchOn; SFX.crackle(0.3);
-}
-
-// ------------------------------------------------------------- hareket ve çarpışma
-function pushOut(e, isDino) {
-  let blocked = null;
-  const q = gQuery(e.x, e.y, e.r + 4);
-  for (const o of q) {
-    if (o.kind === 'build' && !isDino) continue;
-    if (o.dead) continue;
-    const dx = e.x - o.x, dy = e.y - o.y, d = Math.hypot(dx, dy) || 0.01, m = o.r + e.r;
-    if (d < m) { e.x = o.x + dx / d * m; e.y = o.y + dy / d * m; if (o.kind === 'build') blocked = o; }
-  }
-  e.x = clamp(e.x, 30, WORLD - 30); e.y = clamp(e.y, 30, WORLD - 30);
-  return blocked;
-}
-function steer(e, tx, ty, spd, dt, isDino) {
-  let dx = tx - e.x, dy = ty - e.y; const d = Math.hypot(dx, dy);
-  if (d < 3) { e.moving = false; return true; }
-  dx /= d; dy /= d;
-  if (e.detour) { const px = -dy * e.detour, py = dx * e.detour; dx = dx * 0.4 + px; dy = dy * 0.4 + py; const m = Math.hypot(dx, dy); dx /= m; dy /= m; }
-  const s = Math.min(spd * dt, d);
-  const ox = e.x, oy = e.y;
-  e.x += dx * s; e.y += dy * s;
-  const bl = pushOut(e, isDino); if (isDino) e.bash = bl;
-  const moved = Math.hypot(e.x - ox, e.y - oy);
-  if (moved < s * 0.3 && !bl) { e.stuck += dt; if (e.stuck > 0.25) { e.detour = Math.random() < 0.5 ? 1 : -1; e.stuck = -0.7; } }
-  else if (e.stuck < 0) { e.stuck += dt; if (e.stuck >= 0) e.detour = 0; }
-  else e.stuck = Math.max(0, e.stuck - dt);
-  e.ang = angLerp(e.ang, Math.atan2(dy, dx), Math.min(1, dt * 10));
-  e.moving = true;
-  return d < 8;
-}
-function separate(list, dt) {
-  for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) {
-    const a = list[i], b = list[j]; if (a.inHut || b.inHut || a.grabbed || b.grabbed) continue;
-    const dx = b.x - a.x, dy = b.y - a.y, m = a.r + b.r; if (Math.abs(dx) > m || Math.abs(dy) > m) continue;
-    const d = Math.hypot(dx, dy) || 0.01; if (d < m) { const k = (m - d) / d * 0.5; const wa = b.r / m, wb = a.r / m; a.x -= dx * k * wa; a.y -= dy * k * wa; b.x += dx * k * wb; b.y += dy * k * wb; }
-  }
-}
-
-// ------------------------------------------------------------- hasar / ölüm
-function spearDmg(p) { return p.leader ? (G.spear === 2 ? 30 : 18) : (G.spear === 2 ? 13 : 8); }
-function hurt(t, dmg, src) {
-  if (t.dead) return;
-  if (t.type) { // dinozor
-    t.hp -= dmg; t.hurt = 0.15;
-    for (let i = 0; i < 5; i++) G.parts.push({ x: t.x, y: t.y, vx: rand(-120, 120), vy: rand(-120, 120), life: rand(0.3, 0.7), col: '#7a0d0d', s: rand(2, 4) });
-    if (t.carry && src && src.leader) { t.carryDmg += dmg; if (t.carryDmg >= 70) dropCarry(t, true); }
-    if (t.type === 'boynuzlu' && !t.tamed) {
-      if (t.ko > 0) { t.hp = 0; }
-      else { t.angry = 18; t.tgt = src; if (!t.koDone && t.hp > 0 && t.hp < t.maxhp * 0.3) { t.ko = 30; t.koDone = true; t.angry = 0; msg('Boynuzlu bayıldı! [E] basılı tut: 15🍖 ile evcilleştir — ya da vur ve et al.', '#fe9', 6); } }
-    }
-    if (t.type !== 'boynuzlu' && src && !t.leave) { t.tgt = src; t.engaged = true; }
-    if (t.type === 'kucuk' && t.hp < t.maxhp * 0.5) { t.leave = true; }
-    if (t.hp <= 0) killDino(t);
-    return;
-  }
-  // insan
-  t.hp -= dmg; t.hurtT = 0.2; t.lastHurt = 0; t.fear = Math.min(100, t.fear + 12);
-  for (let i = 0; i < 6; i++) G.parts.push({ x: t.x, y: t.y, vx: rand(-100, 100), vy: rand(-100, 100), life: rand(0.3, 0.8), col: '#9a1010', s: rand(2, 4) });
-  if (t === L) { G.red = 0.6; G.shake = Math.max(G.shake, 8); }
-  if (t.hp <= 0) killPerson(t, src);
-}
-function killDino(d) {
-  d.dead = true;
-  const def = DINO[d.type];
-  if (d.carry) dropCarry(d, false);
-  if (!d.tamed) { G.kills++; addStock('food', def.meat, d.x, d.y); }
-  if (d.type === 'dev') { msg('DEV KAFA DÜŞTÜ! Halkın sana hayranlıkla bakıyor.', '#ffb060', 7); for (const p of G.people) p.fear = 0; SFX.roar(0.4); }
-  if (d.tamed) msg('Evcil Boynuzlu öldü...', '#f99', 4);
-  for (let i = 0; i < 16; i++) G.parts.push({ x: d.x, y: d.y, vx: rand(-150, 150), vy: rand(-150, 150), life: rand(0.5, 1.2), col: '#6a0808', s: rand(2, 6) });
-  G.dinos.splice(G.dinos.indexOf(d), 1);
-}
-function killPerson(p, src) {
-  if (p.dead) return; p.dead = true; G.deaths++;
-  const i = G.people.indexOf(p); if (i >= 0) G.people.splice(i, 1);
-  if (p.inHut) { const o = p.inHut.occ; o.splice(o.indexOf(p), 1); }
-  const pan = L && L !== p ? clamp((p.x - L.x) / 600, -1, 1) : 0;
-  SFX.scream(L && L !== p ? clamp(1 - dist(p, L) / 1400, 0.15, 1) : 1, pan);
-  for (const q of G.people) q.fear = Math.min(100, q.fear + (dist(q, p) < 600 ? 35 : 18));
-  for (let k = 0; k < 20; k++) G.parts.push({ x: p.x, y: p.y, vx: rand(-140, 140), vy: rand(-140, 140), life: rand(0.6, 1.4), col: '#8a0a0a', s: rand(2, 5) });
-  G.stains = G.stains || []; G.stains.push({ x: p.x, y: p.y, r: rand(14, 22), life: 120 });
-  if (p === L) {
-    if (G.people.length === 0) { gameOver(); return; }
-    const nl = G.people.slice().sort((a, b) => b.hp - a.hp)[0];
-    nl.leader = true; nl.job = null; nl.maxhp = 100; nl.hp = Math.max(nl.hp, 60); nl.inHut && leaveHut(nl); nl.fear = 0;
-    L = nl;
-    msg(`Liderin öldü... Halk ${gen(nl.name)} etrafında toplandı. Artık sen ${cop(nl.name)}.`, '#ffb', 8);
-    SFX.sting();
-  } else {
-    msg(`${p.name} öldü.`, '#f77', 5);
-    if (G.people.length === 0) gameOver();
-  }
-  buildPList();
-}
-function dropCarry(d, rescued) {
-  const v = d.carry; d.carry = null; if (!v) return;
-  v.grabbed = false;
-  if (rescued) { msg(`${v.name} Dev Kafa'nın ağzından kurtuldu!`, '#9f9', 5); v.x = d.x + 30; v.y = d.y; pushOut(v, false); d.leave = true; SFX.roar(0.6); }
-}
-
-// ------------------------------------------------------------- lider güncellemesi
-function screenToWorld(sx, sy) { return { x: sx + G.camX, y: sy + G.camY }; }
-function updLeader(dt) {
-  const p = L;
-  let mx = 0, my = 0;
-  if (keys.KeyW || keys.ArrowUp) my -= 1; if (keys.KeyS || keys.ArrowDown) my += 1;
-  if (keys.KeyA || keys.ArrowLeft) mx -= 1; if (keys.KeyD || keys.ArrowRight) mx += 1;
-  if (touch.jx || touch.jy) { mx = touch.jx; my = touch.jy; }
-  const m = Math.hypot(mx, my);
-  const sprint = (keys.ShiftLeft || keys.ShiftRight || touch.run) && m > 0.1 && p.stam > 1;
-  p.stam = clamp(p.stam + (sprint ? -28 : 16) * dt, 0, 100);
-  const spd = 150 * (sprint ? 1.6 : 1);
-  p.moving = m > 0.1;
-  if (p.moving) {
-    const k = Math.min(1, m);
-    p.x += mx / m * spd * k * dt; p.y += my / m * spd * k * dt; pushOut(p, false);
-    p.anim += dt * (sprint ? 14 : 9);
-    if (!(mouse.used && !isTouch)) p.ang = angLerp(p.ang, Math.atan2(my, mx), Math.min(1, dt * 12));
-  }
-  // nişan
-  let aim = p.ang;
-  if (mouse.used && !isTouch) { const w = screenToWorld(mouse.x, mouse.y); aim = Math.atan2(w.y - p.y, w.x - p.x); p.ang = aim; }
-  // saldırı
-  p.atkCd -= dt; p.swing = Math.max(0, (p.swing || 0) - dt);
-  const atk = (mouse.down && !G.placing) || keys.Space || touch.atk;
-  if (atk && p.atkCd <= 0 && !G.placing) {
-    if (!(mouse.used && !isTouch)) { // otomatik nişan
-      let best = null, bd = 160; for (const d of G.dinos) { if (d.tamed) continue; const dd = dist(d, p) - d.r; if (dd < bd) { bd = dd; best = d; } }
-      if (best) { aim = angTo(p, best); p.ang = aim; }
-    }
-    p.atkCd = 0.42; p.swing = 0.2; SFX.swing();
-    const hx = p.x + Math.cos(aim) * 34, hy = p.y + Math.sin(aim) * 34;
-    let hit = false;
-    for (const d of G.dinos.slice()) { if (d.tamed) continue; if (Math.hypot(d.x - hx, d.y - hy) < d.r + 30) { hurt(d, spearDmg(p), p); hit = true; const k = d.type === 'dev' ? 4 : d.type === 'boynuzlu' ? 8 : 22; d.x += Math.cos(aim) * k; d.y += Math.sin(aim) * k; } }
-    if (hit) { SFX.hit(0.6); G.shake = Math.max(G.shake, 3); }
-  }
-  // etkileşim
-  G.interact = findInteract();
-  const act = keys.KeyE || touch.act;
-  if (act && G.interact) {
-    const it = G.interact; G.actT += dt;
-    const rate = it.kind === 'fire' ? 0.18 : it.kind === 'tame' ? 2.0 : it.kind === 'rescue' ? 0.6 : 0.4;
-    if (G.actT >= rate) { G.actT = 0; doInteract(it); }
-    if (it.kind !== 'fire') p.ang = angTo(p, it.o);
-  } else G.actT = 0;
-  // meşale yakıtı
-  if (G.torchOn) { G.torchFuel -= dt; if (G.torchFuel <= 0) { if (G.stock.wood > 0) { G.stock.wood--; G.torchFuel = 30; } else { G.torchOn = false; msg('Meşalen söndü! Odun yok.', '#f99', 3); } } }
-  // iyileşme
-  p.lastHurt += dt;
-  if (p.lastHurt > 5 && dist(p, G.fire) < fireR()) p.hp = Math.min(p.maxhp, p.hp + 2 * dt);
-  else if (p.lastHurt > 8) p.hp = Math.min(p.maxhp, p.hp + 0.3 * dt);
-}
-function findInteract() {
-  const p = L; let best = null, bd = 1e9;
-  const consider = (o, kind, d, label) => { if (d < bd) { bd = d; best = { o, kind, label }; } };
-  for (const d of G.dinos) if (d.type === 'boynuzlu' && d.ko > 0 && !d.tamed) { const dd = dist(d, p) - d.r; if (dd < 40) consider(d, 'tame', dd - 30, 'Evcilleştir (15🍖) — basılı tut'); }
-  if (G.rescue) { const dd = dist(G.rescue, p); if (dd < 55) consider(G.rescue, 'rescue', dd - 40, `${acc(G.rescue.name)} kurtar`); }
-  { const dd = dist(G.fire, p) - 30; if (dd < 50) consider(G.fire, 'fire', dd, G.stock.wood > 0 ? 'Ateşe odun at' : 'Odun yok!'); }
-  for (const b of G.bushes) { if (b.food < 1) continue; const dd = dist(b, p) - b.r; if (dd < 26) consider(b, 'bush', dd, 'Meyve topla'); }
-  for (const o of gQuery(p.x, p.y, 70)) {
-    if (o.kind === 'tree' && o.wood > 0) { const dd = dist(o, p) - o.r - p.r; if (dd < 20) consider(o, 'tree', dd, 'Odun kes'); }
-    if (o.kind === 'rock' && o.stone > 0) { const dd = dist(o, p) - o.r - p.r; if (dd < 20) consider(o, 'rock', dd, 'Taş kır'); }
-  }
-  return best;
-}
-function doInteract(it) {
-  const o = it.o;
-  if (it.kind === 'fire') { if (G.stock.wood > 0 && G.fire.fuel < 100) { G.stock.wood--; G.fire.fuel = Math.min(100, G.fire.fuel + 9); SFX.crackle(0.4); for (let i = 0; i < 4; i++) G.parts.push({ x: o.x, y: o.y, vx: rand(-30, 30), vy: rand(-120, -50), life: rand(0.4, 1), col: '#ffb040', s: 2 }); } }
-  else if (it.kind === 'tree') { o.wood--; addStock('wood', 1, o.x, o.y); SFX.chop(); o.shake = 0.2; if (o.wood <= 0) treeDown(o); }
-  else if (it.kind === 'rock') { o.stone--; addStock('stone', 1, o.x, o.y); SFX.rock(); if (o.stone <= 0) { gDel(o); o.dead = true; G.rocks.splice(G.rocks.indexOf(o), 1); } }
-  else if (it.kind === 'bush') { o.food--; addStock('food', 1, o.x, o.y); SFX.pickup(); }
-  else if (it.kind === 'tame') {
-    if (G.stock.food < 15) { msg('Evcilleştirmek için 15🍖 gerek.', '#e99', 2); return; }
-    G.stock.food -= 15; o.tamed = true; o.ko = 0; o.hp = o.maxhp; o.angry = 0; o.tgt = null;
-    msg('Boynuzlu artık senin! Kampı koruyacak.', '#9f9', 5); SFX.bell();
-  } else if (it.kind === 'rescue') {
-    const r = G.rescue; G.rescue = null;
-    const p = mkPerson(r.x, r.y, r.name, false); p.job = 'takip'; p.fear = 40; G.people.push(p);
-    msg(`${r.name} halkına katıldı! (Şimdilik seni takip ediyor)`, '#9f9', 5); SFX.bell(); buildPList();
-  }
-}
-function treeDown(t) { t.stump = true; gDel(t); t.r = 9; gAdd(t); for (let i = 0; i < 10; i++) G.parts.push({ x: t.x + rand(-30, 30), y: t.y + rand(-30, 30), vx: rand(-40, 40), vy: rand(-40, 40), life: rand(0.6, 1.2), col: '#2f5a24', s: rand(3, 6) }); }
-
-// ------------------------------------------------------------- halk yapay zekâsı
-function nearestRes(p, kind) {
-  let best = null, bd = 1e9;
-  if (kind === 'yiyecek') { for (const b of G.bushes) { if (b.food < 1) continue; const d = Math.hypot(b.x - p.x, b.y - p.y) + Math.hypot(b.x - CAMP.x, b.y - CAMP.y) * 0.6 + (b.claim && b.claim !== p ? 400 : 0); if (d < bd) { bd = d; best = b; } } }
-  else { const arr = kind === 'odun' ? G.trees : G.rocks; for (const o of arr) { if (kind === 'odun' ? (o.wood <= 0) : (o.stone <= 0)) continue; const dc = Math.hypot(o.x - CAMP.x, o.y - CAMP.y); if (dc > 1500) continue; const d = Math.hypot(o.x - p.x, o.y - p.y) + dc * 0.6 + (o.claim && o.claim !== p ? 250 : 0); if (d < bd) { bd = d; best = o; } } }
-  return best;
-}
-function nearestThreat(p, range) {
-  let best = null, bd = range;
-  for (const d of G.dinos) { if (d.tamed || (d.type === 'boynuzlu' && !d.angry)) continue; const dd = dist(d, p) - d.r; if (dd < bd) { bd = dd; best = d; } }
-  return best;
-}
-function enterHut(p) {
-  const h = G.builds.find(b => b.type === 'kulube' && b.occ.length < 2 && dist(b, p) < 900);
-  if (!h) return false;
-  if (steer(p, h.x, h.y + h.r + 4, 95, G.dt, false) || dist(p, h) < h.r + 16) { h.occ.push(p); p.inHut = h; p.x = h.x; p.y = h.y; }
-  return true;
-}
-function leaveHut(p) { const h = p.inHut; if (!h) return; h.occ.splice(h.occ.indexOf(p), 1); p.inHut = null; p.x = h.x + rand(-10, 10); p.y = h.y + h.r + 10; }
-
-function updPerson(p, dt, LS, zones) {
-  if (p.grabbed) return;
-  p.atkCd -= dt; p.hurtT = Math.max(0, p.hurtT - dt); p.lastHurt += dt;
-  const night = isNight();
-  // ---- korku
-  if (p.inHut) p.fear -= 12 * dt;
-  else {
-    for (const d of G.dinos) {
-      if (d.tamed || (d.type === 'boynuzlu' && !d.angry)) continue;
-      const rng = d.type === 'dev' ? 800 : d.type === 'yirtici' ? 450 : 320, w = d.type === 'dev' ? 45 : d.type === 'yirtici' ? 18 : 6;
-      const dd = dist(d, p); if (dd < rng) p.fear += w * (1 - dd / rng) * dt;
-    }
-    const lit = lightLevel(p.x, p.y, LS) > 0.4;
-    if (night && !lit) p.fear += 6 * dt;
-    if (G.fire.fuel <= 0 && night) p.fear += 6 * dt;
-    if (lit && dist(p, G.fire) < fireR()) p.fear -= 7 * dt;
-    if (!night) p.fear -= 5 * dt;
-    if (L && L !== p && dist(p, L) < 160) p.fear -= 4 * dt;
-  }
-  p.fear = clamp(p.fear, 0, 100);
-  if (p.lastHurt > 6 && dist(p, G.fire) < fireR() + 20) p.hp = Math.min(p.maxhp, p.hp + 0.8 * dt);
-  if (p.inHut) { p.hp = Math.min(p.maxhp, p.hp + 1.2 * dt); if (!goHome() || p.job === 'muhafiz' || p.job === 'takip') leaveHut(p); return; }
-
-  // ---- kaçış (terk)
-  if (p.desert > 0) {
-    p.desert += dt; const a = p.desertAng;
-    if (L && dist(p, L) < 45) { p.desert = 0; p.fear = 55; msg(`${acc(p.name)} yakaladın. Titreyerek sana sarıldı.`, '#9f9', 4); return; }
-    steer(p, p.x + Math.cos(a) * 200, p.y + Math.sin(a) * 200, 165, dt, false); p.anim += dt * 14;
-    if (p.desert > 7 || dist(p, L) > 1100) {
-      G.lost++; p.dead = true; G.people.splice(G.people.indexOf(p), 1);
-      msg(`${p.name} karanlığa koştu... ve bir daha görülmedi.`, '#c9a', 6);
-      setTimeout(() => { if (A.ctx && !G.over) SFX.scream(0.25, rand(-1, 1)); }, rand(2500, 6000));
-      for (const q of G.people) q.fear = Math.min(100, q.fear + 10);
-      buildPList();
-    }
-    return;
-  }
-  if (p.fear >= 99 && night && lightLevel(p.x, p.y, LS) < 0.3 && Math.random() < 0.05 * dt) {
-    p.desert = 0.01; p.desertAng = angTo(G.fire, p) + rand(-0.8, 0.8);
-    msg(`${p.name} dehşete kapıldı ve kaçıyor! Onu durdurmak için yanına koş!`, '#f9a', 4);
-    return;
-  }
-
-  let spd = 105;
-  const thr = nearestThreat(p, 190);
-  // ---- panik
-  if (p.fear >= 80) {
-    p.anim += dt * 14; spd = 150;
-    const fr = fireR();
-    if (fr > 0 && dist(p, G.fire) > fr * 0.55) { steer(p, G.fire.x + Math.cos(p.seat) * 50, G.fire.y + Math.sin(p.seat) * 50, spd, dt, false); }
-    else if (thr) { const a = angTo(thr, p); steer(p, p.x + Math.cos(a) * 100, p.y + Math.sin(a) * 100, spd, dt, false); }
-    else p.moving = false;
-    return;
-  }
-  // ---- kendini savun
-  const fighter = p.job === 'muhafiz' || p.job === 'takip';
-  if (thr && dist(thr, p) - thr.r < 26 && p.atkCd <= 0 && (fighter || thr.type === 'kucuk' || p.fear < 50)) { personAttack(p, thr); }
-
-  const job = p.job;
-  if (job === 'muhafiz') {
-    const fr = Math.max(fireR(), 160);
-    let foe = null, fd = 1e9;
-    for (const d of G.dinos) { if (d.tamed || (d.type === 'boynuzlu' && !d.angry)) continue; const dc = dist(d, G.fire); if (dc < fr + 220) { const dd = dist(d, p); if (dd < fd) { fd = dd; foe = d; } } }
-    if (foe && !(foe.type === 'dev' && p.fear > 55)) { chaseAttack(p, foe, dt); return; }
-    p.seat += dt * 0.18;
-    const pr = fr * 0.72; steer(p, G.fire.x + Math.cos(p.seat) * pr, G.fire.y + Math.sin(p.seat) * pr, 70, dt, false); p.anim += dt * 6; return;
-  }
-  if (job === 'takip') {
-    let foe = null, fd = 230;
-    for (const d of G.dinos) { if (d.tamed || (d.type === 'boynuzlu' && !d.angry)) continue; const dd = dist(d, L); if (dd < fd) { fd = dd; foe = d; } }
-    if (foe && !(foe.type === 'dev' && p.fear > 50)) { chaseAttack(p, foe, dt); return; }
-    const off = (p.id % 5) / 5 * TAU;
-    const tx = L.x + Math.cos(off + L.ang + Math.PI) * 45, ty = L.y + Math.sin(off + L.ang + Math.PI) * 45;
-    if (dist(p, { x: tx, y: ty }) > 18) { steer(p, tx, ty, dist(p, L) > 160 ? 175 : 140, dt, false); p.anim += dt * 10; } else p.moving = false;
-    return;
-  }
-  // ---- toplayıcılar: gece eve
-  if (goHome()) {
-    if (p.carry > 0 && dist(p, G.fire) < 90) deposit(p);
-    if (p.tgt && p.tgt.claim === p) p.tgt.claim = null;
-    p.tgt = null; p.st = 'idle';
-    if (enterHut(p)) { p.anim += dt * 8; return; }
-    const sx = G.fire.x + Math.cos(p.seat) * 75, sy = G.fire.y + Math.sin(p.seat) * 75;
-    if (dist(p, { x: sx, y: sy }) > 10) { steer(p, sx, sy, 120, dt, false); p.anim += dt * 9; } else { p.moving = false; p.ang = angTo(p, G.fire); }
-    return;
-  }
-  // kaçınma: tehlike yakınsa ateşe dön
-  if (thr && thr.type !== 'kucuk' && p.fear > 35) { steer(p, G.fire.x, G.fire.y, 140, dt, false); p.anim += dt * 12; return; }
-  if (p.st === 'return' || p.carry >= 5) {
-    p.st = 'return';
-    if (steer(p, G.fire.x + Math.cos(p.seat) * 55, G.fire.y + Math.sin(p.seat) * 55, spd, dt, false) || dist(p, G.fire) < 70) { deposit(p); p.st = 'idle'; }
-    p.anim += dt * 9; return;
-  }
-  if (!p.tgt || p.tgt.dead || (job === 'odun' && p.tgt.wood <= 0) || (job === 'tas' && p.tgt.stone <= 0) || (job === 'yiyecek' && p.tgt.food < 1)) {
-    if (p.tgt && p.tgt.claim === p) p.tgt.claim = null;
-    p.tgt = nearestRes(p, job); if (p.tgt) p.tgt.claim = p; p.work = 0;
-    if (!p.tgt) { if (p.carry > 0) p.st = 'return'; else { p.moving = false; } return; }
-  }
-  const o = p.tgt, reach = o.r + p.r + 6;
-  if (dist(p, o) > reach) { steer(p, o.x, o.y, spd, dt, false); p.anim += dt * 9; return; }
-  p.moving = false; p.ang = angTo(p, o);
-  p.work += dt; p.anim += dt * 4;
-  if (p.work >= 1.1) {
-    p.work = 0;
-    if (job === 'odun') { o.wood--; p.carry++; p.ctype = 'wood'; o.shake = 0.2; if (L && dist(p, L) < 500) SFX.chop(); if (o.wood <= 0) { treeDown(o); o.claim = null; p.tgt = null; } }
-    else if (job === 'tas') { o.stone--; p.carry++; p.ctype = 'stone'; if (L && dist(p, L) < 500) SFX.rock(); if (o.stone <= 0) { gDel(o); o.dead = true; G.rocks.splice(G.rocks.indexOf(o), 1); p.tgt = null; } }
-    else if (job === 'yiyecek') { o.food--; p.carry++; p.ctype = 'food'; if (o.food < 1) { o.claim = null; p.tgt = null; } }
-    if (p.carry >= 5 || !p.tgt) p.st = 'return';
-  }
-}
-function deposit(p) { if (p.carry > 0) { addStock(p.ctype, p.carry, p.x, p.y); p.carry = 0; } }
-function chaseAttack(p, foe, dt) {
-  const reach = foe.r + p.r + 14;
-  if (dist(p, foe) > reach) { steer(p, foe.x, foe.y, 150, dt, false); p.anim += dt * 12; }
-  else { p.moving = false; p.ang = angTo(p, foe); if (p.atkCd <= 0) personAttack(p, foe); }
-}
-function personAttack(p, d) {
-  p.atkCd = 0.95; p.swing = 0.2; p.ang = angTo(p, d);
-  hurt(d, spearDmg(p), p);
-  if (L && dist(p, L) < 500) SFX.hit(0.3);
-}
-
-// ------------------------------------------------------------- dinozor yapay zekâsı
-function preyList() {
-  const out = [];
-  for (const p of G.people) if (!p.inHut && !p.grabbed && !p.dead) out.push(p);
-  for (const d of G.dinos) if (d.tamed) out.push(d);
-  if (G.rescue) out.push(G.rescue);
-  return out;
-}
-function isBold(d) {
-  if (G.fire.fuel <= 0) return true;
-  if (d.type === 'kucuk') return false;
-  if (d.type === 'yirtici') {
-    if (d.rush > 0) return true;
-    let pack = 0; for (const o of G.dinos) if (o.type === 'yirtici' && !o.leave && dist(o, d) < 320) pack++;
-    return (G.day >= 3 && pack >= 5) || G.fire.fuel < 18;
-  }
-  if (d.type === 'dev') return G.fire.fuel < 40 || d.rush > 0;
-  return false;
-}
-function updDino(d, dt, prey, zones) {
-  const def = DINO[d.type];
-  d.atkCd -= dt; d.hurt = Math.max(0, d.hurt - dt); d.blink -= dt; if (d.blink < -0.15) d.blink = rand(1.5, 5);
-  d.trapCd = Math.max(0, d.trapCd - dt); d.rush = Math.max(0, d.rush - dt);
-  const night = isNight();
-  if (d.type === 'boynuzlu') return updHerb(d, dt, zones);
-
-  // dev ayak sesleri
-  if (d.type === 'dev' && d.moving && L) {
-    d.stepT -= dt * (d.spdNow || def.spd) / def.spd;
-    if (d.stepT <= 0) { d.stepT = 0.75; const dd = dist(d, L); if (dd < 1300) { const v = 1 - dd / 1300; SFX.thump(0.5 * v * v + 0.03); G.shake = Math.max(G.shake, 7 * v * v); } }
-  }
-  // dev kükremesi
-  if (d.type === 'dev' && L) { d.roarT -= dt; if (d.roarT <= 0) { d.roarT = rand(9, 18); const dd = dist(d, L); SFX.roar(clamp(1 - dd / 2200, 0.1, 1), clamp((d.x - L.x) / 700, -1, 1)); if (dd < 900) for (const p of G.people) p.fear = Math.min(100, p.fear + 15 * (1 - dd / 900)); } }
-
-  // ağzında kurban
-  if (d.carry) {
-    const v = d.carry; const a = angTo(G.fire, d);
-    steer(d, d.x + Math.cos(a) * 200, d.y + Math.sin(a) * 200, def.spd * 1.15, dt, true); d.anim += dt * 6;
-    v.x = d.x + Math.cos(d.ang) * d.r * 1.3; v.y = d.y + Math.sin(d.ang) * d.r * 1.3;
-    if (Math.random() < dt * 0.6 && L) SFX.scream(clamp(1 - dist(d, L) / 1300, 0.08, 0.6), clamp((d.x - L.x) / 700, -1, 1));
-    if (dist(d, G.fire) > 1400 && (!L || dist(d, L) > 700)) {
-      msg(`${gen(v.name)} çığlıkları karanlıkta kesildi...`, '#c88', 6);
-      v.grabbed = false; d.carry = null; killPerson(v, d); d.dead = true; G.dinos.splice(G.dinos.indexOf(d), 1);
-    }
-    return;
-  }
-  // ayrılma
-  if (d.leave) {
-    const a = angTo(G.fire, d); d.spdNow = def.spd * 0.9;
-    steer(d, d.x + Math.cos(a) * 200, d.y + Math.sin(a) * 200, d.spdNow, dt, true); d.anim += dt * 8;
-    if (!L || (dist(d, L) > 1500 && dist(d, G.fire) > 1300)) { d.dead = true; G.dinos.splice(G.dinos.indexOf(d), 1); }
-    return;
-  }
-  // hedef seç
-  d.think -= dt;
-  const bold = isBold(d);
-  if (d.think <= 0) {
-    d.think = rand(0.35, 0.7);
-    const sense = night ? def.nsense : def.sense;
-    let best = null, bs = 1e9;
-    for (const t of prey) {
-      const dd = dist(d, t); if (dd > sense) continue;
-      let s = dd; if (!bold && inSafe(t.x, t.y, zones)) s += 500; if (t.tamed && d.type === 'kucuk') s += 800;
-      if (t.leader) s += 40; // önce zayıflar
-      if (s < bs) { bs = s; best = t; }
-    }
-    if (d.type === 'dev' && bold) for (const b of G.builds) if (b.type === 'kulube' && b.occ.length) { const s = dist(d, b) + 100; if (s < bs && s < sense) { bs = s; best = b; } }
-    if (best && best !== d.tgt && !d.engaged) {
-      d.engaged = true;
-      if (L && dist(d, L) < 1000) { const pan = clamp((d.x - L.x) / 700, -1, 1), v = clamp(1 - dist(d, L) / 1000, 0.1, 0.8); if (d.type === 'yirtici') SFX.screech(v, pan); else if (d.type === 'kucuk') SFX.chirp(v, pan); }
-    }
-    d.tgt = best;
-    if (d.type === 'yirtici' && night && G.day >= 3 && Math.random() < 0.004 * G.day) d.rush = rand(2, 4);
-    if (d.type === 'dev' && night && G.day >= 4 && Math.random() < 0.01) d.rush = rand(5, 9);
-  }
-  const t = d.tgt && !t_dead(d.tgt) ? d.tgt : null;
-  let tx, ty, spd = def.spd;
-  if (t) {
-    const tSafe = !bold && inSafe(t.x, t.y, zones);
-    if (tSafe) {
-      // ışığın kenarında dolaş — gözlerini dik
-      const z = tSafe; const a0 = Math.atan2(d.y - z.y, d.x - z.x) + d.orbit * dt * (d.type === 'dev' ? 0.12 : 0.35);
-      const rr = z.r + d.r + 40 + Math.sin(G.now * 0.7 + d.id) * 25;
-      tx = z.x + Math.cos(a0) * rr; ty = z.y + Math.sin(a0) * rr; spd = def.spd * 0.45;
-      if (Math.random() < dt * 0.1) d.orbit *= -1;
-      if (d.type === 'yirtici' && Math.random() < dt * 0.04 && L && dist(d, L) < 800) SFX.screech(0.15, clamp((d.x - L.x) / 700, -1, 1));
-    } else {
-      tx = t.x; ty = t.y; if (d.type === 'yirtici') { // yandan kuşat
-        const side = (d.id % 3 - 1) * 0.6, dd = dist(d, t); if (dd > 120) { const a = angTo(t, d) + side; tx = t.x + Math.cos(a) * dd * 0.5; ty = t.y + Math.sin(a) * dd * 0.5; } }
-      const reach = d.r + (t.r || 11) + 8;
-      if (dist(d, t) < reach) {
-        d.moving = false; d.ang = angLerp(d.ang, angTo(d, t), Math.min(1, dt * 8));
-        if (d.atkCd <= 0) dinoAttack(d, t);
-        tx = undefined;
-      }
-    }
-  } else {
-    // dolaş — geceleri ateşin ışığına çekilirler
-    d.wt -= dt;
-    if (d.wt <= 0 || Math.hypot(d.wx - d.x, d.wy - d.y) < 20) {
-      d.wt = rand(3, 8);
-      if (night) { const a = rand(0, TAU), r = fireR() + rand(150, 500); d.wx = G.fire.x + Math.cos(a) * r; d.wy = G.fire.y + Math.sin(a) * r; }
-      else { d.wx = d.x + rand(-400, 400); d.wy = d.y + rand(-400, 400); }
-    }
-    tx = d.wx; ty = d.wy; spd = def.spd * 0.4;
-  }
-  if (tx !== undefined) {
-    d.spdNow = spd;
-    steer(d, tx, ty, spd, dt, true); d.anim += dt * spd / 22;
-    // güvenli bölgeye girme
-    if (!bold) for (const z of zones) { const dx = d.x - z.x, dy = d.y - z.y, dd = Math.hypot(dx, dy) || 1; if (dd < z.r) { d.x = z.x + dx / dd * z.r; d.y = z.y + dy / dd * z.r; } }
-    if (d.bash && d.atkCd <= 0) { const b = d.bash; d.atkCd = def.cd; b.hp -= def.dmg * (d.type === 'dev' ? 2 : 1); b.hit = 0.2; SFX.hit(L ? clamp(1 - dist(b, L) / 700, 0, 0.5) : 0.2); if (b.hp <= 0) destroyBuild(b); }
-  }
-  // tuzaklar
-  if (d.trapCd <= 0) for (const b of G.builds) if (b.type === 'tuzak' && Math.hypot(b.x - d.x, b.y - d.y) < b.r + d.r) {
-    d.trapCd = 1; hurt(d, 45, null); b.uses--; SFX.hit(0.5); if (d.type !== 'dev') { d.leave = d.leave || d.type === 'kucuk'; }
-    if (b.uses <= 0) { G.builds.splice(G.builds.indexOf(b), 1); }
-    break;
-  }
-}
-function t_dead(t) { return t.dead || t.inHut || t.grabbed || (t.kind === 'build' && (t.dead || !t.occ.length)) || (t.isRescue && G.rescue !== t); }
-function dinoAttack(d, t) {
-  const def = DINO[d.type]; d.atkCd = def.cd * rand(0.85, 1.15);
-  if (t.kind === 'build') { t.hp -= def.dmg * 2; t.hit = 0.2; G.shake = Math.max(G.shake, 4); SFX.hit(0.5); if (t.hp <= 0) destroyBuild(t); return; }
-  if (t.isRescue) { t.hp -= def.dmg; t.hurtT = 0.2; if (t.hp <= 0) { G.rescue = null; t.dead = true; G.stains = G.stains || []; G.stains.push({ x: t.x, y: t.y, r: 16, life: 120 }); msg(`${gen(t.name)} çığlığı kesildi... Geç kaldın.`, '#c88', 5); SFX.scream(L ? clamp(1 - dist(t, L) / 1500, 0.1, 0.8) : 0.3); } return; }
-  if (d.type === 'dev' && !t.leader && !t.type && Math.random() < 0.55) {
-    t.grabbed = true; d.carry = t; d.carryDmg = 0;
-    msg(`DEV KAFA ${acc(t.name).toLocaleUpperCase('tr')} KAPTI!! Peşinden git ve vur!`, '#ff5040', 6);
-    SFX.scream(1); SFX.roar(0.8); G.shake = 14;
-    for (const p of G.people) p.fear = Math.min(100, p.fear + 30);
-    return;
-  }
-  hurt(t, def.dmg * rand(0.8, 1.2), d);
-  if (L && dist(d, L) < 700) SFX.hit(0.4);
-  if (d.type === 'yirtici' && Math.random() < 0.3) { const a = angTo(t, d); d.x += Math.cos(a) * 30; d.y += Math.sin(a) * 30; } // vur-kaç
-}
-function updHerb(d, dt, zones) {
-  const def = DINO.boynuzlu;
-  if (d.ko > 0) { d.ko -= dt; d.moving = false; if (d.ko <= 0) { d.angry = 10; msg('Boynuzlu ayıldı... ve çok öfkeli.', '#fc9', 3); } return; }
-  if (d.tamed) {
-    d.hp = Math.min(d.maxhp, d.hp + 1.5 * dt);
-    let foe = null, fd = 1e9;
-    for (const o of G.dinos) { if (o === d || o.tamed || (o.type === 'boynuzlu' && !o.angry)) continue; const dc = dist(o, G.fire); if (dc < Math.max(fireR(), 200) + 250) { const dd = dist(o, d); if (dd < fd) { fd = dd; foe = o; } } }
-    if (foe) {
-      if (dist(d, foe) > d.r + foe.r + 10) { steer(d, foe.x, foe.y, def.spd * 1.8, dt, true); d.anim += dt * 8; }
-      else if (d.atkCd <= 0) { d.atkCd = def.cd; hurt(foe, def.dmg + 8, d); const a = angTo(d, foe); foe.x += Math.cos(a) * 20; foe.y += Math.sin(a) * 20; SFX.hit(0.5); }
-      return;
-    }
-    d.wt -= dt; if (d.wt <= 0) { d.wt = rand(4, 9); const a = rand(0, TAU), r = rand(120, 220); d.wx = G.fire.x + Math.cos(a) * r; d.wy = G.fire.y + Math.sin(a) * r; }
-    if (Math.hypot(d.wx - d.x, d.wy - d.y) > 10) { steer(d, d.wx, d.wy, def.spd * 0.5, dt, true); d.anim += dt * 3; } else d.moving = false;
-    return;
-  }
-  if (d.angry > 0) {
-    d.angry -= dt; const t = d.tgt;
-    if (t && !t.dead && !t.inHut) {
-      if (dist(d, t) > d.r + t.r + 6) { steer(d, t.x, t.y, def.spd * 2.3, dt, true); d.anim += dt * 10; }
-      else if (d.atkCd <= 0) { d.atkCd = def.cd; hurt(t, def.dmg, d); const a = angTo(d, t); t.x += Math.cos(a) * 40; t.y += Math.sin(a) * 40; pushOut(t, false); SFX.thump(0.4); }
-      return;
-    }
-  }
-  if (isNight()) d.leave = true;
-  if (d.leave) { const a = angTo(G.fire, d); steer(d, d.x + Math.cos(a) * 100, d.y + Math.sin(a) * 100, def.spd, dt, true); d.anim += dt * 4; if (!L || dist(d, L) > 1600) { d.dead = true; G.dinos.splice(G.dinos.indexOf(d), 1); } return; }
-  d.wt -= dt; if (d.wt <= 0) { d.wt = rand(5, 12); d.wx = d.x + rand(-300, 300); d.wy = d.y + rand(-300, 300); if (Math.hypot(d.wx - CAMP.x, d.wy - CAMP.y) < 400) { d.wx += 400; } }
-  if (Math.hypot(d.wx - d.x, d.wy - d.y) > 10) { steer(d, d.wx, d.wy, def.spd * 0.45, dt, true); d.anim += dt * 3; } else d.moving = false;
-}
-
-// ------------------------------------------------------------- doğurma (spawn)
-function spawnPos(minR = 850, maxR = 1150) {
-  for (let k = 0; k < 30; k++) {
-    const a = rand(0, TAU), r = rand(minR, maxR), x = L.x + Math.cos(a) * r, y = L.y + Math.sin(a) * r;
-    if (x < 80 || y < 80 || x > WORLD - 80 || y > WORLD - 80) continue;
-    if (Math.hypot(x - G.fire.x, y - G.fire.y) < Math.max(fireR(), 320) + 300) continue;
-    if (G.lakes.some(l => Math.hypot(l.x - x, l.y - y) < l.r + 40)) continue;
-    return { x, y };
-  }
-  return null;
-}
-function spawnPack(type, n, pos) {
-  pos = pos || spawnPos(); if (!pos) return;
-  for (let i = 0; i < n; i++) { const d = mkDino(type, pos.x + rand(-60, 60), pos.y + rand(-60, 60)); pushOut(d, true); G.dinos.push(d); }
-}
-function spawner() {
-  const cnt = { kucuk: 0, yirtici: 0, dev: 0, boynuzlu: 0 };
-  for (const d of G.dinos) if (!d.tamed && !d.leave) cnt[d.type]++;
-  const day = G.day, p = phase(), n = isNight();
-  if (!n) {
-    if (cnt.boynuzlu < 4 && Math.random() < 0.25) spawnPack('boynuzlu', 1);
-    if (cnt.kucuk < 2 + day && Math.random() < 0.1) spawnPack('kucuk', ri(2, 4));
-    if (day >= 3 && cnt.yirtici < 2 && Math.random() < 0.015) spawnPack('yirtici', ri(1, 2));
-  } else {
-    if (cnt.kucuk < 4 + day && Math.random() < 0.18) spawnPack('kucuk', ri(3, 5));
-    const maxR = Math.min(1 + day * 1.5, 13);
-    if (cnt.yirtici < maxR && Math.random() < 0.09 + day * 0.012) spawnPack('yirtici', ri(2, 2 + Math.floor(day / 3)));
-    if (day >= 2 && !G.devDone && p > 0.64 && p < 0.82 && cnt.dev === 0 && Math.random() < 0.06 + day * 0.01) {
-      const pos = spawnPos(1100, 1300);
-      if (pos) {
-        G.devDone = true; spawnPack('dev', 1, pos);
-        const pan = clamp((pos.x - L.x) / 900, -1, 1); SFX.roar(0.5, pan);
-        msg(day === 2 ? 'Yer titriyor. Ağaçlar yarılıyor. Bu... ne?' : 'Dev Kafa geri döndü. Ateşi büyüt!', '#ff7050', 7);
-        for (const q of G.people) q.fear = Math.min(100, q.fear + 25);
-      }
-    }
-  }
-}
-
-// ------------------------------------------------------------- gün döngüsü
-function newDay() {
-  G.day++; G.flags = {}; G.devDone = false; G.leaveDone = false;
-  const humans = G.people.length, tamed = G.dinos.filter(d => d.tamed).length;
-  const need = humans * 2 + tamed * 3;
-  if (G.stock.food >= need) { G.stock.food -= need; msg(`☀️ ${G.day}. Gün. Hayattasınız. Halk ${need}🍖 yedi.`, '#ffe6a0', 6); }
-  else {
-    G.stock.food = 0; msg(`☀️ ${G.day}. Gün... ama yiyecek yetmedi. Açlık herkesi zayıflattı!`, '#f99', 6);
-    for (const p of G.people.slice()) { hurt(p, 18, null); }
-  }
-  SFX.bell();
-  // yeni gelenler
-  if (G.people.length > 0 && G.people.length < popCap() && G.stock.food >= need) {
-    const k = Math.random() < 0.65 ? 1 : 0, k2 = G.day > 3 && Math.random() < 0.3 ? 1 : 0;
-    for (let i = 0; i < k + k2 && G.people.length < popCap(); i++) {
-      const a = rand(0, TAU); const p = mkPerson(CAMP.x + Math.cos(a) * 380, CAMP.y + Math.sin(a) * 380, freshName(), false); p.fear = 30; G.people.push(p);
-      msg(`${p.name} gece ateşinizi görmüş ve halkınıza katıldı.`, '#9f9', 6);
-    }
-  } else if (G.people.length >= popCap()) msg('Yeni gelenler için yer yok. Kulübe inşa et.', '#ccc', 5);
-  G.rescueAt = Math.random() < 0.55 ? rand(0.1, 0.3) : -1;
-  buildPList();
-}
-function timeEvents() {
-  const p = phase(), f = G.flags;
-  if (p > 0.40 && !f.a) { f.a = 1; msg('Güneş alçalıyor. Gece için odun stokla!', '#fda', 5); }
-  if (p > 0.48 && !f.b) { f.b = 1; msg('Hava kararıyor... Herkes ateşin başına.', '#f9a070', 5); SFX.sting(); }
-  if (p > 0.62 && !f.c) { f.c = 1; if (G.day === 1) msg('Karanlıkta parlayan gözler var. Ateşten uzaklaşma.', '#e88', 6); }
-  if (p > 0.93 && !G.leaveDone) { G.leaveDone = true; for (const d of G.dinos) if (!d.tamed && (d.type === 'yirtici' || d.type === 'dev')) d.leave = true; msg('Şafak söküyor. Gölgeler geri çekiliyor...', '#fe9', 5); }
-  if (G.rescueAt > 0 && p > G.rescueAt && !G.rescue && !f.r) {
-    f.r = 1; const pos = spawnPos(900, 1300);
-    if (pos) {
-      G.rescue = { x: pos.x, y: pos.y, r: 11, name: freshName(), isRescue: true, t: 0, hp: 60, maxhp: 60, ang: 0, anim: 0, skin: '#d0a078', hair: '#2a1a10', job: 'odun', hurtT: 0 };
-      msg(`Uzaklardan bir çığlık! Biri yardım istiyor — işarete git (${G.rescue.name}).`, '#9cf', 7);
-      SFX.scream(0.25, clamp((pos.x - L.x) / 900, -1, 1));
-      if (Math.random() < 0.7) { const a = rand(0, TAU); spawnPack('kucuk', ri(2, 3), { x: pos.x + Math.cos(a) * 380, y: pos.y + Math.sin(a) * 380 }); }
-    }
-  }
-  if (G.rescue && p > 0.6) { msg(`${gen(G.rescue.name)} sesi karanlıkta kayboldu...`, '#c88', 5); G.rescue = null; }
-}
-
-// ------------------------------------------------------------- ana güncelleme
-function update(dt) {
-  G.now += dt; G.dt = dt;
-  const prevP = phase(); G.t += dt; if (phase() < prevP) newDay();
-  const LS = lights(), zones = safeZones();
-  // ateş
-  G.fire.fuel = Math.max(0, G.fire.fuel - dt * (isNight() ? 0.3 : 0.14));
-  G.stokeT -= dt;
-  if (G.stokeT <= 0) {
-    G.stokeT = 1;
-    if (G.fire.fuel < 70 && G.stock.wood > 0 && G.people.some(p => !p.leader && !p.inHut && !p.grabbed && dist(p, G.fire) < 160 && p.fear < 85)) { G.stock.wood--; G.fire.fuel = Math.min(100, G.fire.fuel + 9); }
-  }
-  if (G.fire.fuel <= 0 && !G.fire.out) { G.fire.out = true; msg('ATEŞ SÖNDÜ! Karanlık her yerde...', '#ff4030', 6); SFX.sting(); }
-  if (G.fire.fuel > 0 && G.fire.out) { G.fire.out = false; msg('Ateş yeniden canlandı.', '#fd9', 3); }
-  // çalılar yeniden büyür
-  G.regrowT -= dt; if (G.regrowT <= 0) { G.regrowT = 2; if (!isNight()) for (const b of G.bushes) if (b.food < b.max && Math.random() < 0.03) b.food++; }
-
-  updLeader(dt);
-  for (const p of G.people.slice()) if (p !== L && !p.dead) updPerson(p, dt, LS, zones);
-  const prey = preyList();
-  for (const d of G.dinos.slice()) if (!d.dead) updDino(d, dt, prey, zones);
-  separate(G.people, dt); separate(G.dinos, dt);
-  for (const p of G.people) if (!p.inHut && !p.grabbed) pushOut(p, false);
-
-  G.spawnT -= dt; if (G.spawnT <= 0) { G.spawnT = 1.5; spawner(); }
-  for (const d of G.dinos.slice()) if (!d.tamed && !d.carry && L && dist(d, L) > 2100 && dist(d, G.fire) > 2000) { d.dead = true; G.dinos.splice(G.dinos.indexOf(d), 1); }
-  timeEvents();
-
-  // tehlike → kalp atışı
-  let danger = 0;
-  for (const d of G.dinos) { if (d.tamed || (d.type === 'boynuzlu' && !d.angry)) continue; const rr = d.type === 'dev' ? 900 : d.type === 'yirtici' ? 420 : 220; danger = Math.max(danger, 1 - dist(d, L) / rr); }
-  G.danger = clamp(danger, 0, 1);
-  G.hbT -= dt; if (G.danger > 0.15 && G.hbT <= 0) { G.hbT = 1.1 - G.danger * 0.65; SFX.heart(0.25 + G.danger * 0.5); }
-  // ortam sesleri
-  if (A.ctx) {
-    const n = darkness(); A.wind.gain.setTargetAtTime(0.04 + n * 0.06, A.ctx.currentTime, 1); A.drone.gain.setTargetAtTime(n * 0.05 + G.danger * 0.08, A.ctx.currentTime, 1);
-    G.ambT -= dt;
-    if (G.ambT <= 0) {
-      G.ambT = rand(2, 7);
-      if (isNight()) { if (Math.random() < 0.5) SFX.rustle(rand(0.1, 0.3), rand(-1, 1)); if (Math.random() < 0.15) { SFX.screech(0.06, rand(-1, 1)); } if (Math.random() < 0.08 && G.day >= 2) msg(pick(['Çalılarda bir şey kıpırdadı...', 'Bir dal kırıldı. Çok yakında.', 'Biri... nefes mi alıyor?', 'Gözler. Ateşin ötesinde gözler.']), '#998', 3); }
-      else { if (Math.random() < 0.6) SFX.bird(); }
-    }
-    if (dist(L, G.fire) < 300 && G.fire.fuel > 0 && Math.random() < dt * 6) SFX.crackle(0.05 * (1 - dist(L, G.fire) / 300));
-  }
-
-  // parçacıklar, yazılar
-  for (const q of G.parts) { q.x += q.vx * dt; q.y += q.vy * dt; q.vx *= 0.92; q.vy *= 0.92; q.life -= dt; }
-  G.parts = G.parts.filter(q => q.life > 0);
-  if (G.fire.fuel > 0 && Math.random() < dt * 14) G.parts.push({ x: G.fire.x + rand(-10, 10), y: G.fire.y - 5, vx: rand(-15, 15), vy: rand(-90, -40), life: rand(0.5, 1.4), col: pick(['#ffb040', '#ff7020', '#ffe080']), s: rand(1, 2.5), ember: 1 });
-  for (const t of G.texts) { t.y -= 25 * dt; t.life -= dt; } G.texts = G.texts.filter(t => t.life > 0);
-  if (G.stains) { for (const s of G.stains) s.life -= dt; G.stains = G.stains.filter(s => s.life > 0); }
-  for (const t of G.trees) if (t.shake > 0) t.shake -= dt;
-  for (const b of G.builds) if (b.hit > 0) b.hit -= dt;
-  G.shake *= Math.pow(0.02, dt); G.red = Math.max(0, G.red - dt);
-  let ch = false; for (const m of G.msgs) { m.life -= dt; } const before = G.msgs.length; G.msgs = G.msgs.filter(m => m.life > 0); if (G.msgs.length !== before) ch = true;
-  G.uiT -= dt; if (G.uiT <= 0) { G.uiT = 0.15; updateHUD(); renderMsgs(); }
-}
-
-// ------------------------------------------------------------- çizim
-function render() {
-  const sx = (Math.random() - 0.5) * G.shake, sy = (Math.random() - 0.5) * G.shake;
-  G.camX = L.x - VW / 2 + sx; G.camY = L.y - VH / 2 + sy;
-  const cx = G.camX, cy = G.camY;
-  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-  ctx.save(); ctx.translate(-cx, -cy);
-  const inV = (x, y, m) => x > cx - m && x < cx + VW + m && y > cy - m && y < cy + VH + m;
-  // zemin
-  ctx.fillStyle = groundPat; ctx.fillRect(cx, cy, VW, VH);
-  // dünya sınırı
-  ctx.fillStyle = '#0b1408';
-  if (cx < 0) ctx.fillRect(cx, cy, -cx, VH); if (cy < 0) ctx.fillRect(cx, cy, VW, -cy);
-  if (cx + VW > WORLD) ctx.fillRect(WORLD, cy, cx + VW - WORLD, VH); if (cy + VH > WORLD) ctx.fillRect(cx, WORLD, VW, cy + VH - WORLD);
-  // kamp toprağı
-  { const g = ctx.createRadialGradient(CAMP.x, CAMP.y, 20, CAMP.x, CAMP.y, 200); g.addColorStop(0, 'rgba(90,70,45,.7)'); g.addColorStop(1, 'rgba(90,70,45,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(CAMP.x, CAMP.y, 200, 0, TAU); ctx.fill(); }
-  // göller
-  for (const l of G.lakes) if (inV(l.x, l.y, l.r)) {
-    ctx.fillStyle = '#26402a'; ctx.beginPath(); ctx.arc(l.x, l.y, l.r + 8, 0, TAU); ctx.fill();
-    const g = ctx.createRadialGradient(l.x, l.y, l.r * 0.2, l.x, l.y, l.r); g.addColorStop(0, '#16324a'); g.addColorStop(1, '#1f4a5a'); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(l.x, l.y, l.r, 0, TAU); ctx.fill();
-    ctx.strokeStyle = 'rgba(180,220,230,.12)'; ctx.lineWidth = 2; for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.arc(l.x + Math.sin(G.now * 0.3 + i) * 20, l.y + i * 20 - 20, l.r * (0.3 + i * 0.15), 0.3, 1.2); ctx.stroke(); }
-  }
-  // kan lekeleri
-  if (G.stains) for (const s of G.stains) { ctx.fillStyle = `rgba(80,5,5,${Math.min(0.6, s.life / 60)})`; ctx.beginPath(); ctx.ellipse(s.x, s.y, s.r, s.r * 0.7, 0, 0, TAU); ctx.fill(); }
-  // çalılar
-  for (const b of G.bushes) if (inV(b.x, b.y, 30)) {
-    ctx.fillStyle = '#1f3a18'; ctx.beginPath(); ctx.arc(b.x, b.y, b.r + 2, 0, TAU); ctx.fill();
-    ctx.fillStyle = '#2d5222'; ctx.beginPath(); ctx.arc(b.x - 4, b.y - 3, b.r - 3, 0, TAU); ctx.arc(b.x + 5, b.y + 2, b.r - 5, 0, TAU); ctx.fill();
-    ctx.fillStyle = b.col; for (let i = 0; i < Math.min(b.food, 5) + Math.floor(b.food / 2); i++) { const q = b.berries[i]; ctx.beginPath(); ctx.arc(b.x + q[0], b.y + q[1], 2.6, 0, TAU); ctx.fill(); }
-  }
-  // kütükler + kayalar
-  for (const t of G.trees) if (t.stump && inV(t.x, t.y, 20)) { ctx.fillStyle = '#5a3d22'; ctx.beginPath(); ctx.arc(t.x, t.y, 9, 0, TAU); ctx.fill(); ctx.strokeStyle = '#3a2614'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(t.x, t.y, 5, 0, TAU); ctx.stroke(); }
-  for (const r of G.rocks) if (inV(r.x, r.y, 40)) {
-    ctx.fillStyle = 'rgba(0,0,0,.3)'; ctx.beginPath(); ctx.ellipse(r.x + 4, r.y + 6, r.r, r.r * 0.6, 0, 0, TAU); ctx.fill();
-    const c = Math.round(110 * r.shade); ctx.fillStyle = `rgb(${c},${c - 4},${c - 10})`; ctx.beginPath(); r.v.forEach((v, i) => i ? ctx.lineTo(r.x + v[0], r.y + v[1]) : ctx.moveTo(r.x + v[0], r.y + v[1])); ctx.closePath(); ctx.fill();
-    ctx.fillStyle = 'rgba(255,255,255,.12)'; ctx.beginPath(); ctx.arc(r.x - r.r * 0.3, r.y - r.r * 0.3, r.r * 0.4, 0, TAU); ctx.fill();
-  }
-  // tuzaklar
-  for (const b of G.builds) if (b.type === 'tuzak') { ctx.strokeStyle = '#7a5a30'; ctx.lineWidth = 3; for (let i = 0; i < 6; i++) { const a = i / 6 * TAU; ctx.beginPath(); ctx.moveTo(b.x + Math.cos(a) * 4, b.y + Math.sin(a) * 4); ctx.lineTo(b.x + Math.cos(a) * 15, b.y + Math.sin(a) * 15); ctx.stroke(); } ctx.fillStyle = '#3a2a18'; ctx.beginPath(); ctx.arc(b.x, b.y, 5, 0, TAU); ctx.fill(); }
-  // ateş
-  drawFire();
-  // y'ye göre sıralı varlıklar
-  const ents = [];
-  for (const b of G.builds) if (b.type !== 'tuzak' && inV(b.x, b.y, 60)) ents.push(b);
-  for (const p of G.people) if (!p.inHut && inV(p.x, p.y, 40)) ents.push(p);
-  for (const d of G.dinos) if (inV(d.x, d.y, d.r * 3)) ents.push(d);
-  if (G.rescue && inV(G.rescue.x, G.rescue.y, 40)) ents.push(G.rescue);
-  for (const t of G.trees) if (!t.stump && inV(t.x, t.y, 30)) ents.push(t);
-  ents.sort((a, b) => a.y - b.y);
-  for (const e of ents) {
-    if (e.kind === 'build') drawBuild(e);
-    else if (e.kind === 'tree') drawTrunk(e);
-    else if (e.type) drawDino(e);
-    else drawPerson(e);
-  }
-  // parçacıklar
-  for (const q of G.parts) { ctx.globalAlpha = clamp(q.life, 0, 1); ctx.fillStyle = q.col; ctx.fillRect(q.x - q.s / 2, q.y - q.s / 2, q.s, q.s); }
-  ctx.globalAlpha = 1;
-  // ağaç tepeleri
-  for (const t of G.trees) if (!t.stump && inV(t.x, t.y, t.cr + 10)) drawCanopy(t);
-  // yerleştirme hayaleti
-  if (G.placing) {
-    const p = placePos(), ok = placeOk(G.placing, p), r = BUILD[G.placing].r;
-    ctx.globalAlpha = 0.55; ctx.fillStyle = ok ? '#7c6' : '#c44'; ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, TAU); ctx.fill(); ctx.globalAlpha = 1;
-    ctx.strokeStyle = ok ? '#bfa' : '#f88'; ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, TAU); ctx.stroke(); ctx.setLineDash([]);
-  }
-  ctx.restore();
-
-  // ---------- karanlık katmanı
-  const dk = darkness(), LS = lights();
-  if (dk > 0.01) {
-    dctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-    dctx.globalCompositeOperation = 'source-over';
-    dctx.clearRect(0, 0, VW, VH);
-    dctx.fillStyle = `rgba(3,5,12,${dk})`; dctx.fillRect(0, 0, VW, VH);
-    dctx.globalCompositeOperation = 'destination-out';
-    const hole = (x, y, r, a) => { const g = dctx.createRadialGradient(x - cx, y - cy, r * 0.15, x - cx, y - cy, r); g.addColorStop(0, `rgba(0,0,0,${a})`); g.addColorStop(0.6, `rgba(0,0,0,${a * 0.7})`); g.addColorStop(1, 'rgba(0,0,0,0)'); dctx.fillStyle = g; dctx.beginPath(); dctx.arc(x - cx, y - cy, r, 0, TAU); dctx.fill(); };
-    for (const l of LS) hole(l.x, l.y, l.r, 1);
-    hole(L.x, L.y, 95, 0.5); // gece görüşü
-    ctx.drawImage(dark, 0, 0, VW, VH);
-    // sıcak ışık
-    ctx.globalCompositeOperation = 'lighter';
-    for (const l of LS) { const g = ctx.createRadialGradient(l.x - cx, l.y - cy, 0, l.x - cx, l.y - cy, l.r * 0.9); g.addColorStop(0, `rgba(255,140,40,${0.22 * l.warm * dk})`); g.addColorStop(1, 'rgba(255,100,20,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(l.x - cx, l.y - cy, l.r, 0, TAU); ctx.fill(); }
-    ctx.globalCompositeOperation = 'source-over';
-    // gözler
-    if (dk > 0.5) for (const d of G.dinos) {
-      if (d.tamed || d.blink < 0 || d.ko > 0) continue;
-      const lv = lightLevel(d.x, d.y, LS); if (lv > 0.35) continue;
-      const hx = d.x + Math.cos(d.ang) * d.r * 1.05 - cx, hy = d.y + Math.sin(d.ang) * d.r * 1.05 - cy;
-      if (hx < -20 || hy < -20 || hx > VW + 20 || hy > VH + 20) continue;
-      const toL = Math.cos(d.ang - angTo(d, L)); if (toL < -0.2) continue;
-      const er = d.r * 0.09 + 1.2, sep = d.r * 0.22, px = -Math.sin(d.ang) * sep, py = Math.cos(d.ang) * sep, col = DINO[d.type].eye;
-      ctx.globalAlpha = 0.5 + 0.5 * toL * (1 - lv);
-      for (const s of [-1, 1]) { const ex = hx + px * s, ey = hy + py * s; const g = ctx.createRadialGradient(ex, ey, 0, ex, ey, er * 4); g.addColorStop(0, col); g.addColorStop(0.25, col); g.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(ex, ey, er * 4, 0, TAU); ctx.fill(); }
-      ctx.globalAlpha = 1;
-    }
-  } else {
-    ctx.fillStyle = 'rgba(255,220,150,.04)'; ctx.fillRect(0, 0, VW, VH);
-  }
-  // yüzen yazılar
-  ctx.font = 'bold 13px Georgia'; ctx.textAlign = 'center';
-  for (const t of G.texts) { ctx.globalAlpha = clamp(t.life, 0, 1); ctx.fillStyle = '#000'; ctx.fillText(t.t, t.x - cx + 1, t.y - cy + 1); ctx.fillStyle = t.col; ctx.fillText(t.t, t.x - cx, t.y - cy); }
-  ctx.globalAlpha = 1;
-  // isimler (aydınlıkta)
-  ctx.font = '10px Georgia';
-  for (const p of G.people) if (!p.inHut && !p.leader && lightLevel(p.x, p.y, LS) > 0.3) { const x = p.x - cx, y = p.y - cy; if (x < -40 || x > VW + 40 || y < -40 || y > VH + 40) continue; ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillText(p.name, x + 1, y + 25); ctx.fillStyle = p.fear >= 80 ? '#f99' : '#eadcc0'; ctx.fillText(p.name, x, y + 24); if (p.fear >= 80) { ctx.fillStyle = '#f44'; ctx.font = 'bold 14px Georgia'; ctx.fillText('!', x, y - 18); ctx.font = '10px Georgia'; } }
-  // ekran kenarı işaretleri
-  edgeMarker(G.fire.x, G.fire.y, '🔥', dist(L, G.fire) > 450);
-  if (G.rescue) edgeMarker(G.rescue.x, G.rescue.y, '🆘', true);
-  for (const p of G.people) if (p.grabbed || p.desert > 0) edgeMarker(p.x, p.y, '❗', true);
-  // vinyet: korku + hasar
-  const fearV = Math.max(G.danger * 0.8, dk * 0.5);
-  const vg = ctx.createRadialGradient(VW / 2, VH / 2, Math.min(VW, VH) * (0.42 - fearV * 0.15), VW / 2, VH / 2, Math.max(VW, VH) * 0.75);
-  vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, `rgba(${Math.round(40 * G.danger)},0,0,${0.45 + fearV * 0.4})`);
-  ctx.fillStyle = vg; ctx.fillRect(0, 0, VW, VH);
-  if (G.red > 0) { ctx.fillStyle = `rgba(160,0,0,${G.red * 0.4})`; ctx.fillRect(0, 0, VW, VH); }
-  if (L.hp < 35) { ctx.fillStyle = `rgba(120,0,0,${(0.15 + Math.sin(G.now * 6) * 0.08) * (1 - L.hp / 35)})`; ctx.fillRect(0, 0, VW, VH); }
-}
-function edgeMarker(wx, wy, ic, show) {
-  if (!show) return;
-  const x = wx - G.camX, y = wy - G.camY; if (x > 20 && y > 20 && x < VW - 20 && y < VH - 20) { if (ic !== '🔥') { ctx.font = '18px serif'; ctx.textAlign = 'center'; ctx.fillText(ic, x, y - 26); } return; }
-  const a = Math.atan2(y - VH / 2, x - VW / 2), m = 34;
-  const tx = clamp(VW / 2 + Math.cos(a) * VW, m, VW - m), ty = clamp(VH / 2 + Math.sin(a) * VH, m + 60, VH - m - 110);
-  ctx.save(); ctx.translate(tx, ty); ctx.rotate(a); ctx.fillStyle = 'rgba(255,200,120,.7)'; ctx.beginPath(); ctx.moveTo(16, 0); ctx.lineTo(4, -7); ctx.lineTo(4, 7); ctx.fill(); ctx.restore();
-  ctx.font = '16px serif'; ctx.textAlign = 'center'; ctx.fillText(ic, tx - Math.cos(a) * 8, ty - Math.sin(a) * 8 + 5);
-}
-function drawFire() {
-  const f = G.fire;
-  ctx.fillStyle = '#2a2420'; for (let i = 0; i < 9; i++) { const a = i / 9 * TAU; ctx.beginPath(); ctx.arc(f.x + Math.cos(a) * 24, f.y + Math.sin(a) * 20, 6, 0, TAU); ctx.fill(); }
-  ctx.fillStyle = '#3a2412'; ctx.save(); ctx.translate(f.x, f.y); ctx.rotate(0.6); ctx.fillRect(-16, -3, 32, 6); ctx.rotate(1.6); ctx.fillRect(-16, -3, 32, 6); ctx.restore();
-  if (f.fuel <= 0) { ctx.fillStyle = '#222'; ctx.beginPath(); ctx.arc(f.x, f.y, 10, 0, TAU); ctx.fill(); return; }
-  const s = 0.5 + f.fuel / 100;
-  for (let i = 0; i < 6; i++) {
-    const t = G.now * 8 + i * 1.7, h = (16 + Math.sin(t) * 5) * s, w = (8 - i) * s;
-    ctx.fillStyle = ['#c22a08', '#ff5a10', '#ff8a20', '#ffb030', '#ffd060', '#fff0a0'][i];
-    ctx.beginPath(); ctx.ellipse(f.x + Math.sin(t * 0.7) * 2, f.y - h * 0.4 - i, w + 2, h * (1 - i * 0.1), 0, 0, TAU); ctx.fill();
-  }
-}
-function drawTrunk(t) {
-  const sh = t.shake > 0 ? Math.sin(G.now * 60) * 2 : 0;
-  ctx.fillStyle = 'rgba(0,0,0,.28)'; ctx.beginPath(); ctx.ellipse(t.x + 10, t.y + 10, t.cr * 0.8, t.cr * 0.5, 0, 0, TAU); ctx.fill();
-  ctx.fillStyle = '#4a3220'; ctx.beginPath(); ctx.arc(t.x + sh, t.y, t.r, 0, TAU); ctx.fill();
-  ctx.fillStyle = '#5c4029'; ctx.beginPath(); ctx.arc(t.x + sh - 3, t.y - 3, t.r * 0.55, 0, TAU); ctx.fill();
-}
-function drawCanopy(t) {
-  const under = (L && Math.hypot(L.x - t.x, L.y - (t.y - 20)) < t.cr) ? 0.35 : 0.95;
-  const sw = Math.sin(G.now * 0.8 + t.sw) * 2 + (t.shake > 0 ? Math.sin(G.now * 50) * 3 : 0);
-  ctx.globalAlpha = under;
-  const g1 = t.tone < 0.33 ? ['#163a14', '#1f4a1a', '#2a5e22'] : t.tone < 0.66 ? ['#1a3a1e', '#24502a', '#2f6634'] : ['#24391a', '#334d20', '#42602a'];
-  ctx.fillStyle = g1[0]; ctx.beginPath(); ctx.arc(t.x + sw, t.y - 22, t.cr, 0, TAU); ctx.fill();
-  ctx.fillStyle = g1[1]; ctx.beginPath(); ctx.arc(t.x - t.cr * 0.3 + sw, t.y - 28, t.cr * 0.65, 0, TAU); ctx.arc(t.x + t.cr * 0.35 + sw, t.y - 18, t.cr * 0.55, 0, TAU); ctx.fill();
-  ctx.fillStyle = g1[2]; ctx.beginPath(); ctx.arc(t.x - t.cr * 0.25 + sw, t.y - 36, t.cr * 0.35, 0, TAU); ctx.fill();
-  ctx.globalAlpha = 1;
-}
-function drawBuild(b) {
-  const hitX = b.hit > 0 ? Math.sin(G.now * 70) * 2 : 0, x = b.x + hitX, y = b.y;
-  if (b.type === 'kulube') {
-    ctx.fillStyle = 'rgba(0,0,0,.3)'; ctx.beginPath(); ctx.ellipse(x + 6, y + 8, b.r + 4, b.r * 0.7, 0, 0, TAU); ctx.fill();
-    ctx.fillStyle = '#6b4a28'; ctx.beginPath(); ctx.arc(x, y, b.r, 0, TAU); ctx.fill();
-    ctx.strokeStyle = '#4a3018'; ctx.lineWidth = 2; for (let i = 0; i < 10; i++) { const a = i / 10 * TAU; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + Math.cos(a) * b.r, y + Math.sin(a) * b.r); ctx.stroke(); }
-    ctx.fillStyle = '#8a6a3a'; ctx.beginPath(); ctx.arc(x, y, 7, 0, TAU); ctx.fill();
-    ctx.fillStyle = '#1a1008'; ctx.fillRect(x - 6, y + b.r - 8, 12, 10);
-    if (b.occ.length) { ctx.fillStyle = '#ffd890'; ctx.font = '10px Georgia'; ctx.textAlign = 'center'; ctx.fillText('💤'.repeat(b.occ.length), x, y - b.r - 4); }
-  } else if (b.type === 'cit') {
-    ctx.fillStyle = 'rgba(0,0,0,.3)'; ctx.beginPath(); ctx.ellipse(x + 4, y + 6, b.r, b.r * 0.5, 0, 0, TAU); ctx.fill();
-    for (let i = -2; i <= 2; i++) { const px = x + Math.cos(b.ang + Math.PI / 2) * i * 8, py = y + Math.sin(b.ang + Math.PI / 2) * i * 8; ctx.fillStyle = '#6a4a26'; ctx.beginPath(); ctx.arc(px, py, 5, 0, TAU); ctx.fill(); ctx.fillStyle = '#8a6a3a'; ctx.beginPath(); ctx.arc(px - 1, py - 1, 2.5, 0, TAU); ctx.fill(); }
-  } else if (b.type === 'mesale') {
-    ctx.fillStyle = '#4a3018'; ctx.fillRect(x - 3, y - 26, 6, 28);
-    const t = G.now * 10 + b.x; ctx.fillStyle = '#ff7a20'; ctx.beginPath(); ctx.ellipse(x, y - 30, 5, 9 + Math.sin(t) * 2, 0, 0, TAU); ctx.fill(); ctx.fillStyle = '#ffd060'; ctx.beginPath(); ctx.ellipse(x, y - 28, 2.5, 5, 0, 0, TAU); ctx.fill();
-  }
-  if (b.hp < b.maxhp && b.type !== 'tuzak') hpBar(x, y - b.r - 10, b.hp / b.maxhp, 30);
-}
-function hpBar(x, y, f, w) { ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillRect(x - w / 2, y, w, 4); ctx.fillStyle = f > 0.5 ? '#7c4' : f > 0.25 ? '#ca3' : '#c33'; ctx.fillRect(x - w / 2, y, w * clamp(f, 0, 1), 4); }
-function drawPerson(p) {
-  const step = p.moving ? Math.sin(p.anim) * 3 : 0;
-  ctx.fillStyle = 'rgba(0,0,0,.3)'; ctx.beginPath(); ctx.ellipse(p.x + 2, p.y + 9, 10, 5, 0, 0, TAU); ctx.fill();
-  ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.ang);
-  // ayaklar
-  ctx.fillStyle = '#3a2a1a'; ctx.beginPath(); ctx.arc(step, -5, 3.5, 0, TAU); ctx.arc(-step, 5, 3.5, 0, TAU); ctx.fill();
-  // mızrak
-  if (p.leader || p.job === 'muhafiz' || p.job === 'takip') {
-    const ext = (p.swing || 0) > 0 ? 14 : 0;
-    ctx.strokeStyle = '#7a5530'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(-10 + ext, 8); ctx.lineTo(24 + ext, 8); ctx.stroke();
-    ctx.fillStyle = G.spear === 2 ? '#aaa' : '#c9a070'; ctx.beginPath(); ctx.moveTo(30 + ext, 8); ctx.lineTo(22 + ext, 4); ctx.lineTo(22 + ext, 12); ctx.fill();
-  }
-  if (p.leader && G.torchOn) { ctx.fillStyle = '#ff9030'; ctx.beginPath(); ctx.arc(6, -12, 4 + Math.random() * 1.5, 0, TAU); ctx.fill(); ctx.fillStyle = '#ffe080'; ctx.beginPath(); ctx.arc(6, -12, 2, 0, TAU); ctx.fill(); }
-  // gövde
-  ctx.fillStyle = p.hurtT > 0 ? '#fff' : p.leader ? '#8a3a1a' : JOBC[p.job] || '#666';
-  ctx.beginPath(); ctx.ellipse(0, 0, 8, 11, 0, 0, TAU); ctx.fill();
-  if (p.carry > 0) { ctx.fillStyle = p.ctype === 'wood' ? '#7a5028' : p.ctype === 'stone' ? '#999' : '#a33'; ctx.fillRect(-12, -5, 6, 10); }
-  // baş
-  ctx.fillStyle = p.skin; ctx.beginPath(); ctx.arc(2, 0, 6.5, 0, TAU); ctx.fill();
-  ctx.fillStyle = p.hair; ctx.beginPath(); ctx.arc(0, 0, 6.5, Math.PI * 0.55, Math.PI * 1.45); ctx.fill();
-  ctx.restore();
-  if (p.leader) { ctx.strokeStyle = 'rgba(255,200,100,.6)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(p.x, p.y, 16, 0, TAU); ctx.stroke(); }
-  if (p.isRescue) { ctx.fillStyle = '#fff'; ctx.font = 'bold 16px Georgia'; ctx.textAlign = 'center'; ctx.fillText('!', p.x, p.y - 18 + Math.sin(G.now * 6) * 2); }
-  if (p.hp < p.maxhp) hpBar(p.x, p.y - 20, p.hp / p.maxhp, 22);
-}
-function drawDino(d) {
-  const def = DINO[d.type], r = d.r;
-  const step = d.moving ? Math.sin(d.anim) : 0;
-  ctx.fillStyle = 'rgba(0,0,0,.3)'; ctx.beginPath(); ctx.ellipse(d.x + 4, d.y + r * 0.35, r * 1.3, r * 0.55, 0, 0, TAU); ctx.fill();
-  ctx.save(); ctx.translate(d.x, d.y); ctx.rotate(d.ang);
-  let col = d.hurt > 0 ? '#e8d0d0' : def.col; if (d.tamed) col = '#b09a6a';
-  const dk = shade(col, -0.35);
-  if (d.type === 'boynuzlu') {
-    ctx.fillStyle = dk; for (const [lx, ly, s] of [[r * 0.5, -r * 0.55, 1], [r * 0.5, r * 0.55, -1], [-r * 0.45, -r * 0.55, -1], [-r * 0.45, r * 0.55, 1]]) { ctx.beginPath(); ctx.ellipse(lx + step * s * r * 0.15, ly, r * 0.22, r * 0.16, 0, 0, TAU); ctx.fill(); }
-    ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(-r * 0.9, -r * 0.2); ctx.lineTo(-r * 1.7, Math.sin(G.now * 2 + d.id) * 4); ctx.lineTo(-r * 0.9, r * 0.2); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(0, 0, r * 1.05, r * 0.68, 0, 0, TAU); ctx.fill();
-    ctx.fillStyle = dk; ctx.beginPath(); ctx.ellipse(-r * 0.1, 0, r * 0.7, r * 0.18, 0, 0, TAU); ctx.fill();
-    // yaka (frill)
-    ctx.fillStyle = shade(col, -0.15); ctx.beginPath(); ctx.ellipse(r * 0.95, 0, r * 0.32, r * 0.72, 0, 0, TAU); ctx.fill();
-    ctx.fillStyle = col; ctx.beginPath(); ctx.ellipse(r * 1.3, 0, r * 0.4, r * 0.32, 0, 0, TAU); ctx.fill();
-    ctx.strokeStyle = '#ece0c0'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(r * 1.15, -r * 0.2); ctx.lineTo(r * 1.85, -r * 0.35); ctx.moveTo(r * 1.15, r * 0.2); ctx.lineTo(r * 1.85, r * 0.35); ctx.moveTo(r * 1.6, 0); ctx.lineTo(r * 1.9, 0); ctx.stroke();
-    if (d.ko > 0) { ctx.fillStyle = '#ffe'; ctx.font = `${r * 0.5}px serif`; ctx.fillText('💫', 0, -r); }
-  } else {
-    // bacaklar
-    ctx.fillStyle = dk;
-    ctx.beginPath(); ctx.ellipse(step * r * 0.35, -r * 0.42, r * 0.28, r * 0.18, 0, 0, TAU); ctx.ellipse(-step * r * 0.35, r * 0.42, r * 0.28, r * 0.18, 0, 0, TAU); ctx.fill();
-    // kuyruk
-    const sway = Math.sin(d.anim * 0.5) * r * 0.25;
-    ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(-r * 0.5, -r * 0.32); ctx.quadraticCurveTo(-r * 1.4, sway * 0.5 - r * 0.1, -r * 2.2, sway); ctx.quadraticCurveTo(-r * 1.4, sway * 0.5 + r * 0.1, -r * 0.5, r * 0.32); ctx.fill();
-    // gövde
-    ctx.beginPath(); ctx.ellipse(0, 0, r * 0.95, r * 0.52, 0, 0, TAU); ctx.fill();
-    // sırt çizgisi / çizgiler
-    ctx.strokeStyle = dk; ctx.lineWidth = Math.max(1, r * 0.08);
-    if (d.type === 'yirtici') { for (let i = -2; i <= 2; i++) { ctx.beginPath(); ctx.moveTo(i * r * 0.25, -r * 0.4); ctx.lineTo(i * r * 0.25 - r * 0.1, r * 0.4); ctx.stroke(); } }
-    else { ctx.beginPath(); ctx.moveTo(-r * 1.6, sway * 0.7); ctx.quadraticCurveTo(-r * 0.6, 0, r * 0.7, 0); ctx.stroke(); }
-    // kollar
-    if (d.type === 'dev') { ctx.fillStyle = dk; ctx.beginPath(); ctx.arc(r * 0.7, -r * 0.3, r * 0.08, 0, TAU); ctx.arc(r * 0.7, r * 0.3, r * 0.08, 0, TAU); ctx.fill(); }
-    else { ctx.strokeStyle = dk; ctx.lineWidth = Math.max(1.5, r * 0.1); ctx.beginPath(); ctx.moveTo(r * 0.5, -r * 0.35); ctx.lineTo(r * 0.85, -r * 0.45); ctx.moveTo(r * 0.5, r * 0.35); ctx.lineTo(r * 0.85, r * 0.45); ctx.stroke(); }
-    // boyun + baş
-    const hl = d.type === 'dev' ? 1.0 : 0.85, hw = d.type === 'dev' ? 0.62 : 0.45, hh = d.type === 'dev' ? 0.42 : 0.28;
-    ctx.fillStyle = col; ctx.beginPath(); ctx.ellipse(r * hl, 0, r * hw, r * hh, 0, 0, TAU); ctx.fill();
-    const jaw = d.atkCd > def.cd * 0.6 || d.carry ? 0.18 : 0.04;
-    ctx.fillStyle = shade(col, -0.2); ctx.beginPath(); ctx.moveTo(r * (hl + 0.1), -r * jaw); ctx.lineTo(r * (hl + hw), 0); ctx.lineTo(r * (hl + 0.1), r * jaw); ctx.fill();
-    if (d.type === 'dev') { ctx.fillStyle = '#eee'; for (let i = 0; i < 5; i++) { ctx.fillRect(r * (hl + 0.05 + i * 0.1), -r * 0.24, 2, 4); ctx.fillRect(r * (hl + 0.05 + i * 0.1), r * 0.24 - 4, 2, 4); } }
-    // gözler (gündüz)
-    ctx.fillStyle = darkness() > 0.5 ? def.eye : '#111'; const ex = r * (hl + hw * 0.2), ey = r * hh * 0.6;
-    ctx.beginPath(); ctx.arc(ex, -ey, Math.max(1.3, r * 0.07), 0, TAU); ctx.arc(ex, ey, Math.max(1.3, r * 0.07), 0, TAU); ctx.fill();
-  }
-  ctx.restore();
-  if ((d.hp < d.maxhp && d.type !== 'kucuk') || d.tamed) hpBar(d.x, d.y - r - 12, d.hp / d.maxhp, Math.max(26, r * 1.4));
-  if (d.tamed) { ctx.fillStyle = '#9f9'; ctx.font = '11px Georgia'; ctx.textAlign = 'center'; ctx.fillText('♥', d.x, d.y - r - 16); }
-}
-function shade(hex, k) {
-  const n = parseInt(hex.slice(1), 16); let r = n >> 16, g = (n >> 8) & 255, b = n & 255;
-  const f = v => clamp(Math.round(k < 0 ? v * (1 + k) : v + (255 - v) * k), 0, 255);
-  return `rgb(${f(r)},${f(g)},${f(b)})`;
-}
-
-// ------------------------------------------------------------- HUD
-function updateHUD() {
-  const p = phase(), n = isNight();
-  $('dayTxt').textContent = `${G.day}. Gün`;
-  $('todTxt').textContent = n ? '🌑 Gece' : p > 0.42 ? '🌇 Akşam' : '☀️ Gündüz';
-  $('todBar').style.width = (p * 100) + '%';
-  $('rWood').textContent = G.stock.wood; $('rStone').textContent = G.stock.stone; $('rFood').textContent = G.stock.food;
-  $('rPop').textContent = `${G.people.length}/${popCap()}`;
-  $('fireBar').style.width = G.fire.fuel + '%';
-  $('hpBar').style.width = clamp(L.hp / L.maxhp * 100, 0, 100) + '%';
-  $('stBar').style.width = L.stam + '%';
-  const it = G.interact;
-  $('prompt').textContent = G.placing ? `${BUILD[G.placing].ad} yerleştiriliyor` : it ? (isTouch ? '[Topla] ' : '[E] ') + it.label : '';
-  for (const b of document.querySelectorAll('#tools button[data-b]')) { b.classList.toggle('on', G.placing === b.dataset.b); b.classList.toggle('no', !canAfford(BUILD[b.dataset.b].cost)); }
-  $('cMizrak').classList.toggle('no', G.spear >= 2); if (G.spear >= 2) $('cMizrak').innerHTML = '🗡️ Taş Mızrak<br><small>hazır ✓</small>';
-  $('cTorch').classList.toggle('on', G.torchOn);
-  if (G.torchOwned) $('cTorch').innerHTML = `🔥 Meşale ${G.torchOn ? 'açık' : 'kapalı'}<br><small>[T]</small>`;
-  // halk listesi
-  for (const p2 of G.people) {
-    if (p2.leader) continue; const row = document.getElementById('pr' + p2.id); if (!row) { buildPList(); return; }
-    row.querySelector('.hpb').style.width = (p2.hp / p2.maxhp * 100) + '%';
-    row.querySelector('.feb').style.width = p2.fear + '%';
-    const jb = row.querySelector('.job'); if (jb.textContent !== JOBL[p2.job]) jb.textContent = JOBL[p2.job];
-    row.querySelector('.st').textContent = p2.grabbed ? '😱 kapıldı!' : p2.desert > 0 ? '🏃 kaçıyor' : p2.inHut ? '💤' : p2.fear >= 80 ? '😨 panik' : '';
-  }
-}
-function buildPList() {
-  const rows = G.people.filter(p => !p.leader).map(p => `<div class="pr" id="pr${p.id}"><span><span class="nm">${p.name}</span> <span class="st"></span></span><button class="job" data-id="${p.id}">${JOBL[p.job]}</button><div class="bars"><div class="bar"><i class="hpb" style="background:#c44"></i></div><div class="bar fear"><i class="feb"></i></div></div></div>`);
-  const tamed = G.dinos.filter(d => d.tamed).length;
-  $('plist').innerHTML = `<div class="pr" style="color:#ffcf9a"><span>👑 ${L ? L.name : ''} (sen)</span><span>${tamed ? '🦕×' + tamed : ''}</span></div>` + (rows.join('') || '<div class="pr" style="color:#a89a80">Yalnızsın.</div>') + `<div class="pr" style="color:#a89a80;font-size:10px">kırmızı: can · yeşil→kırmızı: korku</div>`;
-}
-
-// ------------------------------------------------------------- ekranlar
-function best() { try { return +localStorage.getItem('sonAtesRekor') || 0; } catch (e) { return 0; } }
-function setBest(v) { try { localStorage.setItem('sonAtesRekor', v); } catch (e) { } }
-function startScreen() {
-  G.started = false;
-  $('screenBox').innerHTML = `<h1>SON ATEŞ</h1>
-  <p class="story">Bir fırtına. Kör edici bir ışık. Uyandığınızda gökyüzünde tanımadığınız kanatlar,<br>ormanda tanımadığınız sesler vardı.<br>Dört kişisiniz. Bir ateşiniz var.<br><b>Ve gece yaklaşıyor.</b></p>
-  <div class="keys">${isTouch ? `<b>Sol taraf</b> — hareket (sanal kol)<br><b>Saldır</b> — mızrak (en yakın düşmana nişan)<br><b>Topla/Kullan</b> — odun, taş, meyve, ateşe odun, evcilleştir<br><b>Koş · Meşale</b>` : `<b>WASD / Oklar</b> — hareket · <b>Shift</b> — koş<br><b>Fare / Boşluk</b> — mızrakla saldır<br><b>E (basılı)</b> — topla · ateşe odun at · evcilleştir · kurtar<br><b>1-4</b> — inşa et · <b>T</b> — el meşalesi · <b>P</b> — duraklat`}<br>
-  <b>Halk</b> — sağ panelden herkese iş ver: odun, taş, yiyecek, muhafız, takip<br>
-  <b>Kural</b> — ateş sönerse, karanlıktaki her şey cesaretlenir.</div><br>
-  ${best() ? `<p>En uzun hayatta kalma: <b>${best()} gün</b></p>` : ''}
-  <button id="go">ATEŞİ YAK</button><p style="font-size:12px;color:#776">🎧 Kulaklıkla oyna.</p>`;
-  $('screen').style.display = 'flex';
-  $('go').onclick = () => { audioInit(); $('screen').style.display = 'none'; $('hud').style.display = 'block'; newGame(); };
-}
-function gameOver() {
-  G.over = true;
-  const d = G.day; if (d > best()) setBest(d);
-  setTimeout(() => {
-    $('screenBox').innerHTML = `<h1 style="color:#c33;text-shadow:0 0 30px #600">KARANLIK</h1>
-    <p class="story">Ateşin son közü de söndü. Ormanın sesleri, sanki hiçbir şey olmamış gibi devam etti.</p>
-    <p><b>${d}</b> gün hayatta kaldınız · <b>${G.kills}</b> yaratık avlandı · <b>${G.deaths}</b> kişi öldü · <b>${G.lost}</b> kişi karanlıkta kayboldu</p>
-    <p>Rekor: <b>${best()} gün</b></p><button id="go">YENİDEN DENE</button>`;
-    $('screen').style.display = 'flex'; $('hud').style.display = 'none';
-    $('go').onclick = () => { $('screen').style.display = 'none'; $('hud').style.display = 'block'; newGame(); };
-  }, 2500);
-}
-
-// ------------------------------------------------------------- döngü
-let lastT = performance.now();
-function loop(now) {
-  const dt = Math.min(0.05, (now - lastT) / 1000); lastT = now;
-  if (G.started && L) {
-    if (!G.paused && !G.over) update(dt);
-    render();
-  }
-  requestAnimationFrame(loop);
-}
-makeGround();
-startScreen();
-requestAnimationFrame(loop);
-// test için
-window.__G = G; window.__getL = () => L;
-</script>
+<script src="js/temel.js"></script>
+<script src="js/dunya.js"></script>
+<script src="js/halk.js"></script>
+<script src="js/yaratik.js"></script>
+<script src="js/oyun.js"></script>
+<script src="js/cizim.js"></script>
+<script src="js/arayuz.js"></script>
 </body>
 </html>
