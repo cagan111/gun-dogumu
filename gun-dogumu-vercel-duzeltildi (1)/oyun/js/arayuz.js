@@ -21,7 +21,8 @@ addEventListener('keydown', e => {
   if (e.code === 'KeyM') toggleMap();
   if (e.code === 'KeyH') toggleSide();
   if (e.code === 'KeyG') toggleHunt();
-  if (e.code === 'Escape') { if (UI.char) closeChar(); else if (G.modal) toggleCraft(false); else if (G.placing) cancelPlace(); else if (G.huntMode) G.huntMode = false; else togglePause(); }
+  if (e.code === 'KeyI') { if (UI.inB) closeInterior(); else openInterior(); }
+  if (e.code === 'Escape') { if (UI.char) closeChar(); else if (UI.inB) closeInterior(); else if (G.modal) toggleCraft(false); else if (G.placing) cancelPlace(); else if (G.huntMode) G.huntMode = false; else togglePause(); }
   if (e.code === 'KeyP') togglePause();
   const n = parseInt(e.key);
   if (n >= 1 && n <= 9) { const list = BORDER.filter(buildUnlocked); if (list[n - 1]) startPlace(list[n - 1]); }
@@ -90,11 +91,13 @@ $('tools').addEventListener('pointerdown', e => {
   if (b.dataset.x === 'map') toggleMap();
   if (b.dataset.x === 'torch') toggleTorch();
   if (b.dataset.x === 'hunt') toggleHunt();
+  if (b.dataset.x === 'in') openInterior();
 });
 function buildTools() {
   const bl = bestLvl('insaat');
   $('tools').innerHTML = `<button data-x="hunt" class="hl ${G.huntMode || G.hunt ? 'on' : ''}">🎯 ${G.hunt ? 'Avı bırak' : 'Av Emri'}<br><small>[G]</small></button>`
     + `<button data-x="craft" class="hl">⚒️ Üretim<br><small>[C]${G.orders.length ? ' · ' + G.orders.length + ' emir' : ''}</small></button>`
+    + `<button data-x="in" class="hl">🏠 İçeri<br><small>[I]</small></button>`
     + BORDER.map(k => { const lk = BUILD[k].lvl > bl; return `<button data-b="${k}" class="${G.placing === k ? 'on' : ''} ${lk || !canAfford(BUILD[k].cost) ? 'no' : ''}" title="${BUILD[k].desc}">${BUILD[k].ic} ${BUILD[k].ad}<br><small>${lk ? '🔒 📐' + BUILD[k].lvl : costTxt(BUILD[k].cost)}</small></button>`; }).join('')
     + ((G.stock.mesale || 0) > 0 ? `<button data-x="torch" class="${G.torchOn ? 'on' : ''}">🔥 Meşale<br><small>[T]</small></button>` : '')
     + `<button data-x="map">🗺️ Harita<br><small>[M]</small></button>`;
@@ -157,13 +160,13 @@ function statusOf(p) {
 const topSkill = p => { let b = null, bl = 0; for (const s in SKILLS) { const l = lvl(p, s); if (l > bl) { bl = l; b = s; } } return bl > 1 ? `${SKILLS[b].ic}${bl}` : ''; };
 function renderSide() {
   if ($('side').classList.contains('closed')) return;
-  $('popTxt').textContent = `${G.people.length} · ⛺${emptyTents()} boş`;
+  $('popTxt').textContent = `${G.people.length} · 🛏️${freeHomes()} boş yer`;
   for (const b of document.querySelectorAll('#tabs button')) b.classList.toggle('on', b.dataset.tab === UI.tab);
-  const S = sifahaneler(), beds = S.reduce((n, s) => n + s.beds.filter(Boolean).length, 0);
+  const S = sifahaneler(), beds = S.reduce((n, s) => n + (s.beds || []).filter(Boolean).length, 0), bedsT = S.reduce((n, s) => n + bedCount(s), 0);
   const tamed = G.dinos.filter(d => d.tamed);
   const tm = tamed.length ? `<div class="note">🦕 Evcil: ${Object.entries(tamed.reduce((a, d) => { const k = d.pet ? 'Yırtıcı yavrusu' : DINO[d.type].ad; a[k] = (a[k] || 0) + 1; return a; }, {})).map(([k, v]) => `${k} ×${v}`).join(', ')}</div>` : '';
   if (UI.tab === 'g') {
-    let h = `<div class="note">Moral <b style="color:${G.morale > 70 ? '#9e9' : G.morale < 30 ? '#f88' : '#eed'}">${Math.round(G.morale)}</b> · ⛑️ ${S.length ? beds + '/' + S.length * 4 + ' yatak' : 'şifahane yok'} · 🤒 ${G.people.filter(p => p.sick).length} · 🏚️ ${homelessCount()}</div>`;
+    let h = `<div class="note">Moral <b style="color:${G.morale > 70 ? '#9e9' : G.morale < 30 ? '#f88' : '#eed'}">${Math.round(G.morale)}</b> · ⛑️ ${bedsT ? beds + '/' + bedsT + ' yatak' : 'şifa yeri yok'}${G.meal ? ' · 🍲 yemek vakti' : ''} · 🤒 ${G.people.filter(p => p.sick).length} · 🏚️ ${homelessCount()}</div>`;
     for (const g of GORDER) {
       const m = members(g), mg = mgr(g), ab = G.abil[g];
       h += `<div class="grp" data-g="${g}"><div class="gh"><span title="${GROUPS[g].desc}">${GROUPS[g].ic} ${GROUPS[g].ad} <b>${m.length}</b></span><span class="gm">${mg ? '★ ' + mg.name + (tr(mg, 'onder') ? ' ⭐' : '') : (g === 'bos' ? '' : '<i>yönetici yok</i>')}</span></div><div class="gb">`;
@@ -193,7 +196,7 @@ function renderSide() {
 
 // ---- karakter kartı
 function openChar(id) { UI.char = id; $('charM').style.display = 'flex'; G.modal = true; renderChar(); }
-function closeChar() { UI.char = 0; $('charM').style.display = 'none'; G.modal = $('craft').style.display === 'flex'; }
+function closeChar() { UI.char = 0; $('charM').style.display = 'none'; G.modal = $('craft').style.display === 'flex' || !!UI.inB; }
 $('charM').addEventListener('pointerdown', e => {
   if (e.target.id === 'charM') { closeChar(); return; }
   const b = e.target.closest('[data-c]'); if (!b) return; e.preventDefault();
@@ -203,6 +206,8 @@ $('charM').addEventListener('pointerdown', e => {
   if (c === 'grp') setGroup(p, v);
   if (c === 'mgr') setManager(p.group, p);
   if (c === 'ord') addOrder(v, 1, p.id);
+  if (c === 'rt') { const ord = [null].concat(GORDER.filter(g => g !== 'bos')); p.routine = p.routine || {}; const cur = p.routine[v] || null; p.routine[v] = ord[(ord.indexOf(cur) + 1) % ord.length]; if (!Object.values(p.routine).some(Boolean)) p.routine = null; }
+  if (c === 'alt') { const ks = Object.keys(ALTS); p.alt = ks[(ks.indexOf(p.alt || 'yiyecek') + 1) % ks.length]; }
   if (c === 'prev' || c === 'next') { const L2 = G.people.filter(q => !q.leader); const i = L2.findIndex(q => q.id === p.id); const n = L2[(i + (c === 'next' ? 1 : -1) + L2.length) % L2.length]; if (n) UI.char = n.id; }
   renderChar(); G.uiDirty = true;
 });
@@ -223,12 +228,15 @@ function renderChar() {
     const cur = GROUPS[p.group] && GROUPS[p.group].sk === s;
     h += `<div class="sk ${cur ? 'cur' : ''}"><span>${SKILLS[s].ic} ${SKILLS[s].ad}</span><b>${l}</b><div class="bar"><i style="width:${Math.round(f * 100)}%;background:#d9a94a"></i></div></div>`;
   }
-  h += `</div><div class="cat">Hayatı</div><div><small>⛺ ${home ? (home.owners.length > 1 ? 'Çadırını paylaşıyor' : 'Kendi çadırı var') : 'Çadırı yok — ateş başında uyuyor'}${pt ? ` · ❤ ${pt.name}` : ''}${kids.length ? ` · 👶 ${kids.map(k => k.name).join(', ')}` : ''}</small></div>`;
+  h += `</div><div class="cat">Hayatı</div><div><small>${home ? `${BUILD[home.type].ic} Evi: ${BUILD[home.type].ad}${home.owners.length > 1 ? ' (paylaşıyor)' : ''}` : '🏚️ Kalacak yeri yok — ateş başında uyuyor'}${pt ? ` · ❤ ${pt.name}` : ''}${kids.length ? ` · 👶 ${kids.map(k => k.name).join(', ')}` : ''}</small></div>`;
   h += `<div><small>Kuşandığı: ${eq}</small></div>`;
   if (p.injury || p.sick) h += `<div><small>Sağlık: ${p.injury ? { kanama: 'kanama', kirik: 'kırık bacak', enfeksiyon: 'enfeksiyon (ilaç gerek)' }[p.injury.type] : ''} ${p.sick ? '· hastalık (' + p.sick.d + '. gün)' : ''}${p.bed ? ' · şifahanede, ' + Math.max(0, p.bedUntil - G.day) + ' gün daha' : ''}</small></div>`;
   if (!p.child) {
     h += `<div class="cat">Görev</div><div class="gsel">${GORDER.map(g => `<button data-c="grp" data-v="${g}" class="${p.group === g ? 'on' : ''}" title="${GROUPS[g].desc}">${GROUPS[g].ic} ${GROUPS[g].ad}${GROUPS[g].sk ? ' ' + lvl(p, GROUPS[g].sk) : ''}</button>`).join('')}</div>`;
     h += `<button data-c="mgr" class="wide ${G.managers[p.group] === p.id ? 'on' : ''}">★ ${GROUPS[p.group].ad} grubunun yöneticisi yap</button>`;
+    h += `<div class="cat">Günlük rutin</div><div class="gsel">${Object.keys(SLOTS).map(s => { const g = p.routine && p.routine[s]; return `<button data-c="rt" data-v="${s}" class="${g ? 'on' : ''}">${SLOTS[s]}: ${g ? GROUPS[g].ic + ' ' + GROUPS[g].ad : '—'}</button>`; }).join('')}</div><small class="hint">Dokundukça sıradaki mesleğe geçer. Rutin varsa o saatte meslek kendiliğinden değişir; akşam herkes evine döner.</small>`;
+    h += `<div class="cat">İşi bitince / boşta kalınca</div><div class="gsel"><button data-c="alt">${ALTS[p.alt || 'yiyecek']}</button></div>`;
+    if (p.lastMeal !== undefined) h += `<div><small>Son öğün: ${p.lastMeal === 'food' ? '🍲 pişmiş yemek' : p.lastMeal === 'meyve' ? '🫐 meyve' : p.lastMeal === 'et' ? '🍖 çiğ ama temiz et' : p.lastMeal === 'cigEt' ? '🥩 temizlenmemiş et!' : '— aç kaldı'}${p.hunger ? ` · açlık ${p.hunger}` : ''}</small></div>`;
     const by = p.group === 'zanaat' ? 'zanaat' : p.group === 'sifaci' ? 'sifa' : null;
     if (by) {
       h += `<div class="cat">${p.name} için üretim emri</div><div class="gsel">`;
@@ -281,6 +289,124 @@ function renderCraft() {
   G.craftDirty = false;
 }
 
+// ---- iç görünüm: mağara, kulübe ve yapıların odaları
+const INB = { sifahane: 'sifa', kasaphane: 'kasap', atolye: 'atolye', cadir: 'yatak' };
+const interiorTargets = () => G.builds.filter(b => b.built && !b.dead && (isRoomy(b) || INB[b.type]));
+const roomsOf = b => isRoomy(b) ? b.rooms : [INB[b.type]];
+function openInterior(b) {
+  if (!playing()) return;
+  if (!b) b = interiorTargets().filter(x => dist(x, L) < x.r + 220).sort((a, c) => dist(a, L) - dist(c, L))[0] || G.cave;
+  if (!b) return;
+  UI.inB = b; G.tutIn = true; $('inM').style.display = 'flex'; G.modal = true; if (G.placing) cancelPlace(); renderInterior();
+}
+function closeInterior() { UI.inB = null; $('inM').style.display = 'none'; G.modal = !!UI.char || $('craft').style.display === 'flex'; }
+function occupants(b) {
+  const rooms = roomsOf(b), out = rooms.map(() => []);
+  const put = (t, p, k) => { const ids = []; rooms.forEach((r, i) => { if (r === t) ids.push(i); }); if (!ids.length) rooms.forEach((r, i) => { if (r === 'bos') ids.push(i); }); out[ids.length ? ids[(k || 0) % ids.length] : 0].push(p); };
+  G.people.filter(p => p.inHut === b).forEach((p, i) => put('yatak', p, Math.floor(i / 4)));
+  for (const p of G.people) {
+    if (p.inHut === b) continue;
+    if (p.bed && p.bed.s === b) { put('sifa', p, Math.floor(p.bed.i / 2)); continue; }
+    const here = p.insideB === b || (!isRoomy(b) && p !== L && dist(p, b) < b.r + 40 && !p.moving);
+    if (!here) continue;
+    const t = G.meal && dist(p, G.meal.table) < 70 ? 'mutfak' : ({ asci: 'mutfak', kasap: 'kasap', zanaat: 'atolye', sifaci: 'sifa' })[p.group] || 'bos';
+    put(t, p, 0);
+  }
+  return out;
+}
+const IN_HITS = [];
+function renderInterior() {
+  const b = UI.inB; if (!b || b.dead) { closeInterior(); return; }
+  const c = $('inC'), W = Math.min(700, innerWidth * 0.92), H = Math.round(W * 0.56);
+  if (c.width !== Math.round(W * DPR)) { c.width = Math.round(W * DPR); c.height = Math.round(H * DPR); c.style.width = W + 'px'; c.style.height = H + 'px'; }
+  const g = c.getContext('2d'); g.setTransform(DPR, 0, 0, DPR, 0, 0);
+  const cave = b.type === 'magara', wood = !cave;
+  g.fillStyle = cave ? '#120e0b' : '#2a1c10'; g.fillRect(0, 0, W, H);
+  if (cave) { const R = mulberry32(5); for (let i = 0; i < 160; i++) { g.fillStyle = `rgba(${90 + R() * 40},${80 + R() * 30},${70 + R() * 20},${0.06 + R() * 0.08})`; g.beginPath(); g.arc(R() * W, R() * H, 4 + R() * 26, 0, TAU); g.fill(); } }
+  const rooms = roomsOf(b), occ = occupants(b), n = rooms.length;
+  const cols = n <= 1 ? 1 : n <= 4 ? 2 : 3, rows = Math.ceil(n / cols), pad = 12;
+  const cw = (W - pad * (cols + 1)) / cols, ch = (H - pad * (rows + 1)) / rows;
+  IN_HITS.length = 0;
+  rooms.forEach((t, i) => {
+    const cx = pad + (i % cols) * (cw + pad), cy = pad + Math.floor(i / cols) * (ch + pad);
+    g.save(); g.beginPath();
+    if (cave) { const rr = 26; g.moveTo(cx + rr, cy); g.arcTo(cx + cw, cy, cx + cw, cy + ch, rr); g.arcTo(cx + cw, cy + ch, cx, cy + ch, rr); g.arcTo(cx, cy + ch, cx, cy, rr); g.arcTo(cx, cy, cx + cw, cy, rr); }
+    else g.rect(cx, cy, cw, ch);
+    const fl = g.createLinearGradient(cx, cy, cx, cy + ch);
+    fl.addColorStop(0, cave ? '#3e342a' : '#7a5a36'); fl.addColorStop(1, cave ? '#2a2219' : '#5a4024');
+    g.fillStyle = fl; g.fill(); g.clip();
+    if (wood) { g.strokeStyle = 'rgba(0,0,0,.25)'; g.lineWidth = 1; for (let y = cy + 10; y < cy + ch; y += 12) { g.beginPath(); g.moveTo(cx, y); g.lineTo(cx + cw, y); g.stroke(); } }
+    else { const R = mulberry32(i + 3); g.fillStyle = 'rgba(0,0,0,.18)'; for (let k = 0; k < 30; k++) { g.beginPath(); g.arc(cx + R() * cw, cy + R() * ch, 2 + R() * 6, 0, TAU); g.fill(); } }
+    drawRoomFurniture(g, t, cx, cy, cw, ch);
+    const lit = g.createRadialGradient(cx + cw / 2, cy + ch / 2, 10, cx + cw / 2, cy + ch / 2, Math.max(cw, ch) * 0.7);
+    lit.addColorStop(0, 'rgba(255,170,80,.12)'); lit.addColorStop(1, 'rgba(0,0,0,.45)'); g.fillStyle = lit; g.fillRect(cx, cy, cw, ch);
+    g.restore();
+    g.strokeStyle = cave ? 'rgba(160,140,110,.35)' : '#3a2410'; g.lineWidth = cave ? 2 : 4; g.strokeRect(cx + (cave ? 4 : 0), cy + (cave ? 4 : 0), cw - (cave ? 8 : 0), ch - (cave ? 8 : 0));
+    g.fillStyle = 'rgba(0,0,0,.55)'; g.fillRect(cx + 6, cy + 6, Math.min(cw - 12, 170), 20);
+    g.fillStyle = '#ffd9a0'; g.font = '13px Georgia'; g.textAlign = 'left'; g.fillText(`${ROOMS[t].ic} ${ROOMS[t].ad}`, cx + 11, cy + 21);
+    const ps = occ[i], per = Math.max(1, Math.floor((cw - 30) / 46));
+    ps.forEach((p, k) => {
+      const px = cx + 30 + (k % per) * 46, py = cy + 52 + Math.floor(k / per) * 52;
+      if (py > cy + ch - 10) return;
+      drawMiniPerson(g, p, px, py);
+      IN_HITS.push({ x: px, y: py, id: p.id });
+    });
+  });
+  // alt bilgi
+  const homeB = homeCap(b) > 0;
+  const res = (b.owners || []).map(id => G.people.find(q => q.id === id)).filter(Boolean);
+  let h = `<div class="ch"><b>${BUILD[b.type].ic} ${BUILD[b.type].ad}</b><span class="res">${homeB ? `🛏️ ${households(b)}/${homeCap(b)} hane` : ''} ${roomCount(b, 'depo') ? ' · 📦 depo ' + storeCap() : ''} ${bedCount(b) ? ' · ⛑️ ' + (b.beds || []).filter(Boolean).length + '/' + bedCount(b) + ' yatak' : ''}</span><button data-ix="close">✕</button></div>`;
+  if (isRoomy(b)) h += `<div class="cat" style="margin:6px 12px">Odalar — dokunarak türünü değiştir</div><div class="gsel" style="padding:0 12px">${b.rooms.map((r, i) => `<button data-room="${i}" title="${ROOMS[r].desc}">${i + 1}. ${ROOMS[r].ic} ${ROOMS[r].ad}</button>`).join('')}</div>`;
+  if (res.length) h += `<div class="cat" style="margin:6px 12px">Burada yaşayanlar</div><div class="gsel" style="padding:0 12px 10px">${res.map(p => `<button data-p="${p.id}">${p.inHut === b ? '💤 ' : ''}${p.name}</button>`).join('')}</div>`;
+  h += `<p class="hint" style="padding:0 12px 10px">İçerideki birine dokun: karakter kartı açılır. Sol/sağ ok ile diğer yapılara geç.</p>`;
+  $('inInfo').innerHTML = h;
+}
+function drawRoomFurniture(g, t, x, y, w, h) {
+  const R = mulberry32(Math.floor(x * 3 + y));
+  if (t === 'yatak') for (let i = 0; i < 4; i++) { const bx = x + 18 + (i % 2) * (w / 2), by = y + h * 0.45 + Math.floor(i / 2) * h * 0.25; g.fillStyle = '#9a8048'; g.fillRect(bx, by, w / 2 - 30, 18); g.fillStyle = ['#7a3a3a', '#3a5a7a', '#5a7a3a', '#7a6a3a'][Math.floor(R() * 4)]; g.fillRect(bx + 14, by + 2, w / 2 - 46, 14); }
+  else if (t === 'depo') { for (let i = 0; i < 9; i++) { const bx = x + 16 + R() * (w - 50), by = y + 34 + R() * (h - 60); g.fillStyle = '#7a5a34'; g.fillRect(bx, by, 26, 22); g.strokeStyle = '#4a3018'; g.lineWidth = 2; g.strokeRect(bx, by, 26, 22); g.beginPath(); g.moveTo(bx, by); g.lineTo(bx + 26, by + 22); g.stroke(); } g.fillStyle = '#ffe9b0'; g.font = '12px Georgia'; g.textAlign = 'right'; g.fillText(`🍲${Math.floor(G.stock.food)} 🫐${Math.floor(G.stock.meyve)} 🍖${Math.floor(G.stock.et)} 🪵${G.stock.wood}`, x + w - 8, y + h - 8); }
+  else if (t === 'mutfak') { g.fillStyle = '#2a1a10'; g.beginPath(); g.arc(x + 40, y + h * 0.6, 18, 0, TAU); g.fill(); g.fillStyle = '#ff8a30'; g.beginPath(); g.ellipse(x + 40, y + h * 0.6 - 4, 7, 11 + Math.sin(G.now * 9) * 2, 0, 0, TAU); g.fill(); g.fillStyle = '#6a4a2a'; g.fillRect(x + 70, y + h * 0.5, w - 90, 26); const bowls = Math.min(10, Math.floor(G.stock.food || 0)); g.fillStyle = '#d8b880'; for (let i = 0; i < bowls; i++) { g.beginPath(); g.arc(x + 82 + i * ((w - 110) / 10), y + h * 0.5 + 13, 5, 0, TAU); g.fill(); } }
+  else if (t === 'sifa') { for (let i = 0; i < 2; i++) { const bx = x + 20 + i * (w / 2), by = y + h * 0.55; g.fillStyle = '#e8e0d0'; g.fillRect(bx, by, w / 2 - 40, 20); } g.fillStyle = '#2a8a5a'; g.fillRect(x + w - 30, y + 12, 6, 18); g.fillRect(x + w - 36, y + 18, 18, 6); }
+  else if (t === 'kasap') { g.fillStyle = '#7a5a36'; g.fillRect(x + 20, y + h * 0.55, w - 40, 22); g.fillStyle = '#8a1a14'; for (let i = 0; i < Math.min(6, Math.ceil(G.stock.cigEt || 0)); i++) { g.beginPath(); g.ellipse(x + 34 + i * 22, y + h * 0.55 + 11, 8, 5, 0, 0, TAU); g.fill(); } g.strokeStyle = '#3a2410'; g.lineWidth = 2; g.beginPath(); g.moveTo(x + 20, y + 34); g.lineTo(x + w - 20, y + 34); g.stroke(); }
+  else if (t === 'atolye') { g.fillStyle = '#8a6a44'; g.fillRect(x + 20, y + h * 0.5, w - 40, 24); g.fillStyle = '#999'; g.fillRect(x + 40, y + h * 0.5 + 6, 18, 4); g.fillRect(x + 70, y + h * 0.5 + 10, 4, 12); g.fillStyle = '#5a3a1e'; for (let i = 0; i < 5; i++) g.fillRect(x + w - 60 + i * 6, y + h * 0.5 - 20, 4, 20); }
+}
+function drawMiniPerson(g, p, x, y) {
+  const lying = p.inHut || p.bed;
+  const col = p.leader ? '#8a3a1a' : p.child ? '#b89a6a' : (GROUPS[p.group] || GROUPS.bos).col;
+  g.fillStyle = 'rgba(0,0,0,.35)'; g.beginPath(); g.ellipse(x + 2, y + 12, 12, 5, 0, 0, TAU); g.fill();
+  g.save(); g.translate(x, y); if (lying) g.rotate(Math.PI / 2);
+  const s = p.child ? 0.75 : 1; g.scale(s, s);
+  g.fillStyle = col; g.beginPath(); g.ellipse(0, 4, 8, 11, 0, 0, TAU); g.fill();
+  g.fillStyle = p.skin; g.beginPath(); g.arc(0, -9, 7, 0, TAU); g.fill();
+  g.fillStyle = p.hair; g.beginPath(); g.arc(0, -11, 7.2, Math.PI, TAU); g.fill();
+  if (!lying && p.work > 0.05) { const w = Math.sin(G.now * 10) * 4; g.strokeStyle = p.skin; g.lineWidth = 3; g.beginPath(); g.moveTo(6, 0); g.lineTo(12, -4 + w); g.stroke(); }
+  if (p.bed) { g.fillStyle = 'rgba(230,225,210,.9)'; g.fillRect(-9, 0, 18, 14); }
+  g.restore();
+  g.fillStyle = '#eadcc0'; g.font = '10px Georgia'; g.textAlign = 'center'; g.fillText(p.name, x, y + 26);
+  if (p.inHut) { g.fillStyle = '#cfe'; g.fillText('z', x + 12 + Math.sin(G.now * 2) * 2, y - 14); }
+  const st = p.sick ? '🤒' : p.injury ? '🩹' : ''; if (st) { g.font = '11px serif'; g.fillText(st, x + 12, y - 4); }
+}
+$('inM').addEventListener('pointerdown', e => {
+  if (e.target.id === 'inM') { closeInterior(); return; }
+  if (e.target.id === 'inC') {
+    const r = e.target.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+    const hit = IN_HITS.find(h => Math.hypot(h.x - x, h.y - y) < 22);
+    if (hit) openChar(hit.id);
+    return;
+  }
+  const btn = e.target.closest('[data-ix],[data-room],[data-p],[data-nav]'); if (!btn) return; e.preventDefault();
+  if (btn.dataset.ix === 'close') return closeInterior();
+  if (btn.dataset.p) return openChar(+btn.dataset.p);
+  if (btn.dataset.nav) { const T = interiorTargets(); const i = T.indexOf(UI.inB); UI.inB = T[(i + (+btn.dataset.nav) + T.length) % T.length]; renderInterior(); return; }
+  if (btn.dataset.room !== undefined) {
+    const b = UI.inB, i = +btn.dataset.room, cur = b.rooms[i];
+    b.rooms[i] = RORDER[(RORDER.indexOf(cur) + 1) % RORDER.length];
+    if (b.type === 'magara' && !b.rooms.includes('yatak') && !G.builds.some(o => o !== b && homeCap(o) > 0)) { msg('Mağarada en az bir yatakhane kalmalı.', '#e99', 3); b.rooms[i] = cur; }
+    assignHomes(); assignBeds(); G.uiDirty = true;
+    msg(`${BUILD[b.type].ad}: ${i + 1}. oda artık ${ROOMS[b.rooms[i]].ic} ${ROOMS[b.rooms[i]].ad}.`, '#cde', 2);
+    renderInterior();
+  }
+});
 // ---- bildirimler
 function toast(html) { const t = $('toast'); const d = document.createElement('div'); d.innerHTML = html; t.appendChild(d); setTimeout(() => d.remove(), 5000); }
 function renderMsgs() { $('msgs').innerHTML = G.msgs.map(m => `<div style="color:${m.col};opacity:${clamp(m.life, 0, 1)}">${m.t}</div>`).join(''); G.msgDirty = false; }
@@ -292,8 +418,9 @@ function updateHUD() {
   $('dayTxt').textContent = `${G.day}. Gün`;
   $('todTxt').textContent = (n ? '🌑 Gece' : p > 0.42 ? '🌇 Akşam' : '☀️ Gündüz') + ' ' + WIC[G.weather.type] + (G.finale ? ' 🌀' : '');
   $('todBar').style.width = (p * 100) + '%';
-  $('res').innerHTML = ['wood', 'stone', 'food'].map(k => `<span>${RES[k]} <b>${G.stock[k]}</b></span>`).join('') + `<span title="Halk · boş çadır">👥 <b>${G.people.length}</b><small>/⛺${emptyTents()}</small></span>`;
-  $('res2').innerHTML = ['bone', 'hide', 'herb', 'poison', 'crystal'].filter(k => G.stock[k] > 0 || k === 'herb').map(k => `<span title="${RESN[k]}">${RES[k]}${G.stock[k]}</span>`).join('') + ` <span title="Ok">➶${arrows()}</span><span title="İlaç">💊${G.stock.ilac || 0}</span><span title="Sargı">🩹${G.stock.bandaj || 0}</span>`;
+  const fl = k => Math.floor(G.stock[k] || 0);
+  $('res').innerHTML = ['wood', 'stone', 'food', 'meyve', 'et'].map(k => `<span title="${RESN[k]}">${RES[k]} <b>${fl(k)}</b></span>`).join('') + `<span title="Halk · boş yer">👥 <b>${G.people.length}</b><small>/🛏️${freeHomes()}</small></span>`;
+  $('res2').innerHTML = ['cigEt', 'bone', 'hide', 'herb', 'poison', 'crystal'].filter(k => G.stock[k] > 0 || k === 'herb').map(k => `<span title="${RESN[k]}">${RES[k]}${fl(k)}</span>`).join('') + ` <span title="Ok">➶${arrows()}</span><span title="İlaç">💊${G.stock.ilac || 0}</span><span title="Sargı">🩹${G.stock.bandaj || 0}</span><span title="Depo sınırı">📦${storeCap()}</span>`;
   $('fireBar').style.width = G.fire.fuel + '%';
   $('morBar').style.width = G.morale + '%';
   $('hpBar').style.width = clamp(L.hp / L.maxhp * 100, 0, 100) + '%';
@@ -312,6 +439,7 @@ function hudTick(dt) {
   UI.toolT -= dt; if (UI.toolT <= 0 || G.toolsDirty) { UI.toolT = 1; buildTools(); }
   if ($('craft').style.display === 'flex') { UI.craftT -= dt; if (UI.craftT <= 0 || G.craftDirty) { UI.craftT = 0.6; renderCraft(); } }
   if (UI.char) { UI.charT -= dt; if (UI.charT <= 0) { UI.charT = 0.7; renderChar(); } }
+  if (UI.inB) renderInterior();
 }
 
 // ---- ekranlar
@@ -322,7 +450,7 @@ function startScreen() {
   const achList = Object.entries(ACH).map(([k, a]) => `<div class="${ACHSET.has(k) ? 'got' : ''}">${ACHSET.has(k) ? '🏆' : '🔒'} <b>${a.ad}</b> — ${a.desc}</div>`).join('');
   const best = +(store.get('sonAtesRekor') || 0);
   $('screenBox').innerHTML = `<h1>SON ATEŞ</h1>
-  <p class="story">Bir fırtına. Kör edici bir ışık. Uyandığınızda gökyüzünde tanımadığınız kanatlar,<br>ormanda tanımadığınız sesler vardı. Altı kişisiniz. Bir ateşiniz var.<br>Uzaklarda bir yerde, sizi buraya getiren yarık hâlâ parlıyor.<br><b>Ve gece yaklaşıyor.</b></p>
+  <p class="story">Bir fırtına. Kör edici bir ışık. Uyandığınızda gökyüzünde tanımadığınız kanatlar,<br>ormanda tanımadığınız sesler vardı. Sekiz kişisiniz. Bir mağaranız, bir ateşiniz var.<br>Uzaklarda bir yerde, sizi buraya getiren yarık hâlâ parlıyor.<br><b>Ve gece yaklaşıyor.</b></p>
   ${sv ? `<button id="cont" class="big">DEVAM ET <small>(${sv.day}. gün · ${DIFF[sv.diff] ? DIFF[sv.diff].ad : ''})</small></button><br>` : ''}
   <div class="diffs">${Object.entries(DIFF).map(([k, d]) => `<button data-d="${k}" class="${UI.diff === k ? 'on' : ''}">${d.ad}</button>`).join('')}</div>
   <p class="ddesc" id="ddesc">${DIFF[UI.diff].desc}</p>
@@ -332,7 +460,9 @@ function startScreen() {
   <details><summary>Nasıl oynanır?</summary><div class="keys">${isTouch ? `<b>Sol taraf</b> hareket · <b>Saldır</b> mızrak · <b>Ok</b> yay · <b>Topla/Kullan</b> toplama, ateş, tedavi, taşıma, evcilleştirme, binme` : `<b>WASD</b> hareket · <b>Shift</b> koş · <b>Fare/Boşluk</b> mızrak · <b>F / sağ tık</b> ok<br><b>E</b> (basılı) topla · ateşe odun · tedavi · inşaata yardım · kurtar · (bas) bin/in, yaralı taşı<br><b>G</b> av emri · <b>C</b> üretim · <b>M</b> harita · <b>H</b> halk paneli · <b>1-9</b> inşa planı · <b>T</b> meşale · <b>P</b> duraklat`}<br>
   <b>Halk</b>: 13 meslek grubu. Herkes yaptığı işte seviye atlar (1-10). Karakter kartından (ⓘ) becerileri gör, görev ve doğrudan üretim emri ver.<br>
   <b>Yiyecek</b>: asıl kaynak avcılık. 🎯 ile bir hayvan seç; avcılar mesafeyi koruyarak avlar. Leşi 🔪 Et Ustası temizlemezse çiğ et salgın getirebilir. Tarlalar da ekilebilir.<br>
-  <b>Barınma</b>: her tek kişi ya da çift bir ⛺ çadırda yaşar. Boş çadır yoksa yeni insanlar gelmez.<br>
+  <b>Mağara ve odalar</b>: halk mağarada başlar. <b>I</b> ile mağaranın, kulübenin ve diğer yapıların içini gör, odalara görev ver (yatakhane, depo, mutfak, şifa, et temizleme, atölye), içeriden karakter seç.<br>
+  <b>Yemek</b>: leş → taşıyıcılar → 🔪 et ustası temizler → 🍲 aşçı pişirir. Öğle ve akşam yemek vakti herkes masaya gelir. Çiğ et hastalık getirebilir.<br>
+  <b>Barınma</b>: her tek kişi ya da çift bir yerde yaşar (çadır = 1 hane, yatakhane odası = 2 hane). Yer yoksa yeni insanlar gelmez. Çitsiz evler nadiren saldırıya uğrar.<br>
   <b>Sağlık</b>: yaralılar şifahaneye taşınır, günlerce tedavi görür. Salgınlar nadiren öldürür ama yayılır.<br>
   <b>Bilinmezlik</b>: sadece halkının gördüğünü görürsün. Geceler çoğu zaman sessizdir... ama her zaman değil. Yüzü tanıdık gelen her şeye güvenme.<br>
   <b>Hedef</b>: yarığı bul, halkını 30 kişiye çıkar, 6. seviye bir zanaatkâra Yarık Taşı yaptır ve son savaşı kazan.</div></details>
@@ -345,7 +475,7 @@ function startScreen() {
 }
 function onGameStart() {
   $('screen').style.display = 'none'; $('hud').style.display = 'block'; $('pause').style.display = 'none';
-  G.started = true; G.paused = false; G.modal = false; $('craft').style.display = 'none'; $('charM').style.display = 'none'; UI.char = 0;
+  G.started = true; G.paused = false; G.modal = false; $('craft').style.display = 'none'; $('charM').style.display = 'none'; UI.char = 0; $('inM').style.display = 'none'; UI.inB = null;
   UI.sel.clear(); UI.filter = 'all';
   if (innerWidth <= 700) { toggleSide(false); $('miniBox').style.display = 'none'; } else { toggleSide(true); $('miniBox').style.display = 'block'; }
   $('miniBox').classList.remove('big');

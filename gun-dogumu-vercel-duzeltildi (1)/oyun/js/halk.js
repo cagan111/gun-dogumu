@@ -28,7 +28,8 @@ function mkPerson(x, y, name, leader, child) {
     skin: pick(['#e0b48a', '#c99068', '#a8754f', '#f0c8a0', '#8a5a3a', '#d8a47a']), hair: pick(['#2a1a10', '#4a2e18', '#111', '#6a4020', '#8a6a3a', '#bbb', '#a0522d']),
     stam: 100, stuck: 0, detour: 0, seat: rand(0, TAU), grabbed: false, desert: 0, moving: false,
     injury: null, downed: 0, tired: false, watched: false, partner: 0, parentA: 0, parentB: 0, post: null, medic: 0, fidx: 0, swing: 0,
-    sk: {}, eq: {}, homeT: null, bed: null, bedRes: null, bedUntil: 0, carriedBy: 0, carrying: null, sick: null, wasDowned: false, backT: 0
+    sk: {}, eq: {}, homeT: null, bed: null, bedRes: null, bedUntil: 0, carriedBy: 0, carrying: null, sick: null, wasDowned: false, backT: 0,
+    routine: null, alt: 'yiyecek', hunger: 0, ate: true, insideB: null
   };
   for (const s in SKILLS) p.sk[s] = 0;
   for (const s in st.sk) p.sk[s] = XPL[st.sk[s] - 1] + 1;
@@ -69,7 +70,7 @@ function assignEquip() {
 const spearTier = p => p && p.eq && p.eq.kemikMizrak ? 3 : p && p.eq && p.eq.mizrak ? 2 : 1;
 const arrows = () => (G.stock.ok || 0) + (G.stock.zok || 0);
 const ranged = p => !!(p.eq && p.eq.yay) && arrows() > 0;
-const nearSifahane = p => G.builds.some(b => b.type === 'sifahane' && b.built && Math.hypot(b.x - p.x, b.y - p.y) < 170);
+const nearSifahane = p => G.builds.some(b => b.built && !b.dead && (b.type === 'sifahane' || roomCount(b, 'sifa') > 0) && Math.hypot(b.x - p.x, b.y - p.y) < b.r + 140);
 
 function pSpeed(p) {
   let s = p.leader ? 150 : 105;
@@ -119,16 +120,16 @@ function mgr(g) {
 function grpMul(g) { const m = mgr(g); return m ? 1.2 + (tr(m, 'onder') ? 0.25 : 0) + (tr(m, 'yasli') ? 0.15 : 0) + (lvl(m, GROUPS[g].sk) - 1) * 0.03 : 1; }
 const abilOn = g => !!(G.abil[g] && G.abil[g].act > 0);
 const mgrScore = p => (tr(p, 'onder') ? 3 : 0) + (tr(p, 'yasli') ? 2 : 0) + lvl(p, GROUPS[p.group] && GROUPS[p.group].sk) * 0.8 + p.hp / 100;
-function setGroup(p, g) {
+function setGroup(p, g, quiet) {
   if (p.leader || p.child || p.group === g) return;
-  if (G.managers[p.group] === p.id) { G.managers[p.group] = null; msg(`${GROUPS[p.group].ad} grubu yöneticisiz kaldı.`, '#ccc', 3); }
+  if (G.managers[p.group] === p.id) { G.managers[p.group] = null; if (!quiet) msg(`${GROUPS[p.group].ad} grubu yöneticisiz kaldı.`, '#ccc', 3); }
   if (p.tgt && p.tgt.claim === p) p.tgt.claim = null;
   if (p.post) { p.post.guard = null; p.post = null; }
   for (const o of G.orders) if (o.worker === p.id) o.worker = 0;
   if (p.carrying) dropCarried(p);
   p.tgt = null; p.st = p.carry > 0 ? 'return' : 'idle'; p.group = g; p.stgt = null;
   if (p.inHut && (g === 'muhafiz' || g === 'takip')) leaveHut(p);
-  G.uiDirty = true; G.tutGroup = true;
+  G.uiDirty = true; if (!quiet) G.tutGroup = true;
 }
 function plusGroup(g) {
   let src = members('bos').filter(p => G.managers.bos !== p.id && !p.bed).pop();
@@ -172,6 +173,7 @@ function useAbility(g) {
     p.hp = Math.min(p.maxhp, p.hp + 40); if (p.injury && p.injury.type === 'kanama') p.injury = null;
   }
   if (g === 'muhafiz') for (const p of members('muhafiz')) p.fear = 0;
+  if (g === 'asci') G.feastNext = true;
   msg(`${m.name}: "${SHOUT[g]}" — ${ABIL[g].ad}`, '#ffd27a', 4);
   SFX.bell(); G.uiDirty = true;
 }
@@ -239,8 +241,22 @@ function nearestThreat(p, range) {
   return best;
 }
 
-// ---- haneler (çadırlar)
-const tents = () => G.builds.filter(b => b.type === 'cadir' && b.built && !b.dead);
+// ---- haneler: çadır = 1 hane; mağara/kulübe yatakhanesi = 2 hane
+const roomCount = (b, t) => (b.rooms || []).filter(r => r === t).length;
+const homeBuildings = () => G.builds.filter(b => b.built && !b.dead && (b.type === 'cadir' || roomCount(b, 'yatak') > 0));
+const tents = homeBuildings;
+const homeCap = b => b.type === 'cadir' ? 1 : roomCount(b, 'yatak') * 2;
+function households(b) {
+  const ids = b.owners || []; let n = 0;
+  for (const id of ids) {
+    const q = G.people.find(x => x.id === id); if (!q) continue;
+    if (q.partner && ids.includes(q.partner) && q.partner < q.id) continue;
+    if ((q.parentA && ids.includes(q.parentA)) || (q.parentB && ids.includes(q.parentB))) continue;
+    n++;
+  }
+  return n;
+}
+const hasRoom = b => households(b) < homeCap(b);
 function homeOf(p) {
   if (p.leader) return null;
   if (p.child) { const par = G.people.find(q => (q.id === p.parentA || q.id === p.parentB) && !q.leader && q.homeT); return par ? par.homeT : null; }
@@ -251,9 +267,10 @@ function moveHome(p, t) {
   p.homeT = t; if (t && !t.owners.includes(p.id)) t.owners.push(p.id);
 }
 function assignHomes() {
-  const T = tents();
-  for (const p of G.people) if (p.homeT && (p.homeT.dead || !p.homeT.built)) p.homeT = null;
+  const T = homeBuildings();
+  for (const p of G.people) if (p.homeT && (p.homeT.dead || !p.homeT.built || homeCap(p.homeT) === 0)) moveHome(p, null);
   for (const t of T) t.owners = (t.owners || []).filter(id => { const q = G.people.find(x => x.id === id); return q && q.homeT === t; });
+  for (const t of T) while (households(t) > homeCap(t)) { const id = t.owners[t.owners.length - 1]; const q = G.people.find(x => x.id === id); if (!q) { t.owners.pop(); continue; } moveHome(q, null); }
   for (const p of G.people) {
     if (p.leader || p.child || !p.partner) continue;
     const q = G.people.find(x => x.id === p.partner); if (!q || q.leader) continue;
@@ -264,15 +281,30 @@ function assignHomes() {
     if (p.leader || p.child || p.homeT) continue;
     const par = G.people.find(x => (x.id === p.parentA || x.id === p.parentB) && x.homeT);
     if (par) { moveHome(p, par.homeT); continue; }
-    const t = T.find(t => !t.owners.length);
+    const t = T.find(hasRoom);
     if (t) moveHome(p, t);
   }
 }
-const emptyTents = () => tents().filter(t => !t.owners.length).length;
+const freeHomes = () => homeBuildings().reduce((n, b) => n + Math.max(0, homeCap(b) - households(b)), 0);
+const emptyTents = freeHomes;
 const homelessCount = () => G.people.filter(p => !p.leader && !homeOf(p)).length;
+// ---- istasyonlar: bağımsız yapı ya da mağara/kulübe odası
+const STN = { kasap: 'kasaphane', atolye: 'atolye', sifa: 'sifahane', mutfak: '' };
+const isRoomy = b => b.type === 'magara' || b.type === 'kulube';
+function stations(type) { return G.builds.filter(b => b.built && !b.dead && (b.type === STN[type] || (b.rooms && b.rooms.includes(type)))); }
+function station(type, from) { const S = stations(type); if (!S.length) return null; const f = from || G.fire; return S.sort((a, b) => dist(a, f) - dist(b, f))[0]; }
+const stnPos = b => isRoomy(b) ? { x: b.x, y: b.y + b.r * 0.85 } : { x: b.x, y: b.y + (b.r || 30) + 8 };
+function atStation(p, b, dt) {
+  const sp = stnPos(b), tx = sp.x + Math.cos(p.seat) * (isRoomy(b) ? 14 : 10), ty = sp.y;
+  if (Math.hypot(p.x - tx, p.y - ty) > 12) { steer(p, tx, ty, pSpeed(p), dt, false); p.anim += dt * 9; return false; }
+  p.moving = false; p.ang = angTo(p, b); if (isRoomy(b)) p.insideB = b;
+  return true;
+}
+function storeCap() { let n = 0; for (const b of G.builds) if (b.built && !b.dead) n += roomCount(b, 'depo'); return 200 + 150 * n; }
 function enterHut(p) {
   const h = homeOf(p); if (!h) return false;
-  if (steer(p, h.x, h.y + h.r + 4, pSpeed(p), G.dt, false) || dist(p, h) < h.r + 16) { if (!h.occ.includes(p)) h.occ.push(p); p.inHut = h; p.x = h.x; p.y = h.y; }
+  const ey = isRoomy(h) ? h.y + h.r * 0.85 : h.y + h.r + 4;
+  if (steer(p, h.x, ey, pSpeed(p), G.dt, false) || Math.hypot(p.x - h.x, p.y - ey) < 16) { if (!h.occ.includes(p)) h.occ.push(p); p.inHut = h; p.x = h.x; p.y = h.y; }
   return true;
 }
 function leaveHut(p) { const h = p.inHut; if (!h) return; const i = h.occ.indexOf(p); if (i >= 0) h.occ.splice(i, 1); p.inHut = null; p.x = h.x + rand(-10, 10); p.y = h.y + h.r + 10; }
@@ -318,7 +350,8 @@ function needsCare(q) {
   if (q.injury) { if (q.injury.type === 'enfeksiyon') return (G.stock.ilac || 0) > 0; if (q.injury.type === 'kirik') return !q.injury.set; return true; }
   return false;
 }
-const sifahaneler = () => G.builds.filter(b => b.type === 'sifahane' && b.built && !b.dead);
+function bedCount(b) { return b.type === 'sifahane' ? 4 : roomCount(b, 'sifa') * 2; }
+const sifahaneler = () => G.builds.filter(b => b.built && !b.dead && bedCount(b) > 0);
 function treat(q, healer) {
   if (q.downed > 0) { q.downed = 0; q.hp = Math.max(q.hp, 25); q.wasDowned = true; msg(`${q.name} ayağa kaldırıldı${sifahaneler().length ? ' — şifahanede dinlenmeli' : ''}.`, '#9f9', 3); }
   else if (q.injury) {
@@ -342,7 +375,7 @@ function findPatient(p) {
   }
   return best;
 }
-const bedPos = (s, i) => ({ x: s.x - 18 + (i % 2) * 36, y: s.y - 6 + Math.floor(i / 2) * 18 });
+const bedPos = (s, i) => s.type === 'sifahane' ? { x: s.x - 18 + (i % 2) * 36, y: s.y - 6 + Math.floor(i / 2) * 18 } : { x: s.x + ((i % 4) - 1.5) * 10, y: s.y + s.r * 0.55 };
 function needsBed(q) {
   if (q.leader || q.bed || q.dead || q.grabbed || q.downed > 0 || (q.child && !q.sick)) return false;
   return !!((q.injury && q.injury.type !== 'kanama') || q.sick || q.wasDowned || q.hp < q.maxhp * 0.3);
@@ -350,7 +383,7 @@ function needsBed(q) {
 const needsCarry = q => q.wasDowned || (q.injury && q.injury.type === 'kirik');
 function assignBeds() {
   const S = sifahaneler();
-  for (const s of S) { s.beds = s.beds || [0, 0, 0, 0]; for (let i = 0; i < 4; i++) { const id = s.beds[i]; if (id && !G.people.some(q => q.id === id && (q.bed || q.bedRes))) s.beds[i] = 0; } }
+  for (const s of S) { const n = bedCount(s); s.beds = s.beds || []; while (s.beds.length < n) s.beds.push(0); while (s.beds.length > n) { const id = s.beds.pop(); const q = G.people.find(x => x.id === id); if (q) releaseBed(q, true); } for (let i = 0; i < n; i++) { const id = s.beds[i]; if (id && !G.people.some(q => q.id === id && (q.bed || q.bedRes))) s.beds[i] = 0; } }
   for (const q of G.people) {
     if (q.bedRes && (q.bedRes.s.dead || !needsBed(q))) { q.bedRes.s.beds[q.bedRes.i] = 0; q.bedRes = null; }
     if (!needsBed(q) || q.bedRes) continue;
@@ -414,7 +447,7 @@ function rangedOrMelee(p, foe, dt) {
 }
 
 // ---- korku
-const FEARW = { dev: [800, 45], yelken: [650, 35], taklitci: [500, 50], yirtici: [450, 18], yamyam: [400, 16], batakci: [320, 15], geceavcisi: [380, 12], kucuk: [320, 6] };
+const FEARW = { kesici: [500, 30], dev: [800, 45], yelken: [650, 35], taklitci: [500, 50], yirtici: [450, 18], yamyam: [400, 16], batakci: [320, 15], geceavcisi: [380, 12], kucuk: [320, 6] };
 function updFear(p, dt, LS, night) {
   if (p.inHut || p.bed) { p.fear = Math.max(0, p.fear - 12 * dt); return; }
   let fm = tr(p, 'cesur') ? 0.55 : tr(p, 'korkak') ? 1.6 : 1;
@@ -439,8 +472,9 @@ function updFear(p, dt, LS, night) {
 }
 
 // ---- ana kişi güncellemesi
-const HOME_GROUPS = ['odun', 'tas', 'yiyecek', 'kasap', 'ciftci', 'sifaci', 'zanaat', 'mimar', 'kasif', 'bos', 'avci'];
+const HOME_GROUPS = ['odun', 'tas', 'yiyecek', 'kasap', 'asci', 'ciftci', 'sifaci', 'zanaat', 'mimar', 'kasif', 'bos', 'avci'];
 function updPerson(p, dt, LS) {
+  p.insideB = null;
   if (p.grabbed) return;
   p.atkCd -= dt; p.hurtT = Math.max(0, p.hurtT - dt); p.lastHurt += dt; p.swing = Math.max(0, p.swing - dt);
   if (p.work > 0 && p.moving) p.work = 0;
@@ -449,6 +483,7 @@ function updPerson(p, dt, LS) {
   if (p.bed) {
     if (p.bed.s.dead) { releaseBed(p, true); return; }
     const bp = bedPos(p.bed.s, p.bed.i); p.x = bp.x; p.y = bp.y; p.moving = false; p.ang = -Math.PI / 2;
+    if (isRoomy(p.bed.s)) p.insideB = p.bed.s;
     const tended = G.people.some(h => h.group === 'sifaci' && !h.bed && dist(h, p.bed.s) < 90);
     if (!(p.injury && p.injury.type === 'enfeksiyon')) p.hp = Math.min(p.maxhp, p.hp + (tended ? 3 : 1.8) * dt);
     p.fear = Math.max(0, p.fear - 10 * dt);
@@ -502,7 +537,9 @@ function updPerson(p, dt, LS) {
     else p.moving = false;
     return;
   }
+  if (G.meal && !p.ate && !p.carrying && !p.desert && !(p.post) && dist(p, G.meal.table) < 1600 && !(thr && dist(thr, p) < 150)) return mealStep(p, dt);
   if (p.child) return updChild(p, dt);
+  applyRoutine(p);
   const fighter = p.group === 'muhafiz' || p.group === 'takip' || p.group === 'avci';
   if (thr && dist(thr, p) - thr.r < 26 && p.atkCd <= 0 && (fighter || thr.type === 'kucuk' || p.fear < 50)) personAttack(p, thr);
   switch (p.group) {
@@ -512,6 +549,7 @@ function updPerson(p, dt, LS) {
     case 'kasif': return updScout(p, dt, thr);
     case 'avci': return updHunter(p, dt, thr);
     case 'kasap': return updButcher(p, dt, thr);
+    case 'asci': return updCook(p, dt);
     case 'ciftci': return updFarmer(p, dt);
     case 'zanaat': return updCrafter(p, dt);
     case 'mimar': return updArchitect(p, dt);
@@ -543,18 +581,93 @@ function updChild(p, dt) {
   if (p.wt <= 0) { p.wt = rand(3, 7); p.seat = rand(0, TAU); p.sr = rand(45, 110); }
   sitByFire(p, dt, p.sr || 60);
 }
+// ---- günlük rutin, yedek iş, yemek vakti, et taşıma
+const ALTS = { yiyecek: '🫐 Meyve topla', odun: '🪓 Odun kes', tas: '⛏️ Taş kır', tasima: '🥩 Leşten et taşı', mimar: '📐 İnşaata yardım', bos: '💤 Dinlen' };
+function applyRoutine(p) {
+  if (!p.routine || p.child || p.leader) return;
+  const ph = phase(), slot = ph < 0.16 ? 'sabah' : ph < 0.31 ? 'ogle' : ph < 0.46 ? 'ikindi' : null;
+  if (!slot) return;
+  const g = p.routine[slot];
+  if (g && p.group !== g) setGroup(p, g, true);
+}
+function altJob(p, dt) {
+  const a = p.alt || 'yiyecek';
+  if (goHome()) return homeBehavior(p, dt);
+  if (a === 'odun' || a === 'tas' || a === 'yiyecek') return updGather(p, dt, a, null, true);
+  if (a === 'tasima') { if (haulJob(p, dt)) return; return updIdle(p, dt, true); }
+  if (a === 'mimar') { if (updBuilder(p, dt, true)) return; return updIdle(p, dt, true); }
+  return updIdle(p, dt, true);
+}
+function haulJob(p, dt) {
+  const st = station('kasap', p) || G.fire;
+  if (p.st === 'haul' && p.carry > 0) {
+    const sp = stnPos(st);
+    if (steer(p, sp.x + Math.cos(p.seat) * 14, sp.y, pSpeed(p), dt, false) || Math.hypot(p.x - sp.x, p.y - sp.y) < 30) { deposit(p); p.st = 'idle'; }
+    p.anim += dt * 9; return true;
+  }
+  let c = p.tgt && p.tgt.carc && !p.tgt.dead && p.tgt.meat + p.tgt.bone + p.tgt.hide > 0 ? p.tgt : null;
+  if (!c) p.tgt = c = nearestCarcass(p);
+  if (!c) { if (p.carry > 0 && p.bag.cigEt) { p.st = 'haul'; return true; } return false; }
+  if (dist(p, c) > c.r + 12) { steer(p, c.x, c.y, pSpeed(p), dt, false); p.anim += dt * 9; return true; }
+  p.moving = false; p.ang = angTo(p, c); p.work += dt * (0.8 + 0.4 * skillMul(lvl(p, 'kasaplik')));
+  if (p.work >= 0.7) {
+    p.work = 0.01;
+    const k = c.meat > 0 ? 'cigEt' : c.hide > 0 ? 'hide' : 'bone';
+    if (k === 'cigEt') c.meat--; else if (k === 'hide') c.hide--; else c.bone--;
+    p.bag[k] = (p.bag[k] || 0) + 1; p.carry++;
+    if (c.meat + c.bone + c.hide <= 0) { c.dead = true; p.tgt = null; p.st = 'haul'; }
+    if (p.carry >= carryCap(p) + 3) p.st = 'haul';
+  }
+  return true;
+}
+function tablePos() { const k = station('mutfak'); return k ? { x: k.x, y: k.y + k.r * 0.85 + 14, b: k } : { x: G.fire.x, y: G.fire.y + 46, b: null }; }
+function takeMeal(n) { for (const k of ['food', 'meyve', 'et', 'cigEt']) if ((G.stock[k] || 0) >= n) { G.stock[k] -= n; return k; } return null; }
+function eatMeal(p) {
+  p.ate = true; p.mealT = 0;
+  const src = takeMeal(p.child ? 0.5 : 1);
+  p.lastMeal = src;
+  if (!src) { p.hunger = (p.hunger || 0) + 1; return; }
+  p.hunger = 0;
+  if (src === 'food') { p.hp = Math.min(p.maxhp, p.hp + 6 + (G.meal && G.meal.feast ? 25 : 0)); }
+  if (src === 'cigEt') G.unclean = (G.unclean || 0) + 1;
+}
+function mealStep(p, dt) {
+  const t = G.meal.table, sx = t.x + Math.cos(p.seat) * 40, sy = t.y + Math.sin(p.seat) * 20;
+  if (Math.hypot(p.x - sx, p.y - sy) > 12) { steer(p, sx, sy, pSpeed(p) * 1.15, dt, false); p.anim += dt * 9; return; }
+  p.moving = false; p.ang = angTo(p, t); p.work = 0;
+  if (t.b && isRoomy(t.b)) p.insideB = t.b;
+  p.mealT = (p.mealT || 0) + dt;
+  if (p.mealT > 3) eatMeal(p);
+}
+function updCook(p, dt) {
+  if (goHome()) return homeBehavior(p, dt);
+  const k = station('mutfak', p), st = k || G.fire;
+  const canCook = (G.stock.et || 0) >= 1 || (G.stock.meyve || 0) >= 2;
+  if (!canCook || (G.stock.food || 0) >= storeCap()) return altJob(p, dt);
+  if (!(k ? atStation(p, k, dt) : (dist(p, G.fire) < 50 || (steer(p, G.fire.x + 30, G.fire.y + 26, pSpeed(p), dt, false), false)))) { p.anim += dt * 9; return; }
+  p.moving = false; p.work = 1; p.cook = (p.cook || 0) + dt * workRate(p) * (k ? 1 : 0.7);
+  if (Math.random() < dt * 3) G.parts.push({ x: st.x + rand(-8, 8), y: (k ? stnPos(k).y : st.y) - 10, vx: rand(-5, 5), vy: -25, life: 0.8, col: 'rgba(230,230,230,.5)', s: 3 });
+  if (p.cook >= 3) {
+    p.cook = 0;
+    let n = 2;
+    if ((G.stock.et || 0) >= 1) G.stock.et--; else G.stock.meyve -= 2;
+    if (lvl(p, 'asci') >= 4 && Math.random() < 0.3) n++;
+    addStock('food', n, p.x, p.y); addXP(p, 'asci', 2);
+  }
+}
 function updIdle(p, dt, helper) {
   if (goHome()) return homeBehavior(p, dt);
   if (p.carry > 0) { if (dist(p, G.fire) < 80) deposit(p); else { steer(p, G.fire.x, G.fire.y, pSpeed(p), dt, false); p.anim += dt * 9; return; } }
   if (helper) {
     if (tryCarryJob(p, dt)) return;
     if (updBuilder(p, dt)) return;
+    if (p.group === 'bos' && haulJob(p, dt)) return;
   }
   p.wt = (p.wt || 0) - dt;
   if (p.wt <= 0) { p.wt = rand(5, 12); p.seat = rand(0, TAU); p.sr = rand(70, 140); }
   sitByFire(p, dt, p.sr || 90);
 }
-function updGather(p, dt, g, thr) {
+function updGather(p, dt, g, thr, isAlt) {
   if (goHome()) return homeBehavior(p, dt);
   if (thr && thr.type !== 'kucuk' && p.fear > 35) { steer(p, G.fire.x, G.fire.y, pSpeed(p) * 1.35, dt, false); p.anim += dt * 12; return; }
   const spd = pSpeed(p);
@@ -566,7 +679,8 @@ function updGather(p, dt, g, thr) {
   if (!p.tgt || p.tgt.dead || p.tgt.amt < 1 || p.tgt.stump) {
     if (p.tgt && p.tgt.claim === p) p.tgt.claim = null;
     p.tgt = nearestRes(p, g); if (p.tgt) p.tgt.claim = p; p.work = 0;
-    if (!p.tgt) { if (p.carry > 0) p.st = 'return'; else updIdle(p, dt); return; }
+    if (!p.tgt && !isAlt && g !== p.alt) { altJob(p, dt); return; }
+    if (!p.tgt) { if (p.carry > 0) p.st = 'return'; else if (isAlt) updIdle(p, dt, true); else altJob(p, dt); return; }
   }
   const o = p.tgt, reach = o.r + p.r + 6;
   if (dist(p, o) > reach) { steer(p, o.x, o.y, spd, dt, false); p.anim += dt * 9; return; }
@@ -596,12 +710,12 @@ function updHealer(p, dt, thr) {
     return;
   }
   if (tryCarryJob(p, dt)) return;
-  const S = sifahaneler()[0];
+  const S = sifahaneler().sort((a, b) => dist(a, p) - dist(b, p))[0];
   const bedP = S ? G.people.filter(q => q.bed && q.bed.s === S) : [];
   if (bedP.length) {
     const needy = bedP.find(q => (G.stock.ilac || 0) > 0 && ((q.injury && q.injury.type === 'enfeksiyon') || (q.sick && !q.sick.med)));
     if (needy || night) {
-      if (dist(p, S) > S.r + 30) { steer(p, S.x, S.y + S.r + 16, pSpeed(p), dt, false); p.anim += dt * 9; return; }
+      if (!atStation(p, S, dt)) return;
       p.moving = false; p.work = needy ? 1 : 0; p.tendT = (p.tendT || 0) + dt * skillMul(lvl(p, 'sifa'));
       if (needy && p.tendT >= 4) {
         p.tendT = 0; G.stock.ilac--; addXP(p, 'sifa', 5);
@@ -612,10 +726,10 @@ function updHealer(p, dt, thr) {
     }
   }
   if (night) return homeBehavior(p, dt);
-  const station = S || G.fire;
-  if (workOrder(p, dt, 'sifa', station)) return;
-  if (G.stock.herb >= 3 && (G.stock.ilac || 0) < 3 && lvl(p, 'sifa') >= 2 && dist(p, station) < 260) {
-    if (dist(p, station) > 50) { steer(p, station.x, station.y + 30, pSpeed(p), dt, false); p.anim += dt * 9; return; }
+  const stn = S || G.fire;
+  if (workOrder(p, dt, 'sifa', stn)) return;
+  if (G.stock.herb >= 3 && (G.stock.ilac || 0) < 3 && lvl(p, 'sifa') >= 2 && dist(p, stn) < 260) {
+    if (dist(p, stn) > 50) { steer(p, stn.x, stn.y + 30, pSpeed(p), dt, false); p.anim += dt * 9; return; }
     p.moving = false; p.work = 1; p.brew = (p.brew || 0) + dt * grpMul('sifaci') * skillMul(lvl(p, 'sifa'));
     if (p.brew >= 6) { p.brew = 0; G.stock.herb -= 3; G.stock.ilac = (G.stock.ilac || 0) + 1; ftext(p.x, p.y - 16, '+1 💊', '#bfe'); addXP(p, 'sifa', 4); }
     return;
@@ -673,7 +787,7 @@ function updFollow(p, dt) {
 function huntTarget(p) {
   if (G.hunt && G.hunt.t && !G.hunt.t.dead && !G.hunt.t.tamed) return G.hunt.t;
   if (isNight()) return null;
-  if (G.stock.food >= 20 + G.people.length * 3) { p.autoT = null; return null; }
+  if (foodTotal() >= 20 + G.people.length * 4) { p.autoT = null; return null; }
   p.autoCheck = (p.autoCheck || 0) - G.dt;
   if (!p.autoT || p.autoT.dead || p.autoCheck <= 0) {
     p.autoCheck = 3; let best = null, bs = 1e9;
@@ -695,6 +809,7 @@ function updHunter(p, dt, thr) {
   if (!t) {
     if (goHome()) return homeBehavior(p, dt);
     if (thr) return rangedOrMelee(p, thr, dt);
+    if (haulJob(p, dt)) return;
     p.seat += dt * 0.12; const rr = Math.max(fireR(), 200) * 1.15;
     steer(p, G.fire.x + Math.cos(p.seat) * rr, G.fire.y + Math.sin(p.seat) * rr, 70, dt, false); p.anim += dt * 6; return;
   }
@@ -735,28 +850,22 @@ function nearestCarcass(p) {
 function updButcher(p, dt, thr) {
   if (goHome() && !(p.carry > 0)) return homeBehavior(p, dt);
   if (thr && thr.type !== 'kucuk' && p.fear > 30) { steer(p, G.fire.x, G.fire.y, pSpeed(p) * 1.35, dt, false); p.anim += dt * 12; return; }
-  const station = G.builds.find(b => b.type === 'kasaphane' && b.built && !b.dead) || G.fire;
-  if (p.st === 'return' || p.carry >= carryCap(p) + 3) {
-    p.st = 'return';
-    if (steer(p, station.x + Math.cos(p.seat) * 20, station.y + 26, pSpeed(p), dt, false) || dist(p, station) < 45) { deposit(p, station !== G.fire ? 1.25 : 1); p.st = 'idle'; }
-    p.anim += dt * 9; return;
+  const st = station('kasap', p);
+  if ((G.stock.cigEt || 0) >= 1 && !(p.st === 'haul' && p.carry > 0)) {
+    const ok = st ? atStation(p, st, dt) : (dist(p, G.fire) < 60 || (steer(p, G.fire.x - 30, G.fire.y + 30, pSpeed(p), dt, false), false));
+    if (!ok) { p.anim += dt * 9; return; }
+    p.moving = false; p.work = 1; p.clean = (p.clean || 0) + dt * workRate(p);
+    if (p.clean >= 1.3) {
+      p.clean = 0; G.stock.cigEt--;
+      const n = st ? 1.25 : 1; G.stock.et = Math.min(storeCap(), (G.stock.et || 0) + n);
+      if (Math.random() < 0.25) ftext(p.x, p.y - 16, '+🍖', '#ffe9b0');
+      addXP(p, 'kasaplik', 1.5);
+      if (Math.random() < 0.3) G.parts.push({ x: p.x + 8, y: p.y, vx: rand(-30, 30), vy: rand(-30, 30), life: 0.4, col: '#7a0d0d', s: 2 });
+    }
+    return;
   }
-  let c = p.tgt && p.tgt.carc && !p.tgt.dead && p.tgt.meat + p.tgt.bone + p.tgt.hide > 0 ? p.tgt : null;
-  if (!c) p.tgt = c = nearestCarcass(p);
-  if (!c) { if (p.carry > 0) p.st = 'return'; else updIdle(p, dt, true); return; }
-  if (dist(p, c) > c.r + 12) { steer(p, c.x, c.y, pSpeed(p), dt, false); p.anim += dt * 9; return; }
-  p.moving = false; p.ang = angTo(p, c);
-  p.work += dt * workRate(p); p.anim += dt * 4;
-  if (p.work >= 0.7) {
-    p.work = 0.01;
-    const k = c.meat > 0 ? 'food' : c.hide > 0 ? 'hide' : 'bone';
-    if (k === 'food') c.meat--; else if (k === 'hide') c.hide--; else c.bone--;
-    p.bag[k] = (p.bag[k] || 0) + 1; p.carry++;
-    addXP(p, 'kasaplik', 1);
-    if (Math.random() < 0.3) G.parts.push({ x: c.x, y: c.y, vx: rand(-40, 40), vy: rand(-40, 40), life: 0.5, col: '#7a0d0d', s: 2 });
-    if (c.meat + c.bone + c.hide <= 0) { c.dead = true; p.tgt = null; p.st = 'return'; }
-    if (p.carry >= carryCap(p) + 3) p.st = 'return';
-  }
+  if (haulJob(p, dt)) return;
+  altJob(p, dt);
 }
 // ---- çiftçi
 function updFarmer(p, dt) {
@@ -776,7 +885,7 @@ function updFarmer(p, dt) {
   }
   if (!f) {
     if (!F.length && !G.flags.noField) { G.flags.noField = 1; msg('Çiftçilerin çalışması için bir 🌾 Tarla inşa et.', '#e9c', 4); }
-    return updIdle(p, dt, true);
+    return altJob(p, dt);
   }
   const job = jobOf(f);
   const spot = { x: f.x + Math.cos(p.seat) * f.r * 0.5, y: f.y + Math.sin(p.seat) * f.r * 0.4 };
@@ -785,7 +894,7 @@ function updFarmer(p, dt) {
   const need = job === 3 ? 6 : job === 2 ? 5 : 4;
   if (p.work >= need) {
     p.work = 0.01; f.claim = null; p.tgt = null;
-    if (job === 3) { const n = Math.round(14 * skillMul(lvl(p, 'tarim'))); p.bag.food = (p.bag.food || 0) + n; p.carry += n; f.planted = false; f.g = 0; p.st = 'return'; addXP(p, 'tarim', 8); ftext(f.x, f.y - 20, 'Hasat!', '#ffe08a'); }
+    if (job === 3) { const n = Math.round(14 * skillMul(lvl(p, 'tarim'))); p.bag.meyve = (p.bag.meyve || 0) + n; p.carry += n; f.planted = false; f.g = 0; p.st = 'return'; addXP(p, 'tarim', 8); ftext(f.x, f.y - 20, 'Hasat!', '#ffe08a'); }
     else if (job === 2) { f.planted = true; f.g = 0; addXP(p, 'tarim', 3); }
     else { f.g = Math.min(1, f.g + 0.06 * skillMul(lvl(p, 'tarim'))); f.tendT = 30; addXP(p, 'tarim', 2); }
   }
@@ -799,18 +908,19 @@ function canDoOrder(p, o) {
   if (o.worker && o.worker !== p.id && G.people.some(q => q.id === o.worker && q.group === p.group && !q.dead && !q.bed)) return false;
   return true;
 }
-function workOrder(p, dt, by, station) {
+function workOrder(p, dt, by, stn) {
   const o = G.orders.find(o => ITEMS[o.item].by === by && canDoOrder(p, o) && (o.paid || canAfford(ITEMS[o.item].cost)));
   if (!o) return false;
   o.worker = p.id;
-  if (dist(p, station) > station.r + 24) { steer(p, station.x + Math.cos(p.seat) * 10, station.y + station.r + 10, pSpeed(p), dt, false); p.anim += dt * 9; return true; }
-  p.moving = false; p.ang = angTo(p, station); p.work = 1;
+  if (stn.kind === 'build') { if (!atStation(p, stn, dt)) return true; }
+  else if (dist(p, stn) > (stn.r || 30) + 24) { steer(p, stn.x + Math.cos(p.seat) * 10, stn.y + (stn.r || 30) + 10, pSpeed(p), dt, false); p.anim += dt * 9; return true; }
+  p.moving = false; p.ang = angTo(p, stn); p.work = 1;
   const it = ITEMS[o.item];
   if (!o.paid) { pay(it.cost); o.paid = true; }
   o.prog += dt * skillMul(lvl(p, by)) * grpMul(p.group) * (abilOn(p.group) ? 2 : 1) * (tr(p, 'caliskan') ? 1.3 : 1) * (p.sick ? 0.5 : 1);
   if (Math.random() < dt * 2.5 && L && dist(p, L) < 450) SFX.hammer(0.25);
   if (o.prog >= it.work) {
-    addStock(o.item, it.qty || 1, station.x, station.y);
+    addStock(o.item, it.qty || 1, stn.x, stn.y);
     o.prog = 0; o.paid = false; o.left--; o.worker = 0;
     addXP(p, by, it.work * 0.7);
     if (o.item === 'yarikTasi') { msg('🌀 YARIK TAŞI HAZIR! Yarığa götür ve E ile etkinleştir.', '#9cf', 8); SFX.bell(); }
@@ -821,12 +931,12 @@ function workOrder(p, dt, by, station) {
 }
 function updCrafter(p, dt) {
   if (goHome()) return homeBehavior(p, dt);
-  const st = G.builds.find(b => b.type === 'atolye' && b.built && !b.dead);
+  const st = station('atolye', p);
   if (!st) {
     if (!G.flags.noAtolye && G.orders.some(o => ITEMS[o.item].by === 'zanaat')) { G.flags.noAtolye = 1; msg('Zanaatkârların çalışması için bir 🔨 Atölye inşa et.', '#e99', 5); }
-    return updIdle(p, dt, true);
+    return altJob(p, dt);
   }
-  if (!workOrder(p, dt, 'zanaat', st)) updIdle(p, dt, true);
+  if (!workOrder(p, dt, 'zanaat', st)) altJob(p, dt);
 }
 // ---- mimar / inşaat
 function blueprintFor(p) {
@@ -838,9 +948,9 @@ function blueprintFor(p) {
   }
   return best;
 }
-function updBuilder(p, dt) {
+function updBuilder(p, dt, any) {
   const b = blueprintFor(p); if (!b) return false;
-  if (p.group !== 'mimar' && dist(b, G.fire) > 900 && !abilOn('mimar')) return false;
+  if (p.group !== 'mimar' && !any && dist(b, G.fire) > 900 && !abilOn('mimar')) return false;
   if (dist(p, b) > b.r + 16) { steer(p, b.x + Math.cos(p.seat) * (b.r + 10), b.y + Math.sin(p.seat) * (b.r + 10), pSpeed(p), dt, false); p.anim += dt * 9; return true; }
   p.moving = false; p.ang = angTo(p, b); p.work = 1;
   const rate = (p.group === 'mimar' ? skillMul(lvl(p, 'insaat')) * grpMul('mimar') : 0.6) * (abilOn('mimar') ? 2 : 1) * (p.sick ? 0.5 : 1);
@@ -852,7 +962,7 @@ function updBuilder(p, dt) {
 }
 function updArchitect(p, dt) {
   if (goHome()) { const b = blueprintFor(p); if (!(b && dist(b, G.fire) < fireR())) return homeBehavior(p, dt); }
-  if (!updBuilder(p, dt)) updIdle(p, dt, true);
+  if (!updBuilder(p, dt)) altJob(p, dt);
 }
 function assignPosts() {
   const guards = members('muhafiz').filter(p => !p.downed && !p.desert && !p.bed);
@@ -965,7 +1075,7 @@ function halkDawn() {
     done.add(a.id); done.add(b.id);
     const home = homeOf(a) || homeOf(b);
     const kids = G.people.filter(q => q.child && (q.parentA === a.id || q.parentB === a.id)).length;
-    if (home && G.morale >= 40 && G.stock.food >= 10 && kids < 2 && Math.random() < 0.22) {
+    if (home && G.morale >= 40 && foodTotal() >= 10 && kids < 2 && Math.random() < 0.22) {
       const c = mkPerson(home.x + rand(-20, 20), home.y + 30, freshName(), false, true);
       c.parentA = a.id; c.parentB = b.id; c.group = null; G.people.push(c);
       msg(`${a.name} ve ${gen(b.name)} bir bebeği oldu: ${c.name}! 👶`, '#ffd0e0', 6); moraleAdd(8); unlock('cocuk');

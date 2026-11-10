@@ -185,7 +185,7 @@ function render() {
   drawFire();
   const ents = [];
   for (const b of G.builds) if (!BUILD[b.type].flat && b.type !== 'sifahane' && inV(b.x, b.y, 60)) ents.push(b);
-  for (const p of G.people) if (!p.inHut && inV(p.x, p.y, 40) && !(p === L && G.mount) && !(p.grabbed && G.dinos.some(d => d.type === 'yamyam' && d.carry === p))) ents.push(p);
+  for (const p of G.people) if (!p.inHut && !p.insideB && inV(p.x, p.y, 40) && !(p === L && G.mount) && !(p.grabbed && G.dinos.some(d => d.type === 'yamyam' && d.carry === p))) ents.push(p);
   for (const d of G.dinos) if (!d.fly && !d.hidden && inV(d.x, d.y, d.r * 3) && (d.tamed || visible(d.x, d.y, d.r))) ents.push(d);
   if (G.rescue && inV(G.rescue.x, G.rescue.y, 40) && visible(G.rescue.x, G.rescue.y)) ents.push(G.rescue);
   for (const t of G.trees) if (!t.stump && inV(t.x, t.y, 30)) ents.push(t);
@@ -264,7 +264,7 @@ function render() {
   if (G.rescue) edgeMarker(G.rescue.x, G.rescue.y, '🆘', true);
   if (G.rift.found || (G.riftHint && isNight())) edgeMarker(G.rift.x, G.rift.y, '🌀', true);
   if (G.hunt && G.hunt.t && !G.hunt.t.dead) edgeMarker(G.hunt.t.x, G.hunt.t.y, '🎯', true);
-  for (const p of G.people) if (p.grabbed || p.desert > 0 || p.downed > 0) edgeMarker(p.x, p.y, p.downed > 0 ? '🩸' : '❗', true);
+  for (const p of G.people) if ((p.grabbed && p.grabT > 0 && dist(p, L) < 1100) || p.desert > 0 || p.downed > 0) edgeMarker(p.x, p.y, p.downed > 0 ? '🩸' : '❗', true);
   for (const c of G.ccamps) if (c.captives.length) edgeMarker(c.x, c.y, '⛓️', true);
   const fearV = Math.max(G.danger * 0.8, dk * 0.5);
   const vg = ctx.createRadialGradient(VW / 2, VH / 2, Math.min(VW, VH) * (0.42 - fearV * 0.15), VW / 2, VH / 2, Math.max(VW, VH) * 0.75);
@@ -297,7 +297,7 @@ function drawLabels(LS, cx, cy) {
     if (ic) { ctx.font = '12px serif'; ctx.fillText(ic, x, y - 21); ctx.font = '10px Georgia'; }
   };
   for (const p of G.people) {
-    if (p.inHut || p.leader) continue;
+    if (p.inHut || p.leader || p.insideB) continue;
     const x = p.x - cx, y = p.y - cy; if (x < -40 || x > VW + 40 || y < -40 || y > VH + 40) continue;
     if (lightLevel(p.x, p.y, LS) < 0.3 && !(p.downed > 0)) continue;
     const isM = !p.child && GORDER.some(g => G.managers[g] === p.id);
@@ -429,13 +429,40 @@ function drawCanopy(t) {
   ctx.globalAlpha = under; ctx.drawImage(s.c, t.x - s.S / 2 + sw, t.y - 24 - s.S / 2, s.S, s.S); ctx.globalAlpha = 1;
 }
 
+// ---- mağara
+function drawCave(b) {
+  const x = b.x, y = b.y, r = b.r;
+  shadowAt(x + 6, y + 10, r * 1.35, r * 0.75, 0.35);
+  const R = mulberry32(77);
+  const pts = []; for (let i = 0; i < 16; i++) { const a = i / 16 * TAU; pts.push([x + Math.cos(a) * r * 1.35 * (0.85 + R() * 0.25), y + Math.sin(a) * r * 0.9 * (0.85 + R() * 0.25)]); }
+  const g = ctx.createRadialGradient(x - r * 0.4, y - r * 0.5, r * 0.2, x, y, r * 1.4); g.addColorStop(0, '#8a8476'); g.addColorStop(0.6, '#5e5a50'); g.addColorStop(1, '#3a3630');
+  ctx.fillStyle = g; ctx.beginPath(); pts.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = 'rgba(0,0,0,.4)'; ctx.lineWidth = 2; ctx.stroke();
+  ctx.fillStyle = 'rgba(70,110,40,.45)'; for (let i = 0; i < 18; i++) circle(x + (R() - 0.5) * r * 2.2, y - r * 0.2 + (R() - 0.6) * r, 3 + R() * 7);
+  ctx.strokeStyle = 'rgba(30,26,20,.5)'; ctx.lineWidth = 1.5; for (let i = 0; i < 6; i++) { const a = R() * TAU; ctx.beginPath(); ctx.moveTo(x + Math.cos(a) * r * 0.3, y + Math.sin(a) * r * 0.2); ctx.lineTo(x + Math.cos(a) * r * 0.9, y + Math.sin(a) * r * 0.6); ctx.stroke(); }
+  const mouth = ctx.createRadialGradient(x, y + r * 0.55, 2, x, y + r * 0.45, r * 0.55); mouth.addColorStop(0, '#000'); mouth.addColorStop(0.7, '#0e0a08'); mouth.addColorStop(1, 'rgba(20,16,12,0)');
+  ctx.fillStyle = mouth; ctx.beginPath(); ctx.ellipse(x, y + r * 0.5, r * 0.5, r * 0.36, 0, Math.PI, TAU); ctx.lineTo(x + r * 0.5, y + r * 0.75); ctx.lineTo(x - r * 0.5, y + r * 0.75); ctx.closePath(); ctx.fill();
+  if (darkness() > 0.3 || b.occ.length) { const gl = ctx.createRadialGradient(x, y + r * 0.55, 1, x, y + r * 0.55, r * 0.35); gl.addColorStop(0, 'rgba(255,150,60,.45)'); gl.addColorStop(1, 'rgba(255,120,40,0)'); ctx.fillStyle = gl; circle(x, y + r * 0.55, r * 0.35); }
+  ctx.fillStyle = '#e8d8b8'; ctx.font = '11px Georgia'; ctx.textAlign = 'center';
+  const n = (b.occ || []).length; if (n) ctx.fillText(`💤 ${n}`, x, y + r * 0.2);
+}
 // ---- yapılar
 function drawBuild(b) {
   const x = b.x + (b.hit > 0 ? Math.sin(G.now * 70) * 2 : 0), y = b.y;
   if (!b.built) ctx.globalAlpha = 0.45;
   if (!BUILD[b.type].flat && b.type !== 'sifahane') shadowAt(x + 2, y + 4, b.r + 2, b.r * 0.6, 0.3);
   const T = b.type;
-  if (T === 'cadir') {
+  if (T === 'magara') { drawCave(b); ctx.globalAlpha = 1; return; }
+  if (T === 'kulube') {
+    const w = b.r * 1.6, h = b.r * 1.25;
+    const g = ctx.createLinearGradient(x - w / 2, y - h / 2, x + w / 2, y + h / 2); g.addColorStop(0, '#9a7444'); g.addColorStop(1, '#5a3e20');
+    ctx.fillStyle = '#4a3218'; ctx.fillRect(x - w / 2 - 3, y - h / 2 - 3, w + 6, h + 6);
+    ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(x - w / 2, y + h / 2); ctx.lineTo(x - w / 2, y - h * 0.1); ctx.lineTo(x, y - h / 2 - 10); ctx.lineTo(x + w / 2, y - h * 0.1); ctx.lineTo(x + w / 2, y + h / 2); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = 'rgba(40,24,8,.55)'; ctx.lineWidth = 1.2; for (let i = -4; i <= 4; i++) { ctx.beginPath(); ctx.moveTo(x + i * w / 9, y - h / 2 - 10 + Math.abs(i) * 6); ctx.lineTo(x + i * w / 9, y + h / 2); ctx.stroke(); }
+    ctx.strokeStyle = '#3a2410'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x, y - h / 2 - 10); ctx.lineTo(x, y + h / 2); ctx.stroke();
+    ctx.fillStyle = '#1a0e06'; ctx.fillRect(x - 8, y + h / 2 - 16, 16, 16);
+    if (b.built) { ctx.font = '11px serif'; ctx.textAlign = 'center'; (b.rooms || []).forEach((r, i) => ctx.fillText(ROOMS[r].ic, x - w / 2 + 12 + i * (w - 24) / Math.max(1, b.rooms.length - 1), y - 2)); if (b.occ.length) ctx.fillText('💤', x + w / 2 - 6, y - h / 2); }
+  } else if (T === 'cadir') {
     const n = 7;
     for (let i = 0; i < n; i++) {
       const a0 = b.ang + i / n * TAU, a1 = a0 + TAU / n, lit = Math.cos((a0 + a1) / 2 + 2.4);
@@ -689,7 +716,7 @@ function drawDino(d) {
 function drawTheropod(d, r, col, dk, lt, step) {
   const T = d.type, def = DINO[T];
   const sway = Math.sin(d.moving ? d.anim * 0.5 : G.now * 1.2 + d.id) * r * (d.moving ? 0.28 : 0.12);
-  const slim = T === 'geceavcisi' ? 0.8 : T === 'kucuk' ? 0.85 : 1;
+  const slim = T === 'geceavcisi' ? 0.8 : T === 'kucuk' ? 0.85 : T === 'kesici' ? 0.82 : 1;
   legPair(r, step, 0.38 * slim, 1.2, dk, false);
   ctx.fillStyle = bodyGrad(r * 0.4, col);
   ctx.beginPath(); ctx.moveTo(-r * 0.5, -r * 0.34 * slim); ctx.quadraticCurveTo(-r * 1.45, sway * 0.5 - r * 0.12, -r * (T === 'yelken' ? 2.6 : 2.25), sway); ctx.quadraticCurveTo(-r * 1.45, sway * 0.5 + r * 0.12, -r * 0.5, r * 0.34 * slim); ctx.fill();
@@ -703,6 +730,7 @@ function drawTheropod(d, r, col, dk, lt, step) {
     ctx.fillStyle = fin; ctx.beginPath(); ctx.moveTo(-r * 1.0, 0); ctx.quadraticCurveTo(-r * 0.2, -r * 0.55, r * 0.6, 0); ctx.quadraticCurveTo(-r * 0.2, r * 0.55, -r * 1.0, 0); ctx.fill();
     ctx.strokeStyle = 'rgba(40,10,5,.8)'; ctx.lineWidth = 1.2; for (let i = 0; i < 8; i++) { const x = -r * 0.9 + i * r * 0.2, h = r * 0.42 * Math.sin((i + 1) / 9 * Math.PI); ctx.beginPath(); ctx.moveTo(x, -h); ctx.lineTo(x, h); ctx.stroke(); }
   }
+  else if (T === 'kesici') { ctx.strokeStyle = '#2a1e16'; ctx.lineWidth = Math.max(1, r * 0.06); for (let i = -3; i <= 3; i++) { ctx.beginPath(); ctx.moveTo(i * r * 0.2, -r * 0.45); ctx.lineTo(i * r * 0.2 + r * 0.08, r * 0.45); ctx.stroke(); } ctx.fillStyle = '#6a1a10'; for (let i = 0; i < 6; i++) ell(-r * 0.7 + i * r * 0.26, 0, r * 0.07, r * 0.14); ctx.strokeStyle = '#e8e0cc'; ctx.lineWidth = 2; for (const s of [-1, 1]) { ctx.beginPath(); ctx.arc(r * 0.12, s * r * 0.62, r * 0.18, s > 0 ? -0.2 : 0.2 - Math.PI, s > 0 ? 1.4 : -1.4 - Math.PI, s < 0); ctx.stroke(); } }
   else if (T === 'geceavcisi') { ctx.strokeStyle = 'rgba(200,220,210,.45)'; ctx.lineWidth = 1; for (let i = -2; i <= 2; i++) { ctx.beginPath(); ctx.moveTo(i * r * 0.22, -r * 0.35); ctx.lineTo(i * r * 0.22 - r * 0.08, r * 0.35); ctx.stroke(); } }
   else if (T === 'kucuk' || T === 'tukurgec') { ctx.beginPath(); ctx.moveTo(-r * 1.5, sway * 0.7); ctx.quadraticCurveTo(-r * 0.6, 0, r * 0.7, 0); ctx.stroke(); ctx.fillStyle = shade(col, 0.2); for (let i = 0; i < 4; i++) circle(-r * 0.4 + i * r * 0.25, (i % 2 ? 1 : -1) * r * 0.2, r * 0.06); }
   if (T === 'dev') { ctx.fillStyle = dk; circle(r * 0.7, -r * 0.3, r * 0.08); circle(r * 0.7, r * 0.3, r * 0.08); }
@@ -824,7 +852,7 @@ function drawMini() {
   for (const z of GORDER) if (G.zone[z]) dot(G.zone[z].x, G.zone[z].y, 2.5, GROUPS[z].col);
   for (const c2 of G.ccamps) if (c2.found) { dot(c2.x, c2.y, 4, c2.alive ? '#d22' : '#633'); if (c2.alive) { g.fillStyle = '#fff'; g.font = `${9 * DPR}px serif`; g.textAlign = 'center'; g.fillText('☠', c2.x * k, c2.y * k + 3 * DPR); } }
   if (G.zone.kasif) { g.strokeStyle = '#ffd27a'; g.lineWidth = 1.5 * DPR; g.beginPath(); g.arc(G.zone.kasif.x * k, G.zone.kasif.y * k, 7 * DPR, 0, TAU); g.stroke(); }
-  for (const p of G.people) if (!p.inHut && p !== L) dot(p.x, p.y, 1.4, p.downed > 0 || p.grabbed ? '#f44' : '#e8dcc0');
+  for (const p of G.people) if (!p.inHut && !p.insideB && p !== L && !(p.grabbed && !(p.grabT > 0))) dot(p.x, p.y, 1.4, p.downed > 0 || p.grabbed ? '#f44' : '#e8dcc0');
   for (const d of G.dinos) { if (d.tamed) dot(d.x, d.y, 2, '#8f8'); else if ((d.scouted > 0 || visible(d.x, d.y)) && hostile(d)) dot(d.x, d.y, 2, '#f33'); else if (visible(d.x, d.y) && DINO[d.type].herb) dot(d.x, d.y, 1.8, '#dc8'); }
   if (G.hunt && G.hunt.t && !G.hunt.t.dead) { g.strokeStyle = '#f63'; g.lineWidth = 1.5 * DPR; g.beginPath(); g.arc(G.hunt.t.x * k, G.hunt.t.y * k, 5 * DPR, 0, TAU); g.stroke(); }
   if (G.rescue) dot(G.rescue.x, G.rescue.y, 3, '#5cf');

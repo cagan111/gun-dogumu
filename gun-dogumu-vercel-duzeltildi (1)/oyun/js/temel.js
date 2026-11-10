@@ -38,7 +38,7 @@ const STORIES = [
   { t: 'Emekli bir asker. Az konuşur.', sk: { savas: 3 } }, { t: 'Eski bir dağcı. Yükseklikten korkmaz.', sk: { kesif: 3 } },
   { t: 'Ormancıydı; ağaçları sesinden tanır.', sk: { toplama: 3 } }, { t: 'Mimarlık öğrencisiydi.', sk: { insaat: 2 } },
   { t: 'Demirci çırağıydı.', sk: { zanaat: 2 } }, { t: 'Eczanede çalışıyordu. Otları tanır.', sk: { sifa: 2 } },
-  { t: 'Aşçıydı; "her şeyi pişiririm" der.', sk: { kasaplik: 2 } }, { t: 'Bahçıvandı.', sk: { tarim: 2 } },
+  { t: 'Aşçıydı; "her şeyi pişiririm" der.', sk: { asci: 3 } }, { t: 'Bir lokantada bulaşıkçıydı; mutfağı bilir.', sk: { asci: 2 } }, { t: 'Annesinin yemeklerini özlüyor; tariflerini ezbere bilir.', sk: { asci: 1, tarim: 1 } }, { t: 'Bahçıvandı.', sk: { tarim: 2 } },
   { t: 'Okçuluk kulübündeydi.', sk: { avcilik: 2 } }, { t: 'Taksi şoförüydü. Yön duygusu çok iyi.', sk: { kesif: 2 } },
   { t: 'Gece bekçisiydi. Karanlığa alışkın.', sk: { savas: 2 } }, { t: 'Balıkçıydı; suyun sesini dinler.', sk: { avcilik: 1, toplama: 1 } },
   { t: 'Bir müzede dinozor iskeletlerini temizlerdi. Ne ironi.', sk: { kasaplik: 1, kesif: 1 } }, { t: 'Kuyumcuydu; kristallere bakışı başka.', sk: { zanaat: 2 } },
@@ -70,7 +70,8 @@ const tr = (p, k) => !!(p.traits && p.traits.includes(k));
 const SKILLS = {
   toplama:  { ad: 'Toplayıcılık', ic: '🪓' }, avcilik: { ad: 'Avcılık', ic: '🏹' }, kasaplik: { ad: 'Kasaplık', ic: '🔪' },
   tarim:    { ad: 'Tarım',        ic: '🌾' }, sifa:    { ad: 'Şifacılık', ic: '🌿' }, zanaat:  { ad: 'Zanaat', ic: '🔨' },
-  insaat:   { ad: 'İnşaat',       ic: '📐' }, savas:   { ad: 'Savaş', ic: '⚔️' },    kesif:   { ad: 'Keşif', ic: '🧭' }
+  insaat:   { ad: 'İnşaat',       ic: '📐' }, savas:   { ad: 'Savaş', ic: '⚔️' },    kesif:   { ad: 'Keşif', ic: '🧭' },
+  asci:     { ad: 'Aşçılık',      ic: '🍲' }
 };
 const XPL = [0, 30, 80, 160, 280, 450, 680, 980, 1360, 1830];
 const lvlOfXp = xp => { let l = 1; while (l < 10 && xp >= XPL[l]) l++; return l; };
@@ -81,7 +82,8 @@ const GROUPS = {
   tas:     { ad: 'Taşçı',      ic: '⛏️', col: '#7c7c7c', sk: 'toplama',  desc: 'Taş kırar; kazma ile dağlarda kristal çıkarır.' },
   yiyecek: { ad: 'Toplayıcı',  ic: '🫐', col: '#7a3a6a', sk: 'toplama',  desc: 'Meyve toplar.' },
   avci:    { ad: 'Avcı',       ic: '🏹', col: '#6a4a1a', sk: 'avcilik',  desc: 'Av emri verilen hayvana mesafe koruyarak saldırır. Yiyecek azalınca kendiliğinden ava çıkar.' },
-  kasap:   { ad: 'Et Ustası',  ic: '🔪', col: '#8a2a2a', sk: 'kasaplik', desc: 'Leşleri temizler, eti kampa taşır. Temiz et hastalık yapmaz.' },
+  kasap:   { ad: 'Et Ustası',  ic: '🔪', col: '#8a2a2a', sk: 'kasaplik', desc: 'Leşlerden getirilen çiğ eti temizler. Temiz et hastalık yapmaz. İş yoksa leşten et taşır.' },
+  asci:    { ad: 'Aşçı',       ic: '🍲', col: '#b06a2a', sk: 'asci',     desc: 'Temiz et ve meyveden yemek pişirir, yemek vaktinde masaya koyar.' },
   ciftci:  { ad: 'Çiftçi',     ic: '🌾', col: '#9a8a2a', sk: 'tarim',    desc: 'Tarlaları eker, bakar, hasat eder.' },
   sifaci:  { ad: 'Şifacı',     ic: '🌿', col: '#3a7a5a', sk: 'sifa',     desc: 'Yaralıları kaldırır, şifahaneye taşır, ilaç ve sargı yapar, ot toplar.' },
   zanaat:  { ad: 'Zanaatkâr',  ic: '🔨', col: '#5a4a8a', sk: 'zanaat',   desc: 'Atölyede üretim emirlerini yapar: balta, kazma, ok, yay, zırh...' },
@@ -91,13 +93,14 @@ const GROUPS = {
   takip:   { ad: 'Takip',      ic: '👣', col: '#5c6b2a', sk: 'savas',    desc: 'Seninle gelir, yanında savaşır.' },
   bos:     { ad: 'Boşta',      ic: '💤', col: '#555',    sk: null,       desc: 'Ateşi besler, inşaata yardım eder, dinlenir.' }
 };
-const GORDER = ['odun', 'tas', 'yiyecek', 'avci', 'kasap', 'ciftci', 'sifaci', 'zanaat', 'mimar', 'kasif', 'muhafiz', 'takip', 'bos'];
+const GORDER = ['odun', 'tas', 'yiyecek', 'avci', 'kasap', 'asci', 'ciftci', 'sifaci', 'zanaat', 'mimar', 'kasif', 'muhafiz', 'takip', 'bos'];
 const ABIL = {
   odun:    { ad: 'Toplu Kesim',    desc: '30 sn: odun ×2', dur: 30, cd: 120 },
   tas:     { ad: 'Damar Bul',      desc: '30 sn: taş/kristal ×2', dur: 30, cd: 120 },
   yiyecek: { ad: 'Hasat Bereketi', desc: 'Kampa yakın çalılar dolar', dur: 0, cd: 150 },
   avci:    { ad: 'Sürek Avı',      desc: '30 sn: avcılar hızlı ve öldürücü', dur: 30, cd: 110 },
   kasap:   { ad: 'Hızlı Kesim',    desc: '30 sn: et işleme ×2', dur: 30, cd: 100 },
+  asci:    { ad: 'Şölen',          desc: 'Bir sonraki yemekte herkes +25 can, moral +10', dur: 0, cd: 240 },
   ciftci:  { ad: 'Bereket',        desc: 'Bütün ekili tarlalar bir anda serpilir', dur: 0, cd: 200 },
   sifaci:  { ad: 'Şifa Çemberi',   desc: 'Kamptaki herkes +40 can, kanamalar durur', dur: 0, cd: 120 },
   zanaat:  { ad: 'Ustalık',        desc: '40 sn: üretim ×2', dur: 40, cd: 120 },
@@ -113,6 +116,7 @@ const DINO = {
   kucuk:      { ad: 'Sürüngeç',    r: 9,  hp: 16,  spd: 175, dmg: 4,  cd: 0.7, col: '#6b7d3a', eye: '#b6ff5a', drop: { meat: 4 },                     sense: 380, nsense: 560,  pred: true },
   geceavcisi: { ad: 'Gece Avcısı', r: 12, hp: 30,  spd: 205, dmg: 8,  cd: 0.8, col: '#3a3f4a', eye: '#7cff9a', drop: { meat: 5, bone: 1 },             sense: 300, nsense: 900,  pred: true, night: true },
   tukurgec:   { ad: 'Tükürgeç',    r: 13, hp: 28,  spd: 160, dmg: 7,  cd: 0.9, col: '#5a6a4a', eye: '#ff9a3a', drop: { meat: 6, bone: 1, poison: 2 },  sense: 420, nsense: 600,  pred: true },
+  kesici:     { ad: 'Kesici',      r: 17, hp: 85,  spd: 265, dmg: 44, cd: 1.4, col: '#4a3a2e', eye: '#ff4040', drop: { meat: 12, bone: 3, hide: 3 },   sense: 650, nsense: 950,  pred: true },
   yirtici:    { ad: 'Yırtıcı',     r: 20, hp: 70,  spd: 215, dmg: 13, cd: 0.9, col: '#8a4b2a', eye: '#ffd23a', drop: { meat: 14, bone: 2, hide: 2 },   sense: 480, nsense: 850,  pred: true },
   yelken:     { ad: 'Yelkensırt',  r: 56, hp: 650, spd: 150, dmg: 42, cd: 1.5, col: '#5a4a3a', eye: '#ffb030', drop: { meat: 80, bone: 12, hide: 9 },  sense: 520, nsense: 700,  pred: true },
   dev:        { ad: 'Dev Kafa',    r: 62, hp: 750, spd: 125, dmg: 48, cd: 1.6, col: '#3e3b35', eye: '#ff3a1a', drop: { meat: 100, bone: 16, hide: 10 }, sense: 750, nsense: 1150, pred: true },
@@ -129,7 +133,9 @@ const DINO = {
 
 // ---- yapılar (lvl: gereken en iyi İnşaat seviyesi; work: 1. seviye bir mimarın saniye cinsinden emeği)
 const BUILD = {
-  cadir:     { ad: 'Çadır',            ic: '⛺', cost: { wood: 6, hide: 2 },            r: 22, hp: 120, lvl: 1, work: 18, desc: 'Bir hane: tek kişi ya da bir çift ve çocukları' },
+  cadir:     { ad: 'Çadır',            ic: '⛺', cost: { wood: 6, hide: 2 },            r: 22, hp: 120, lvl: 1, work: 18, desc: 'Bir hane: tek kişi ya da bir çift ve çocukları', rooms: [] },
+  kulube:    { ad: 'Kulübe',           ic: '🛖', cost: { wood: 30, stone: 10, hide: 4 }, r: 54, hp: 400, lvl: 2, work: 60, desc: '4 odalı büyük yapı; odaları sen seçersin', rooms: ['yatak', 'yatak', 'bos', 'bos'] },
+  magara:    { ad: 'Mağara',           ic: '🪨', cost: {},                               r: 78, hp: 99999, lvl: 99, work: 1, desc: 'Halkın ilk yuvası', rooms: ['yatak', 'yatak', 'yatak', 'depo', 'mutfak', 'bos'] },
   atolye:    { ad: 'Atölye',           ic: '🔨', cost: { wood: 12, stone: 6 },          r: 30, hp: 200, lvl: 1, work: 30, desc: 'Zanaatkârlar burada alet ve silah üretir' },
   kasaphane: { ad: 'Kasap Tezgâhı',    ic: '🔪', cost: { wood: 8, stone: 4 },           r: 24, hp: 150, lvl: 1, work: 20, desc: 'Et ustaları burada çalışır: %25 daha çok et' },
   tarla:     { ad: 'Tarla',            ic: '🌾', cost: { wood: 4 },                     r: 42, hp: 999, lvl: 1, work: 14, flat: true, desc: 'Çiftçiler eker; iki günde hasat' },
@@ -141,7 +147,7 @@ const BUILD = {
   sifahane:  { ad: 'Şifahane',         ic: '⛑️', cost: { wood: 14, stone: 6, herb: 4 }, r: 34, hp: 250, lvl: 2, work: 40, desc: '4 yatak: yaralılar ve hastalar günlerce burada iyileşir' },
   kule:      { ad: 'Gözetleme Kulesi', ic: '🗼', cost: { wood: 12, stone: 8 },          r: 24, hp: 300, lvl: 3, work: 45, desc: 'Geniş ışık ve görüş; muhafız çıkarsa ok atar' }
 };
-const BORDER = ['cadir', 'atolye', 'kasaphane', 'tarla', 'cit', 'mesale', 'tuzak', 'duvar', 'raf', 'sifahane', 'kule'];
+const BORDER = ['cadir', 'kulube', 'atolye', 'kasaphane', 'tarla', 'cit', 'mesale', 'tuzak', 'duvar', 'raf', 'sifahane', 'kule'];
 
 // ---- üretilebilen eşyalar (by: hangi beceri üretir; lvl: gereken seviye; work: saniye)
 const ITEMS = {
@@ -162,8 +168,20 @@ const ITEMS = {
 };
 const IORDER = ['balta', 'kazma', 'mizrak', 'sepet', 'ok', 'mesale', 'yay', 'zirh', 'zok', 'eyer', 'kemikMizrak', 'yarikTasi', 'bandaj', 'ilac'];
 
-const RES = { wood: '🪵', stone: '🪨', food: '🍖', bone: '🦴', hide: '🟫', herb: '🌿', poison: '🧪', crystal: '💎' };
-const RESN = { wood: 'Odun', stone: 'Taş', food: 'Yiyecek', bone: 'Kemik', hide: 'Deri', herb: 'Şifalı ot', poison: 'Zehir', crystal: 'Kristal' };
+const RES = { wood: '🪵', stone: '🪨', food: '🍲', meyve: '🫐', et: '🍖', cigEt: '🥩', bone: '🦴', hide: '🟫', herb: '🌿', poison: '🧪', crystal: '💎' };
+const RESN = { wood: 'Odun', stone: 'Taş', food: 'Pişmiş yemek', meyve: 'Meyve ve tahıl', et: 'Temiz et', cigEt: 'Çiğ et (temizlenmemiş)', bone: 'Kemik', hide: 'Deri', herb: 'Şifalı ot', poison: 'Zehir', crystal: 'Kristal' };
+// ---- odalar (mağara ve kulübe içinde seçilir)
+const ROOMS = {
+  yatak:  { ad: 'Yatakhane',    ic: '🛏️', desc: 'İki hane burada uyur' },
+  depo:   { ad: 'Depo',         ic: '📦', desc: 'Yiyecek ve malzeme sınırını 150 artırır' },
+  mutfak: { ad: 'Mutfak',       ic: '🍲', desc: 'Aşçılar burada pişirir; yemek vakti herkes buradaki masaya gelir' },
+  sifa:   { ad: 'Şifa Odası',   ic: '⛑️', desc: '2 hasta yatağı' },
+  kasap:  { ad: 'Et Temizleme', ic: '🔪', desc: 'Et ustaları burada eti temizler (+%25 et)' },
+  atolye: { ad: 'Atölye',       ic: '🔨', desc: 'Zanaatkârlar burada üretir' },
+  bos:    { ad: 'Boş Oda',      ic: '⬜', desc: 'Henüz bir işe ayrılmadı' }
+};
+const RORDER = ['yatak', 'depo', 'mutfak', 'sifa', 'kasap', 'atolye', 'bos'];
+const SLOTS = { sabah: 'Sabah', ogle: 'Öğle', ikindi: 'İkindi' };
 const icOf = k => RES[k] || (ITEMS[k] && ITEMS[k].ic) || k;
 
 const DIFF = {
@@ -219,7 +237,11 @@ function gQuery(x, y, r) {
 // ---- mesajlar
 function msg(t, col = '#eee', dur = 5) { if (!G.msgs) return; G.msgs.push({ t, col, life: dur }); if (G.msgs.length > 6) G.msgs.shift(); G.msgDirty = true; }
 function ftext(x, y, t, col = '#fff') { if (G.texts) G.texts.push({ x, y, t, col, life: 1.3 }); }
-function addStock(k, n, x, y) { if (!(n > 0)) return; G.stock[k] = (G.stock[k] || 0) + n; if (x !== undefined) ftext(x, y - 16, `+${n} ${icOf(k)}`, '#ffe9b0'); }
+const CAPPED = ['wood', 'stone', 'food', 'meyve', 'et', 'cigEt', 'bone', 'hide', 'herb', 'poison'];
+function addStock(k, n, x, y) {
+  if (!(n > 0)) return;
+  if (CAPPED.includes(k) && typeof storeCap === 'function') { const room = Math.max(0, storeCap() - (G.stock[k] || 0)); if (n > room) { if (!G.flags.full) { G.flags.full = 1; msg(`📦 Depo dolu (${RESN[k]})! Mağara ya da kulübede bir odayı Depo yap.`, '#e9c', 5); } n = room; } if (n <= 0) return; }
+  G.stock[k] = (G.stock[k] || 0) + n; if (x !== undefined) ftext(x, y - 16, `+${n} ${icOf(k)}`, '#ffe9b0'); }
 function canAfford(c) { for (const k in c) if ((G.stock[k] || 0) < c[k]) return false; return true; }
 function pay(c) { for (const k in c) G.stock[k] -= c[k]; }
 function costTxt(c) { return Object.entries(c).map(([k, v]) => `${v}${icOf(k)}`).join(' '); }

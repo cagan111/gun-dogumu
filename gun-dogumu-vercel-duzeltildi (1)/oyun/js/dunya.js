@@ -99,7 +99,7 @@ function genWorld(seed) {
   function addBush(x, y) {
     if (!free(x, y, 20) || nearCamp(x, y, 160) || inPool(x, y, 10)) return;
     const b = B(x, y); if (b === 1 || b === 3) return;
-    G.bushes.push({ x, y, r: 16, res: 'food', amt: 5, max: 5, berries: Array.from({ length: 7 }, () => [sr(-11, 11), sr(-11, 11)]), col: spick(['#b3243a', '#6a2a8a', '#c4382a']) });
+    G.bushes.push({ x, y, r: 16, res: 'meyve', amt: 5, max: 5, berries: Array.from({ length: 7 }, () => [sr(-11, 11), sr(-11, 11)]), col: spick(['#b3243a', '#6a2a8a', '#c4382a']) });
   }
   for (let i = 0; i < 380; i++) addBush(sr(0, WORLD), sr(0, WORLD));
   for (let i = 0; i < 12; i++) { const a = sr(0, TAU), r = sr(200, 480); addBush(CAMP.x + Math.cos(a) * r, CAMP.y + Math.sin(a) * r); }

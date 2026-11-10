@@ -82,6 +82,7 @@ function hurt(t, dmg, src, poison, isProj) {
     if (t.type === 'kanatli' && t.alt > 0.4 && !isProj) return;
     if (t.type === 'zirhli' && src && !t.tamed) { const ad = angDiff(t.ang, angTo(t, src)); if (!(ad > 0.9 && ad < 2.3)) { dmg *= 0.3; if (Math.random() < 0.3) ftext(t.x, t.y - t.r, 'zırh!', '#ccc'); } }
     if (t.type === 'taklitci' && !t.revealed) reveal(t);
+    if (t.type === 'kesici' && src && !src.type) { const al = alliesNear(src, 150); dmg *= al >= 2 ? 1.8 : al === 1 ? 1 : 0.5; if (al >= 2 && !t.retreat) t.retreat = 1.5; }
     t.hp -= dmg; t.hurt = 0.15; if (poison) t.poison = 5;
     for (let i = 0; i < 5; i++) G.parts.push({ x: t.x, y: t.y, vx: rand(-120, 120), vy: rand(-120, 120), life: rand(0.3, 0.7), col: '#7a0d0d', s: rand(2, 4) });
     if (t.carry && src && src.leader) { t.carryDmg += dmg; if (t.carryDmg >= 70) dropCarry(t, true); }
@@ -182,7 +183,7 @@ function dismount(silent) {
 // ---- av listesi
 function preyList() {
   const out = [];
-  for (const p of G.people) if (!p.inHut && !p.grabbed && !p.dead) out.push(p);
+  for (const p of G.people) if (!p.inHut && !p.grabbed && !p.dead && !p.insideB) out.push(p);
   for (const d of G.dinos) if (d.tamed && !d.fly && !d.mounted) out.push(d);
   if (G.rescue && L && dist(G.rescue, L) < 450) out.push(G.rescue);
   return out;
@@ -194,11 +195,11 @@ function isBold(d) {
   if (d.type === 'yirtici') {
     if (d.rush > 0) return true;
     let pack = 0; for (const o of G.dinos) if (o.type === 'yirtici' && !o.leave && !o.tamed && dist(o, d) < 320) pack++;
-    return (G.day >= 3 && pack >= 5) || G.fire.fuel < 18;
+    return (G.day >= 5 && pack >= 6) || G.fire.fuel < 18;
   }
   if (d.type === 'dev') return G.fire.fuel < 40 || d.rush > 0;
   if (d.type === 'yelken') return G.fire.fuel < 30 || d.rush > 0;
-  if (d.type === 'geceavcisi') { if (d.rush > 0) return true; let pack = 0; for (const o of G.dinos) if (o.type === 'geceavcisi' && !o.leave && dist(o, d) < 260) pack++; return (G.day >= 3 && pack >= 5) || G.fire.fuel < 25; }
+  if (d.type === 'geceavcisi') { if (d.rush > 0) return true; let pack = 0; for (const o of G.dinos) if (o.type === 'geceavcisi' && !o.leave && dist(o, d) < 260) pack++; return (G.day >= 5 && pack >= 6) || G.fire.fuel < 25; }
   return false;
 }
 
@@ -218,6 +219,7 @@ function updDino(d, dt, prey, zones) {
   if (d.type === 'yamyam') return updCannibal(d, dt, prey);
   if (d.type === 'ordek' || d.type === 'gurleyen' || d.type === 'zirhli') return updGrazer(d, dt);
   if (d.type === 'taklitci') return updMimicC(d, dt, prey);
+  if (d.type === 'kesici') return updKesici(d, dt, prey);
   if (d.pet) return updPet(d, dt);
   return updPred(d, dt, prey, zones);
 }
@@ -225,6 +227,20 @@ function updDino(d, dt, prey, zones) {
 function updPred(d, dt, prey, zones) {
   const def = DINO[d.type], night = isNight() || !!G.finale;
   if (d.mother) { d.motherT -= dt; if (d.motherT <= 0) d.mother = false; }
+  if (d.siege) {
+    const b = d.siege;
+    if (b.dead || !isNight()) { d.siege = null; d.leave = true; return; }
+    if (dist(d, b) > d.r + b.r + 6) {
+      steer(d, b.x, b.y, def.spd * 0.8, dt, true); d.anim += dt * 10;
+      if (d.bash && d.atkCd <= 0) { const f = d.bash; d.atkCd = def.cd; f.hp -= def.dmg; f.hit = 0.2; SFX.hit(L ? clamp(1 - dist(f, L) / 700, 0, 0.5) : 0.2); if (f.hp <= 0) destroyBuild(f); }
+    } else if (d.atkCd <= 0) {
+      d.atkCd = def.cd; b.hp -= def.dmg * 1.5; b.hit = 0.2; G.shake = Math.max(G.shake, L && dist(b, L) < 500 ? 4 : 0);
+      SFX.hit(L ? clamp(1 - dist(b, L) / 900, 0.05, 0.6) : 0.2);
+      if (b.hp <= 0) destroyBuild(b);
+      else if (Math.random() < 0.25) for (const q of b.occ.slice()) { leaveHut(q); q.fear = Math.min(100, q.fear + 40); }
+    }
+    return;
+  }
   if (d.retreat > 0) { d.retreat -= dt; const fr = d.tgt && !d.tgt.dead ? d.tgt : G.fire, a = angTo(fr, d); steer(d, d.x + Math.cos(a) * 100, d.y + Math.sin(a) * 100, def.spd, dt, true); d.anim += dt * 12; return; }
   if (d.type === 'geceavcisi' && !isNight() && !G.finale) d.leave = true;
   if (d.type === 'yelken' && d.home && d.tgt && !d.tgt.dead && Math.hypot(d.tgt.x - d.home.x, d.tgt.y - d.home.y) > 750) { d.tgt = null; d.wx = d.home.x; d.wy = d.home.y; }
@@ -267,6 +283,7 @@ function updPred(d, dt, prey, zones) {
     else for (const t of prey) {
       const dd = dist(d, t); if (dd > sense) continue;
       let s = dd; if (!bold && inSafe(t.x, t.y, zones)) s += 500; if (t.tamed && d.type === 'kucuk') s += 800;
+      if ((d.type === 'kucuk' || d.type === 'tukurgec') && !bold && (dist(t, G.fire) < 450 || alliesNear(t, 160) >= 2)) continue;
       if (t.leader) s += 40;
       if (t.downed > 0) s -= 120;
       if (s < bs) { bs = s; best = t; }
@@ -337,7 +354,7 @@ function dinoAttack(d, t) {
   if (t.kind === 'build') { t.hp -= def.dmg * 2; t.hit = 0.2; G.shake = Math.max(G.shake, 4); SFX.hit(0.5); if (t.hp <= 0) destroyBuild(t); return; }
   if (t.isRescue) { hurt(t, def.dmg, d); return; }
   if (d.type === 'dev' && !t.leader && !t.type && Math.random() < 0.55) {
-    t.grabbed = true; t.downed = 0; d.carry = t; d.carryDmg = 0;
+    t.grabbed = true; t.grabT = 12; t.downed = 0; d.carry = t; d.carryDmg = 0;
     if (t.tgt && t.tgt.claim === t) t.tgt.claim = null;
     msg(`DEV KAFA ${acc(t.name).toLocaleUpperCase('tr')} KAPTI!! Peşinden git ve vur!`, '#ff5040', 6);
     SFX.scream(1); SFX.roar(0.8); G.shake = 14;
@@ -544,9 +561,9 @@ function spawner() {
   const day = G.day, n = isNight(), sm = DIFF[G.diff].spawn, lb = biomeFast(L.x, L.y);
   if (!n) {
     if (c('boynuzlu') < 4 && Math.random() < 0.25) spawnPack('boynuzlu', 1, spawnPosBiome([0, 2]));
-    if (c('uzunboyun') < 2 && Math.random() < 0.06) spawnPack('uzunboyun', 1, spawnPosBiome([0, 2], 700, 1100));
+    if (c('uzunboyun') < 1 && Math.random() < 0.02) spawnPack('uzunboyun', 1, spawnPosBiome([0, 2], 700, 1100));
     if (c('kanatli') < 3 && Math.random() < 0.2) { const pos = spawnPosBiome([1], 500, 1100); if (pos) spawnFlyer(pos); }
-    if (c('kucuk') < (3 + day) * sm && Math.random() < 0.12) spawnPack('kucuk', ri(2, 5));
+    if (c('kucuk') < (2 + day / 2) * sm && Math.random() < 0.08) spawnPack('kucuk', ri(2, 4));
     if (c('ordek') < 9 && Math.random() < 0.14) spawnPack('ordek', ri(3, 6), spawnPosBiome([0, 2], 700, 1200));
     if (c('gurleyen') < 5 && Math.random() < 0.06) spawnPack('gurleyen', ri(2, 4), spawnPosBiome([0, 1], 700, 1200));
     if (c('zirhli') < 2 && Math.random() < 0.03) spawnPack('zirhli', 1, spawnPosBiome([0, 1], 800, 1200));
@@ -563,9 +580,13 @@ function spawner() {
     if (c('tukurgec') < 2 && Math.random() < 0.015 * sm) spawnPack('tukurgec', 1, spawnPosBiome([0, 2]));
     if (day >= 2 && c('geceavcisi') < Math.min(day, 8) * sm && Math.random() < 0.04) spawnPack('geceavcisi', ri(2, 3 + Math.floor(day / 4)));
   }
-  if (day >= 3 && c('yelken') < 1 && Math.random() < 0.012 * sm) {
+  if (day >= 4 && c('yelken') < 1 && Math.random() < 0.003 * sm) {
     const W = G.pools.concat(G.lakes).filter(w => { const d = Math.hypot(w.x - L.x, w.y - L.y); return d > 700 && d < 1500; });
     if (W.length) { const w = pick(W), a = rand(0, TAU), d = mkDino('yelken', w.x + Math.cos(a) * (w.r + 40), w.y + Math.sin(a) * (w.r + 40)); d.home = { x: w.x, y: w.y }; pushOut(d, true); G.dinos.push(d); }
+  }
+  if (day >= 3 && c('kesici') < (day >= 7 ? 2 : 1) && Math.random() < (n ? 0.012 : 0.004) * sm) {
+    const pos = spawnPosBiome([0, 3], 750, 1100) || spawnPos(800, 1100);
+    if (pos) for (const d of spawnPack('kesici', 1, pos)) d.silent = true;
   }
   if (c('batakci') < 5 && Math.random() < 0.3) {
     const pools = G.pools.filter(pl => !pl.croc && Math.hypot(pl.x - L.x, pl.y - L.y) < 1300 && Math.hypot(pl.x - L.x, pl.y - L.y) > 450);
@@ -704,7 +725,7 @@ function updCannibal(d, dt, prey) {
   d.atkCd = def.cd * rand(0.85, 1.15); d.swing = 0.25;
   const R = G.raid;
   if (!t.leader && !t.type && !t.isRescue && Math.random() < (d.raid ? 0.4 : 0.25) && (!R || R.grabbed < 2)) {
-    t.grabbed = true; t.downed = 0; d.carry = t; if (R) R.grabbed++;
+    t.grabbed = true; t.grabT = 12; t.downed = 0; d.carry = t; if (R) R.grabbed++;
     if (t.tgt && t.tgt.claim === t) t.tgt.claim = null;
     if (t.inHut) leaveHut(t);
     msg(`YAMYAMLAR ${acc(t.name).toLocaleUpperCase('tr')} SÜRÜKLÜYOR! Peşlerinden git!`, '#ff5040', 6);
@@ -817,5 +838,58 @@ function updMimicC(d, dt, prey) {
     hurt(t, def.dmg * rand(0.9, 1.1), d); SFX.hit(0.8);
     if (t.dead || t.downed > 0) d.kills++;
     if (d.kills >= 2 || d.hp < d.maxhp * 0.4) { d.leave = true; msg('Benzeyen karanlığa geri süzüldü... Bir gün yine gelecek.', '#bbb', 6); }
+  }
+}
+
+// =============================================================
+//  KESİCİ — yalnız kalanı avlar; 2-3 kişi bir aradaysa geri çekilir
+// =============================================================
+function alliesNear(p, r) { let n = 0; for (const q of G.people) if (q !== p && !q.child && !q.downed && !q.inHut && !q.bed && !q.insideB && dist(q, p) < r) n++; return n; }
+function updKesici(d, dt, prey) {
+  const def = DINO.kesici;
+  if (d.leave) { const a = angTo(G.fire, d); steer(d, d.x + Math.cos(a) * 200, d.y + Math.sin(a) * 200, def.spd * 0.8, dt, true); d.anim += dt * 12; if (!L || dist(d, L) > 1500) removeDino(d); return; }
+  if (d.hp < d.maxhp * 0.35 || (d.kills || 0) >= 2) { d.leave = true; return; }
+  if (d.retreat > 0) {
+    d.retreat -= dt; d.dash = 0;
+    const fr = d.tgt && !d.tgt.dead ? d.tgt : G.fire, a = angTo(fr, d) + Math.sin(G.now + d.id) * 0.4;
+    steer(d, d.x + Math.cos(a) * 120, d.y + Math.sin(a) * 120, def.spd * 0.8, dt, true); d.anim += dt * 14; return;
+  }
+  d.think -= dt;
+  const zones = safeZones();
+  if (d.think <= 0 && !(d.dash > 0)) {
+    d.think = 0.6; let best = null, bs = 1e9;
+    for (const t of prey) {
+      if (t.type || t.isRescue) continue;
+      if (G.fire.fuel > 0 && inSafe(t.x, t.y, zones)) continue;
+      const al = alliesNear(t, 150); if (al >= 2) continue;
+      const dd = dist(d, t); if (dd > (isNight() ? def.nsense : def.sense)) continue;
+      const s = dd + al * 300 + (t.leader ? 150 : 0);
+      if (s < bs) { bs = s; best = t; }
+    }
+    d.tgt = best;
+  }
+  const t = !t_dead(d.tgt) && !d.tgt.type ? d.tgt : null;
+  if (!t) {
+    d.wt -= dt;
+    if (d.wt <= 0 || Math.hypot(d.wx - d.x, d.wy - d.y) < 20) { d.wt = rand(4, 9); const a = rand(0, TAU), r = Math.max(fireR(), 300) + rand(250, 550); d.wx = G.fire.x + Math.cos(a) * r; d.wy = G.fire.y + Math.sin(a) * r; }
+    steer(d, d.wx, d.wy, def.spd * 0.3, dt, true); d.anim += dt * 5; return;
+  }
+  const dd = dist(d, t);
+  if (!(d.dash > 0)) {
+    if (dd > 240) { steer(d, t.x, t.y, def.spd * 0.42, dt, true); d.anim += dt * 6; return; }
+    d.dash = 2.4;
+    if (L && dist(t, L) < 650) jumpAt(t.x, t.y, 'KESİCİ!'); else msg(`Uzaklardan bir çığlık... ${dat(t.name)} bir şey saldırıyor!`, '#f77', 4);
+    SFX.screech(L ? clamp(1 - dist(d, L) / 900, 0.2, 1) : 0.3, panOf(d.x));
+  }
+  d.dash -= dt;
+  if (alliesNear(t, 140) >= 2) { d.retreat = rand(2.5, 4); SFX.chitter(L ? clamp(1 - dist(d, L) / 800, 0.1, 0.6) : 0.2, panOf(d.x)); if (!G.flags.kesiciHint) { G.flags.kesiciHint = 1; msg('Kesici kalabalığı görünce geri çekildi. Birlikte durun!', '#fd9', 5); } return; }
+  if (dd > d.r + bodyR(t) + 8) { steer(d, t.x, t.y, def.spd, dt, true); d.anim += dt * 16; if (d.dash <= 0) d.retreat = 2; return; }
+  d.moving = false; d.ang = angTo(d, t);
+  if (d.atkCd <= 0) {
+    d.atkCd = def.cd; d.dash = 0;
+    hurt(t, def.dmg * rand(0.9, 1.15), d);
+    if (!t.dead && !t.injury && t.hp > 0 && Math.random() < 0.5) t.injury = { type: 'kanama', t: 14 };
+    if (t.dead || t.downed > 0) d.kills = (d.kills || 0) + 1;
+    SFX.hit(0.8); d.retreat = rand(2.5, 4);
   }
 }
