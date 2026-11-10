@@ -120,7 +120,8 @@ button.wide{width:100%;margin-top:6px}
 .obtns{display:flex;gap:3px;flex:none;flex-wrap:wrap;justify-content:flex-end;max-width:46%}
 .card .obtns button{padding:4px 7px;background:#2b2419;border-color:#5a4a30}
 #touch{display:none;position:fixed;inset:0;pointer-events:none}
-#joy{position:absolute;left:0;bottom:0;width:50%;height:62%;pointer-events:auto}
+#joy{position:absolute;left:0;bottom:64px;width:50%;height:calc(62% - 64px);pointer-events:auto}
+body.sideOpen #tbtns{display:none}
 #knobBase{position:absolute;width:110px;height:110px;border-radius:50%;border:2px solid rgba(255,255,255,.18);display:none}
 #knob{position:absolute;width:48px;height:48px;border-radius:50%;background:rgba(255,255,255,.22);left:31px;top:31px}
 #tbtns{position:absolute;right:10px;bottom:120px;display:grid;grid-template-columns:repeat(3,58px);gap:8px;pointer-events:auto}
@@ -152,6 +153,18 @@ summary{cursor:pointer;color:#e8d4b0}
   #msgs{top:auto;bottom:250px;width:92vw}#msgs div{font-size:12px}
   #miniBox{top:auto;bottom:250px}
   #tutBox{bottom:auto;top:185px;left:8px;transform:none;max-width:46vw;font-size:12px;text-align:left}
+}
+@media (max-height:520px){
+  #top{font-size:11px;padding:5px 7px;min-width:0;max-width:40vw;gap:3px}
+  #res{gap:5px;font-size:11px}#res2{font-size:10px}
+  #miniBox{top:auto;bottom:66px;left:auto;right:8px}#miniBox canvas{width:84px!important;height:84px!important}
+  #side{width:min(300px,46vw);max-height:calc(100vh - 80px);font-size:11px}
+  #msgs{top:6px;width:min(44vw,420px)}#msgs div{font-size:11px}
+  #tutBox{bottom:auto;top:auto;bottom:118px;font-size:11px;max-width:44vw;padding:4px 8px}
+  #tbtns{bottom:66px;grid-template-columns:repeat(3,50px);gap:6px}
+  #tbtns div{width:50px;height:50px;font-size:10px}
+  #bottom{gap:3px;padding:0 6px 4px}
+  #tools button{font-size:11px;padding:4px 7px}
 }
 </style>
 </head>
@@ -4587,7 +4600,7 @@ function pickHuntTarget(sx, sy) {
 if (isTouch) {
   $('touch').style.display = 'block';
   const joy = $('joy'), base = $('knobBase'), knob = $('knob');
-  joy.addEventListener('pointerdown', e => { audioInit(); if (G.huntMode) { pickHuntTarget(e.clientX, e.clientY); return; } touch.id = e.pointerId; touch.ox = e.clientX; touch.oy = e.clientY; base.style.display = 'block'; base.style.left = (e.clientX - 55) + 'px'; base.style.top = (e.clientY - 55 - (innerHeight - joy.offsetHeight)) + 'px'; joy.setPointerCapture(e.pointerId); });
+  joy.addEventListener('pointerdown', e => { audioInit(); if (G.huntMode) { pickHuntTarget(e.clientX, e.clientY); return; } touch.id = e.pointerId; touch.ox = e.clientX; touch.oy = e.clientY; base.style.display = 'block'; base.style.left = (e.clientX - 55) + 'px'; base.style.top = (e.clientY - 55 - joy.getBoundingClientRect().top) + 'px'; joy.setPointerCapture(e.pointerId); });
   joy.addEventListener('pointermove', e => { if (e.pointerId !== touch.id) return; let dx = e.clientX - touch.ox, dy = e.clientY - touch.oy; const m = Math.hypot(dx, dy); if (m > 45) { dx *= 45 / m; dy *= 45 / m; } touch.jx = dx / 45; touch.jy = dy / 45; knob.style.left = (31 + dx) + 'px'; knob.style.top = (31 + dy) + 'px'; });
   const end = e => { if (e.pointerId !== touch.id) return; touch.id = null; touch.jx = touch.jy = 0; base.style.display = 'none'; knob.style.left = knob.style.top = '31px'; };
   joy.addEventListener('pointerup', end); joy.addEventListener('pointercancel', end);
@@ -4640,7 +4653,7 @@ function sendScouts(x, y) {
 }
 
 // ---- halk paneli
-function toggleSide(force) { const s = $('side'); const closed = force !== undefined ? !force : !s.classList.contains('closed'); s.classList.toggle('closed', closed); $('sideTog').textContent = closed ? '▸' : '▾'; }
+function toggleSide(force) { const s = $('side'); const closed = force !== undefined ? !force : !s.classList.contains('closed'); s.classList.toggle('closed', closed); document.body.classList.toggle('sideOpen', !closed && isTouch); $('sideTog').textContent = closed ? '▸' : '▾'; }
 $('sideHead').addEventListener('pointerdown', e => { e.preventDefault(); toggleSide(); });
 $('side').addEventListener('pointerdown', e => {
   const el = e.target.closest('[data-a],[data-tab],[data-f],[data-bulk]'); if (!el) return;
@@ -4835,7 +4848,7 @@ function occupants(b) {
 const IN_HITS = [];
 function renderInterior() {
   const b = UI.inB; if (!b || b.dead) { closeInterior(); return; }
-  const c = $('inC'), W = Math.min(700, innerWidth * 0.92), H = Math.round(W * 0.56);
+  const c = $('inC'), W = Math.round(Math.min(700, innerWidth * 0.92, innerHeight * 0.5 / 0.56)), H = Math.round(W * 0.56);
   if (c.width !== Math.round(W * DPR)) { c.width = Math.round(W * DPR); c.height = Math.round(H * DPR); c.style.width = W + 'px'; c.style.height = H + 'px'; }
   const g = c.getContext('2d'); g.setTransform(DPR, 0, 0, DPR, 0, 0);
   const cave = b.type === 'magara', wood = !cave;
@@ -4995,7 +5008,7 @@ function onGameStart() {
   $('screen').style.display = 'none'; $('hud').style.display = 'block'; $('pause').style.display = 'none';
   G.started = true; G.paused = false; G.modal = false; $('craft').style.display = 'none'; $('charM').style.display = 'none'; UI.char = 0; $('inM').style.display = 'none'; UI.inB = null;
   UI.sel.clear(); UI.filter = 'all';
-  if (innerWidth <= 700) { toggleSide(false); $('miniBox').style.display = 'none'; } else { toggleSide(true); $('miniBox').style.display = 'block'; }
+  if (innerWidth <= 700 || innerHeight <= 520) { toggleSide(false); $('miniBox').style.display = 'none'; } else { toggleSide(true); $('miniBox').style.display = 'block'; }
   $('miniBox').classList.remove('big');
   buildTools(); renderSide(); updateHUD();
 }

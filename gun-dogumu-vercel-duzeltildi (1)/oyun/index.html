@@ -116,7 +116,8 @@ button.wide{width:100%;margin-top:6px}
 .obtns{display:flex;gap:3px;flex:none;flex-wrap:wrap;justify-content:flex-end;max-width:46%}
 .card .obtns button{padding:4px 7px;background:#2b2419;border-color:#5a4a30}
 #touch{display:none;position:fixed;inset:0;pointer-events:none}
-#joy{position:absolute;left:0;bottom:0;width:50%;height:62%;pointer-events:auto}
+#joy{position:absolute;left:0;bottom:64px;width:50%;height:calc(62% - 64px);pointer-events:auto}
+body.sideOpen #tbtns{display:none}
 #knobBase{position:absolute;width:110px;height:110px;border-radius:50%;border:2px solid rgba(255,255,255,.18);display:none}
 #knob{position:absolute;width:48px;height:48px;border-radius:50%;background:rgba(255,255,255,.22);left:31px;top:31px}
 #tbtns{position:absolute;right:10px;bottom:120px;display:grid;grid-template-columns:repeat(3,58px);gap:8px;pointer-events:auto}
@@ -148,6 +149,18 @@ summary{cursor:pointer;color:#e8d4b0}
   #msgs{top:auto;bottom:250px;width:92vw}#msgs div{font-size:12px}
   #miniBox{top:auto;bottom:250px}
   #tutBox{bottom:auto;top:185px;left:8px;transform:none;max-width:46vw;font-size:12px;text-align:left}
+}
+@media (max-height:520px){
+  #top{font-size:11px;padding:5px 7px;min-width:0;max-width:40vw;gap:3px}
+  #res{gap:5px;font-size:11px}#res2{font-size:10px}
+  #miniBox{top:auto;bottom:66px;left:auto;right:8px}#miniBox canvas{width:84px!important;height:84px!important}
+  #side{width:min(300px,46vw);max-height:calc(100vh - 80px);font-size:11px}
+  #msgs{top:6px;width:min(44vw,420px)}#msgs div{font-size:11px}
+  #tutBox{bottom:auto;top:auto;bottom:118px;font-size:11px;max-width:44vw;padding:4px 8px}
+  #tbtns{bottom:66px;grid-template-columns:repeat(3,50px);gap:6px}
+  #tbtns div{width:50px;height:50px;font-size:10px}
+  #bottom{gap:3px;padding:0 6px 4px}
+  #tools button{font-size:11px;padding:4px 7px}
 }
 </style>
 </head>

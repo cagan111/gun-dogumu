@@ -69,7 +69,7 @@ function pickHuntTarget(sx, sy) {
 if (isTouch) {
   $('touch').style.display = 'block';
   const joy = $('joy'), base = $('knobBase'), knob = $('knob');
-  joy.addEventListener('pointerdown', e => { audioInit(); if (G.huntMode) { pickHuntTarget(e.clientX, e.clientY); return; } touch.id = e.pointerId; touch.ox = e.clientX; touch.oy = e.clientY; base.style.display = 'block'; base.style.left = (e.clientX - 55) + 'px'; base.style.top = (e.clientY - 55 - (innerHeight - joy.offsetHeight)) + 'px'; joy.setPointerCapture(e.pointerId); });
+  joy.addEventListener('pointerdown', e => { audioInit(); if (G.huntMode) { pickHuntTarget(e.clientX, e.clientY); return; } touch.id = e.pointerId; touch.ox = e.clientX; touch.oy = e.clientY; base.style.display = 'block'; base.style.left = (e.clientX - 55) + 'px'; base.style.top = (e.clientY - 55 - joy.getBoundingClientRect().top) + 'px'; joy.setPointerCapture(e.pointerId); });
   joy.addEventListener('pointermove', e => { if (e.pointerId !== touch.id) return; let dx = e.clientX - touch.ox, dy = e.clientY - touch.oy; const m = Math.hypot(dx, dy); if (m > 45) { dx *= 45 / m; dy *= 45 / m; } touch.jx = dx / 45; touch.jy = dy / 45; knob.style.left = (31 + dx) + 'px'; knob.style.top = (31 + dy) + 'px'; });
   const end = e => { if (e.pointerId !== touch.id) return; touch.id = null; touch.jx = touch.jy = 0; base.style.display = 'none'; knob.style.left = knob.style.top = '31px'; };
   joy.addEventListener('pointerup', end); joy.addEventListener('pointercancel', end);
@@ -122,7 +122,7 @@ function sendScouts(x, y) {
 }
 
 // ---- halk paneli
-function toggleSide(force) { const s = $('side'); const closed = force !== undefined ? !force : !s.classList.contains('closed'); s.classList.toggle('closed', closed); $('sideTog').textContent = closed ? '▸' : '▾'; }
+function toggleSide(force) { const s = $('side'); const closed = force !== undefined ? !force : !s.classList.contains('closed'); s.classList.toggle('closed', closed); document.body.classList.toggle('sideOpen', !closed && isTouch); $('sideTog').textContent = closed ? '▸' : '▾'; }
 $('sideHead').addEventListener('pointerdown', e => { e.preventDefault(); toggleSide(); });
 $('side').addEventListener('pointerdown', e => {
   const el = e.target.closest('[data-a],[data-tab],[data-f],[data-bulk]'); if (!el) return;
@@ -317,7 +317,7 @@ function occupants(b) {
 const IN_HITS = [];
 function renderInterior() {
   const b = UI.inB; if (!b || b.dead) { closeInterior(); return; }
-  const c = $('inC'), W = Math.min(700, innerWidth * 0.92), H = Math.round(W * 0.56);
+  const c = $('inC'), W = Math.round(Math.min(700, innerWidth * 0.92, innerHeight * 0.5 / 0.56)), H = Math.round(W * 0.56);
   if (c.width !== Math.round(W * DPR)) { c.width = Math.round(W * DPR); c.height = Math.round(H * DPR); c.style.width = W + 'px'; c.style.height = H + 'px'; }
   const g = c.getContext('2d'); g.setTransform(DPR, 0, 0, DPR, 0, 0);
   const cave = b.type === 'magara', wood = !cave;
@@ -477,7 +477,7 @@ function onGameStart() {
   $('screen').style.display = 'none'; $('hud').style.display = 'block'; $('pause').style.display = 'none';
   G.started = true; G.paused = false; G.modal = false; $('craft').style.display = 'none'; $('charM').style.display = 'none'; UI.char = 0; $('inM').style.display = 'none'; UI.inB = null;
   UI.sel.clear(); UI.filter = 'all';
-  if (innerWidth <= 700) { toggleSide(false); $('miniBox').style.display = 'none'; } else { toggleSide(true); $('miniBox').style.display = 'block'; }
+  if (innerWidth <= 700 || innerHeight <= 520) { toggleSide(false); $('miniBox').style.display = 'none'; } else { toggleSide(true); $('miniBox').style.display = 'block'; }
   $('miniBox').classList.remove('big');
   buildTools(); renderSide(); updateHUD();
 }
