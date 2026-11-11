@@ -271,6 +271,7 @@ function noiseOf(p) {
   else n = p.moving ? 0.6 : 0.25;
   const w = G.weather && G.weather.type;
   if (w === 'yagmur' || w === 'firtina') n *= 0.7;
+  else if (w === 'kar') n *= 0.8;   // kar sesi yutar
   return n;
 }
 // görüş: yaratığın önündeki ~120° koni; çömelen daha zor, ovanın uzun otlarında çömelen neredeyse görünmez

@@ -163,7 +163,7 @@ function drawOverlay3D() {
   ctx.clearRect(0, 0, VW, VH);
   const dk = darkness(), LS = U3.LS && U3.LS.length ? U3.LS : lights();
   if (SUN.grade) { ctx.fillStyle = SUN.grade; ctx.fillRect(0, 0, VW, VH); }
-  if ((G.weather.type === 'yagmur' || G.weather.type === 'firtina') && !G.inside && (G.pitch || 0) > -0.2) {
+  if (L && precipAt(L.x, L.y) === 'yagmur' && !G.inside && (G.pitch || 0) > -0.2) {
     // merceğe düşen birkaç damla (yağmur çizgileri 3B sahnede)
     for (let i = 0; i < 9; i++) { const ph = (G.now * 0.35 + i * 0.37) % 1, x = (i * 211.7) % VW, y = (i * 133.1) % VH + ph * 24, a = (1 - ph) * 0.16; ctx.fillStyle = `rgba(200,215,240,${a})`; ell(x, y, 4 + (i % 3), 5 + (i % 3)); }
   }
@@ -404,7 +404,11 @@ function render2D() {
   } else { ctx.fillStyle = 'rgba(255,225,160,.035)'; ctx.fillRect(0, 0, VW, VH); }
   drawFog(cx, cy);
   if (dk > 0.5) drawEyes(LS, cx, cy);
-  if (G.weather.type === 'yagmur' || G.weather.type === 'firtina') {
+  const lpr = L ? precipAt(L.x, L.y) : null;
+  if (lpr === 'kar') {
+    ctx.fillStyle = 'rgba(240,245,255,.7)'; const n = G.weather.heavy ? 260 : 140;
+    for (let i = 0; i < n; i++) { const x = (i * 137.5 + G.now * (G.weather.heavy ? 90 : 20) + Math.sin(G.now + i) * 12) % VW, y = (i * 91.3 + G.now * 70) % VH; ell(x, y, 1.6 + (i % 3) * 0.6, 1.6 + (i % 3) * 0.6); }
+  } else if (lpr === 'yagmur') {
     ctx.strokeStyle = 'rgba(170,190,220,.35)'; ctx.lineWidth = 1; ctx.beginPath();
     const n = G.weather.type === 'firtina' ? 220 : 130;
     for (let i = 0; i < n; i++) { const x = (i * 137.5 + G.now * 60) % VW, y = (i * 91.3 + G.now * 900) % VH; ctx.moveTo(x, y); ctx.lineTo(x - 3, y + 14); }
