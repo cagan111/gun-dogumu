@@ -669,7 +669,7 @@ function gameOver() {
 //  KAYIT
 // =============================================================
 function serialize() {
-  const pf = ['id', 'name', 'x', 'y', 'leader', 'child', 'age', 'traits', 'story', 'group', 'hp', 'maxhp', 'fear', 'skin', 'hair', 'injury', 'downed', 'tired', 'watched', 'partner', 'parentA', 'parentB', 'stam', 'seat', 'r', 'sk', 'sick', 'wasDowned', 'bedUntil', 'routine', 'alt', 'hunger', 'own', 'joinHunt'];
+  const pf = ['id', 'name', 'x', 'y', 'leader', 'child', 'age', 'traits', 'story', 'group', 'hp', 'maxhp', 'fear', 'skin', 'hair', 'injury', 'downed', 'tired', 'watched', 'partner', 'parentA', 'parentB', 'stam', 'seat', 'r', 'sk', 'sick', 'wasDowned', 'bedUntil', 'routine', 'alt', 'hunger', 'own', 'joinHunt', 'bag', 'carry', 'cookGot', 'batch'];
   let ex = ''; for (let i = 0; i < G.explored.length; i++) ex += G.explored[i] ? '1' : '0';
   return JSON.stringify({
     v: 4, wrecks: (G.wrecks || []).map(w => !!w.found), inside: G.inside ? G.builds.indexOf(G.inside.b) : -1, seed: G.seed, diff: G.diff, t: G.t, day: G.day, stock: G.stock, fuel: G.fire.fuel, morale: G.morale, orders: G.orders.map(o => Object.assign({}, o, { worker: 0 })), oid: G.oid, unclean: G.unclean,
@@ -719,6 +719,7 @@ function loadGame(s) {
   for (const s2 of D.people) {
     const p = mkPerson(s2.x, s2.y, s2.name, s2.leader, s2.child);
     Object.assign(p, s2); p.inHut = null; p.homeT = null; p.bed = null; p.eq = {}; p.sk = Object.assign({}, p.sk || {});
+    p.bag = s2.bag && typeof s2.bag === 'object' ? Object.assign({}, s2.bag) : {}; p.carry = +s2.carry || 0; p.cookGot = s2.cookGot || null; p.batch = s2.batch || null; p.cook = p.cook || 0;
     const ht = G.builds[s2.homeT]; if (s2.homeT >= 0 && ht && ht.type === 'cadir') moveHome(p, ht);
     if (s2.bed) { const sb = G.builds[s2.bed[0]]; if (sb && sb.type === 'sifahane' && sb.built) { sb.beds[s2.bed[1]] = p.id; p.bed = { s: sb, i: s2.bed[1] }; } }
     G.people.push(p); if (p.leader) L = p;
