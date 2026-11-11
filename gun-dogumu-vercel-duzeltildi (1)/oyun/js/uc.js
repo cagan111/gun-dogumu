@@ -144,7 +144,10 @@ function initMat() {
   MAT.water = L_({ color: 0x2a6a88, emissive: 0x06141c, transparent: true, opacity: 0.9 });
   MAT.sand = L_({ color: 0x968258 });
   MAT.swamp = L_({ color: 0x2f3a22, emissive: 0x040603 });
-  MAT.shadow = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.26, depthWrite: false });
+  // yumuşak leke gölge: merkezde koyu, kenara doğru sönen radyal geçiş (alphaMap = G kanalı)
+  TEX.shadow = canvasTex(64, (g, S) => { g.fillStyle = '#000'; g.fillRect(0, 0, S, S); const gr = g.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S / 2 - 1); gr.addColorStop(0, '#fff'); gr.addColorStop(0.35, '#e8e8e8'); gr.addColorStop(0.7, '#6a6a6a'); gr.addColorStop(1, '#000'); g.fillStyle = gr; g.fillRect(0, 0, S, S); });
+  const shM = o => new THREE.MeshBasicMaterial(Object.assign({ color: 0x000000, transparent: true, alphaMap: TEX.shadow, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }, o));
+  MAT.shadow = shM({ opacity: 0.5 }); MAT.tshadow = shM({ opacity: 0.42 }); MAT.inShadow = shM({ opacity: 0.55, fog: false });
   MAT.blood = new THREE.MeshBasicMaterial({ color: 0x3a0303, transparent: true, opacity: 0.6, depthWrite: false });
   MAT.track = new THREE.MeshBasicMaterial({ color: 0x120c06, transparent: true, opacity: 0.5, depthWrite: false });
   MAT.fl0 = new THREE.MeshBasicMaterial({ color: 0xff5a14, fog: false });
@@ -251,7 +254,7 @@ function init3D() {
 
   // dinamik havuzlar
   const dyn = U3.dyn = new THREE.Group(); sc.add(dyn);
-  U3.entShadow = mkInst(GEO.disc, MAT.shadow, 160); dyn.add(U3.entShadow);
+  U3.entShadow = mkInst(GEO.disc, MAT.shadow, 700); U3.entShadow.renderOrder = 1; dyn.add(U3.entShadow);
   U3.stainI = mkInst(GEO.disc, MAT.blood, 240); dyn.add(U3.stainI);
   U3.trackI = mkInst(GEO.disc, MAT.track, 60); dyn.add(U3.trackI);
   U3.arrowI = mkInst(GEO.cyl, new THREE.MeshLambertMaterial({ color: 0x6a4a26, emissive: 0x1a1208 }), 24); dyn.add(U3.arrowI);
@@ -607,7 +610,7 @@ function buildWorld() {
   const nT = G.trees.length + G.deco.length;
   I.trunk = mkInst(GEO.trunk, MAT.inst, nT * 4 + 8); I.cone = mkInst(GEO.cone, MAT.inst, G.trees.length * 3 + 8); I.blob = mkInst(GEO.ico1, MAT.inst, G.trees.length * 3 + 8);
   I.moss = mkInst(GEO.cone4, MAT.instD, G.trees.length * 3 + 8); I.frond = mkInst(GEO.frond, MAT.instD, G.trees.length * 2 + 8);
-  I.tshadow = mkInst(GEO.disc, MAT.shadow, G.trees.length + 8);
+  I.tshadow = mkInst(GEO.disc, MAT.tshadow, G.trees.length + G.rocks.length + 8); I.tshadow.renderOrder = 1;
   I.rock = mkInst(GEO.dod, MAT.rock, G.rocks.length * 2 + G.deco.length + 8);
   I.bush = mkInst(GEO.ico, MAT.inst, G.bushes.length * 2 + (G.herbs.length + G.poisons.length) + 8);
   I.berry = mkInst(GEO.ico, MAT.inst, 900);
@@ -693,6 +696,7 @@ function worldSig() {
 }
 function rebuildInst(cx, cy) {
   const I = U3.inst; for (const k in I) I[k].count = 0;
+  const TS = U3.tsh = [];   // ağaç/kaya gölgeleri: [x, z, yarıçap, gölge yüksekliği] — güneş yönüne göre fillTreeShadows yerleştirir
   U3.instX = cx; U3.instY = cy;
   const near = (o, R) => { const dx = o.x - cx, dy = o.y - cy; return dx * dx + dy * dy < R * R; };
   const stumpC = c3('#8a6a44'), col = _col, snowC = c3('#e8eef2'), mossC = c3('#7d8c5a'), deadC = c3('#4e4740');
@@ -701,7 +705,7 @@ function rebuildInst(cx, cy) {
     const y0 = gh(t.x, t.y) - 1.5;
     if (t.stump) { instAdd(I.trunk, t.x, y0, t.y, 9, 8.5, 9, t.sw, stumpC); continue; }
     const b = t.b === undefined ? bioAt(t.x, t.y) : t.b, C = treeCols(b, t.tone), k = (t.cr - 36) / 26, H = (125 + k * 120 + ((t.tone * 37) % 1) * 30) * (t.dark ? 1.35 : 1), cr = t.cr, r2 = (t.tone * 13) % 1;
-    instAdd(I.tshadow, t.x, y0 + 1.9, t.y, cr * 0.95, 1, cr * 0.95, 0);
+    TS.push([t.x, t.y, cr * (b === 5 ? 0.9 : 1.05), b === 5 ? H * 0.7 : H * 0.55]);
     if (b === 5) {                                       // palmiye: kıvrık gövde + taç yaprakları
       let x = t.x, y = y0, z = t.y; const seg = 5, L = (H * 0.75) / seg, lean = 0.25 + r2 * 0.35;
       for (let i = 0; i < seg; i++) { const rz = lean * (i + 1) / seg, w = 5.2 - i * 0.55; instAdd(I.trunk, x, y, z, w, L * 1.06, w, t.sw, C.t, 0, rz); x += -Math.sin(rz) * Math.cos(t.sw) * L; y += Math.cos(rz) * L; z += Math.sin(rz) * Math.sin(t.sw) * L; }
@@ -733,6 +737,7 @@ function rebuildInst(cx, cy) {
     const g = (112 * r.shade) / 255, b = bioAt(r.x, r.y), mtn = b === 1, h = hash2(r.x, r.y), y0 = gh(r.x, r.y);
     col.setRGB(g + 0.05, g + 0.03, g); if (b === 5) col.lerp(c3('#b0a080'), 0.4); else if (!mtn && h > 0.5) col.lerp(c3('#5a7a3a'), 0.25);
     instAdd(I.rock, r.x, y0 + r.r * 0.15, r.y, r.r * 1.15, r.r * (mtn ? 1.3 + h * 1.4 : 0.75 + h * 0.5), r.r * 1.1, h * 6, col, h * 0.4, 0);
+    TS.push([r.x, r.y, r.r * 1.35, r.r * (mtn ? 1.0 + h : 0.5)]);
     if (h > 0.55) instAdd(I.rock, r.x + r.r * 0.9, y0, r.y - r.r * 0.4, r.r * 0.45, r.r * 0.35, r.r * 0.5, h * 9, col);
   }
   for (const b of G.bushes) {
@@ -775,6 +780,30 @@ function rebuildInst(cx, cy) {
     for (let i = 0; i < 4; i++) { col.setHSL(c.hue / 360, 0.8, 0.5 + i * 0.06); const a = c.x + i * 1.9; instAdd(I.crystal, c.x + Math.cos(a) * 4, y0, c.y + Math.sin(a) * 4, 4.2 - i * 0.5, 30 - Math.abs(i - 1.5) * 8, 4.2 - i * 0.5, a, col, Math.sin(a) * 0.3, Math.cos(a) * 0.3); }
   }
   for (const k in I) instDone(I[k]);
+  U3.shK = null; fillTreeShadows();
+}
+
+// ---- gölge yönü: güneşin tersine, alçak güneşte uzun (yükseklik başına x/z kayması)
+function u3ShadowDir() {
+  const v = U3.sunV, o = U3.shO || (U3.shO = { x: 0, z: 0 });
+  if (!v) { o.x = 0.15; o.z = -0.1; return o; }
+  const k = 1 / Math.max(v.y, 0.3); o.x = -v.x * k * 0.55; o.z = -v.z * k * 0.55; return o;
+}
+function fillTreeShadows() {
+  const m = U3.inst && U3.inst.tshadow; if (!m || !U3.tsh) return;
+  const o = u3ShadowDir(); U3.shK = o.x * 1000 + o.z;
+  m.count = 0;
+  for (const q of U3.tsh) {
+    let ox = o.x * q[3], oz = o.z * q[3]; const L0 = Math.hypot(ox, oz), cap = q[2] * 2.2; if (L0 > cap) { ox *= cap / L0; oz *= cap / L0; }
+    const L = Math.min(L0, cap), x = q[0] + ox * 0.75, z = q[1] + oz * 0.75;
+    instAdd(m, x, gh(x, z) + 1.6, z, q[2] + L * 0.35, 1, q[2] * 0.92, -Math.atan2(oz, ox));
+  }
+  instDone(m);
+}
+// dinamik leke gölge (kişi, yaratık, yapı, leş): h = gölgeyi atan yükseklik
+function blobShadow(x, y0, z, rx, rz, ry, h) {
+  const o = U3.shO || u3ShadowDir(), k = Math.min(h || 0, rx * 3) * 0.6;
+  instAdd(U3.entShadow, x + o.x * k, y0 + 0.6, z + o.z * k, rx + Math.hypot(o.x, o.z) * k * 0.25, 1, rz, ry || 0);
 }
 
 // =============================================================
@@ -978,6 +1007,7 @@ function syncBuilds(dk) {
     let e = M.get(b); const sig = buildSig(b);
     if (!e || e.sig !== sig) { if (e) { U3.scene.remove(e.g); disposeTree(e.g, true); } e = { g: buildMesh(b), sig }; e.g.position.set(b.x, buildY(b), b.y); U3.scene.add(e.g); M.set(b, e); }
     e.f = f;
+    if (!(BUILD[b.type] || {}).flat && b.type !== 'gemi') { const br = b.type === 'magara' ? b.r * 1.05 : b.type === 'cit' || b.type === 'duvar' ? b.r * 0.7 : b.type === 'mesale' ? 9 : b.r * 0.95; blobShadow(b.x, buildY(b), b.y, br * 1.1, br, 0, b.type === 'kule' ? 120 : b.type === 'mesale' ? 40 : br * 0.8); }
     if (e.g.userData.glow) e.g.userData.glow.material.opacity = clamp(Math.max(dk * 1.1, (b.occ || []).length ? 0.35 : 0) * (0.75 + Math.sin(G.now * 5) * 0.08), 0, 0.85);
   }
   for (const [b, e] of M) if (e.f !== f) { U3.scene.remove(e.g); disposeTree(e.g, true); M.delete(b); }
@@ -1005,7 +1035,7 @@ function syncCarcs() {
     const sig = Math.floor(clamp(c.meat / (DINO[c.type].drop.meat || 1), 0, 1) * 4) + (c.rotten ? 10 : 0);
     let e = M.get(c);
     if (!e || e.sig !== sig) { if (e) { U3.scene.remove(e.g); disposeTree(e.g); } e = { g: carcMesh(c), sig }; e.g.position.set(c.x, gh(c.x, c.y), c.y); U3.scene.add(e.g); M.set(c, e); }
-    e.f = f;
+    e.f = f; blobShadow(c.x, gh(c.x, c.y), c.y, c.r * 1.25, c.r * 0.7, -c.ang, c.r * 0.4);
   }
   for (const [c, e] of M) if (e.f !== f) { U3.scene.remove(e.g); disposeTree(e.g); M.delete(c); }
 }
@@ -1078,8 +1108,7 @@ function haulProp(e, p) {
   if (k) { e.hm = new THREE.Mesh(haulGeo(k), MAT.v); e.g.add(e.hm); }
 }
 function syncEnts(t, dk) {
-  const M = U3.ents, f = U3.frame, sh = U3.entShadow; sh.count = 0;
-  const shA = 1 - dk * 0.8;
+  const M = U3.ents, f = U3.frame;
   const put = (key, kind, mk, show) => {
     let e = M.get(key);
     if (e && e.kind !== kind) { dropEnt(e); e = null; }
@@ -1099,8 +1128,7 @@ function syncEnts(t, dk) {
     e.g.position.set(p.x, y0, p.y); e.g.rotation.y = -p.ang;
     if (p === guard && !p.torch) { const v = e.gv || (e.gv = {}); for (const k in v) delete v[k]; Object.assign(v, p); v.torch = true; M3.updPerson(e.g, v, t); }
     else M3.updPerson(e.g, p, t);
-    haulProp(e, p);
-    if (!tw) instAdd(sh, p.x, y0 + 0.5, p.y, p.child ? 7 : 10, 1, p.child ? 7 : 10, 0);
+    if (!tw) blobShadow(p.x, y0, p.y, p.child ? 6 : 8.5, p.child ? 5.5 : 7.5, -p.ang, p.child ? 20 : 32);
     if (p.group === 'balik' && p.work && !p.moving && nf < 24) {   // olta: elden uca kamış, uçtan suya ip
       const c = Math.cos(p.ang), sn = Math.sin(p.ang), hx = p.x + c * 6 - sn * 4, hz = p.y + sn * 6 + c * 4, tx = p.x + c * 44, tz = p.y + sn * 44, ty = y0 + 40 + Math.sin(t * 1.3 + p.id) * 1.5;
       const wx = p.x + c * 62, wz = p.y + sn * 62, wy = Math.max(gh(wx, wz), SEA_Y) + 0.5 + Math.sin(t * 2.1 + p.id) * 0.6;
@@ -1119,17 +1147,17 @@ function syncEnts(t, dk) {
       const e = put(d, 'c', () => { const v = cannibalView(d); const g = M3.person(v); g.userData.view = v; return g; }, vis); if (!e) continue;
       const v = Object.assign(e.g.userData.view, cannibalView(d));
       e.g.position.set(d.x, y0, d.y); e.g.rotation.y = -d.ang; M3.updPerson(e.g, v, t);
-      instAdd(sh, d.x, y0 + 0.5, d.y, 10, 1, 10, 0);
+      blobShadow(d.x, y0, d.y, 8.5, 7.5, -d.ang, 32);
     } else if (d.type === 'taklitci' && !d.revealed) {
       const e = put(d, 'm', () => { const v = mimicView(d); const g = M3.person(v); g.userData.view = v; return g; }, vis); if (!e) continue;
       const v = mimicView(d, e.g.userData.view);
       e.g.position.set(d.x, y0, d.y); e.g.rotation.y = -v.ang; M3.updPerson(e.g, v, t);
-      instAdd(sh, d.x, y0 + 0.5, d.y, 10, 1, 10, 0);
+      blobShadow(d.x, y0, d.y, 8.5, 7.5, -d.ang, 32);
     } else {
       const e = put(d, 'd', () => M3.dino(d), vis); if (!e) continue;
       e.g.position.set(d.x, y0 + (d.fly ? (d.alt || 0) * 85 : 0), d.y); e.g.rotation.y = -d.ang;
       M3.updDino(e.g, d, t);
-      instAdd(sh, d.x, y0 + 0.5, d.y, d.r * (d.fly ? 0.9 : 1.2), 1, d.r * (d.fly ? 0.9 : 0.9), -d.ang);
+      const fl = d.fly ? clamp(1 - (d.alt || 0) * 0.6, 0.3, 1) : 1; blobShadow(d.x, y0, d.y, d.r * (d.fly ? 1.1 : 1.45) * fl, d.r * (d.fly ? 1.4 : 0.85) * fl, -d.ang, d.fly ? 0 : d.r * 1.6);
     }
   }
   if (G.rescue) {
@@ -1137,8 +1165,6 @@ function syncEnts(t, dk) {
     if (e) { e.g.position.set(q.x, ghE(q.x, q.y), q.y); e.g.rotation.y = -(q.ang || 0); M3.updPerson(e.g, q, t); }
   }
   for (const [k, e] of M) if (e.f !== f) { dropEnt(e); M.delete(k); }
-  MAT.shadow.opacity = 0.26 * shA;
-  instDone(sh);
   // muhafızın elindeki meşalenin ışığı modelin elinden gelsin
   U3.guardPos = null;
   if (guard) { const e = M.get(guard); if (e && e.g.visible && e.g.userData.flame) { e.g.userData.flame.updateWorldMatrix(true, false); U3.guardPos = new THREE.Vector3().setFromMatrixPosition(e.g.userData.flame.matrixWorld); } else if (e) U3.guardPos = new THREE.Vector3(guard.x + Math.cos(guard.ang + 1.2) * 8, ghE(guard.x, guard.y) + 30, guard.y + Math.sin(guard.ang + 1.2) * 8); }
@@ -1285,7 +1311,7 @@ function updAtmos(dt, t, LS) {
   U3.stars.visible = U3.stars.material.opacity > 0.01; U3.stars.rotation.y = G.t / CYCLE * 0.6;
   // güneş ve ay
   const ts = clamp(p / 0.5, 0, 1), sx = -Math.cos(ts * Math.PI), sy = Math.sin(ts * Math.PI) * 0.85 + 0.06;
-  _v.set(sx, sy, 0.38).normalize();
+  _v.set(sx, sy, 0.38).normalize(); (U3.sunV || (U3.sunV = new THREE.Vector3())).copy(_v);
   U3.sunS.position.copy(_v).multiplyScalar(6200); U3.sunS.material.opacity = clamp(1 - dk * 2.2, 0, 1) * clamp(U3.fogK * 1.4 - 0.4, 0, 1) * 0.8; U3.sunS.visible = U3.sunS.material.opacity > 0.01;
   U3.sunS.material.color.copy(c3(0xfff2c0)).lerp(c3(0xff9a50), warm * 0.7);
   U3.sunD.position.copy(U3.sunS.position); U3.sunD.visible = U3.sunS.visible; U3.sunD.material.opacity = U3.sunS.material.opacity; U3.sunD.material.color.copy(c3(0xfffbe8)).lerp(c3(0xffb070), warm * 0.8);
@@ -1385,10 +1411,15 @@ function render3D(dt) {
   U3.sigT -= dt;
   if (U3.sigT <= 0) { U3.sigT = 0.4; const s = worldSig(); if (s !== U3.sig) { U3.sig = s; U3.instX = 1e9; const ns = G.nests.reduce((a, n) => a + n.eggs, 0) + G.nests.length * 100; if (ns !== U3.nestSig) { U3.nestSig = ns; rebuildNests(); } } }
   if (Math.abs(px - U3.instX) + Math.abs(py - U3.instY) > 200) rebuildInst(px, py);
-  U3.inst.tshadow.visible = dk < 0.7;
+  // ---- gölgeler: gece ve kapalı havada söner; ağaç gölgeleri güneşle döner
+  { const day = clamp(1 - dk / 0.75, 0, 1), soft = 0.55 + 0.45 * clamp(U3.fogK, 0, 1);
+    MAT.shadow.opacity = 0.5 * day * soft + 0.1 * (1 - day); MAT.tshadow.opacity = 0.42 * day * soft;
+    U3.inst.tshadow.visible = MAT.tshadow.opacity > 0.01;
+    const o = u3ShadowDir(); if (U3.inst.tshadow.visible && Math.abs(o.x * 1000 + o.z - (U3.shK || 0)) > 25) fillTreeShadows(); }
+  U3.entShadow.count = 0;
   // ---- dinamik içerik
   syncBuilds(dk); syncCarcs(); syncCamps(); syncWrecks(t);
-  syncEnts(t, dk); syncEyes(dk, LS); syncSmall(t, dk);
+  syncEnts(t, dk); instDone(U3.entShadow); syncEyes(dk, LS); syncSmall(t, dk);
   updFire(t, dk); updFlames(t); updViewModel(dt, t);
   // yerleştirme hayaleti, av hedefi, bakılan kişi
   if (G.placing) {
@@ -1665,17 +1696,72 @@ function inFurniture(gb, f, R, st, X) {
   }
 }
 // ---- oda bölmeleri: mağarada alçak kaya sırtları + sütunlar, kulübede hasır paravanlar
-function inDividers(gb, b, D, st, R, X, ceil) {
-  const rooms = inRooms(b), W = D.w, H = D.h, pts = new Map();
+// ---- oda bölmesi düzeni (deterministik): sahne kurulmadan çarpışma için de kullanılır
+function inLayout(b) {
+  const rooms = inRooms(b), D = inDims(b), W = D.w, H = D.h, walls = [], pts = new Map();
   for (const r of rooms) {
     const left = r.x < 2, right = r.x + r.w > W - 2, back = !left && !right && r.y < 2;
     // komşu odayla ortak kenar: duvardan içeri doğru %65
-    if (left || right) { const z = r.y + r.h + 4, x0 = left ? 0 : W, x1 = left ? r.w * 0.68 : W - r.w * 0.68; if (z < H - 70 && rooms.some(o => o !== r && Math.abs(o.y - z) < 14 && Math.abs(o.x - r.x) < 2)) X.walls.push([x0, z, x1, z]); }
-    if (back) { const x = r.x + r.w + 4; if (rooms.some(o => o !== r && Math.abs(o.x - x) < 14 && o.y < 2)) X.walls.push([x, 0, x, r.h * 0.68]); }
+    if (left || right) { const z = r.y + r.h + 4, x0 = left ? 0 : W, x1 = left ? r.w * 0.68 : W - r.w * 0.68; if (z < H - 70 && rooms.some(o => o !== r && Math.abs(o.y - z) < 14 && Math.abs(o.x - r.x) < 2)) walls.push([x0, z, x1, z]); }
+    if (back) { const x = r.x + r.w + 4; if (rooms.some(o => o !== r && Math.abs(o.x - x) < 14 && o.y < 2)) walls.push([x, 0, x, r.h * 0.68]); }
     // girişin iki ucunda sütun
     const ends = left ? [[r.x + r.w, r.y], [r.x + r.w, r.y + r.h]] : right ? [[r.x, r.y], [r.x, r.y + r.h]] : [[r.x, r.y + r.h], [r.x + r.w, r.y + r.h]];
     for (const [px, pz] of ends) { const k = Math.round(px / 30) + ',' + Math.round(pz / 30); if (!pts.has(k) && pz < H - 60) pts.set(k, [px, pz]); }
   }
+  return { walls, pts };
+}
+// ---- iç mekân çarpışması (ic.js inMove çağırır): katı daireler + yürünebilir alanın sınırı
+const INCOL = new Map();
+function inColKey(b) { return b.type + '|' + ((typeof roomsOf === 'function' ? roomsOf(b) : b.rooms) || []).join() + '|' + inDims(b).w; }
+function inCol(b) {
+  const key = inColKey(b); let c = INCOL.get(b);
+  if (c && c.key === key) return c;
+  const D = inDims(b), W = D.w, H = D.h, st = b.type === 'magara' ? 'cave' : b.type === 'kulube' ? 'hut' : 'tent', lay = inLayout(b), sol = [];
+  if (st !== 'tent') for (const [x0, z0, x1, z1] of lay.walls) {
+    const len = Math.hypot(x1 - x0, z1 - z0), n = st === 'cave' ? Math.max(2, Math.round(len / 14)) : Math.max(2, Math.round(len / 9));
+    for (let i = 0; i <= n; i++) { const t = i / n; sol.push({ x: x0 + (x1 - x0) * t, y: z0 + (z1 - z0) * t, r: st === 'cave' ? 10 * (1 - t * 0.25) : 4 }); }
+  }
+  if (st === 'cave') {
+    for (const [px, pz] of lay.pts.values()) sol.push({ x: px, y: pz, r: 13 });
+    const hz = H * 0.62, hx = W / 2;   // büyük ocak çevresindeki oturak kütükleri
+    for (const [a, l] of [[0.5, 46], [2.6, 40], [4.2, 44]]) { const px = hx + Math.cos(a) * 48, pz = hz + Math.sin(a) * 48; for (const t of [0.15, 0.5, 0.85]) sol.push({ x: px - Math.sin(a) * l * t, y: pz + Math.cos(a) * l * t, r: 5 }); }
+  }
+  if (st === 'tent') for (let i = 0; i < 3; i++) sol.push({ x: W / 2 - 70 + i * 34, y: 8, r: 13 });
+  // yürünebilir sınır: mağarada kubbe duvarının zemin halkası (caveShell ile aynı formül) eksi moloz payı
+  let ring = null;
+  if (st === 'cave') {
+    const cx = W / 2, cz = H / 2, A = W / 2 + 50, Bb = H / 2 + 52, Bf = H / 2 + 24, NT = 84, ph = 0.05, k = Math.pow(Math.cos(ph), 0.42), y = 150 * Math.sin(ph); ring = [];
+    for (let i = 0; i < NT; i++) {
+      const th = i / NT * TAU, c = Math.cos(th), sn = Math.sin(th);
+      let x = cx + Math.sign(c) * Math.pow(Math.abs(c), 0.4) * A * k, z = cz + Math.sign(sn) * Math.pow(Math.abs(sn), 0.4) * (sn > 0 ? Bf : Bb) * k;
+      const nn = fbm3(x * 0.021, y * 0.03 + 3, z * 0.021), big = fbm3(x * 0.006 + 5, y * 0.008, z * 0.006 + 2), wk = Math.cos(ph);
+      const dx = x - cx, dz = z - cz, dl = Math.hypot(dx, dz) || 1, disp = (nn - 0.42) * 38 + (big - 0.5) * 56;
+      x += dx / dl * disp * wk; z += dz / dl * disp * wk;
+      if (x > -18 && x < W + 18 && z > -18 && z < H + 18) { const m = [x + 18, W + 18 - x, z + 18, H + 18 - z], q = m.indexOf(Math.min(...m)); if (q === 0) x = -18; else if (q === 1) x = W + 18; else if (q === 2) z = -18; else z = H + 18; }
+      ring.push([Math.atan2(z - cz, x - cx), Math.hypot(x - cx, z - cz) - 26]);
+    }
+    ring.sort((a, c) => a[0] - c[0]);
+  } else if (st === 'tent') ring = 'circle';
+  c = { key, sol, ring, W, H }; INCOL.set(b, c); return c;
+}
+function inSolids(b) { return inCol(b).sol; }
+function inWall(b, x, y) {
+  const c = inCol(b), W = c.W, H = c.H;
+  if (y > H - 50 && Math.abs(x - W / 2) < 50) return null;          // kapı / mağara ağzı geçidi
+  if (!c.ring) return null;
+  const cx = W / 2, cz = H / 2, dx = x - cx, dz = y - cz, d = Math.hypot(dx, dz) || 1e-6;
+  let lim;
+  if (c.ring === 'circle') lim = 164;
+  else {
+    const R = c.ring, a = Math.atan2(dz, dx); let i = 0; while (i < R.length && R[i][0] < a) i++;
+    const p0 = R[(i - 1 + R.length) % R.length], p1 = R[i % R.length]; let a0 = p0[0], a1 = p1[0]; if (a1 < a0) a1 += TAU; let aa = a; if (aa < a0) aa += TAU;
+    lim = p0[1] + (p1[1] - p0[1]) * clamp((aa - a0) / Math.max(1e-6, a1 - a0), 0, 1);
+  }
+  if (d <= lim) return null;
+  return { x: cx + dx / d * lim, y: cz + dz / d * lim };
+}
+function inDividers(gb, b, D, st, R, X, ceil) {
+  const W = D.w, H = D.h, lay = inLayout(b), pts = lay.pts; X.walls.push(...lay.walls);
   for (const [x0, z0, x1, z1] of X.walls) {
     const len = Math.hypot(x1 - x0, z1 - z0), n = Math.max(2, Math.round(len / 14));
     for (let i = 0; i <= n; i++) { const t = i / n, x = x0 + (x1 - x0) * t, z = z0 + (z1 - z0) * t, y0 = inFloorY(x, z), fall = 1 - t * 0.55;
@@ -1789,6 +1875,11 @@ function inBuild(b) {
     if (r.t === 'kasap') X.decals.push([mx, mz, Math.min(r.w, r.h) * 0.25, '#3a1010']);
   }
   const mesh = gb.mesh(); mesh.material = MAT.inV; root.add(mesh);
+  // leke gölgeler: eşyaların ve insanların altında, ana ateşin ters yönüne kaymış
+  { IN.mainL = X.lights.filter(l => l.fl && !l.door).sort((a, c) => c.int - a.int)[0] || { x: W / 2, z: H / 2 };
+    IN.shadow = mkInst(GEO.disc, MAT.inShadow, 160); IN.shadow.renderOrder = 1; root.add(IN.shadow); IN.fsh = [];
+    const SZ = { bed: [27, 15], mat: [21, 12], healbed: [27, 15], crate: [17, 16], table: [34, 21], bench: [31, 16], block: [14, 14], rack: [27, 7], herbs: [29, 9] };
+    for (const f of furn) { const z = SZ[f.k]; if (z) IN.fsh.push(inShadowArgs(f.x, f.y, z[0], z[1], f.ang || 0, 16)); } }
   // lekeler
   for (const [x, z, r, c] of X.decals) { const m = new THREE.Mesh(GEO.disc, new THREE.MeshBasicMaterial({ color: c3(c), transparent: true, opacity: 0.55, depthWrite: false })); m.scale.set(r, 1, r * 0.8); m.position.set(x, inFloorY(x, z) + 0.7, z); root.add(m); }
   // asılı postlar
@@ -1814,6 +1905,10 @@ function inBuild(b) {
   X.lights.sort((a, c) => a.pri - c.pri); IN.lights = X.lights.slice(0, 6);
   IN.ceil = ceil;
   root.updateMatrixWorld(true);
+}
+function inShadowArgs(x, z, rx, rz, ry, h) {
+  const l = IN.mainL || { x, z: z + 1 }, dx = x - l.x, dz = z - l.z, d = Math.hypot(dx, dz) || 1, k = Math.min(h * 0.6, 1600 / (d + 40));
+  return [x + dx / d * k, inFloorY(x, z) + 0.9, z + dz / d * k, rx + k * 0.3, 1, rz, ry];
 }
 function inDispose() {
   if (!IN.root) return;
@@ -1874,6 +1969,11 @@ function render3DInterior(dt, t, yaw, pitch, bobY, sh) {
     g.position.set(q.x, inFloorY(q.x, q.y) + (q.pose === 'sleep' ? 2.5 : 0), q.y); g.rotation.y = -q.ang;
   }
   for (const [p, g] of IN.ppl) if (!seen.has(p)) { IN.root.remove(g); if (M3.dispose) M3.dispose(g); IN.ppl.delete(p); }
+  if (IN.shadow) {
+    const m = IN.shadow; m.count = 0; for (const a of IN.fsh) instAdd(m, ...a);
+    for (const q of list) { if (!q.p || q.p === L) continue; const sl = q.pose === 'sleep'; instAdd(m, ...inShadowArgs(q.x, q.y, sl ? 17 : 8.5, sl ? 9 : 7.5, -q.ang, sl ? 4 : 30)); }
+    instDone(m); MAT.inShadow.opacity = 0.5 - 0.15 * (1 - dk);
+  }
   updFlames(t); updViewModel(dt, t);
   U3.r.setClearColor(0x000000, 1);
   U3.r.render(IN.scene, cam);

@@ -111,7 +111,8 @@ button{font-family:Georgia,serif;color:var(--ink);cursor:pointer}
 #inBox .nav{position:absolute;top:50%;transform:translateY(-50%);font-size:16px;padding:6px 10px;opacity:.85}
 #inBox .nav.l{left:4px}#inBox .nav.r{right:4px}
 #charM{z-index:6}
-#charBox{background:#15110c;border:1px solid #6a5030;border-radius:12px;width:min(520px,94vw);max-height:88vh;display:flex;flex-direction:column;font-size:13px}
+#charBox{background:#15110c;border:1px solid #6a5030;border-radius:12px;width:min(520px,94vw);max-height:86vh;max-height:86dvh;display:flex;flex-direction:column;font-size:13px}
+#charBox .cl{overflow-y:auto;-webkit-overflow-scrolling:touch;touch-action:pan-y;overscroll-behavior:contain;min-height:0;flex:1;padding-bottom:28px}
 #charBox button,.ctabs button,.obtns button{background:#2b2419;border:1px solid #5a4a30;border-radius:6px;padding:4px 9px;font-size:12px}
 #charBox button.on,.ctabs button.on{border-color:var(--fire);background:#4a2a10}
 #charBox button.no{opacity:.45}
@@ -1143,7 +1144,8 @@ const ranged = p => !!(p.eq && p.eq.yay) && arrows() > 0;
 const nearSifahane = p => G.builds.some(b => b.built && !b.dead && (b.type === 'sifahane' || roomCount(b, 'sifa') > 0) && Math.hypot(b.x - p.x, b.y - p.y) < b.r + 140);
 
 function pSpeed(p) {
-  let s = p.leader ? 150 : 105;
+  let s = p.leader ? 120 : 84;
+  if (p.carry > 0 && !p.leader) s *= 0.82;   // yük taşıyan ağır yürür
   if (typeof terrainMul === 'function') s *= terrainMul(p.x, p.y);
   if (p.sneak) s *= 0.5;
   if (tr(p, 'cevik')) s *= 1.25;
@@ -1576,6 +1578,17 @@ function updPerson(p, dt, LS) {
   if (p.carriedBy) { if (!G.people.some(c => c.id === p.carriedBy && c.carrying === p) && !(G.lcarry === p)) p.carriedBy = 0; else return; }
   const night = isNight();
   updFear(p, dt, LS, night);
+  // yaralı çalışmaz: kırığı olan yerinde bekler (taşınır), diğerleri mağaraya/ateşe çekilip dinlenir; şifacı yanına gelir
+  if (!p.carrying && (p.injury || p.hp < p.maxhp * 0.4) && !(p.fear > 60)) {
+    p.work = 0; p.sneak = false; if (p.tgt && p.tgt.claim === p) p.tgt.claim = null; p.tgt = null; p.carryOrder = 0;
+    if (!members('sifaci').length && !G.flags.noHealer) { G.flags.noHealer = 1; msg(`🩹 ${p.name} yaralı ve çalışamıyor. Şifacın yok: birini 🌿 Şifacı yap ya da yanına gidip kendin sar.`, '#f99', 6); }
+    const broken = p.injury && p.injury.type === 'kirik';
+    if (broken || p.wasDowned) { p.moving = false; p.stageAd = 'Yaralı — taşınmayı bekliyor'; return; }
+    if (p.bedRes) { const bp = bedPos(p.bedRes.s, p.bedRes.i); if (Math.hypot(p.x - bp.x, p.y - bp.y) > 30 && dist(p, p.bedRes.s) > p.bedRes.s.r + 20) { steer(p, bp.x, bp.y + 20, pSpeed(p) * 0.6, dt, false); p.anim += dt * 6; } else putInBed(p); p.stageAd = 'Yaralı — şifa yerine gidiyor'; return; }
+    const rp = depotOf(p); p.stageAd = 'Yaralı — dinleniyor';
+    if (Math.hypot(p.x - rp.x, p.y - rp.y) > 40) { steer(p, rp.x + Math.cos(p.seat) * 20, rp.y + 10, pSpeed(p) * 0.6, dt, false); p.anim += dt * 6; } else { p.moving = false; p.hp = Math.min(p.maxhp, p.hp + 0.6 * dt); }
+    return;
+  }
   if (p.lastHurt > 6 && !(p.injury && p.injury.type === 'enfeksiyon')) {
     let h = 0;
     if (dist(p, G.fire) < fireR() + 20) h = 0.8;
@@ -5498,6 +5511,9 @@ function inMove(mx, my, spd, dt) {
   const I = G.inside, D = inDims(I.b); let x = I.x + mx * spd * dt, y = I.y + my * spd * dt;
   x = clamp(x, 14, D.w - 14); y = clamp(y, 14, D.h - 10);
   for (const f of inFurn(I.b)) { if (f.k === 'door' || f.k === 'paint' || f.k === 'torch' || f.k === 'mat') continue; const r = f.k === 'table' ? 30 : f.k === 'hearth' ? 22 : 18, dx = x - f.x, dy = y - f.y, d = Math.hypot(dx, dy); if (d < r && d > 0.01) { x = f.x + dx / d * r; y = f.y + dy / d * r; } }
+  // duvar, sütun ve kaya bölmeleri (çizici tanımlar): içinden geçilmez
+  if (typeof inSolids === 'function') for (const o of inSolids(I.b)) { const dx = x - o.x, dy = y - o.y, d = Math.hypot(dx, dy), r = o.r + 9; if (d < r && d > 0.01) { x = o.x + dx / d * r; y = o.y + dy / d * r; } }
+  if (typeof inWall === 'function') { const q = inWall(I.b, x, y); if (q) { x = q.x; y = q.y; } }
   I.x = x; I.y = y;
 }
 function inInteract() {
@@ -5546,6 +5562,10 @@ const M3 = (function () {
   const VC = LM({ vertexColors: true });
   const FLASH = LM({ color: 0xffe2e2, emissive: 0x5a3030 });
   const POIS = LM({ vertexColors: true, color: 0xa4c070 });
+  // yaratıklar: yumuşak gölgelendirme (loft yüzeyleri kendi normallerini taşır; diğer parçalar yüz normali = köşeli)
+  const DV = LM({ vertexColors: true, flatShading: false });
+  const DFLASH = LM({ color: 0xffe2e2, emissive: 0x5a3030, flatShading: false });
+  const DPOIS = LM({ vertexColors: true, color: 0xa4c070, flatShading: false });
   const MATS = {};
   function tint(h) { const k = 't' + h; return MATS[k] || (MATS[k] = LM({ color: col(h), vertexColors: true })); }
   function glow(h) { const k = 'g' + h; return MATS[k] || (MATS[k] = LM({ color: 0x0a0a0a, emissive: col(h) })); }
@@ -5554,13 +5574,87 @@ const M3 = (function () {
   const U_ICO0 = new T3.IcosahedronGeometry(1, 0), U_ICO1 = new T3.IcosahedronGeometry(1, 1), U_BOX = new T3.BoxGeometry(1, 1, 1);
   const _m = new T3.Matrix4(), _q = new T3.Quaternion(), _e = new T3.Euler(), _p = new T3.Vector3(), _s = new T3.Vector3();
   const _v0 = new T3.Vector3(), _v1 = new T3.Vector3(), _v2 = new T3.Vector3(), _up = new T3.Vector3(0, 1, 0), _d = new T3.Vector3(), _m2 = new T3.Matrix4();
-  function PB(seed) { this.p = []; this.c = []; this.s = seed || 11; }
+  function PB(seed) { this.p = []; this.c = []; this.n = []; this.s = seed || 11; }
   const pp = PB.prototype;
+  const _e1 = new T3.Vector3(), _e2 = new T3.Vector3(), _fn = new T3.Vector3();
   pp.rnd = function () { this.s = (this.s * 16807) % 2147483647; return this.s / 2147483647; };
   pp._t = function (a, b, c, k) {
     const j = 0.93 + this.rnd() * 0.14;
     this.p.push(a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z);
     for (let i = 0; i < 3; i++) this.c.push(k.r * j, k.g * j, k.b * j);
+    _fn.crossVectors(_e1.subVectors(b, a), _e2.subVectors(c, a)).normalize();
+    this.n.push(_fn.x, _fn.y, _fn.z, _fn.x, _fn.y, _fn.z, _fn.x, _fn.y, _fn.z);
+  };
+  // ---- organik gövde: XY düzlemindeki bir yol boyunca süpürülen elips kesitler (yumuşak normal + köşe rengi)
+  // P: [[x, y, rt(üst/ön yarıçap), rb(alt/arka), w(yarı genişlik), z?], ...]
+  // o: { n: kesit kenarı, e: süperelips üssü (<1 köşeli), col, dk (sırt), bel (karın), back, belK, pat(u, up, x, y, z) -> 0..1, pc (desen rengi), top: renk (iç yüz, up>0.6), jit }
+  const _lc = new T3.Color(), _lk = new T3.Color();
+  const sstep = (a, b, x) => { const t = cl((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+  pp.loft = function (P, o) {
+    o = o || {};
+    const N = o.n || 10, m = P.length, e = o.e || 1, G = [], U = [], D = [];
+    const base = col(o.col || '#888'), dk = o.dk ? col(o.dk) : base, bel = o.bel ? col(o.bel) : base, pc = o.pc ? col(o.pc) : null, top = o.top ? col(o.top) : null, botc = o.bot ? col(o.bot) : null;
+    const back = o.back == null ? 0.7 : o.back, belK = o.belK == null ? 0.85 : o.belK, jit = o.jit == null ? 0.05 : o.jit;
+    let acc = 0; const us = [0];
+    for (let i = 1; i < m; i++) { acc += Math.hypot(P[i][0] - P[i - 1][0], P[i][1] - P[i - 1][1]); us.push(acc); }
+    for (let i = 0; i < m; i++) {
+      const a = P[Math.max(0, i - 1)], b = P[Math.min(m - 1, i + 1)], q = P[i];
+      let tx = b[0] - a[0], ty = b[1] - a[1]; const tl = Math.hypot(tx, ty) || 1; tx /= tl; ty /= tl;
+      const nx = -ty, ny = tx, row = [], dr = [];
+      for (let j = 0; j < N; j++) {
+        const th = j / N * TAU2, s = Math.sin(th), c = Math.cos(th);
+        const sy = Math.sign(s) * Math.pow(Math.abs(s), e), cz = Math.sign(c) * Math.pow(Math.abs(c), e), r = s > 0 ? q[2] : q[3];
+        const ox = nx * sy * r, oy = ny * sy * r, oz = cz * q[4];
+        row.push(new T3.Vector3(q[0] + ox, q[1] + oy, (q[5] || 0) + oz));
+        const ol = Math.hypot(ox, oy, oz) || 1; dr.push(oy / ol);
+      }
+      G.push(row); D.push(dr); U.push(acc ? us[i] / acc : 0);
+    }
+    // köşe normalleri (komşu farklarından) ve renkleri
+    const NV = [], CV = [];
+    for (let i = 0; i < m; i++) {
+      const nr = [], cr = [];
+      for (let j = 0; j < N; j++) {
+        const pu1 = G[Math.min(m - 1, i + 1)][j], pu0 = G[Math.max(0, i - 1)][j], pv1 = G[i][(j + 1) % N], pv0 = G[i][(j + N - 1) % N];
+        const n = new T3.Vector3().crossVectors(_e1.subVectors(pu1, pu0), _e2.subVectors(pv1, pv0));
+        // dışa baksın: kesit merkezinden uzağa
+        const q = P[i]; _fn.set(G[i][j].x - q[0], G[i][j].y - q[1], G[i][j].z - (q[5] || 0));
+        if (n.dot(_fn) < 0) n.negate();
+        if (n.lengthSq() < 1e-12) n.copy(_fn); n.normalize(); nr.push(n);
+        const up = D[i][j], v = G[i][j];
+        _lc.copy(base);
+        if (up > 0) _lc.lerp(dk, sstep(0.05, 0.95, up) * back); else _lc.lerp(bel, sstep(-0.1, -0.75, up) * belK);
+        if (pc && o.pat) { const k = o.pat(U[i], up, v.x, v.y, v.z); if (k > 0) _lc.lerp(pc, cl(k, 0, 1)); }
+        if (top && up > 0.55) _lc.lerp(top, sstep(0.55, 0.8, up));
+        if (botc && up < -0.6) _lc.lerp(botc, sstep(-0.6, -0.85, up));
+        const jj = 1 - jit + this.rnd() * jit * 2; cr.push(new T3.Color(_lc.r * jj, _lc.g * jj, _lc.b * jj));
+      }
+      NV.push(nr); CV.push(cr);
+    }
+    const tri = (i0, j0, i1, j1, i2, j2) => {
+      const a = G[i0][j0], b = G[i1][j1], c = G[i2][j2];
+      _fn.crossVectors(_e1.subVectors(b, a), _e2.subVectors(c, a));
+      const sn = NV[i0][j0], flip = _fn.dot(sn) + _fn.dot(NV[i1][j1]) + _fn.dot(NV[i2][j2]) < 0;
+      const L = flip ? [[i0, j0], [i2, j2], [i1, j1]] : [[i0, j0], [i1, j1], [i2, j2]];
+      for (const [ii, jx] of L) { const v = G[ii][jx], n = NV[ii][jx], k = CV[ii][jx]; this.p.push(v.x, v.y, v.z); this.n.push(n.x, n.y, n.z); this.c.push(k.r, k.g, k.b); }
+    };
+    for (let i = 0; i < m - 1; i++) for (let j = 0; j < N; j++) { const j1 = (j + 1) % N; tri(i, j, i, j1, i + 1, j1); tri(i, j, i + 1, j1, i + 1, j); }
+    // uç kapakları
+    for (const [i, sg] of [[0, -1], [m - 1, 1]]) {
+      if (o.open) break;
+      const q = P[i], cx = q[0], cy = q[1], cz = q[5] || 0;
+      let r0 = 0; for (let j = 0; j < N; j++) r0 = Math.max(r0, G[i][j].distanceTo(_fn.set(cx, cy, cz)));
+      if (r0 < 1e-3) continue;
+      const a = P[Math.max(0, i - 1)], b = P[Math.min(m - 1, i + 1)]; let tx = b[0] - a[0], ty = b[1] - a[1]; const tl = Math.hypot(tx, ty) || 1; tx = tx / tl * sg; ty = ty / tl * sg;
+      const C = new T3.Vector3(cx + tx * r0 * 0.35, cy + ty * r0 * 0.35, cz), kC = CV[i][0];
+      for (let j = 0; j < N; j++) {
+        const v0 = G[i][j], v1 = G[i][(j + 1) % N];
+        _fn.crossVectors(_e1.subVectors(v1, v0), _e2.subVectors(C, v0));
+        const L = _fn.x * tx + _fn.y * ty < 0 ? [v0, C, v1] : [v0, v1, C], K = [CV[i][j], kC, CV[i][(j + 1) % N]];
+        for (let k = 0; k < 3; k++) { const v = L[k], kk = v === C ? kC : v === v0 ? CV[i][j] : CV[i][(j + 1) % N]; const n = v === C ? _e1.set(tx, ty, 0) : NV[i][v === v0 ? j : (j + 1) % N]; this.p.push(v.x, v.y, v.z); this.n.push(n.x, n.y, n.z); this.c.push(kk.r, kk.g, kk.b); }
+      }
+    }
+    return this;
   };
   // o: { belly: renk, by: bu y'nin altındaki üçgenler belly rengi alır, half: ±1 (yalnız z işareti tutan üçgenler) }
   pp.add = function (geo, m, k, o) {
@@ -5623,7 +5717,7 @@ const M3 = (function () {
     const g = new T3.BufferGeometry();
     g.setAttribute('position', new T3.BufferAttribute(new Float32Array(this.p), 3));
     g.setAttribute('color', new T3.BufferAttribute(new Float32Array(this.c), 3));
-    g.computeVertexNormals(); g.computeBoundingSphere();
+    g.setAttribute('normal', new T3.BufferAttribute(new Float32Array(this.n), 3)); g.computeBoundingSphere();
     return g;
   };
   const GEO = {};
@@ -5670,117 +5764,155 @@ const M3 = (function () {
     dev: { H: 1.32, tl: 0.92, th: 0.54, tw: 0.47, tailL: 1.85, tailN: 5, tailR: 0.38, nL: 0.5, nA: 0.72, nR: 0.37, hL: 1.25, hH: 0.66, hW: 0.64, tp: 0.66, teeth: 8, arm: 0.26, lr: 0.25, leg: [0.66, 0.7, 0.42], eye: 0.055 },
     gurleyen: { H: 1.12, th: 0.4, tw: 0.36, nL: 0.6, nA: 0.8, nR: 0.2, hL: 0.6, hH: 0.34, hW: 0.36, teeth: 0, arm: 0.34, herb: true, tailR: 0.28, lr: 0.16 }
   };
-  function stripe(pb, P, x, k, wid) {
-    const u = (x - 0.1) / P.tl, f = Math.sqrt(Math.max(0.04, 1 - u * u));
-    pb.ball(x, 0.05, 0, wid || 0.035, P.th * f * 1.03, P.tw * f * 1.05, k);
+  // ---- deri desenleri (köşe rengi). u: boy boyunca 0..1, up: -1 karın .. 1 sırt
+  const wob = (x, y, z) => Math.sin(x * 17.1 + y * 3.3 + 1.7) * Math.sin(y * 13.7 + z * 11.3) * Math.sin(z * 9.1 + x * 7.7 + 0.5);
+  const PAT = {
+    yirtici: ['#3a1608', (u, up, x, y, z) => sstep(0.3, 0.75, Math.sin(x * 15 + Math.abs(z) * 6 + Math.sin(y * 9) * 0.8)) * sstep(-0.45, 0.1, up)],
+    kesici: ['#16100a', (u, up, x, y, z) => sstep(0.25, 0.5, Math.sin(x * 19 - Math.abs(z) * 5)) * sstep(-0.5, -0.05, up)],
+    geceavcisi: ['#8a9e9a', (u, up, x, y, z) => sstep(0.82, 0.96, Math.sin(x * 22 + Math.abs(z) * 3)) * sstep(-0.3, 0.1, up)],
+    dev: ['#1c1a16', (u, up, x, y, z) => sstep(0.08, 0.32, wob(x * 0.8, y * 0.8, z * 0.8)) * 0.8],
+    tukurgec: ['#c8a04a', (u, up, x, y, z) => sstep(0.18, 0.32, wob(x * 1.7, y * 1.7, z * 1.7)) * sstep(-0.4, 0, up)],
+    kucuk: ['#2e3a14', (u, up, x, y, z) => sstep(0.15, 0.3, wob(x * 2, y * 2, z * 2)) * sstep(-0.4, 0, up)],
+    yelken: ['#2e2016', (u, up, x, y, z) => sstep(0.4, 0.75, Math.sin(x * 11 + Math.sin(z * 6) * 1.5)) * 0.7 * sstep(-0.3, 0.2, up)],
+    gurleyen: ['#d8c8a8', (u, up, x, y, z) => sstep(0.12, 0.3, wob(x * 1.5, y * 1.5, z * 1.5)) * sstep(0, 0.4, up)],
+    boynuzlu: ['#5a4430', (u, up, x, y, z) => sstep(0.35, 0.7, Math.sin(x * 9 + Math.abs(z) * 3)) * 0.6 * sstep(-0.1, 0.4, up)],
+    zirhli: ['#3e3a2a', (u, up, x, y, z) => sstep(0.1, 0.3, wob(x * 1.3, y * 1.3, z * 1.3)) * 0.6],
+    ordek: ['#4e4026', (u, up, x, y, z) => sstep(0.55, 0.85, Math.sin(x * 12 + Math.abs(z) * 2)) * 0.7 * sstep(0, 0.4, up)],
+    uzunboyun: ['#4a5a40', (u, up, x, y, z) => sstep(0.12, 0.3, wob(x * 0.9, y * 0.9, z * 0.9)) * 0.7 * sstep(-0.2, 0.3, up)],
+    batakci: ['#26301e', (u, up, x, y, z) => sstep(0.1, 0.35, wob(x * 2.2, y * 2.2, z * 2.2)) * sstep(-0.3, 0.2, up)],
+    kanatli: ['#5a3a2e', (u, up, x, y, z) => sstep(0.5, 0.8, Math.sin(x * 14)) * 0.6 * sstep(0, 0.5, up)]
+  };
+  function skin(T, c, o) { const pt = PAT[T]; return Object.assign({ col: c.col, dk: c.dk, bel: c.bel, back: 0.5, belK: 0.9, pc: pt ? pt[0] : null, pat: pt ? pt[1] : null }, o || {}); }
+  // kesitli gövde profili (theropod): s 0..1 kalçanın arkasından göğse -> [x, yc, rt, rb, w]
+  function torsoProf(P) {
+    const xb = 0.1 - P.tl * 0.98, xf = 0.1 + P.tl * 1.02;
+    return s => {
+      const env = Math.pow(Math.sin(PI * (0.03 + 0.94 * s)), 0.5), hip = Math.exp(-Math.pow((s - 0.3) / 0.17, 2)), bel = Math.exp(-Math.pow((s - 0.58) / 0.22, 2)), ch = Math.exp(-Math.pow((s - 0.84) / 0.12, 2));
+      return [xb + (xf - xb) * s, P.th * (0.06 * Math.sin(PI * s) + 0.05 * hip), P.th * (0.5 + 0.48 * env + 0.1 * hip), P.th * (0.42 + 0.55 * env + 0.16 * bel + 0.08 * ch), P.tw * (0.48 + 0.5 * env + 0.1 * hip + 0.06 * ch)];
+    };
   }
-  function topY(P, x, z) { const u = (x - 0.1) / P.tl, w = (z || 0) / P.tw; return P.th * Math.sqrt(Math.max(0, 1 - u * u - w * w)); }
-  // sırt boyunca eğriyi izleyen sırt çıkıntısı (havada asılı düz levha olmasın)
-  function ridge(pb, f, x0, x1, n, h, w, k) { for (let i = 0; i < n; i++) { const xa = x0 + (x1 - x0) * i / n, xb = x0 + (x1 - x0) * (i + 1) / n, ya = f(xa), yb = f(xb); pb.wedge(xa, xb, ya - h, ya + h * 0.55, yb - h, yb + h * 0.55, w, w, k); } }
-
+  function topY(P, x, z) { const q = torsoProf(P)(cl((x - (0.1 - P.tl * 0.98)) / (P.tl * 2), 0, 1)), w = (z || 0) / q[4]; return q[1] + q[2] * Math.sqrt(Math.max(0, 1 - w * w)); }
+  // sırt boyunca yuvarlak pullar (eski kutu sırtın yerine)
+  function ridge(pb, f, x0, x1, n, h, w, k) { for (let i = 0; i <= n; i++) { const x = x0 + (x1 - x0) * i / n; pb.ball(x, f(x) + h * 0.15, 0, Math.abs(x1 - x0) / n * 0.42, h * 1.2, w * 0.9, k); } }
+  const lerp = (a, b, t) => a + (b - a) * t;
+  // kafatası / çene kesit tabloları: [x/L, üst/h, alt/h, genişlik/w]
+  function skullSecs(P, T) {
+    const L = P.hL, h = P.hH, w = P.hW * 0.5, tp = P.tp, dev = T === 'dev' ? 1 : 0;
+    const wx = xu => xu < 0.36 ? 1 : lerp(0.94, tp, Math.pow((xu - 0.36) / 0.64, 0.9));
+    const S = [[-0.17, 0.55, 0.16, 0.5 + dev * 0.15], [-0.08, 0.84, 0.02, 0.86 + dev * 0.1], [0.08, 0.98 + dev * 0.04, -0.03, 1.0 + dev * 0.06], [0.26, 1.0, -0.03, 0.97], [0.42, 0.88 + dev * 0.04, -0.01, 0], [0.58, 0.77 + dev * 0.1, 0.0, 0], [0.74, 0.67 + dev * 0.12, 0.01, 0], [0.88, 0.58 + dev * 0.1, 0.02, 0], [0.97, 0.47 + dev * 0.08, 0.04, -0.85], [1.02, 0.3, 0.08, -0.5]];
+    return S.map(([xu, tt, bb, ww]) => { const W = ww > 0 ? ww : ww < 0 ? -ww * tp : wx(xu); const yc = (tt + bb) / 2 * h, r = (tt - bb) / 2 * h; return [xu * L, yc, r, r, W * w]; });
+  }
   function skull(pb, P, T, c) {
-    const L = P.hL, h = P.hH, w = P.hW * 0.5, tp = P.tp;
-    if (P.herb) { // kubbe kafa
-      pb.wedge(-0.12 * L, 0.45 * L, 0, 0.72 * h, 0, 0.62 * h, w * 0.9, w * 0.95, c.col);
-      pb.wedge(0.45 * L, L, 0, 0.55 * h, 0.06 * h, 0.22 * h, w * 0.85, w * 0.45, c.col);
-      pb.wedge(0.88 * L, 1.05 * L, 0.0, 0.26 * h, -0.06 * h, 0.08 * h, w * 0.4, w * 0.25, '#4a4034');
-      pb.ball(0.14 * L, 0.86 * h, 0, 0.42 * L, 0.6 * h, w * 1.05, mix(c.col, '#e4d8c0', 0.55));
-      pb.ball(0.2 * L, 1.1 * h, 0, 0.28 * L, 0.42 * h, w * 0.75, mix(c.col, '#efe6d2', 0.7));
-      for (let i = 0; i < 7; i++) { const a = PI * 0.5 + (i / 6 - 0.5) * PI * 1.3, x = 0.1 * L + Math.cos(a) * 0.1 * L - 0.34 * L * Math.abs(Math.sin(a)) * 0 - 0.3 * L * (1 - Math.abs(i - 3) / 4), z = Math.cos((i / 6) * PI) * w * 1.15; pb.cone([x, 0.6 * h, z], [x - 0.14 * L, 0.78 * h, z * 1.35], 0.07 * L, '#5a4a3a'); }
-      for (const s of [-1, 1]) { pb.ball(0.5 * L, 0.42 * h, s * w * 0.86, 0.05 * L, 0.05 * L, 0.03 * L, '#0c0a08', { d: 0 }); pb.cone([0.72 * L, 0.36 * h, s * w * 0.5], [0.78 * L, 0.52 * h, s * w * 0.6], 0.04 * L, '#5a4a3a'); }
+    const L = P.hL, h = P.hH, w = P.hW * 0.5, tp = P.tp, E = P.eye;
+    if (P.herb) { // kubbe kafa (kafakalkan)
+      const S = [[-0.15, 0.62, 0.1, 0.7], [0.05, 0.86, -0.05, 0.95], [0.3, 0.76, -0.05, 0.9], [0.55, 0.55, 0, 0.72], [0.8, 0.38, 0, 0.52], [0.97, 0.26, 0.02, 0.36], [1.04, 0.14, 0.05, 0.18]].map(([xu, tt, bb, ww]) => [xu * L, (tt + bb) / 2 * h, (tt - bb) / 2 * h, (tt - bb) / 2 * h, ww * w]);
+      pb.loft(S, skin(T, c, { n: 10, e: 0.85, back: 0.3 }));
+      pb.ball(0.14 * L, 0.86 * h, 0, 0.42 * L, 0.6 * h, w * 1.02, mix(c.col, '#e4d8c0', 0.55));
+      pb.ball(0.2 * L, 1.08 * h, 0, 0.29 * L, 0.42 * h, w * 0.76, mix(c.col, '#efe6d2', 0.7));
+      for (let i = 0; i < 7; i++) { const a = (i / 6 - 0.5) * PI * 1.2, x = -0.1 * L + Math.cos(a) * 0.06 * L, z = Math.sin(a) * w * 1.05; pb.cone([x, 0.62 * h, z], [x - 0.16 * L, 0.8 * h, z * 1.3], 0.065 * L, '#5a4a3a', { n: 5 }); }
+      for (const s of [-1, 1]) {
+        pb.ball(0.42 * L, 0.48 * h, s * w * 0.78, 0.07 * L, 0.065 * L, 0.035 * L, '#e8dcc0', { d: 0 }); pb.ball(0.44 * L, 0.48 * h, s * w * 0.82, 0.035 * L, 0.05 * L, 0.02 * L, '#0c0a08', { d: 0 });
+        pb.ball(0.36 * L, 0.6 * h, s * w * 0.74, 0.12 * L, 0.035 * L, 0.06 * L, c.dk, { az: -0.3 });
+        pb.cone([0.72 * L, 0.36 * h, s * w * 0.5], [0.8 * L, 0.52 * h, s * w * 0.62], 0.04 * L, '#5a4a3a', { n: 5 });
+        pb.ball(0.96 * L, 0.2 * h, s * w * 0.14, 0.025 * L, 0.02 * L, 0.015 * L, '#0c0a08', { d: 0 });
+      }
+      pb.cone([0.9 * L, 0.06 * h, 0], [1.1 * L, -0.06 * h, 0], 0.07 * L, '#3a3024', { n: 5 }); // gaga
       return;
     }
-    pb.wedge(-0.14 * L, 0.36 * L, 0, 0.9 * h, 0, 0.95 * h, w * 0.78, w, c.col);
-    pb.wedge(0.36 * L, L, 0, 0.9 * h, 0.03 * h, 0.5 * h, w * 0.96, w * tp, c.col);
-    pb.wedge(0.36 * L, 0.98 * L, 0.84 * h, 0.98 * h, 0.46 * h, 0.56 * h, w * 0.5, w * tp * 0.5, c.dk);     // burun sırtı
-    pb.wedge(0.02 * L, 0.96 * L, -0.03 * h, 0.02 * h, -0.01 * h, 0.04 * h, w * 0.8, w * tp * 0.8, MAW);       // damak
+    const S = skullSecs(P, T);
+    pb.loft(S, skin(T, c, { n: 12, e: 0.78, back: 0.55, bot: MAW, top: null }));
+    const wAt = x => { for (let i = 1; i < S.length; i++) if (S[i][0] >= x) { const a = S[i - 1], b = S[i], t = (x - a[0]) / (b[0] - a[0] || 1); return [lerp(a[1], b[1], t), lerp(a[2], b[2], t), lerp(a[4], b[4], t)]; } return [S[S.length - 1][1], S[S.length - 1][2], S[S.length - 1][4]]; };
+    // damak ve dişler (üst sıra: ağız kapalıyken de alt çenenin dışından görünür)
+    const n = P.teeth, tl = (T === 'dev' ? 0.3 : T === 'yelken' ? 0.3 : T === 'kesici' ? 0.26 : 0.22) * h;
     for (const s of [-1, 1]) {
-      pb.wedge(0.12 * L, 0.42 * L, 0.78 * h, 1.12 * h, 0.82 * h, 0.98 * h, w * 0.22, w * 0.16, T === 'yirtici' ? '#c87a3a' : c.dk, s * w * 0.8); // kaş çıkıntısı
-      pb.ball(0.3 * L, 0.6 * h, s * w * 0.99, 0.085 * L, 0.2 * h, 0.03 * L, '#141010', { d: 0 });           // göz çukuru
-      const n = P.teeth, tl = (T === 'dev' ? 0.26 : T === 'yelken' ? 0.3 : 0.2) * h;
-      for (let i = 0; i < n; i++) { const u = 0.4 + 0.56 * (i + 0.5) / n, x = u * L, ww = w * (0.96 + (tp - 0.96) * ((u - 0.36) / 0.64)) * 0.94, yb = 0.03 * h * ((u - 0.36) / 0.64); pb.cone([x, yb + 0.02 * h, s * ww], [x + 0.01 * L, yb - tl * (0.75 + 0.5 * pb.rnd()), s * ww * 0.97], 0.34 * L / n * 0.5, BONE, { n: 3 }); }
-      pb.ball(0.93 * L, 0.42 * h, s * w * tp * 0.8, 0.03 * L, 0.03 * L, 0.02 * L, '#0c0a08', { d: 0 });       // burun deliği
+      for (let i = 0; i < n; i++) {
+        const u = 0.36 + 0.6 * (i + 0.5) / n, x = u * L, q = wAt(x), y0 = q[0] - q[1] * 0.72, z = q[2] * 0.74, big = i === Math.floor(n * 0.35) || i === n - 2 ? 1.3 : 1;
+        pb.cone([x, y0, s * z], [x + 0.012 * L, q[0] - q[1] - tl * big * (0.8 + 0.4 * pb.rnd()), s * z * 0.97], 0.36 * L / n * 0.5 * big, BONE, { n: 4 });
+      }
+      // göz çukuru, kaş çıkıntısı, göz bebeği (göz küresi ayrı parlayan ağdadır)
+      const ex = 0.27 * L, ey = 0.64 * h, ez = w * 0.9;
+      pb.ball(ex, ey, s * (ez - E * 0.08), E * 1.4, E * 1.12, E * 0.45, '#140e0a', { d: 1 });
+      pb.ball(ex, ey, s * (ez + E * 0.4), E * 0.2, E * 0.66, E * 0.1, '#050303', { d: 0 });
+      pb.ball(ex - 0.02 * L, ey + E * 1.0, s * (ez - E * 0.1), E * 2.5, E * 0.62, E * 0.85, T === 'yirtici' ? '#c87a3a' : c.dk, { az: -0.32 });
+      pb.ball(0.96 * L, 0.44 * h, s * w * tp * 0.52, 0.035 * L, 0.028 * L, 0.02 * L, '#0a0806', { d: 0 });       // burun deliği
+      pb.ball(0.6 * L, 0.36 * h, s * wAt(0.6 * L)[2] * 0.9, 0.3 * L, 0.06 * h, 0.02 * L, shd(c.col, -0.25), { d: 1 }); // dudak çizgisi
     }
     if (T === 'tukurgec') for (const s of [-1, 1]) { pb.tri([0.05 * L, 0.9 * h, s * w * 0.5], [0.45 * L, 1.75 * h, s * w * 0.75], [0.85 * L, 0.6 * h, s * w * 0.4], '#c84a2a'); pb.tri([0.05 * L, 0.9 * h, s * w * 0.5], [0.2 * L, 1.5 * h, s * w * 0.7], [0.45 * L, 1.75 * h, s * w * 0.75], '#8a2a14'); }
-    if (T === 'dev') { for (let i = 0; i < 4; i++) pb.ball((0.45 + i * 0.13) * L, (0.9 - i * 0.1) * h, 0, 0.05 * L, 0.07 * h, 0.1 * w, c.dk, { d: 0 }); pb.box(0.6 * L, 0.55 * h, w * 0.86, 0.3 * L, 0.03 * h, 0.02, '#7a2a20', 0.5); pb.box(0.66 * L, 0.5 * h, w * 0.82, 0.24 * L, 0.03 * h, 0.02, '#7a2a20', 0.5); }
-    if (T === 'yelken') pb.wedge(0.22 * L, 0.5 * L, 0.9 * h, 1.3 * h, 0.85 * h, 0.95 * h, w * 0.1, w * 0.06, '#8a3018');
-    if (T === 'geceavcisi') for (let i = 0; i < 4; i++) pb.cone([(-0.1 + i * 0.1) * L, 0.9 * h, 0], [(-0.32 + i * 0.1) * L, (1.5 - i * 0.1) * h, 0], 0.04 * L, '#9fb4b0', { n: 3 });
-    if (T === 'kesici') for (let i = 0; i < 3; i++) pb.cone([(-0.12 + i * 0.12) * L, 0.9 * h, 0], [(-0.4 + i * 0.12) * L, (1.25 - i * 0.08) * h, 0], 0.05 * L, '#6a1a10', { n: 3 });
+    if (T === 'dev') { for (const s of [-1, 1]) { pb.ball(0.08 * L, 0.98 * h, s * w * 0.62, 0.09 * L, 0.1 * h, 0.12 * w, shd(c.col, -0.35)); pb.cone([0.08 * L, 0.98 * h, s * w * 0.62], [0.0, 1.14 * h, s * w * 0.72], 0.06 * L, shd(c.col, -0.45), { n: 5 }); } for (let i = 0; i < 5; i++) pb.ball((0.45 + i * 0.11) * L, (0.86 - i * 0.07) * h, 0, 0.04 * L, 0.05 * h, 0.12 * w, shd(c.col, -0.3), { d: 0 }); }
+    if (T === 'yelken') pb.loft([[0.2 * L, 0.92 * h, 0.05 * h, 0.05 * h, 0.04 * w], [0.36 * L, 1.28 * h, 0.12 * h, 0.12 * h, 0.05 * w], [0.5 * L, 0.9 * h, 0.04 * h, 0.04 * h, 0.03 * w]], { n: 6, col: '#8a3018', dk: '#5a1a0c', back: 0.6 });
+    if (T === 'geceavcisi') for (let i = 0; i < 4; i++) pb.cone([(-0.1 + i * 0.1) * L, 0.9 * h, 0], [(-0.32 + i * 0.1) * L, (1.5 - i * 0.1) * h, 0], 0.04 * L, '#9fb4b0', { n: 4 });
+    if (T === 'kesici') for (let i = 0; i < 3; i++) pb.cone([(-0.12 + i * 0.12) * L, 0.92 * h, 0], [(-0.4 + i * 0.12) * L, (1.28 - i * 0.08) * h, 0], 0.05 * L, '#6a1a10', { n: 4 });
   }
   function jawG(pb, P, T, c) {
     const L = P.hL, h = P.hH, w = P.hW * 0.5, tp = P.tp;
-    if (P.herb) { pb.wedge(0, 0.95 * L, -0.24 * h, 0.02, -0.1 * h, 0.04 * h, w * 0.8, w * 0.36, c.bel); return; }
-    pb.wedge(-0.08 * L, 0.93 * L, -0.42 * h, 0, -0.2 * h, 0, w * 0.86, w * tp * 0.82, c.jaw);
-    pb.wedge(0.02 * L, 0.88 * L, -0.02 * h, 0.03 * h, -0.02 * h, 0.03 * h, w * 0.66, w * tp * 0.6, MAW);
-    pb.wedge(0.1 * L, 0.7 * L, 0.02 * h, 0.07 * h, 0.02 * h, 0.05 * h, w * 0.3, w * 0.16, '#8a2a2a');     // dil
-    const n = Math.max(3, P.teeth - 1), tl = (T === 'dev' ? 0.2 : 0.16) * h;
-    for (const s of [-1, 1]) for (let i = 0; i < n; i++) { const u = 0.36 + 0.54 * (i + 0.5) / n, x = u * L, ww = w * (0.86 + (tp * 0.82 - 0.86) * u) * 0.9; pb.cone([x, 0, s * ww], [x, tl * (0.7 + 0.5 * pb.rnd()), s * ww], 0.3 * L / n * 0.5, BONE, { n: 3 }); }
+    if (P.herb) { pb.loft([[-0.02 * L, -0.1 * h, 0.12 * h, 0.12 * h, w * 0.7], [0.5 * L, -0.08 * h, 0.12 * h, 0.12 * h, w * 0.6], [0.95 * L, -0.03 * h, 0.07 * h, 0.07 * h, w * 0.3]], skin(T, c, { n: 8, col: c.bel, back: 0, top: MAW })); return; }
+    const wj = xu => w * 0.8 * (xu < 0.2 ? 1 : lerp(1, tp * 0.95, (xu - 0.2) / 0.8));
+    const S = [[-0.12, 0.05, -0.3, 0.9], [0.05, 0.06, -0.45, 1], [0.25, 0.05, -0.39, 0], [0.5, 0.05, -0.3, 0], [0.75, 0.05, -0.24, 0], [0.92, 0.05, -0.18, 0], [0.99, 0.04, -0.1, -0.5]].map(([xu, tt, bb, ww]) => { const W = ww > 0 ? ww * w * 0.8 : ww < 0 ? wj(xu) * -ww : wj(xu); return [xu * L, (tt + bb) / 2 * h, (tt - bb) / 2 * h, (tt - bb) / 2 * h, W]; });
+    pb.loft(S, skin(T, c, { n: 10, e: 0.8, col: c.jaw, bel: c.bel, back: 0, top: MAW }));
+    pb.ball(0.42 * L, 0.06 * h, 0, 0.36 * L, 0.06 * h, w * 0.32, '#8a2a2a');                  // dil
+    const n = Math.max(3, P.teeth - 1), tl = (T === 'dev' ? 0.24 : 0.18) * h;
+    for (const s of [-1, 1]) for (let i = 0; i < n; i++) { const u = 0.32 + 0.6 * (i + 0.5) / n, x = u * L, ww = wj(u) * 0.78; pb.cone([x, 0.0, s * ww], [x - 0.01 * L, tl * (0.7 + 0.5 * pb.rnd()), s * ww * 0.96], 0.3 * L / n * 0.5, BONE, { n: 4 }); }
   }
   function theroSpec(T, colHex) {
     const key = 'th|' + T + '|' + colHex;
     if (GEO[key]) return GEO[key];
     const P = Object.assign({}, TP0, TP[T] || TP.yirtici), def = defOf(T);
-    const c = { col: col(colHex), dk: shd(colHex, -0.4), lt: shd(colHex, 0.25), bel: mix(shd(colHex, 0.3), '#c8b890', 0.3), jaw: shd(colHex, -0.2) };
+    const c = { col: col(colHex), dk: shd(colHex, -0.45), lt: shd(colHex, 0.25), bel: mix(shd(colHex, 0.35), '#d0c098', 0.35), jaw: shd(colHex, -0.12) };
     if (T === 'geceavcisi') c.bel = shd(colHex, 0.12);
-    const S = { kind: 'thero', P, T, g: {} }, g = S.g;
+    const S = { kind: 'thero', P, T, g: {} }, g = S.g, tf = torsoProf(P);
     g.torso = geo(key + 'torso', pb => {
-      pb.ball(0.1, 0, 0, P.tl, P.th, P.tw, c.col, { belly: c.bel, by: -P.th * 0.42 });
-      pb.ball(0.52, -0.04, 0, P.tl * 0.5, P.th * 0.86, P.tw * 0.9, c.col, { belly: c.bel, by: -P.th * 0.42 });
-      if (T === 'yirtici') { for (let i = -2; i <= 2; i++) stripe(pb, P, 0.1 + i * 0.26, c.dk, 0.04); for (let i = 0; i < 6; i++) { const x = -0.55 + i * 0.26; pb.cone([x, topY(P, x) - 0.03, 0], [x - 0.08, topY(P, x) + 0.22, 0], 0.085, '#c87a3a'); } }
+      const secs = []; for (let i = 0; i <= 12; i++) secs.push(tf(i / 12));
+      pb.loft(secs, skin(T, c, { n: 14 }));
+      if (T === 'yirtici') { for (let i = 0; i < 6; i++) { const x = -0.55 + i * 0.26; pb.cone([x, topY(P, x) - 0.04, 0], [x - 0.08, topY(P, x) + 0.2, 0], 0.075, '#c87a3a', { n: 5 }); } }
       else if (T === 'dev') {
-        ridge(pb, x => topY(P, x), -0.68, 0.6, 7, 0.07, 0.07, c.dk);
-        for (let i = 0; i < 12; i++) { const x = -0.6 + (i % 6) * 0.27, z = (i < 6 ? -1 : 1) * P.tw * (0.42 + 0.1 * (i % 2)); pb.ball(x, topY(P, x, z) + 0.0, z, 0.085, 0.05, 0.07, shd(colHex, -0.3), { d: 0 }); }
-        pb.box(0.15, 0.12, P.tw * 0.97, 0.5, 0.03, 0.03, '#7a2a20', 0.5); pb.box(0.25, 0.08, P.tw * 0.95, 0.42, 0.03, 0.03, '#7a2a20', 0.5); pb.box(-0.2, 0.1, -P.tw * 0.99, 0.4, 0.03, 0.03, '#6a2018', -0.6);
+        ridge(pb, x => topY(P, x), -0.72, 0.62, 9, 0.05, 0.08, c.dk);
+        for (let i = 0; i < 12; i++) { const x = -0.6 + (i % 6) * 0.27, z = (i < 6 ? -1 : 1) * P.tw * (0.45 + 0.1 * (i % 2)); pb.ball(x, topY(P, x, z) - 0.01, z, 0.08, 0.045, 0.065, shd(colHex, -0.3), { d: 0 }); }
+        pb.box(0.15, 0.08, P.tw * 0.99, 0.5, 0.025, 0.03, '#6a2018', 0.5); pb.box(0.25, 0.03, P.tw * 0.99, 0.42, 0.025, 0.03, '#6a2018', 0.5); pb.box(-0.2, 0.05, -P.tw * 1.02, 0.4, 0.025, 0.03, '#5a1a14', -0.6);
       } else if (T === 'yelken') {
         const N = 9, xs = [], hs = [];
         for (let i = 0; i <= N; i++) { const x = -0.98 + i * 1.72 / N; xs.push(x); hs.push(0.12 + 1.05 * Math.pow(Math.sin((i + 0.35) / (N + 0.7) * PI), 0.8)); }
         for (let i = 0; i < N; i++) {
-          const y0 = P.th * 0.4, a = [xs[i], y0, 0], b = [xs[i + 1], y0, 0], cT = [xs[i + 1], P.th * 0.7 + hs[i + 1], 0], dT = [xs[i], P.th * 0.7 + hs[i], 0];
-          const m1 = [xs[i], y0 + (dT[1] - y0) * 0.5, 0], m2 = [xs[i + 1], y0 + (cT[1] - y0) * 0.5, 0];
+          const y0 = topY(P, xs[i]) - 0.06, y1 = topY(P, xs[i + 1]) - 0.06, a = [xs[i], y0, 0], b = [xs[i + 1], y1, 0], cT = [xs[i + 1], P.th * 0.7 + hs[i + 1], 0], dT = [xs[i], P.th * 0.7 + hs[i], 0];
+          const m1 = [xs[i], y0 + (dT[1] - y0) * 0.5, 0], m2 = [xs[i + 1], y1 + (cT[1] - y1) * 0.5, 0];
           pb.quad(a, b, m2, m1, i % 2 ? '#6a2212' : '#7a2a16'); pb.quad(m1, m2, cT, dT, i % 2 ? '#b0481f' : '#c8582c');
         }
-        for (let i = 0; i <= N; i++) pb.tube([xs[i], P.th * 0.4, 0], [xs[i], P.th * 0.7 + hs[i] + 0.05, 0], 0.03, 0.012, '#34100a', { n: 4 });
-        stripe(pb, P, -0.3, c.dk, 0.05); stripe(pb, P, 0.3, c.dk, 0.05);
+        for (let i = 0; i <= N; i++) pb.tube([xs[i], topY(P, xs[i]) - 0.06, 0], [xs[i], P.th * 0.7 + hs[i] + 0.05, 0], 0.03, 0.012, '#34100a', { n: 4 });
       } else if (T === 'kesici') {
-        for (let i = -3; i <= 3; i++) stripe(pb, P, 0.1 + i * 0.2, '#1e1610', 0.04);
-        for (let i = 0; i < 6; i++) { const x = -0.6 + i * 0.26; pb.ball(x, topY(P, x) + 0.0, 0, 0.07, 0.045, 0.1, '#7a1a10', { d: 0 }); }
+        for (let i = 0; i < 6; i++) { const x = -0.6 + i * 0.26; pb.ball(x, topY(P, x) + 0.0, 0, 0.07, 0.045, 0.08, '#7a1a10', { d: 0 }); }
       } else if (T === 'geceavcisi') {
-        for (let i = -2; i <= 2; i++) stripe(pb, P, 0.1 + i * 0.24, '#7f928f', 0.022);
-        for (let i = 0; i < 7; i++) { const x = -0.6 + i * 0.22; pb.cone([x, topY(P, x) - 0.03, 0], [x - 0.16, topY(P, x) + 0.2, 0], 0.04, '#aebfba', { n: 3 }); }
+        for (let i = 0; i < 7; i++) { const x = -0.6 + i * 0.22; pb.cone([x, topY(P, x) - 0.03, 0], [x - 0.16, topY(P, x) + 0.2, 0], 0.04, '#aebfba', { n: 4 }); }
       } else if (T === 'gurleyen') {
-        ridge(pb, x => topY(P, x), -0.66, 0.6, 6, 0.06, 0.09, shd(colHex, -0.25));
-        for (let i = 0; i < 5; i++) { const x = -0.5 + i * 0.28; for (const s of [-1, 1]) pb.ball(x, topY(P, x, s * P.tw * 0.55), s * P.tw * 0.55, 0.06, 0.04, 0.05, c.lt, { d: 0 }); }
+        ridge(pb, x => topY(P, x), -0.66, 0.6, 7, 0.05, 0.08, shd(colHex, -0.25));
       } else {
-        ridge(pb, x => topY(P, x), -0.7, 0.6, 6, 0.05, 0.05, c.dk);
-        for (let i = 0; i < 6; i++) { const x = -0.45 + i * 0.22, z = (i % 2 ? 1 : -1) * P.tw * 0.6; pb.ball(x, topY(P, x, z), z, 0.06, 0.04, 0.06, T === 'tukurgec' ? '#c8a04a' : c.lt, { d: 0 }); }
+        ridge(pb, x => topY(P, x), -0.7, 0.6, 7, 0.04, 0.05, c.dk);
       }
     });
-    // kuyruk
+    // kuyruk: konik, birbirine geçen yumuşak bölümler
     g.tail = []; S.tsl = P.tailL / P.tailN;
+    const tx0 = -P.tl * 0.72 + 0.1, pt = PAT[T];
     for (let i = 0; i < P.tailN; i++) {
-      const r0 = P.tailR * Math.pow(1 - i / P.tailN, 0.85), r1 = i === P.tailN - 1 ? 0.012 : P.tailR * Math.pow(1 - (i + 1) / P.tailN, 0.85);
+      const rr = k => P.tailR * Math.pow(Math.max(0, 1 - k / P.tailN), 0.85), r0 = rr(i) * 1.04, rm = rr(i + 0.5), r1 = i === P.tailN - 1 ? 0.01 : rr(i + 1);
       g.tail.push(geo(key + 'tail' + i, pb => {
-        const kk = T === 'kesici' ? (i % 2 ? '#1e1610' : c.col) : T === 'yirtici' && i % 2 ? c.dk : T === 'geceavcisi' && i === P.tailN - 1 ? '#7f928f' : c.col;
-        pb.tube([0.03, 0, 0], [-S.tsl, 0, 0], r0, r1, kk, { n: 6, wz: 0.78 });
-        if (T === 'yirtici' && i < 2) pb.cone([-S.tsl * 0.5, r0 * 0.8, 0], [-S.tsl * 0.6, r0 * 0.8 + 0.16, 0], 0.07, '#c87a3a');
-        if (T === 'dev' || T === 'gurleyen') pb.wedge(-S.tsl, 0, r1 * 0.6, r1 * 1.05, r0 * 0.6, r0 * 1.05, 0.04, 0.06, c.dk);
-        if (T === 'geceavcisi' && i < 3) pb.cone([-S.tsl * 0.4, r0 * 0.8, 0], [-S.tsl * 0.75, r0 + 0.14, 0], 0.035, '#aebfba', { n: 3 });
+        const off = tx0 - i * S.tsl;
+        pb.loft([[0.07, 0, r0, r0 * 0.92, r0 * 0.82], [-S.tsl * 0.5, 0, rm, rm * 0.9, rm * 0.78], [-S.tsl, 0, r1, r1 * 0.9, r1 * 0.76]], skin(T, c, { n: 10, pat: pt ? (u, up, x, y, z) => pt[1](u, up, x + off, y, z) : null }));
+        if (T === 'yirtici' && i < 2) pb.cone([-S.tsl * 0.5, rm * 0.8, 0], [-S.tsl * 0.6, rm * 0.8 + 0.15, 0], 0.06, '#c87a3a', { n: 5 });
+        if (T === 'dev' || T === 'gurleyen') for (let k = 0; k < 3; k++) { const x = -S.tsl * (0.15 + k * 0.33), r = lerp(r0, r1, 0.15 + k * 0.33); pb.ball(x, r * 0.92, 0, S.tsl * 0.12, r * 0.25 + 0.01, r * 0.3 + 0.01, c.dk); }
+        if (T === 'geceavcisi' && i < 3) pb.cone([-S.tsl * 0.4, r0 * 0.8, 0], [-S.tsl * 0.75, r0 + 0.14, 0], 0.035, '#aebfba', { n: 4 });
       }));
     }
-    // boyun (pivot: boyun kökü)
+    // boyun (pivot: boyun kökü) — S kıvrımlı, gırtlağı kalın
     S.nx = P.tl * 0.82 + 0.02; S.ny = P.th * 0.22;
     S.hx = Math.cos(P.nA) * P.nL; S.hy = Math.sin(P.nA) * P.nL;
     g.neck = geo(key + 'neck', pb => {
-      const a2 = P.nA + 0.3, mx = Math.cos(a2) * P.nL * 0.5, my = Math.sin(a2) * P.nL * 0.5;
-      pb.tube([-0.18, -0.12, 0], [mx, my, 0], P.nR * 1.55, P.nR * 1.15, c.col, { n: 6, wz: 0.85 });
-      pb.tube([mx, my, 0], [S.hx + 0.02, S.hy, 0], P.nR * 1.15, P.nR * 0.98, c.col, { n: 6, wz: 0.85 });
-      pb.ball(mx, my, 0, P.nR * 1.15, P.nR * 1.15, P.nR * 0.98, c.col, { d: 0 });
-      if (T === 'geceavcisi') for (let i = 0; i < 3; i++) pb.cone([mx * (0.4 + i * 0.5) - P.nR, my * (0.4 + i * 0.5) + P.nR * 0.3, 0], [mx * (0.4 + i * 0.5) - P.nR - 0.2, my * (0.4 + i * 0.5) + 0.2, 0], 0.035, '#aebfba', { n: 3 });
-      if (T === 'tukurgec') pb.tube([mx * 1.5, my * 1.5, 0], [mx * 1.7, my * 1.7, 0], P.nR * 1.35, P.nR * 1.3, '#a83a1c', { n: 6 });
+      const a2 = P.nA + 0.3, mx = Math.cos(a2) * P.nL * 0.5, my = Math.sin(a2) * P.nL * 0.5, A = [-0.22, -0.16], B = [S.hx + 0.03, S.hy], secs = [];
+      for (let i = 0; i <= 7; i++) { const t = i / 7, u = 1 - t, x = u * u * A[0] + 2 * u * t * mx + t * t * B[0], y = u * u * A[1] + 2 * u * t * my + t * t * B[1]; secs.push([x, y, P.nR * (1.3 - 0.35 * t), P.nR * (1.75 - 0.7 * t), P.nR * (1.3 - 0.36 * t)]); }
+      pb.loft(secs, skin(T, c, { n: 12, pat: null }));
+      if (T === 'geceavcisi') for (let i = 0; i < 3; i++) pb.cone([mx * (0.4 + i * 0.5) - P.nR, my * (0.4 + i * 0.5) + P.nR * 0.3, 0], [mx * (0.4 + i * 0.5) - P.nR - 0.2, my * (0.4 + i * 0.5) + 0.2, 0], 0.035, '#aebfba', { n: 4 });
+      if (T === 'tukurgec') pb.tube([mx * 1.5, my * 1.5, 0], [mx * 1.7, my * 1.7, 0], P.nR * 1.35, P.nR * 1.3, '#a83a1c', { n: 8 });
     });
     g.head = geo(key + 'head', pb => skull(pb, P, T, c));
     g.jaw = geo(key + 'jaw', pb => jawG(pb, P, T, c));
-    if (!P.herb) g.eyes = geo(key + 'eyes', pb => { for (const s of [-1, 1]) pb.ball(0.3 * P.hL, 0.6 * P.hH, s * (P.hW * 0.5 + 0.035 * P.hL), P.eye, P.eye * 0.8, P.eye * 0.5, '#fff', { d: 0 }); });
+    if (!P.herb) g.eyes = geo(key + 'eyes2', pb => { for (const s of [-1, 1]) pb.ball(0.27 * P.hL, 0.64 * P.hH, s * (P.hW * 0.5 * 0.9), P.eye * 0.95, P.eye * 0.78, P.eye * 0.45, '#fff', { d: 1 }); });
     S.eyeMat = glow(def.eye || '#f0d040');
     if (T === 'tukurgec') g.frill = geo(key + 'frill', pb => {
       const N = 10, R = 1.0;
@@ -5791,42 +5923,48 @@ const M3 = (function () {
         pb.tube([0, 0, 0], p0, 0.035, 0.012, '#6a1a0a', { n: 3 });
       }
     });
-    // bacak
-    const lr = P.lr, [L1, L2, L3] = P.leg;
-    g.thigh = geo(key + 'thigh', pb => { pb.tube([0, 0.06, 0], [0, -L1, 0], lr * 1.85, lr * 0.95, c.col, { n: 6, wz: 0.62 }); pb.ball(0, -L1, 0, lr * 0.95, lr * 0.95, lr * 0.7, c.col, { d: 0 }); });
-    g.shin = geo(key + 'shin', pb => { pb.tube([0, 0, 0], [0, -L2, 0], lr * 0.98, lr * 0.5, c.col, { n: 5, wz: 0.75 }); });
-    g.meta = geo(key + 'meta', pb => { pb.tube([0, 0, 0], [0, -L3, 0], lr * 0.52, lr * 0.46, c.dk, { n: 5 }); pb.ball(0, 0, 0, lr * 0.56, lr * 0.56, lr * 0.5, c.dk, { d: 0 }); });
+    // bacak: kaslı uyluk, belirgin diz, baldır, ince metatars, üç parmak + pençe
+    const lr = P.lr, [L1, L2, L3] = P.leg, lsk = { col: c.col, dk: c.dk, bel: c.bel, back: 0.15, belK: 0.2 };
+    g.thigh = geo(key + 'thigh', pb => {
+      pb.loft([[0, 0.14, lr * 1.5, lr * 1.6, lr * 1.15], [0, -L1 * 0.18, lr * 2.1, lr * 2.25, lr * 1.42], [0, -L1 * 0.45, lr * 1.85, lr * 1.9, lr * 1.28], [0, -L1 * 0.75, lr * 1.25, lr * 1.2, lr * 0.92], [0, -L1, lr * 0.92, lr * 0.85, lr * 0.75], [0, -L1 - lr * 0.6, lr * 0.3, lr * 0.3, lr * 0.3]], Object.assign({ n: 10 }, lsk));
+    });
+    g.shin = geo(key + 'shin', pb => { pb.loft([[0, lr * 0.3, lr * 0.7, lr * 0.75, lr * 0.65], [0, -L2 * 0.12, lr * 0.95, lr * 1.2, lr * 0.8], [0, -L2 * 0.4, lr * 0.75, lr * 1.05, lr * 0.66], [0, -L2 * 0.8, lr * 0.52, lr * 0.55, lr * 0.46], [0, -L2, lr * 0.5, lr * 0.5, lr * 0.44]], Object.assign({ n: 8 }, lsk)); });
+    g.meta = geo(key + 'meta', pb => { pb.loft([[0, lr * 0.35, lr * 0.4, lr * 0.4, lr * 0.4], [0, 0, lr * 0.6, lr * 0.62, lr * 0.55], [0, -L3 * 0.5, lr * 0.46, lr * 0.5, lr * 0.42], [0, -L3, lr * 0.5, lr * 0.55, lr * 0.46], [0, -L3 - lr * 0.4, lr * 0.2, lr * 0.2, lr * 0.2]], Object.assign({ n: 8 }, lsk, { col: shd(colHex, -0.15) })); });
     S.toeH = lr * 0.38;
     g.toes = geo(key + 'toes', pb => {
-      const f = lr * 5.4, h = S.toeH;
-      for (const z of [-0.13, 0, 0.13]) { const tl = (z === 0 ? 0.34 : 0.27) * f; pb.wedge(-0.04 * f, tl, -h, h * 0.9, -h, -h * 0.25, 0.05 * f, 0.035 * f, c.dk, z * f + (z ? z * f * 0.7 : 0) * 0); pb.cone([tl - 0.01, -h * 0.5, z * f * 1.25], [tl + 0.11 * f, -h, z * f * 1.4], 0.035 * f, T === 'kesici' ? BONE : CLAW); }
-      pb.cone([-0.02 * f, -h * 0.3, 0], [-0.2 * f, -h, 0], 0.045 * f, c.dk);
-      if (T === 'kesici') { pb.tube([0.04 * f, 0, -0.1 * f], [0.2 * f, 0.26 * f, -0.12 * f], 0.05 * f, 0.045 * f, c.dk, { n: 4 }); pb.tube([0.2 * f, 0.26 * f, -0.12 * f], [0.42 * f, 0.3 * f, -0.12 * f], 0.055 * f, 0.035 * f, BONE, { n: 4 }); pb.cone([0.42 * f, 0.3 * f, -0.12 * f], [0.54 * f, 0.08 * f, -0.12 * f], 0.04 * f, BONE); }
+      const f = lr * 5.4, h = S.toeH, tk = shd(colHex, -0.3);
+      for (const z of [-1, 0, 1]) {
+        const tl = (z === 0 ? 0.36 : 0.28) * f, sp = z * 0.32;
+        const pts = [[-0.04 * f, -h * 0.1, h * 0.9, h * 0.8, 0.06 * f, z * 0.03 * f], [tl * 0.45, -h * 0.35, h * 0.62, h * 0.62, 0.05 * f, z * f * 0.03 + Math.sin(sp) * tl * 0.45], [tl, -h * 0.55, h * 0.42, h * 0.42, 0.036 * f, z * f * 0.03 + Math.sin(sp) * tl]];
+        pb.loft(pts, { n: 7, col: tk, dk: shd(colHex, -0.5), bel: '#3a3026', back: 0.4 });
+        const ez = pts[2][5]; pb.cone([tl - 0.01 * f, -h * 0.4, ez], [tl + 0.13 * f, -h * 1.0, ez * 1.08], 0.03 * f, T === 'kesici' ? BONE : CLAW, { n: 5 });
+      }
+      pb.cone([-0.02 * f, -h * 0.2, 0], [-0.18 * f, -h * 0.9, 0], 0.04 * f, tk, { n: 5 });
+      if (T === 'kesici') { pb.tube([0.04 * f, 0, -0.1 * f], [0.2 * f, 0.26 * f, -0.12 * f], 0.05 * f, 0.045 * f, c.dk, { n: 6 }); pb.tube([0.2 * f, 0.26 * f, -0.12 * f], [0.42 * f, 0.3 * f, -0.12 * f], 0.055 * f, 0.035 * f, BONE, { n: 6 }); pb.cone([0.42 * f, 0.3 * f, -0.12 * f], [0.54 * f, 0.08 * f, -0.12 * f], 0.04 * f, BONE, { n: 5 }); }
     });
     g.arm = geo(key + 'arm', pb => {
-      const a = P.arm, k = P.herb ? c.col : c.dk;
-      pb.tube([0, 0.03, 0], [-0.12 * a, -0.5 * a, 0], 0.13 * a + 0.02, 0.09 * a + 0.012, k, { n: 5 });
-      pb.tube([-0.12 * a, -0.5 * a, 0], [0.26 * a, -0.86 * a, 0], 0.09 * a + 0.012, 0.06 * a + 0.01, k, { n: 5 });
+      const a = P.arm, k = P.herb ? c.col : shd(colHex, -0.2), r0 = 0.14 * a + 0.022, r1 = 0.09 * a + 0.014, r2 = 0.06 * a + 0.01;
+      pb.loft([[0, 0.05, r0, r0, r0 * 0.9], [-0.12 * a, -0.5 * a, r1 * 1.1, r1 * 1.1, r1], [0.26 * a, -0.86 * a, r2, r2, r2 * 0.9]], { n: 7, col: k, dk: c.dk, bel: c.bel, back: 0.3 });
       const cn = T === 'kesici' || T === 'yelken' ? 0.34 : 0.2;
-      for (const z of [-0.07, 0.07]) pb.cone([0.26 * a, -0.86 * a, z * a], [(0.26 + cn * 0.6) * a, (-0.86 - cn) * a, z * a * 1.8], 0.05 * a + 0.006, T === 'kesici' ? BONE : CLAW);
+      for (const z of [-0.07, 0.07]) pb.cone([0.26 * a, -0.86 * a, z * a], [(0.26 + cn * 0.6) * a, (-0.86 - cn) * a, z * a * 1.8], 0.05 * a + 0.006, T === 'kesici' ? BONE : CLAW, { n: 5 });
     });
     return (GEO[key] = S);
   }
   function rigThero(S, root, ud) {
     const P = S.P, g = S.g, M = ud.meshes;
     const body = grp(root, 0, P.H, 0); ud.body = body;
-    M.push(ud.torso = mesh(g.torso, VC, body));
+    M.push(ud.torso = mesh(g.torso, DV, body));
     ud.tail = []; let par = body, tx = -P.tl * 0.72 + 0.1, ty = P.th * 0.1;
-    for (let i = 0; i < g.tail.length; i++) { const m = mesh(g.tail[i], VC, par, i ? -S.tsl : tx, i ? 0 : ty, 0); M.push(m); ud.tail.push(m); par = m; }
-    M.push(ud.neck = mesh(g.neck, VC, body, S.nx, S.ny, 0));
-    M.push(ud.head = mesh(g.head, VC, ud.neck, S.hx, S.hy, 0));
-    M.push(ud.jaw = mesh(g.jaw, VC, ud.head, 0, 0, 0));
+    for (let i = 0; i < g.tail.length; i++) { const m = mesh(g.tail[i], DV, par, i ? -S.tsl : tx, i ? 0 : ty, 0); M.push(m); ud.tail.push(m); par = m; }
+    M.push(ud.neck = mesh(g.neck, DV, body, S.nx, S.ny, 0));
+    M.push(ud.head = mesh(g.head, DV, ud.neck, S.hx, S.hy, 0));
+    M.push(ud.jaw = mesh(g.jaw, DV, ud.head, 0, 0, 0));
     if (g.eyes) ud.eyes = mesh(g.eyes, S.eyeMat, ud.head);
-    if (g.frill) { M.push(ud.frill = mesh(g.frill, VC, ud.neck, S.hx * 0.82, S.hy * 0.82, 0)); ud.frill.rotation.z = P.nA - PI / 2 + 0.5; ud.frillK = 0; }
+    if (g.frill) { M.push(ud.frill = mesh(g.frill, DV, ud.neck, S.hx * 0.82, S.hy * 0.82, 0)); ud.frill.rotation.z = P.nA - PI / 2 + 0.5; ud.frillK = 0; }
     ud.arms = []; ud.legs = [];
     for (const s of [-1, 1]) {
-      const a = mesh(g.arm, VC, body, P.tl * 0.62, -P.th * 0.42, s * P.tw * 0.78); M.push(a); ud.arms.push(a);
-      const th = mesh(g.thigh, VC, root, 0, P.H, s * P.tw * 0.86), sh = mesh(g.shin, VC, th, 0, -P.leg[0], 0), me = mesh(g.meta, VC, sh, 0, -P.leg[1], 0), to = mesh(g.toes, VC, me, 0, -P.leg[2], 0);
+      const a = mesh(g.arm, DV, body, P.tl * 0.62, -P.th * 0.42, s * P.tw * 0.78); M.push(a); ud.arms.push(a);
+      const th = mesh(g.thigh, DV, root, 0, P.H, s * P.tw * 0.86), sh = mesh(g.shin, DV, th, 0, -P.leg[0], 0), me = mesh(g.meta, DV, sh, 0, -P.leg[1], 0), to = mesh(g.toes, DV, me, 0, -P.leg[2], 0);
       to.scale.z = s > 0 ? -1 : 1; if (S.T !== 'kesici') to.scale.z = 1;
       M.push(th, sh, me, to); ud.legs.push({ th, sh, me, to });
     }
@@ -5899,99 +6037,107 @@ const M3 = (function () {
     ordek: { by: 1.18, pitch: -0.14, tr: [1.0, 0.5, 0.46], fl: { x: 0.62, y: 0.8, z: 0.32, L: [0.43, 0.42], r: 0.11 }, bl: { x: -0.3, y: 1.18, z: 0.36, L: [0.62, 0.62], r: 0.2 }, tail: { x: -0.82, y: 0.08, len: 1.5, n: 4, r: 0.3, dz: [0.2, -0.02, -0.03, -0.03] }, neck: { x: 0.78, y: 0.1, n: 2, len: 0.75, a0: 0.95, da: -0.25, r0: 0.25, r1: 0.16 }, hp: -0.2, S: 0.36 },
     uzunboyun: { by: 1.42, tr: [1.05, 0.6, 0.66], fl: { x: 0.6, y: 1.34, z: 0.44, L: [0.72, 0.68], r: 0.2 }, bl: { x: -0.58, y: 1.3, z: 0.46, L: [0.7, 0.66], r: 0.22 }, tail: { x: -0.88, y: 0.1, len: 2.7, n: 6, r: 0.34, dz: [-0.3, -0.12, 0.02, 0.12, 0.12, 0.08] }, neck: { x: 0.8, y: 0.2, n: 5, len: 2.9, a0: 0.62, da: 0.09, r0: 0.34, r1: 0.14 }, hp: -0.1, S: 0.3 }
   };
+  function quadProf(P, T) {
+    const [RX, RY, RZ] = P.tr, g = (s, m, w) => Math.exp(-Math.pow((s - m) / w, 2));
+    return s => {
+      const env = Math.pow(Math.sin(PI * (0.04 + 0.92 * s)), 0.55);
+      let yc = 0, rt = RY * (0.42 + 0.58 * env), rb = RY * (0.38 + 0.66 * env), w = RZ * (0.42 + 0.6 * env);
+      if (T === 'boynuzlu') { rt *= 1 + 0.08 * g(s, 0.72, 0.15) + 0.05 * g(s, 0.25, 0.14); w *= 1 + 0.06 * g(s, 0.7, 0.2); }
+      else if (T === 'zirhli') { rt *= 1.05; rb *= 0.82; w *= 1.06; yc = RY * 0.08; }
+      else if (T === 'ordek') { yc = RY * 0.14 * (1 - s); rt *= 1 + 0.12 * g(s, 0.3, 0.18); rb *= 1 + 0.06 * g(s, 0.45, 0.2); }
+      else if (T === 'uzunboyun') { rt *= 1 + 0.08 * g(s, 0.68, 0.2); rb *= 1 + 0.1 * g(s, 0.6, 0.25); yc = RY * 0.05 * g(s, 0.7, 0.3); }
+      return [-RX * 1.02 + 2.04 * RX * s, yc, rt, rb, w];
+    };
+  }
   function quadSpec(T, colHex) {
     const key = 'q|' + T + '|' + colHex;
     if (GEO[key]) return GEO[key];
-    const P = QP[T], c = { col: col(colHex), dk: shd(colHex, -0.4), lt: shd(colHex, 0.25), bel: mix(shd(colHex, 0.3), '#c8b890', 0.3) };
-    const S = { kind: 'quad', P, T, g: {} }, g = S.g, [RX, RY, RZ] = P.tr;
-    const top = (x, z) => RY * Math.sqrt(Math.max(0, 1 - x * x / (RX * RX) - (z || 0) * (z || 0) / (RZ * RZ)));
+    const P = QP[T], c = { col: col(colHex), dk: shd(colHex, -0.42), lt: shd(colHex, 0.25), bel: mix(shd(colHex, 0.35), '#d0c098', 0.35) };
+    const S = { kind: 'quad', P, T, g: {} }, g = S.g, [RX, RY, RZ] = P.tr, qf = quadProf(P, T);
+    const top = (x, z) => { const q = qf(cl((x + RX * 1.02) / (2.04 * RX), 0, 1)), w = (z || 0) / q[4]; return q[1] + q[2] * Math.sqrt(Math.max(0, 1 - w * w)); };
+    const sk = o => skin(T, c, o);
     g.torso = geo(key + 'torso', pb => {
-      pb.ball(0, 0, 0, RX, RY, RZ, c.col, { belly: c.bel, by: -RY * 0.45 });
+      const secs = []; for (let i = 0; i <= 12; i++) secs.push(qf(i / 12));
+      pb.loft(secs, sk({ n: 14, e: T === 'zirhli' ? 0.8 : 1 }));
       if (T === 'boynuzlu') {
-        pb.ball(0.5, 0.06, 0, 0.55, RY * 0.95, RZ * 0.9, c.col, { belly: c.bel, by: -RY * 0.45 });
-        ridge(pb, x => top(x, 0), -0.9, 0.75, 7, 0.06, 0.1, shd(colHex, -0.25));
-        for (let i = 0; i < 5; i++) { const x = -0.6 + i * 0.3; for (const s of [-1, 1]) pb.ball(x, top(x, s * RZ * 0.6), s * RZ * 0.6, 0.07, 0.04, 0.07, shd(colHex, -0.2), { d: 0 }); }
+        ridge(pb, x => top(x, 0), -0.9, 0.75, 9, 0.04, 0.07, shd(colHex, -0.25));
+        for (let i = 0; i < 5; i++) { const x = -0.6 + i * 0.3; for (const s of [-1, 1]) pb.ball(x, top(x, s * RZ * 0.6) - 0.01, s * RZ * 0.6, 0.07, 0.035, 0.07, shd(colHex, -0.2), { d: 0 }); }
       } else if (T === 'zirhli') {
-        pb.ball(0, RY * 0.22, 0, RX * 0.97, RY * 0.9, RZ * 0.98, shd(colHex, -0.15));
-        const topS = (x, z) => RY * 0.22 + RY * 0.9 * Math.sqrt(Math.max(0, 1 - x * x / (RX * RX * 0.94) - z * z / (RZ * RZ * 0.96)));
-        for (let i = -3; i <= 3; i++) for (let j = -2; j <= 2; j++) { const x = i * 0.27, z = j * 0.25; if (x * x / (RX * RX) + z * z / (RZ * RZ) > 0.8) continue; pb.cone([x, topS(x, z) - 0.04, z], [x - 0.03, topS(x, z) + 0.1, z], 0.1, (i + j) % 2 ? '#8a8262' : '#4e4834', { n: 5 }); }
-        for (let i = -3; i <= 3; i++) for (const s of [-1, 1]) { const x = i * 0.27 + 0.03, zz = RZ * Math.sqrt(Math.max(0.1, 1 - x * x / (RX * RX))) * 0.9; pb.cone([x, 0.06, s * zz], [x - 0.05, 0.14, s * (zz + 0.3)], 0.085, '#d8d0b8'); }
+        const topS = (x, z) => top(x, z);
+        for (let i = -3; i <= 3; i++) for (let j = -2; j <= 2; j++) { const x = i * 0.27, z = j * 0.25; if (x * x / (RX * RX) + z * z / (RZ * RZ) > 0.8) continue; pb.cone([x, topS(x, z) - 0.05, z], [x - 0.03, topS(x, z) + 0.09, z], 0.1, (i + j) % 2 ? '#8a8262' : '#4e4834', { n: 6 }); }
+        for (let i = -3; i <= 3; i++) for (const s of [-1, 1]) { const x = i * 0.27 + 0.03, q = qf(cl((x + RX * 1.02) / (2.04 * RX), 0, 1)), zz = q[4] * 0.92; pb.cone([x, q[1] + 0.02, s * zz], [x - 0.05, q[1] + 0.1, s * (zz + 0.28)], 0.085, '#d8d0b8', { n: 5 }); }
       } else if (T === 'ordek') {
-        pb.ball(-0.3, 0.06, 0, 0.6, RY * 0.98, RZ * 0.98, c.col, { belly: c.bel, by: -RY * 0.45 });
-        ridge(pb, x => Math.max(top(x, 0), x < -0.3 ? RY * 0.98 * Math.sqrt(Math.max(0, 1 - Math.pow((x + 0.3) / 0.6, 2))) + 0.06 : 0), -0.88, 0.8, 8, 0.05, 0.045, shd(colHex, -0.3));
-        for (let i = 0; i < 4; i++) { const x = -0.5 + i * 0.3, f = Math.sqrt(Math.max(0.04, 1 - x * x / (RX * RX))); pb.ball(x, 0.08, 0, 0.03, RY * f * 1.02, RZ * f * 1.04, c.lt); }
+        ridge(pb, x => top(x, 0), -0.88, 0.8, 10, 0.035, 0.04, shd(colHex, -0.3));
       } else if (T === 'uzunboyun') {
-        pb.ball(0.45, 0.12, 0, 0.6, RY * 0.9, RZ * 0.85, c.col, { belly: c.bel, by: -RY * 0.45 });
-        pb.ball(-0.5, 0.04, 0, 0.55, RY * 0.85, RZ * 0.85, c.col, { belly: c.bel, by: -RY * 0.45 });
-        for (let i = 0; i < 7; i++) { const x = -0.7 + i * 0.25; pb.ball(x, top(x, 0) + (i > 3 ? 0.06 : 0.0), 0, 0.09, 0.05, 0.1, c.dk, { d: 0 }); }
-        for (let i = 0; i < 6; i++) { const x = -0.55 + i * 0.25; for (const s of [-1, 1]) pb.ball(x, top(x, s * RZ * 0.62), s * RZ * 0.62, 0.07, 0.035, 0.07, shd(colHex, -0.22), { d: 0 }); }
+        for (let i = 0; i < 7; i++) { const x = -0.7 + i * 0.25; pb.ball(x, top(x, 0) - 0.01, 0, 0.09, 0.045, 0.1, c.dk, { d: 1 }); }
       }
     });
-    const tl = P.tail; S.tsl = tl.len / tl.n; g.tail = [];
+    const tl = P.tail, pt = PAT[T]; S.tsl = tl.len / tl.n; g.tail = [];
     for (let i = 0; i < tl.n; i++) {
-      const r0 = tl.r * Math.pow(1 - i / tl.n, 0.8) + 0.01, r1 = i === tl.n - 1 ? (T === 'zirhli' ? 0.07 : 0.015) : tl.r * Math.pow(1 - (i + 1) / tl.n, 0.8) + 0.01;
+      const rr = k => tl.r * Math.pow(Math.max(0, 1 - k / tl.n), 0.8) + 0.01, r0 = rr(i) * 1.05, rm = rr(i + 0.5), r1 = i === tl.n - 1 ? (T === 'zirhli' ? 0.07 : 0.012) : rr(i + 1), wz = T === 'zirhli' ? 1.15 : 0.82;
       g.tail.push(geo(key + 'tail' + i, pb => {
-        pb.tube([0.04, 0, 0], [-S.tsl, 0, 0], r0, r1, c.col, { n: 6, wz: T === 'zirhli' ? 1.15 : 0.85 });
+        const off = tl.x - i * S.tsl;
+        pb.loft([[0.08, 0, r0, r0 * 0.92, r0 * wz], [-S.tsl * 0.5, 0, rm, rm * 0.9, rm * wz], [-S.tsl, 0, r1, r1 * 0.9, r1 * wz]], sk({ n: 10, pat: pt ? (u, up, x, y, z) => pt[1](u, up, x + off, y, z) : null }));
         if (T === 'zirhli') {
-          for (const s of [-1, 1]) pb.cone([-S.tsl * 0.5, 0, s * r0 * 0.9], [-S.tsl * 0.6, 0.03, s * (r0 + 0.16)], 0.05, '#d8d0b8');
+          for (const s of [-1, 1]) pb.cone([-S.tsl * 0.5, 0, s * rm * 0.9], [-S.tsl * 0.6, 0.03, s * (rm + 0.16)], 0.05, '#d8d0b8', { n: 5 });
           if (i === tl.n - 1) { pb.ball(-S.tsl - 0.08, 0, 0.13, 0.2, 0.15, 0.17, shd(colHex, -0.3)); pb.ball(-S.tsl - 0.08, 0, -0.13, 0.2, 0.15, 0.17, shd(colHex, -0.3)); pb.ball(-S.tsl - 0.2, 0, 0, 0.14, 0.12, 0.14, '#3a3626'); }
         }
-        if (T === 'uzunboyun' && i < 3) pb.ball(-S.tsl * 0.5, r0 * 0.85, 0, 0.08, 0.04, 0.08, c.dk, { d: 0 });
-        if (T === 'ordek') pb.wedge(-S.tsl, 0, r1 * 0.7, r1 * 1.25, r0 * 0.7, r0 * 1.25, 0.03, 0.04, shd(colHex, -0.3));
+        if (T === 'uzunboyun' && i < 3) pb.ball(-S.tsl * 0.5, rm * 0.9, 0, 0.08, 0.035, 0.08, c.dk, { d: 1 });
+        if (T === 'ordek') for (let k = 0; k < 2; k++) pb.ball(-S.tsl * (0.25 + k * 0.5), lerp(r0, r1, 0.25 + k * 0.5) * 0.95, 0, S.tsl * 0.2, 0.03, 0.025, shd(colHex, -0.3));
       }));
     }
     const nk = P.neck; S.nsl = nk.len / nk.n; g.neck = [];
     for (let i = 0; i < nk.n; i++) {
-      const r0 = nk.r0 + (nk.r1 - nk.r0) * i / nk.n, r1 = nk.r0 + (nk.r1 - nk.r0) * (i + 1) / nk.n;
+      const r0 = nk.r0 + (nk.r1 - nk.r0) * i / nk.n, r1 = nk.r0 + (nk.r1 - nk.r0) * (i + 1) / nk.n, x0 = i ? -0.08 : -0.16, k0 = i ? 1.02 : 1.12;
       g.neck.push(geo(key + 'neck' + i, pb => {
-        pb.tube([-0.06, 0, 0], [S.nsl + 0.02, 0, 0], r0, r1, c.col, { n: 6, wz: 0.85 });
-        if (T === 'uzunboyun') pb.wedge(0, S.nsl, r0 * 0.75, r0 * 1.02, r1 * 0.75, r1 * 1.02, 0.05, 0.04, c.dk);
-        if (T === 'ordek') pb.wedge(0, S.nsl, r0 * 0.75, r0 * 1.15, r1 * 0.75, r1 * 1.15, 0.03, 0.03, shd(colHex, -0.3));
+        pb.loft([[x0, 0, r0 * k0, r0 * k0 * 1.08, r0 * k0 * 0.9], [S.nsl * 0.5, 0, (r0 + r1) / 2, (r0 + r1) / 2 * 1.1, (r0 + r1) / 2 * 0.86], [S.nsl + 0.03, 0, r1, r1 * 1.08, r1 * 0.84]], sk({ n: 10, pat: null }));
+        if (T === 'uzunboyun') for (let k = 0; k < 2; k++) pb.ball(S.nsl * (0.25 + k * 0.5), lerp(r0, r1, 0.25 + k * 0.5) * 0.92, 0, S.nsl * 0.18, 0.03, 0.04, c.dk);
+        if (T === 'ordek') pb.ball(S.nsl * 0.5, (r0 + r1) / 2 * 0.95, 0, S.nsl * 0.45, 0.03, 0.025, shd(colHex, -0.3));
       }));
     }
+    const hl = (A, o) => A.map(([x, t, b, w]) => [x, (t + b) / 2, (t - b) / 2, (t - b) / 2, w]);
+    const eye = (pb, x, y, z, r) => { for (const s of [-1, 1]) { pb.ball(x, y, s * z, r * 1.4, r * 1.15, r * 0.5, shd(colHex, -0.5), { d: 1 }); pb.ball(x, y, s * (z + r * 0.15), r, r * 0.9, r * 0.45, '#d8c890', { d: 1 }); pb.ball(x + r * 0.15, y, s * (z + r * 0.45), r * 0.45, r * 0.6, r * 0.12, '#0a0806', { d: 0 }); pb.ball(x - r * 0.1, y + r * 1.05, s * (z - r * 0.1), r * 1.9, r * 0.45, r * 0.7, shd(colHex, -0.35)); } };
     g.head = geo(key + 'head', pb => {
       if (T === 'boynuzlu') {
         const fk = shd(colHex, -0.18), fx = -0.1, fy = 0.36, az = 0.5;
         pb.ball(fx, fy, 0, 0.1, 0.62, 0.74, fk, { az });
-        pb.ball(fx + 0.06, fy - 0.02, 0, 0.08, 0.4, 0.5, mix(colHex, '#8a3a2a', 0.45), { az });
-        for (let i = 0; i < 9; i++) { const a = (i / 8 - 0.5) * PI * 1.25, ly = Math.cos(a) * 0.62, lz = Math.sin(a) * 0.74; pb.cone([fx - Math.sin(az) * ly * 0.95, fy + Math.cos(az) * ly * 0.95, lz * 0.95], [fx - Math.sin(az) * ly * 1.14 - 0.03, fy + Math.cos(az) * ly * 1.14, lz * 1.14], 0.07, BONE); }
-        pb.wedge(-0.12, 0.42, -0.3, 0.3, -0.27, 0.14, 0.3, 0.22, c.col);
-        pb.wedge(0.42, 0.74, -0.27, 0.14, -0.26, -0.02, 0.22, 0.11, c.col);
-        pb.wedge(0.7, 0.86, -0.3, 0.0, -0.36, -0.2, 0.1, 0.04, '#4a4030');
-        for (const s of [-1, 1]) { pb.tube([0.16, 0.24, s * 0.2], [0.6, 0.62, s * 0.3], 0.085, 0.05, BONE, { n: 5 }); pb.cone([0.6, 0.62, s * 0.3], [1.0, 0.76, s * 0.33], 0.05, '#f4eedc', { n: 5 }); pb.ball(0.3, 0.06, s * 0.265, 0.05, 0.05, 0.03, '#0c0a08', { d: 0 }); }
-        pb.cone([0.56, 0.04, 0], [0.72, 0.36, 0], 0.075, BONE, { n: 5 });
+        pb.ball(fx + 0.06, fy - 0.02, 0, 0.08, 0.42, 0.52, mix(colHex, '#8a3a2a', 0.45), { az });
+        pb.ball(fx + 0.08, fy + 0.05, 0, 0.07, 0.22, 0.3, mix(colHex, '#c8a050', 0.4), { az });
+        for (let i = 0; i < 9; i++) { const a = (i / 8 - 0.5) * PI * 1.25, ly = Math.cos(a) * 0.62, lz = Math.sin(a) * 0.74; pb.cone([fx - Math.sin(az) * ly * 0.95, fy + Math.cos(az) * ly * 0.95, lz * 0.95], [fx - Math.sin(az) * ly * 1.14 - 0.03, fy + Math.cos(az) * ly * 1.14, lz * 1.14], 0.07, BONE, { n: 5 }); }
+        pb.loft(hl([[-0.14, 0.3, -0.3, 0.3], [0.1, 0.3, -0.3, 0.31], [0.35, 0.22, -0.28, 0.25], [0.55, 0.12, -0.27, 0.18], [0.72, 0.04, -0.28, 0.11], [0.82, -0.06, -0.3, 0.06]]), sk({ n: 10, e: 0.85, pat: null }));
+        pb.cone([0.7, -0.08, 0], [0.92, -0.32, 0], 0.08, '#3a3024', { n: 5 });                        // gaga
+        for (const s of [-1, 1]) { pb.tube([0.16, 0.22, s * 0.2], [0.6, 0.62, s * 0.3], 0.085, 0.05, BONE, { n: 7 }); pb.cone([0.6, 0.62, s * 0.3], [1.0, 0.76, s * 0.33], 0.05, '#f4eedc', { n: 7 }); pb.ball(0.66, -0.02, s * 0.06, 0.035, 0.025, 0.02, '#0c0a08', { d: 0 }); }
+        eye(pb, 0.28, 0.08, 0.27, 0.045);
+        pb.tube([0.5, 0.0, 0], [0.62, 0.32, 0], 0.07, 0.04, BONE, { n: 6 }); pb.cone([0.62, 0.32, 0], [0.72, 0.42, 0], 0.04, '#f4eedc', { n: 6 });
       } else if (T === 'zirhli') {
-        pb.wedge(-0.1, 0.3, -0.2, 0.2, -0.18, 0.14, 0.3, 0.27, shd(colHex, -0.1));
-        pb.wedge(0.3, 0.52, -0.18, 0.14, -0.16, 0.0, 0.27, 0.15, shd(colHex, -0.1));
-        pb.wedge(-0.08, 0.34, 0.14, 0.25, 0.1, 0.17, 0.26, 0.2, '#4e4834');
-        pb.wedge(0.46, 0.58, -0.2, -0.02, -0.22, -0.12, 0.13, 0.08, '#3a3626');
-        for (const s of [-1, 1]) { pb.cone([-0.02, 0.14, s * 0.26], [-0.16, 0.26, s * 0.46], 0.08, '#d8d0b8'); pb.cone([0.02, -0.1, s * 0.27], [-0.08, -0.16, s * 0.45], 0.07, '#d8d0b8'); pb.ball(0.2, 0.06, s * 0.275, 0.04, 0.04, 0.025, '#0c0a08', { d: 0 }); }
+        pb.loft(hl([[-0.1, 0.2, -0.2, 0.3], [0.15, 0.2, -0.18, 0.29], [0.35, 0.14, -0.17, 0.24], [0.5, 0.05, -0.17, 0.16], [0.58, -0.02, -0.18, 0.1]]), sk({ n: 10, e: 0.8, col: shd(colHex, -0.1), pat: null }));
+        pb.ball(0.12, 0.18, 0, 0.26, 0.06, 0.26, '#4e4834');
+        for (const s of [-1, 1]) { pb.cone([-0.02, 0.14, s * 0.26], [-0.16, 0.26, s * 0.46], 0.08, '#d8d0b8', { n: 5 }); pb.cone([0.02, -0.1, s * 0.27], [-0.08, -0.16, s * 0.45], 0.07, '#d8d0b8', { n: 5 }); pb.ball(0.56, -0.06, s * 0.05, 0.025, 0.02, 0.015, '#0c0a08', { d: 0 }); }
+        eye(pb, 0.2, 0.06, 0.25, 0.035);
       } else if (T === 'ordek') {
-        pb.wedge(-0.14, 0.26, -0.15, 0.17, -0.14, 0.13, 0.15, 0.15, c.col);
-        pb.wedge(0.26, 0.5, -0.12, 0.13, -0.08, 0.02, 0.14, 0.15, c.col);
-        pb.wedge(0.44, 0.74, -0.1, 0.03, -0.07, -0.02, 0.15, 0.22, '#d0b070');
-        pb.tube([0.14, 0.1, 0], [-0.3, 0.3, 0], 0.09, 0.07, '#b8503a', { n: 5, wz: 0.7 }); pb.tube([-0.3, 0.3, 0], [-0.7, 0.4, 0], 0.07, 0.035, '#a03c28', { n: 5, wz: 0.7 });
-        for (const s of [-1, 1]) pb.ball(0.16, 0.05, s * 0.15, 0.04, 0.04, 0.02, '#0c0a08', { d: 0 });
+        pb.loft(hl([[-0.14, 0.15, -0.15, 0.15], [0.08, 0.17, -0.14, 0.15], [0.3, 0.12, -0.12, 0.13], [0.48, 0.05, -0.1, 0.13], [0.64, 0.03, -0.09, 0.18], [0.75, 0.0, -0.08, 0.2], [0.78, -0.02, -0.06, 0.1]]), sk({ n: 10, e: 0.85, pc: '#c8a868', pat: (u, up, x) => sstep(0.42, 0.52, x) }));
+        pb.loft([[0.14, 0.1, 0.09, 0.09, 0.063], [-0.3, 0.3, 0.07, 0.07, 0.05], [-0.7, 0.4, 0.035, 0.035, 0.025]], { n: 7, col: '#b8503a', dk: '#7a2a18', bel: '#d07050', back: 0.5 });  // ibik
+        for (const s of [-1, 1]) pb.ball(0.7, 0.0, s * 0.08, 0.025, 0.018, 0.015, '#0c0a08', { d: 0 });
+        eye(pb, 0.16, 0.06, 0.135, 0.032);
       } else {
-        pb.wedge(-0.12, 0.2, -0.11, 0.12, -0.1, 0.13, 0.11, 0.12, c.col);
-        pb.wedge(0.2, 0.44, -0.1, 0.13, -0.08, 0.02, 0.12, 0.09, c.col);
-        pb.wedge(0.02, 0.24, 0.12, 0.2, 0.12, 0.14, 0.05, 0.04, c.dk);
-        for (const s of [-1, 1]) pb.ball(0.14, 0.05, s * 0.12, 0.03, 0.03, 0.018, '#0c0a08', { d: 0 });
+        pb.loft(hl([[-0.12, 0.12, -0.11, 0.11], [0.1, 0.13, -0.1, 0.12], [0.3, 0.08, -0.09, 0.1], [0.44, 0.02, -0.08, 0.07], [0.47, -0.01, -0.07, 0.04]]), sk({ n: 10, pat: null }));
+        pb.ball(0.02, 0.14, 0, 0.1, 0.05, 0.06, c.dk);
+        eye(pb, 0.12, 0.05, 0.11, 0.025);
       }
     });
     g.jaw = geo(key + 'jaw', pb => {
-      if (T === 'boynuzlu') pb.wedge(0, 0.72, -0.4, -0.26, -0.33, -0.25, 0.2, 0.06, shd(colHex, -0.15));
-      else if (T === 'zirhli') pb.wedge(0, 0.48, -0.27, -0.17, -0.22, -0.15, 0.22, 0.1, shd(colHex, -0.2));
-      else if (T === 'ordek') pb.wedge(0, 0.7, -0.19, -0.11, -0.11, -0.06, 0.12, 0.19, '#b89a5c');
-      else pb.wedge(0, 0.4, -0.16, -0.09, -0.11, -0.07, 0.1, 0.07, c.bel);
+      const jo = (A, k) => pb.loft(hl(A), { n: 8, col: k || c.bel, dk: shd(colHex, -0.1), bel: c.bel, back: 0, top: MAW });
+      if (T === 'boynuzlu') { jo([[0.0, -0.25, -0.4, 0.2], [0.35, -0.26, -0.37, 0.17], [0.6, -0.26, -0.34, 0.11], [0.74, -0.26, -0.31, 0.05]], shd(colHex, -0.1)); pb.cone([0.66, -0.3, 0], [0.84, -0.34, 0], 0.05, '#3a3024', { n: 5 }); }
+      else if (T === 'zirhli') jo([[0, -0.17, -0.27, 0.22], [0.3, -0.16, -0.24, 0.18], [0.48, -0.15, -0.22, 0.1]], shd(colHex, -0.2));
+      else if (T === 'ordek') jo([[0, -0.11, -0.19, 0.12], [0.4, -0.1, -0.16, 0.12], [0.72, -0.07, -0.11, 0.17]], '#b89a5c');
+      else jo([[0, -0.08, -0.16, 0.1], [0.4, -0.07, -0.11, 0.07]]);
     });
     const legG = (L, nm) => {
-      const r = L.r;
-      g[nm + 'u'] = geo(key + nm + 'u', pb => { pb.tube([0, 0.08, 0], [0, -L.L[0], 0], r * 1.3, r * 0.85, c.col, { n: 6 }); pb.ball(0, -L.L[0], 0, r * 0.86, r * 0.86, r * 0.86, c.col, { d: 0 }); });
+      const r = L.r, lk = { col: c.col, dk: c.dk, bel: c.bel, back: 0.2, belK: 0.2 };
+      g[nm + 'u'] = geo(key + nm + 'u', pb => { pb.loft([[0, 0.12, r * 1.25, r * 1.3, r * 1.15], [0, -L.L[0] * 0.25, r * 1.5, r * 1.55, r * 1.25], [0, -L.L[0] * 0.65, r * 1.15, r * 1.15, r * 0.98], [0, -L.L[0], r * 0.88, r * 0.88, r * 0.82], [0, -L.L[0] - r * 0.55, r * 0.3, r * 0.3, r * 0.3]], Object.assign({ n: 10 }, lk)); });
       g[nm + 'l'] = geo(key + nm + 'l', pb => {
-        pb.tube([0, 0, 0], [0, -L.L[1] + r * 0.3, 0], r * 0.84, r * 0.78, c.dk, { n: 6 });
-        pb.tube([0.02, -L.L[1] + r * 0.45, 0], [0.04, -L.L[1], 0], r * 0.86, r * 1.02, c.dk, { n: 6 });
-        for (const z of [-0.5, 0, 0.5]) pb.ball(r * 0.9, -L.L[1] + r * 0.16, z * r * 1.1, r * 0.2, r * 0.18, r * 0.2, T === 'ordek' ? CLAW : '#d8d0b8', { d: 0 });
+        pb.loft([[0, r * 0.3, r * 0.6, r * 0.6, r * 0.6], [0, 0, r * 0.86, r * 0.9, r * 0.8], [0, -L.L[1] * 0.4, r * 0.8, r * 0.82, r * 0.74], [0, -L.L[1] + r * 0.5, r * 0.78, r * 0.8, r * 0.74], [0.02 * r, -L.L[1] + r * 0.12, r * 1.02, r * 0.95, r * 0.95], [0.03 * r, -L.L[1] - r * 0.02, r * 1.0, r * 0.95, r * 0.94]], Object.assign({ n: 10 }, lk, { col: shd(colHex, -0.12), e: 0.9 }));
+        for (const z of [-0.55, 0, 0.55]) pb.ball(r * 0.88, -L.L[1] + r * 0.14, z * r * 1.05, r * 0.24, r * 0.2, r * 0.22, T === 'ordek' ? CLAW : '#d8d0b8', { d: 1 });
       });
     };
     legG(P.fl, 'f'); legG(P.bl, 'b');
@@ -6005,17 +6151,17 @@ const M3 = (function () {
   function rigQuad(S, root, ud) {
     const P = S.P, g = S.g, M = ud.meshes;
     const body = grp(root, 0, P.by, 0); ud.body = body;
-    M.push(ud.torso = mesh(g.torso, VC, body));
+    M.push(ud.torso = mesh(g.torso, DV, body));
     ud.tail = []; let par = body;
-    for (let i = 0; i < g.tail.length; i++) { const m = mesh(g.tail[i], VC, par, i ? -S.tsl : P.tail.x, i ? 0 : P.tail.y, 0); M.push(m); ud.tail.push(m); par = m; }
+    for (let i = 0; i < g.tail.length; i++) { const m = mesh(g.tail[i], DV, par, i ? -S.tsl : P.tail.x, i ? 0 : P.tail.y, 0); M.push(m); ud.tail.push(m); par = m; }
     ud.necks = []; par = body;
-    for (let i = 0; i < g.neck.length; i++) { const m = mesh(g.neck[i], VC, par, i ? S.nsl : P.neck.x, i ? 0 : P.neck.y, 0); M.push(m); ud.necks.push(m); par = m; }
-    M.push(ud.head = mesh(g.head, VC, par, S.nsl, 0, 0));
-    M.push(ud.jaw = mesh(g.jaw, VC, ud.head, -0.05, 0, 0));
+    for (let i = 0; i < g.neck.length; i++) { const m = mesh(g.neck[i], DV, par, i ? S.nsl : P.neck.x, i ? 0 : P.neck.y, 0); M.push(m); ud.necks.push(m); par = m; }
+    M.push(ud.head = mesh(g.head, DV, par, S.nsl, 0, 0));
+    M.push(ud.jaw = mesh(g.jaw, DV, ud.head, -0.05, 0, 0));
     ud.legs = [];
     const defs = [[P.fl, 'f', 1, -1, 0], [P.fl, 'f', -1, -1, PI], [P.bl, 'b', 1, 1, PI], [P.bl, 'b', -1, 1, 0]];
     for (const [L, nm, s, dir, po] of defs) {
-      const u = mesh(g[nm + 'u'], VC, root, L.x, L.y, s * L.z), l = mesh(g[nm + 'l'], VC, u, 0, -L.L[0], 0);
+      const u = mesh(g[nm + 'u'], DV, root, L.x, L.y, s * L.z), l = mesh(g[nm + 'l'], DV, u, 0, -L.L[0], 0);
       M.push(u, l); ud.legs.push({ u, l, L, dir, po });
     }
     ud.mouth = { n: ud.head, x: 0.5, y: -0.15 };
@@ -6071,7 +6217,7 @@ const M3 = (function () {
     ud.jaw.rotation.z = -(ud.jawK * 0.35 + 0.02 + chew + 0.02 * Math.sin(t * 2.6 + id) * (1 - graze));
     if (S.g.saddle) {
       const want = !!d.tamed && !d.pet;
-      if (want && !ud.saddle) ud.saddle = mesh(S.g.saddle, VC, body, 0.05, P.tr[1] - 0.02, 0);
+      if (want && !ud.saddle) ud.saddle = mesh(S.g.saddle, DV, body, 0.05, P.tr[1] - 0.02, 0);
       if (ud.saddle) ud.saddle.visible = want;
     }
   }
@@ -6118,14 +6264,14 @@ const M3 = (function () {
   function rigCroc(S, root, ud) {
     const g = S.g, M = ud.meshes;
     const body = grp(root, 0, 0.34, 0); ud.body = body;
-    M.push(ud.torso = mesh(g.torso, VC, body));
+    M.push(ud.torso = mesh(g.torso, DV, body));
     ud.tail = []; let par = body;
-    for (let i = 0; i < 5; i++) { const m = mesh(g.tail[i], VC, par, i ? -S.tsl : -0.82, i ? 0 : 0.0, 0); M.push(m); ud.tail.push(m); par = m; }
-    M.push(ud.head = mesh(g.head, VC, body, 0.78, -0.06, 0));
-    M.push(ud.jaw = mesh(g.jaw, VC, ud.head, 0, 0, 0));
+    for (let i = 0; i < 5; i++) { const m = mesh(g.tail[i], DV, par, i ? -S.tsl : -0.82, i ? 0 : 0.0, 0); M.push(m); ud.tail.push(m); par = m; }
+    M.push(ud.head = mesh(g.head, DV, body, 0.78, -0.06, 0));
+    M.push(ud.jaw = mesh(g.jaw, DV, ud.head, 0, 0, 0));
     ud.eyes = mesh(g.eyes, S.eyeMat, ud.head);
     ud.legs = [];
-    for (const [x, s, po] of [[0.52, -1, 0], [0.52, 1, PI], [-0.42, -1, PI], [-0.42, 1, 0]]) { const m = mesh(g.leg[s < 0 ? 0 : 1], VC, body, x, -0.02, s * 0.3); M.push(m); ud.legs.push({ m, s, po }); }
+    for (const [x, s, po] of [[0.52, -1, 0], [0.52, 1, PI], [-0.42, -1, PI], [-0.42, 1, 0]]) { const m = mesh(g.leg[s < 0 ? 0 : 1], DV, body, x, -0.02, s * 0.3); M.push(m); ud.legs.push({ m, s, po }); }
     ud.mouth = { n: ud.head, x: 0.8, y: -0.05 }; ud.seat = { n: body, x: 0, y: 0.26 }; ud.side = 0.44;
     ud.neckBase = null; ud.strideK = 1.2;
   }
@@ -6185,19 +6331,19 @@ const M3 = (function () {
   function rigFly(S, root, ud) {
     const g = S.g, M = ud.meshes;
     const body = grp(root, 0, 0.45, 0); ud.body = body;
-    M.push(ud.torso = mesh(g.torso, VC, body));
-    M.push(ud.head = mesh(g.head, VC, body, 0.95, 0.33, 0));
-    M.push(ud.jaw = mesh(g.jaw, VC, ud.head, 0.05, 0, 0));
+    M.push(ud.torso = mesh(g.torso, DV, body));
+    M.push(ud.head = mesh(g.head, DV, body, 0.95, 0.33, 0));
+    M.push(ud.jaw = mesh(g.jaw, DV, ud.head, 0.05, 0, 0));
     ud.wings = [];
     const a = new T3.Vector3(), b = new T3.Vector3();
     for (let i = 0; i < 2; i++) {
-      const s = i ? 1 : -1, wi = mesh(g.wi[i], VC, body, 0.2, 0.12, s * 0.2), wo = mesh(g.wo[i], VC, wi, 0.12, 0.03, s * 1.1); M.push(wi, wo);
+      const s = i ? 1 : -1, wi = mesh(g.wi[i], DV, body, 0.2, 0.12, s * 0.2), wo = mesh(g.wo[i], DV, wi, 0.12, 0.03, s * 1.1); M.push(wi, wo);
       // yerde: kol (kanat kemiği) öne-aşağı inip ön ayak olur, dış kanat geriye katlanır
       const qi = new T3.Quaternion().setFromUnitVectors(a.set(0.12, 0.03, s * 1.1).normalize(), b.set(-0.12, -0.84, s * 0.3).normalize());
       const qo = new T3.Quaternion().setFromUnitVectors(a.set(-0.3, 0, s * 1.25).normalize(), b.set(-0.15, 0.25, -s * 0.95).normalize());
       ud.wings.push({ wi, wo, s, qi, qo });
     }
-    ud.legs = []; for (const s of [-1, 1]) { const m = mesh(g.leg, VC, body, -0.35, -0.12, s * 0.16); M.push(m); ud.legs.push(m); }
+    ud.legs = []; for (const s of [-1, 1]) { const m = mesh(g.leg, DV, body, -0.35, -0.12, s * 0.16); M.push(m); ud.legs.push(m); }
     ud.mouth = { n: ud.head, x: 0.6, y: -0.05 }; ud.seat = { n: body, x: 0, y: 0.28 }; ud.side = 0.3; ud.neckBase = null;
     ud.fp = 0; ud.turn = 0; ud.pa = null; ud.strideK = 0.8;
   }
@@ -6265,14 +6411,14 @@ const M3 = (function () {
   function rigMimic(root, ud) {
     const S = mimicSpec(), g = S.g, M = ud.meshes, o = {};
     o.root = grp(root, 0, 0, 0);
-    M.push(o.torso = mesh(g.torso, VC, o.root, 0, 27, 0));
+    M.push(o.torso = mesh(g.torso, DV, o.root, 0, 27, 0));
     o.head = grp(o.torso, 4.6, 19.6, 0);
-    M.push(o.maw = mesh(g.maw, VC, o.head));
-    o.half = []; for (let i = 0; i < 2; i++) { const h = mesh(g.half[i], VC, o.head); M.push(h); mesh(g.eye[i], S.eyeMat, h); o.half.push(h); }
+    M.push(o.maw = mesh(g.maw, DV, o.head));
+    o.half = []; for (let i = 0; i < 2; i++) { const h = mesh(g.half[i], DV, o.head); M.push(h); mesh(g.eye[i], S.eyeMat, h); o.half.push(h); }
     o.arms = []; o.legs = [];
     for (const s of [-1, 1]) {
-      const u = mesh(g.uarm, VC, o.torso, 1.2, 15.6, s * 5.2), f = mesh(g.farm, VC, u, 0, -13, 0), h = mesh(g.hand, VC, f, 0, -14, 0); M.push(u, f, h); o.arms.push({ u, f, h, s });
-      const th = mesh(g.thigh, VC, o.root, 0, 27, s * 2.3), sh = mesh(g.shin, VC, th, 0, -13.5, 0); M.push(th, sh); o.legs.push({ th, sh });
+      const u = mesh(g.uarm, DV, o.torso, 1.2, 15.6, s * 5.2), f = mesh(g.farm, DV, u, 0, -13, 0), h = mesh(g.hand, DV, f, 0, -14, 0); M.push(u, f, h); o.arms.push({ u, f, h, s });
+      const th = mesh(g.thigh, DV, o.root, 0, 27, s * 2.3), sh = mesh(g.shin, DV, th, 0, -13.5, 0); M.push(th, sh); o.legs.push({ th, sh });
     }
     o.root.scale.setScalar(1.02);
     return o;
@@ -6554,13 +6700,13 @@ const M3 = (function () {
     const ak = can || p.child ? null : (p.leader ? null : ACC[p.group] || null);
     if (ak !== ud.ak) { ud.ak = ak; if (ak && !ud.acc) ud.acc = mesh(accG(ak), VC, ud.torso); if (ud.acc) { ud.acc.visible = !!ak; if (ak) ud.acc.geometry = accG(ak); } }
     // alet (yay sol elde)
-    const tk = toolOf(p, working);
+    const tk = ud.hkK ? null : toolOf(p, working);
     if (tk !== ud.toolK) {
       ud.toolK = tk; ud.tool.visible = !!tk;
       if (tk) { ud.tool.geometry = toolGeo(tk); const hand = ud.arms[tk === 'bow' ? 0 : 1].f; if (ud.tool.parent !== hand) hand.add(ud.tool); ud.tool.position.set(0.3, -6.0, tk === 'bow' ? -0.2 : 0.2); }
     }
     // sırt yükü / sepet
-    const eq = p.eq || {}, carry = p.carry > 0, bk = eq.sepet ? 2 : carry ? 1 : 0;
+    const eq = p.eq || {}, carry = p.carry > 0, bk = eq.sepet ? 2 : carry && !ud.hkK ? 1 : 0;
     if (bk !== (ud.bk || 0) || (carry && !ud.pack)) {
       ud.bk = bk;
       if (bk && !ud.pack) ud.pack = mesh(PG.pack, VC, ud.torso, -4.1, 7.2, 0);
@@ -6570,7 +6716,7 @@ const M3 = (function () {
     if (ud.pack && ud.pack.visible) {
       let bc = '#ccbbaa'; if (carry && p.bag) { for (const k in p.bag) { bc = BAGCOL[k] || bc; break; } }
       if (ud.bc !== bc + bk) { ud.bc = bc + bk; if (bk === 2) ud.pack.material = VC; else ud.pack.material = tint(bc); if (ud.fill) ud.fill.material = tint(bc); }
-      if (ud.fill) ud.fill.visible = bk === 2 && carry;
+      if (ud.fill) ud.fill.visible = bk === 2 && carry && !ud.hkK;
     }
     // lider: pelerin + alın bandı
     if (!!p.leader !== !!ud.ldr) {
@@ -6597,6 +6743,41 @@ const M3 = (function () {
     L.th.position.x = hipX; L.th.position.y = hipY;
     L.th.rotation.z = IK.a; L.sh.rotation.z = IK.b - IK.a; L.ft.rotation.z = -IK.b + (toe || 0);
   }
+  // ---- taşınan yük: kütük omuzda iki elle, taş kucakta, sepet tek elde, et elde, bohça sırtta
+  const HAULK = { wood: 'wood', stone: 'stone', meyve: 'basket', herb: 'basket', poison: 'basket', et: 'meat', cigEt: 'meat' };
+  const HAULW = { wood: 1, stone: 0.8, basket: 0.25, meat: 0.2, bundle: 0.45 };
+  // gövde yerelinde el hedefleri (omuz: y 10.9, z ±5.75), lean: + geriye
+  const HPOSE = {
+    wood: { r: [-5.6, 12.4, 5.0], l: [5.6, 12.9, 3.6], lean: -0.1 },
+    stone: { r: [4.6, 4.2, 2.9], l: [4.6, 4.2, -2.9], lean: 0.1 },
+    basket: { r: null, l: [1.2, 5.6, -6.4], lean: 0 },
+    meat: { r: null, l: null, lean: -0.02 },
+    bundle: { r: [-0.6, 13.6, 4.0], l: null, lean: -0.08 }
+  };
+  const ARM = { a: 0, e: 0, r: 0 };
+  function armTo(sx, sy, sz, tx, ty, tz) {   // omuzdan ele: kol düzlemi x ekseni çevresinde döner (r), düzlem içinde iki kemik IK
+    const dx = tx - sx, dy = ty - sy, dz = tz - sz, h = Math.hypot(dy, dz);
+    ARM.r = Math.atan2(-dz, -dy); ik2(0, 0, dx, -h, 6.2, 6.05, -1); ARM.a = IK.a; ARM.e = IK.b - IK.a;
+  }
+  function haulGeoK(k) {
+    return geo('haul_' + k, pb => {
+      if (k === 'wood') { pb.tube([-15, 0, 0], [15, 0, 0], 2.7, 2.5, '#6a4a2a', { n: 7 }); pb.tube([14.9, 0, 0], [15.2, 0, 0], 2.45, 2.4, '#c09a66', { n: 7 }); pb.tube([-15.2, 0, 0], [-14.9, 0, 0], 2.6, 2.6, '#b08a5a', { n: 7 }); pb.cone([4, 2, 0], [7, 6.5, 0.8], 0.7, '#4a3018', { n: 4 }); for (let i = 0; i < 5; i++) pb.box(-12 + i * 6, 2.45, (i % 2 ? 1 : -1) * 0.9, 3, 0.3, 0.5, '#3a2614'); }
+      else if (k === 'stone') { pb.ball(0, 0, 0, 5.0, 4.2, 5.4, '#8a857c', { d: 1 }); pb.ball(1.6, 1.8, 1.2, 2.6, 2.0, 2.4, '#9a958a', { d: 0 }); }
+      else if (k === 'basket') { pb.tube([0, -3.6, 0], [0, 3.0, 0], 2.4, 3.2, '#b89858', { n: 8 }); pb.tube([0, 2.6, 0], [0, 3.4, 0], 3.35, 3.35, '#8a6a34', { n: 8 }); for (let i = 0; i < 5; i++) pb.ball(Math.cos(i * 1.3) * 1.6, 3.6, Math.sin(i * 1.3) * 1.6, 1.4, 1.2, 1.4, i % 2 ? '#b3243a' : '#4c8a3a', { d: 0 }); pb.tube([0, 3.2, -3.1], [0, 6.2, 0], 0.3, 0.3, '#6a4a24', { n: 4 }); pb.tube([0, 6.2, 0], [0, 3.2, 3.1], 0.3, 0.3, '#6a4a24', { n: 4 }); }
+      else if (k === 'meat') { pb.ball(0, -3.5, 0, 2.6, 4.2, 2.2, '#9a2a1c'); pb.ball(0.6, -5.5, 0.8, 1.8, 2.2, 1.6, '#c8a088', { d: 0 }); pb.tube([0, 1.2, 0], [0, -1.5, 0], 0.55, 0.6, '#e4dcc6', { n: 5 }); pb.ball(0, 1.4, 0, 0.9, 0.8, 0.9, '#e4dcc6', { d: 0 }); }
+      else { pb.ball(0, 0, 0, 3.4, 4.6, 4.2, '#8a7050'); pb.box(0, 0, 0, 7.2, 1.0, 9.0, '#5a3e22'); pb.tube([2.8, 3.6, 2.2], [4.8, 4.6, 3.2], 0.5, 0.5, '#5a3e22', { n: 4 }); }
+    });
+  }
+  const HPOS = { wood: [0.4, 13.7, 4.6, 0.1], stone: [5.2, 6.9, 0, 0], basket: [1.2, 1.6, -7.2, 0], bundle: [-4.8, 9.2, 0.6, 0.1] };
+  function haulMesh(ud, k) {
+    if (k === (ud.hmK || null)) return; ud.hmK = k;
+    if (!k) { if (ud.hm) ud.hm.visible = false; return; }
+    if (!ud.hm) ud.hm = mesh(haulGeoK(k), VC, ud.torso);
+    ud.hm.geometry = haulGeoK(k); ud.hm.visible = true;
+    const par = k === 'meat' ? ud.arms[1].f : ud.torso; if (ud.hm.parent !== par) par.add(ud.hm);
+    if (k === 'meat') { ud.hm.position.set(0.4, -6.4, 0.6); ud.hm.rotation.set(0, 0, 0); }
+    else { const q = HPOS[k]; ud.hm.position.set(q[0], q[1], q[2]); ud.hm.rotation.set(0, 0, q[3]); }
+  }
   function updPerson(g, p, t) {
     const ud = g && g.userData; if (!ud || ud.kind !== 'person') return;
     p = p || {}; t = t || 0;
@@ -6614,11 +6795,13 @@ const M3 = (function () {
     const sprint = mvB && (p.sprinting || ud.spd > 150 || da / Math.max(dt, 1e-3) > 12.5) ? 1 : 0, sneak = mvB && p.sneak ? 1 : 0;
     ud.spr = (ud.spr || 0) + (sprint - (ud.spr || 0)) * Math.min(1, dt * 5);
     ud.snk = (ud.snk || 0) + (sneak - (ud.snk || 0)) * Math.min(1, dt * 5);
-    const sc0 = p.child ? 0.6 : can ? 1.04 : 1, stride = (13 + ud.spr * 7 - ud.snk * 4) * sc0;
+    const hv0 = HAULW[ud.hkK] || 0, sc0 = p.child ? 0.6 : can ? 1.04 : 1, stride = (13 + ud.spr * 7 - ud.snk * 4) * sc0 * (1 + hv0 * 0.14);
     let w = moved > 1e-3 ? moved / stride * TAU2 : (p.moving ? da : 0); w = Math.min(w, (14 + ud.spr * 6) * dt); ud.ph += w;
     const ph = ud.ph, s = Math.sin(ph), c = Math.cos(ph), mv = ud.mv;
     const lying = p.downed > 0 || !!p.bed || !!p.carriedBy || !!p.dead || !!p.grabbed || pose === 1;
     const working = !lying && !mvB && !p.child && !can && (p.work > 0.05 || pose === 4);
+    const hk = !lying && !working && !(pose === 2 || pose === 3) && !p.carrying && !can && p.haul ? HAULK[p.haul] || 'bundle' : null;
+    ud.hkK = hk; haulMesh(ud, hk);
     look(ud, p, working);
     const root = ud.root, sc = sc0;
     if (ud.sc !== sc) { ud.sc = sc; root.scale.setScalar(sc); ud.headG.scale.setScalar(p.child ? 1.32 : 1); }
@@ -6695,6 +6878,11 @@ const M3 = (function () {
         lean = bench ? -0.25 : -0.85 - reach * 0.15; drop = bench ? 0.4 : 2.8; hz = bench ? -0.35 : 0.25;
         aR = 0.7 + reach * 0.5 + pick2; eR = 0.3 + (1 - reach) * 0.9; sR = 0.2; aL = 0.55 + (1 - reach) * 0.4; eL = 0.8 + reach * 0.5; sL = 0.25;
       }
+    } else if (hk) {                                                                         // yük: eller yükü tutar
+      const H = HPOSE[hk]; if (H.r) { armTo(0, 10.9, 5.75, H.r[0], H.r[1], H.r[2]); aR = ARM.a; eR = ARM.e; sR = -ARM.r; }
+      else { aR = 0.22 + armSw * 0.25; eR = 0.35; sR = 0.12; }
+      if (H.l) { armTo(0, 10.9, -5.75, H.l[0], H.l[1], H.l[2]); aL = ARM.a; eL = ARM.e; sL = ARM.r; } else { aL = -armSw * 0.8 + 0.05; }
+      const hv = HAULW[hk] || 0; lean += H.lean * (0.7 + 0.3 * walk) - walk * hv * 0.05; drop += hv * (0.9 + walk * 0.5); hz -= hv * 0.12; twist *= 1 - hv * 0.6;
     } else if (p.carrying) {                                                                 // yaralıyı omuzda taşır
       aL = 2.45; eL = 1.45; aR = 2.45; eR = 1.45; sL = sR = 0.35; lean -= 0.28; drop += 1.2; hz += 0.12;
     } else if (cower > 0) {                                                                  // korkuyla sinme
@@ -6733,7 +6921,7 @@ const M3 = (function () {
       torso.position.set(-0.6, hipY + breathe * 0.05, 0);
       for (let i = 0; i < 2; i++) { const L = Lg[i]; L.th.rotation.x = L.s * -0.12; legIK(L, -0.6, hipY, 9.8 + (i ? 0.6 : -0.4), lift0, 0); }
     } else {
-      const bob = walk * (Math.abs(c) * (0.6 + spr * 0.9) - 0.35 - spr * 0.9) + (1 - walk) * br * 0.08;
+      const bob = walk * (Math.abs(c) * (0.6 + spr * 0.9 + hv0 * 0.45) - 0.35 - spr * 0.9) + (1 - walk) * br * 0.08;
       const hipY = 15.25 + bob - J[11] - k * 0.9;
       const Sx = walk * (3.4 + spr * 2.6 - snk * 1.1) * (k > 0.05 ? 0.4 : 1);
       torso.position.set(0, hipY, 0);
@@ -6744,7 +6932,9 @@ const M3 = (function () {
         legIK(L, 0, hipY, sn * Sx + stand + (can ? 1.2 : 0), lift0 + lift, walk * Math.max(0, -cs) * sn * -0.4 + lift * 0.06);
       }
     }
-    torso.rotation.set(0, J[7], J[6]);
+    // yük altında yalpalama: adımla yana sallanma + yükün ters yanına eğilme
+    const sway = hv0 * walk * Math.sin(ph) * 0.07 + (ud.hkK === 'wood' ? -0.07 : ud.hkK === 'basket' ? 0.06 : 0);
+    torso.rotation.set(sway, J[7], J[6]); root.position.z = hv0 * walk * Math.sin(ph) * 0.9;
     ud.skirt.position.copy(torso.position); ud.skirt.rotation.set(0, J[7] * 0.5, seated ? 0.35 : J[6] * 0.3);
     head.rotation.set(J[10], J[8], J[9] - J[6] * 0.65 - walk * Math.sin(ph * 2) * 0.03);
     A[0].u.rotation.set(J[2], 0, J[0]); A[0].f.rotation.z = J[1];
@@ -6757,6 +6947,7 @@ const M3 = (function () {
     if (ud.torch && ud.torch.visible) { ud.torch.rotation.z = 1.35 - (J[0] + J[1] + J[6]); const f = 0.85 + 0.25 * Math.sin(t * 23 + id) * Math.sin(t * 7.1); ud.flame.scale.set(f, 0.8 + 0.4 * Math.abs(Math.sin(t * 17)), f); }
     if (ud.cloak && ud.cloak.visible) ud.cloak.rotation.z = 0.06 + walk * (0.22 + s * 0.06) + spr * 0.15 + Math.sin(t * 1.3) * 0.02;
     if (ud.pack && ud.pack.visible) ud.pack.rotation.z = 0.08 + walk * s * 0.03;
+    if (ud.hm && ud.hm.visible && ud.hkK === 'meat') ud.hm.rotation.z = -(J[3] + J[4] + J[6]) + walk * Math.sin(ph) * 0.15;
   }
 
   // =============================================================
@@ -6829,7 +7020,7 @@ const M3 = (function () {
   }
   function setFlash(ud, f) {
     if (ud.fl === f) return; ud.fl = f;
-    const m = f === 1 ? FLASH : f === 2 ? POIS : VC;
+    const m = f === 1 ? DFLASH : f === 2 ? DPOIS : DV;
     for (const x of ud.meshes) x.material = m;
   }
   function updDino(g, d, t) {
@@ -7036,7 +7227,10 @@ function initMat() {
   MAT.water = L_({ color: 0x2a6a88, emissive: 0x06141c, transparent: true, opacity: 0.9 });
   MAT.sand = L_({ color: 0x968258 });
   MAT.swamp = L_({ color: 0x2f3a22, emissive: 0x040603 });
-  MAT.shadow = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.26, depthWrite: false });
+  // yumuşak leke gölge: merkezde koyu, kenara doğru sönen radyal geçiş (alphaMap = G kanalı)
+  TEX.shadow = canvasTex(64, (g, S) => { g.fillStyle = '#000'; g.fillRect(0, 0, S, S); const gr = g.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S / 2 - 1); gr.addColorStop(0, '#fff'); gr.addColorStop(0.35, '#e8e8e8'); gr.addColorStop(0.7, '#6a6a6a'); gr.addColorStop(1, '#000'); g.fillStyle = gr; g.fillRect(0, 0, S, S); });
+  const shM = o => new THREE.MeshBasicMaterial(Object.assign({ color: 0x000000, transparent: true, alphaMap: TEX.shadow, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }, o));
+  MAT.shadow = shM({ opacity: 0.5 }); MAT.tshadow = shM({ opacity: 0.42 }); MAT.inShadow = shM({ opacity: 0.55, fog: false });
   MAT.blood = new THREE.MeshBasicMaterial({ color: 0x3a0303, transparent: true, opacity: 0.6, depthWrite: false });
   MAT.track = new THREE.MeshBasicMaterial({ color: 0x120c06, transparent: true, opacity: 0.5, depthWrite: false });
   MAT.fl0 = new THREE.MeshBasicMaterial({ color: 0xff5a14, fog: false });
@@ -7143,7 +7337,7 @@ function init3D() {
 
   // dinamik havuzlar
   const dyn = U3.dyn = new THREE.Group(); sc.add(dyn);
-  U3.entShadow = mkInst(GEO.disc, MAT.shadow, 160); dyn.add(U3.entShadow);
+  U3.entShadow = mkInst(GEO.disc, MAT.shadow, 700); U3.entShadow.renderOrder = 1; dyn.add(U3.entShadow);
   U3.stainI = mkInst(GEO.disc, MAT.blood, 240); dyn.add(U3.stainI);
   U3.trackI = mkInst(GEO.disc, MAT.track, 60); dyn.add(U3.trackI);
   U3.arrowI = mkInst(GEO.cyl, new THREE.MeshLambertMaterial({ color: 0x6a4a26, emissive: 0x1a1208 }), 24); dyn.add(U3.arrowI);
@@ -7499,7 +7693,7 @@ function buildWorld() {
   const nT = G.trees.length + G.deco.length;
   I.trunk = mkInst(GEO.trunk, MAT.inst, nT * 4 + 8); I.cone = mkInst(GEO.cone, MAT.inst, G.trees.length * 3 + 8); I.blob = mkInst(GEO.ico1, MAT.inst, G.trees.length * 3 + 8);
   I.moss = mkInst(GEO.cone4, MAT.instD, G.trees.length * 3 + 8); I.frond = mkInst(GEO.frond, MAT.instD, G.trees.length * 2 + 8);
-  I.tshadow = mkInst(GEO.disc, MAT.shadow, G.trees.length + 8);
+  I.tshadow = mkInst(GEO.disc, MAT.tshadow, G.trees.length + G.rocks.length + 8); I.tshadow.renderOrder = 1;
   I.rock = mkInst(GEO.dod, MAT.rock, G.rocks.length * 2 + G.deco.length + 8);
   I.bush = mkInst(GEO.ico, MAT.inst, G.bushes.length * 2 + (G.herbs.length + G.poisons.length) + 8);
   I.berry = mkInst(GEO.ico, MAT.inst, 900);
@@ -7585,6 +7779,7 @@ function worldSig() {
 }
 function rebuildInst(cx, cy) {
   const I = U3.inst; for (const k in I) I[k].count = 0;
+  const TS = U3.tsh = [];   // ağaç/kaya gölgeleri: [x, z, yarıçap, gölge yüksekliği] — güneş yönüne göre fillTreeShadows yerleştirir
   U3.instX = cx; U3.instY = cy;
   const near = (o, R) => { const dx = o.x - cx, dy = o.y - cy; return dx * dx + dy * dy < R * R; };
   const stumpC = c3('#8a6a44'), col = _col, snowC = c3('#e8eef2'), mossC = c3('#7d8c5a'), deadC = c3('#4e4740');
@@ -7593,7 +7788,7 @@ function rebuildInst(cx, cy) {
     const y0 = gh(t.x, t.y) - 1.5;
     if (t.stump) { instAdd(I.trunk, t.x, y0, t.y, 9, 8.5, 9, t.sw, stumpC); continue; }
     const b = t.b === undefined ? bioAt(t.x, t.y) : t.b, C = treeCols(b, t.tone), k = (t.cr - 36) / 26, H = (125 + k * 120 + ((t.tone * 37) % 1) * 30) * (t.dark ? 1.35 : 1), cr = t.cr, r2 = (t.tone * 13) % 1;
-    instAdd(I.tshadow, t.x, y0 + 1.9, t.y, cr * 0.95, 1, cr * 0.95, 0);
+    TS.push([t.x, t.y, cr * (b === 5 ? 0.9 : 1.05), b === 5 ? H * 0.7 : H * 0.55]);
     if (b === 5) {                                       // palmiye: kıvrık gövde + taç yaprakları
       let x = t.x, y = y0, z = t.y; const seg = 5, L = (H * 0.75) / seg, lean = 0.25 + r2 * 0.35;
       for (let i = 0; i < seg; i++) { const rz = lean * (i + 1) / seg, w = 5.2 - i * 0.55; instAdd(I.trunk, x, y, z, w, L * 1.06, w, t.sw, C.t, 0, rz); x += -Math.sin(rz) * Math.cos(t.sw) * L; y += Math.cos(rz) * L; z += Math.sin(rz) * Math.sin(t.sw) * L; }
@@ -7625,6 +7820,7 @@ function rebuildInst(cx, cy) {
     const g = (112 * r.shade) / 255, b = bioAt(r.x, r.y), mtn = b === 1, h = hash2(r.x, r.y), y0 = gh(r.x, r.y);
     col.setRGB(g + 0.05, g + 0.03, g); if (b === 5) col.lerp(c3('#b0a080'), 0.4); else if (!mtn && h > 0.5) col.lerp(c3('#5a7a3a'), 0.25);
     instAdd(I.rock, r.x, y0 + r.r * 0.15, r.y, r.r * 1.15, r.r * (mtn ? 1.3 + h * 1.4 : 0.75 + h * 0.5), r.r * 1.1, h * 6, col, h * 0.4, 0);
+    TS.push([r.x, r.y, r.r * 1.35, r.r * (mtn ? 1.0 + h : 0.5)]);
     if (h > 0.55) instAdd(I.rock, r.x + r.r * 0.9, y0, r.y - r.r * 0.4, r.r * 0.45, r.r * 0.35, r.r * 0.5, h * 9, col);
   }
   for (const b of G.bushes) {
@@ -7667,6 +7863,30 @@ function rebuildInst(cx, cy) {
     for (let i = 0; i < 4; i++) { col.setHSL(c.hue / 360, 0.8, 0.5 + i * 0.06); const a = c.x + i * 1.9; instAdd(I.crystal, c.x + Math.cos(a) * 4, y0, c.y + Math.sin(a) * 4, 4.2 - i * 0.5, 30 - Math.abs(i - 1.5) * 8, 4.2 - i * 0.5, a, col, Math.sin(a) * 0.3, Math.cos(a) * 0.3); }
   }
   for (const k in I) instDone(I[k]);
+  U3.shK = null; fillTreeShadows();
+}
+
+// ---- gölge yönü: güneşin tersine, alçak güneşte uzun (yükseklik başına x/z kayması)
+function u3ShadowDir() {
+  const v = U3.sunV, o = U3.shO || (U3.shO = { x: 0, z: 0 });
+  if (!v) { o.x = 0.15; o.z = -0.1; return o; }
+  const k = 1 / Math.max(v.y, 0.3); o.x = -v.x * k * 0.55; o.z = -v.z * k * 0.55; return o;
+}
+function fillTreeShadows() {
+  const m = U3.inst && U3.inst.tshadow; if (!m || !U3.tsh) return;
+  const o = u3ShadowDir(); U3.shK = o.x * 1000 + o.z;
+  m.count = 0;
+  for (const q of U3.tsh) {
+    let ox = o.x * q[3], oz = o.z * q[3]; const L0 = Math.hypot(ox, oz), cap = q[2] * 2.2; if (L0 > cap) { ox *= cap / L0; oz *= cap / L0; }
+    const L = Math.min(L0, cap), x = q[0] + ox * 0.75, z = q[1] + oz * 0.75;
+    instAdd(m, x, gh(x, z) + 1.6, z, q[2] + L * 0.35, 1, q[2] * 0.92, -Math.atan2(oz, ox));
+  }
+  instDone(m);
+}
+// dinamik leke gölge (kişi, yaratık, yapı, leş): h = gölgeyi atan yükseklik
+function blobShadow(x, y0, z, rx, rz, ry, h) {
+  const o = U3.shO || u3ShadowDir(), k = Math.min(h || 0, rx * 3) * 0.6;
+  instAdd(U3.entShadow, x + o.x * k, y0 + 0.6, z + o.z * k, rx + Math.hypot(o.x, o.z) * k * 0.25, 1, rz, ry || 0);
 }
 
 // =============================================================
@@ -7870,6 +8090,7 @@ function syncBuilds(dk) {
     let e = M.get(b); const sig = buildSig(b);
     if (!e || e.sig !== sig) { if (e) { U3.scene.remove(e.g); disposeTree(e.g, true); } e = { g: buildMesh(b), sig }; e.g.position.set(b.x, buildY(b), b.y); U3.scene.add(e.g); M.set(b, e); }
     e.f = f;
+    if (!(BUILD[b.type] || {}).flat && b.type !== 'gemi') { const br = b.type === 'magara' ? b.r * 1.05 : b.type === 'cit' || b.type === 'duvar' ? b.r * 0.7 : b.type === 'mesale' ? 9 : b.r * 0.95; blobShadow(b.x, buildY(b), b.y, br * 1.1, br, 0, b.type === 'kule' ? 120 : b.type === 'mesale' ? 40 : br * 0.8); }
     if (e.g.userData.glow) e.g.userData.glow.material.opacity = clamp(Math.max(dk * 1.1, (b.occ || []).length ? 0.35 : 0) * (0.75 + Math.sin(G.now * 5) * 0.08), 0, 0.85);
   }
   for (const [b, e] of M) if (e.f !== f) { U3.scene.remove(e.g); disposeTree(e.g, true); M.delete(b); }
@@ -7897,7 +8118,7 @@ function syncCarcs() {
     const sig = Math.floor(clamp(c.meat / (DINO[c.type].drop.meat || 1), 0, 1) * 4) + (c.rotten ? 10 : 0);
     let e = M.get(c);
     if (!e || e.sig !== sig) { if (e) { U3.scene.remove(e.g); disposeTree(e.g); } e = { g: carcMesh(c), sig }; e.g.position.set(c.x, gh(c.x, c.y), c.y); U3.scene.add(e.g); M.set(c, e); }
-    e.f = f;
+    e.f = f; blobShadow(c.x, gh(c.x, c.y), c.y, c.r * 1.25, c.r * 0.7, -c.ang, c.r * 0.4);
   }
   for (const [c, e] of M) if (e.f !== f) { U3.scene.remove(e.g); disposeTree(e.g); M.delete(c); }
 }
@@ -7970,8 +8191,7 @@ function haulProp(e, p) {
   if (k) { e.hm = new THREE.Mesh(haulGeo(k), MAT.v); e.g.add(e.hm); }
 }
 function syncEnts(t, dk) {
-  const M = U3.ents, f = U3.frame, sh = U3.entShadow; sh.count = 0;
-  const shA = 1 - dk * 0.8;
+  const M = U3.ents, f = U3.frame;
   const put = (key, kind, mk, show) => {
     let e = M.get(key);
     if (e && e.kind !== kind) { dropEnt(e); e = null; }
@@ -7991,8 +8211,7 @@ function syncEnts(t, dk) {
     e.g.position.set(p.x, y0, p.y); e.g.rotation.y = -p.ang;
     if (p === guard && !p.torch) { const v = e.gv || (e.gv = {}); for (const k in v) delete v[k]; Object.assign(v, p); v.torch = true; M3.updPerson(e.g, v, t); }
     else M3.updPerson(e.g, p, t);
-    haulProp(e, p);
-    if (!tw) instAdd(sh, p.x, y0 + 0.5, p.y, p.child ? 7 : 10, 1, p.child ? 7 : 10, 0);
+    if (!tw) blobShadow(p.x, y0, p.y, p.child ? 6 : 8.5, p.child ? 5.5 : 7.5, -p.ang, p.child ? 20 : 32);
     if (p.group === 'balik' && p.work && !p.moving && nf < 24) {   // olta: elden uca kamış, uçtan suya ip
       const c = Math.cos(p.ang), sn = Math.sin(p.ang), hx = p.x + c * 6 - sn * 4, hz = p.y + sn * 6 + c * 4, tx = p.x + c * 44, tz = p.y + sn * 44, ty = y0 + 40 + Math.sin(t * 1.3 + p.id) * 1.5;
       const wx = p.x + c * 62, wz = p.y + sn * 62, wy = Math.max(gh(wx, wz), SEA_Y) + 0.5 + Math.sin(t * 2.1 + p.id) * 0.6;
@@ -8011,17 +8230,17 @@ function syncEnts(t, dk) {
       const e = put(d, 'c', () => { const v = cannibalView(d); const g = M3.person(v); g.userData.view = v; return g; }, vis); if (!e) continue;
       const v = Object.assign(e.g.userData.view, cannibalView(d));
       e.g.position.set(d.x, y0, d.y); e.g.rotation.y = -d.ang; M3.updPerson(e.g, v, t);
-      instAdd(sh, d.x, y0 + 0.5, d.y, 10, 1, 10, 0);
+      blobShadow(d.x, y0, d.y, 8.5, 7.5, -d.ang, 32);
     } else if (d.type === 'taklitci' && !d.revealed) {
       const e = put(d, 'm', () => { const v = mimicView(d); const g = M3.person(v); g.userData.view = v; return g; }, vis); if (!e) continue;
       const v = mimicView(d, e.g.userData.view);
       e.g.position.set(d.x, y0, d.y); e.g.rotation.y = -v.ang; M3.updPerson(e.g, v, t);
-      instAdd(sh, d.x, y0 + 0.5, d.y, 10, 1, 10, 0);
+      blobShadow(d.x, y0, d.y, 8.5, 7.5, -d.ang, 32);
     } else {
       const e = put(d, 'd', () => M3.dino(d), vis); if (!e) continue;
       e.g.position.set(d.x, y0 + (d.fly ? (d.alt || 0) * 85 : 0), d.y); e.g.rotation.y = -d.ang;
       M3.updDino(e.g, d, t);
-      instAdd(sh, d.x, y0 + 0.5, d.y, d.r * (d.fly ? 0.9 : 1.2), 1, d.r * (d.fly ? 0.9 : 0.9), -d.ang);
+      const fl = d.fly ? clamp(1 - (d.alt || 0) * 0.6, 0.3, 1) : 1; blobShadow(d.x, y0, d.y, d.r * (d.fly ? 1.1 : 1.45) * fl, d.r * (d.fly ? 1.4 : 0.85) * fl, -d.ang, d.fly ? 0 : d.r * 1.6);
     }
   }
   if (G.rescue) {
@@ -8029,8 +8248,6 @@ function syncEnts(t, dk) {
     if (e) { e.g.position.set(q.x, ghE(q.x, q.y), q.y); e.g.rotation.y = -(q.ang || 0); M3.updPerson(e.g, q, t); }
   }
   for (const [k, e] of M) if (e.f !== f) { dropEnt(e); M.delete(k); }
-  MAT.shadow.opacity = 0.26 * shA;
-  instDone(sh);
   // muhafızın elindeki meşalenin ışığı modelin elinden gelsin
   U3.guardPos = null;
   if (guard) { const e = M.get(guard); if (e && e.g.visible && e.g.userData.flame) { e.g.userData.flame.updateWorldMatrix(true, false); U3.guardPos = new THREE.Vector3().setFromMatrixPosition(e.g.userData.flame.matrixWorld); } else if (e) U3.guardPos = new THREE.Vector3(guard.x + Math.cos(guard.ang + 1.2) * 8, ghE(guard.x, guard.y) + 30, guard.y + Math.sin(guard.ang + 1.2) * 8); }
@@ -8177,7 +8394,7 @@ function updAtmos(dt, t, LS) {
   U3.stars.visible = U3.stars.material.opacity > 0.01; U3.stars.rotation.y = G.t / CYCLE * 0.6;
   // güneş ve ay
   const ts = clamp(p / 0.5, 0, 1), sx = -Math.cos(ts * Math.PI), sy = Math.sin(ts * Math.PI) * 0.85 + 0.06;
-  _v.set(sx, sy, 0.38).normalize();
+  _v.set(sx, sy, 0.38).normalize(); (U3.sunV || (U3.sunV = new THREE.Vector3())).copy(_v);
   U3.sunS.position.copy(_v).multiplyScalar(6200); U3.sunS.material.opacity = clamp(1 - dk * 2.2, 0, 1) * clamp(U3.fogK * 1.4 - 0.4, 0, 1) * 0.8; U3.sunS.visible = U3.sunS.material.opacity > 0.01;
   U3.sunS.material.color.copy(c3(0xfff2c0)).lerp(c3(0xff9a50), warm * 0.7);
   U3.sunD.position.copy(U3.sunS.position); U3.sunD.visible = U3.sunS.visible; U3.sunD.material.opacity = U3.sunS.material.opacity; U3.sunD.material.color.copy(c3(0xfffbe8)).lerp(c3(0xffb070), warm * 0.8);
@@ -8277,10 +8494,15 @@ function render3D(dt) {
   U3.sigT -= dt;
   if (U3.sigT <= 0) { U3.sigT = 0.4; const s = worldSig(); if (s !== U3.sig) { U3.sig = s; U3.instX = 1e9; const ns = G.nests.reduce((a, n) => a + n.eggs, 0) + G.nests.length * 100; if (ns !== U3.nestSig) { U3.nestSig = ns; rebuildNests(); } } }
   if (Math.abs(px - U3.instX) + Math.abs(py - U3.instY) > 200) rebuildInst(px, py);
-  U3.inst.tshadow.visible = dk < 0.7;
+  // ---- gölgeler: gece ve kapalı havada söner; ağaç gölgeleri güneşle döner
+  { const day = clamp(1 - dk / 0.75, 0, 1), soft = 0.55 + 0.45 * clamp(U3.fogK, 0, 1);
+    MAT.shadow.opacity = 0.5 * day * soft + 0.1 * (1 - day); MAT.tshadow.opacity = 0.42 * day * soft;
+    U3.inst.tshadow.visible = MAT.tshadow.opacity > 0.01;
+    const o = u3ShadowDir(); if (U3.inst.tshadow.visible && Math.abs(o.x * 1000 + o.z - (U3.shK || 0)) > 25) fillTreeShadows(); }
+  U3.entShadow.count = 0;
   // ---- dinamik içerik
   syncBuilds(dk); syncCarcs(); syncCamps(); syncWrecks(t);
-  syncEnts(t, dk); syncEyes(dk, LS); syncSmall(t, dk);
+  syncEnts(t, dk); instDone(U3.entShadow); syncEyes(dk, LS); syncSmall(t, dk);
   updFire(t, dk); updFlames(t); updViewModel(dt, t);
   // yerleştirme hayaleti, av hedefi, bakılan kişi
   if (G.placing) {
@@ -8557,17 +8779,72 @@ function inFurniture(gb, f, R, st, X) {
   }
 }
 // ---- oda bölmeleri: mağarada alçak kaya sırtları + sütunlar, kulübede hasır paravanlar
-function inDividers(gb, b, D, st, R, X, ceil) {
-  const rooms = inRooms(b), W = D.w, H = D.h, pts = new Map();
+// ---- oda bölmesi düzeni (deterministik): sahne kurulmadan çarpışma için de kullanılır
+function inLayout(b) {
+  const rooms = inRooms(b), D = inDims(b), W = D.w, H = D.h, walls = [], pts = new Map();
   for (const r of rooms) {
     const left = r.x < 2, right = r.x + r.w > W - 2, back = !left && !right && r.y < 2;
     // komşu odayla ortak kenar: duvardan içeri doğru %65
-    if (left || right) { const z = r.y + r.h + 4, x0 = left ? 0 : W, x1 = left ? r.w * 0.68 : W - r.w * 0.68; if (z < H - 70 && rooms.some(o => o !== r && Math.abs(o.y - z) < 14 && Math.abs(o.x - r.x) < 2)) X.walls.push([x0, z, x1, z]); }
-    if (back) { const x = r.x + r.w + 4; if (rooms.some(o => o !== r && Math.abs(o.x - x) < 14 && o.y < 2)) X.walls.push([x, 0, x, r.h * 0.68]); }
+    if (left || right) { const z = r.y + r.h + 4, x0 = left ? 0 : W, x1 = left ? r.w * 0.68 : W - r.w * 0.68; if (z < H - 70 && rooms.some(o => o !== r && Math.abs(o.y - z) < 14 && Math.abs(o.x - r.x) < 2)) walls.push([x0, z, x1, z]); }
+    if (back) { const x = r.x + r.w + 4; if (rooms.some(o => o !== r && Math.abs(o.x - x) < 14 && o.y < 2)) walls.push([x, 0, x, r.h * 0.68]); }
     // girişin iki ucunda sütun
     const ends = left ? [[r.x + r.w, r.y], [r.x + r.w, r.y + r.h]] : right ? [[r.x, r.y], [r.x, r.y + r.h]] : [[r.x, r.y + r.h], [r.x + r.w, r.y + r.h]];
     for (const [px, pz] of ends) { const k = Math.round(px / 30) + ',' + Math.round(pz / 30); if (!pts.has(k) && pz < H - 60) pts.set(k, [px, pz]); }
   }
+  return { walls, pts };
+}
+// ---- iç mekân çarpışması (ic.js inMove çağırır): katı daireler + yürünebilir alanın sınırı
+const INCOL = new Map();
+function inColKey(b) { return b.type + '|' + ((typeof roomsOf === 'function' ? roomsOf(b) : b.rooms) || []).join() + '|' + inDims(b).w; }
+function inCol(b) {
+  const key = inColKey(b); let c = INCOL.get(b);
+  if (c && c.key === key) return c;
+  const D = inDims(b), W = D.w, H = D.h, st = b.type === 'magara' ? 'cave' : b.type === 'kulube' ? 'hut' : 'tent', lay = inLayout(b), sol = [];
+  if (st !== 'tent') for (const [x0, z0, x1, z1] of lay.walls) {
+    const len = Math.hypot(x1 - x0, z1 - z0), n = st === 'cave' ? Math.max(2, Math.round(len / 14)) : Math.max(2, Math.round(len / 9));
+    for (let i = 0; i <= n; i++) { const t = i / n; sol.push({ x: x0 + (x1 - x0) * t, y: z0 + (z1 - z0) * t, r: st === 'cave' ? 10 * (1 - t * 0.25) : 4 }); }
+  }
+  if (st === 'cave') {
+    for (const [px, pz] of lay.pts.values()) sol.push({ x: px, y: pz, r: 13 });
+    const hz = H * 0.62, hx = W / 2;   // büyük ocak çevresindeki oturak kütükleri
+    for (const [a, l] of [[0.5, 46], [2.6, 40], [4.2, 44]]) { const px = hx + Math.cos(a) * 48, pz = hz + Math.sin(a) * 48; for (const t of [0.15, 0.5, 0.85]) sol.push({ x: px - Math.sin(a) * l * t, y: pz + Math.cos(a) * l * t, r: 5 }); }
+  }
+  if (st === 'tent') for (let i = 0; i < 3; i++) sol.push({ x: W / 2 - 70 + i * 34, y: 8, r: 13 });
+  // yürünebilir sınır: mağarada kubbe duvarının zemin halkası (caveShell ile aynı formül) eksi moloz payı
+  let ring = null;
+  if (st === 'cave') {
+    const cx = W / 2, cz = H / 2, A = W / 2 + 50, Bb = H / 2 + 52, Bf = H / 2 + 24, NT = 84, ph = 0.05, k = Math.pow(Math.cos(ph), 0.42), y = 150 * Math.sin(ph); ring = [];
+    for (let i = 0; i < NT; i++) {
+      const th = i / NT * TAU, c = Math.cos(th), sn = Math.sin(th);
+      let x = cx + Math.sign(c) * Math.pow(Math.abs(c), 0.4) * A * k, z = cz + Math.sign(sn) * Math.pow(Math.abs(sn), 0.4) * (sn > 0 ? Bf : Bb) * k;
+      const nn = fbm3(x * 0.021, y * 0.03 + 3, z * 0.021), big = fbm3(x * 0.006 + 5, y * 0.008, z * 0.006 + 2), wk = Math.cos(ph);
+      const dx = x - cx, dz = z - cz, dl = Math.hypot(dx, dz) || 1, disp = (nn - 0.42) * 38 + (big - 0.5) * 56;
+      x += dx / dl * disp * wk; z += dz / dl * disp * wk;
+      if (x > -18 && x < W + 18 && z > -18 && z < H + 18) { const m = [x + 18, W + 18 - x, z + 18, H + 18 - z], q = m.indexOf(Math.min(...m)); if (q === 0) x = -18; else if (q === 1) x = W + 18; else if (q === 2) z = -18; else z = H + 18; }
+      ring.push([Math.atan2(z - cz, x - cx), Math.hypot(x - cx, z - cz) - 26]);
+    }
+    ring.sort((a, c) => a[0] - c[0]);
+  } else if (st === 'tent') ring = 'circle';
+  c = { key, sol, ring, W, H }; INCOL.set(b, c); return c;
+}
+function inSolids(b) { return inCol(b).sol; }
+function inWall(b, x, y) {
+  const c = inCol(b), W = c.W, H = c.H;
+  if (y > H - 50 && Math.abs(x - W / 2) < 50) return null;          // kapı / mağara ağzı geçidi
+  if (!c.ring) return null;
+  const cx = W / 2, cz = H / 2, dx = x - cx, dz = y - cz, d = Math.hypot(dx, dz) || 1e-6;
+  let lim;
+  if (c.ring === 'circle') lim = 164;
+  else {
+    const R = c.ring, a = Math.atan2(dz, dx); let i = 0; while (i < R.length && R[i][0] < a) i++;
+    const p0 = R[(i - 1 + R.length) % R.length], p1 = R[i % R.length]; let a0 = p0[0], a1 = p1[0]; if (a1 < a0) a1 += TAU; let aa = a; if (aa < a0) aa += TAU;
+    lim = p0[1] + (p1[1] - p0[1]) * clamp((aa - a0) / Math.max(1e-6, a1 - a0), 0, 1);
+  }
+  if (d <= lim) return null;
+  return { x: cx + dx / d * lim, y: cz + dz / d * lim };
+}
+function inDividers(gb, b, D, st, R, X, ceil) {
+  const W = D.w, H = D.h, lay = inLayout(b), pts = lay.pts; X.walls.push(...lay.walls);
   for (const [x0, z0, x1, z1] of X.walls) {
     const len = Math.hypot(x1 - x0, z1 - z0), n = Math.max(2, Math.round(len / 14));
     for (let i = 0; i <= n; i++) { const t = i / n, x = x0 + (x1 - x0) * t, z = z0 + (z1 - z0) * t, y0 = inFloorY(x, z), fall = 1 - t * 0.55;
@@ -8681,6 +8958,11 @@ function inBuild(b) {
     if (r.t === 'kasap') X.decals.push([mx, mz, Math.min(r.w, r.h) * 0.25, '#3a1010']);
   }
   const mesh = gb.mesh(); mesh.material = MAT.inV; root.add(mesh);
+  // leke gölgeler: eşyaların ve insanların altında, ana ateşin ters yönüne kaymış
+  { IN.mainL = X.lights.filter(l => l.fl && !l.door).sort((a, c) => c.int - a.int)[0] || { x: W / 2, z: H / 2 };
+    IN.shadow = mkInst(GEO.disc, MAT.inShadow, 160); IN.shadow.renderOrder = 1; root.add(IN.shadow); IN.fsh = [];
+    const SZ = { bed: [27, 15], mat: [21, 12], healbed: [27, 15], crate: [17, 16], table: [34, 21], bench: [31, 16], block: [14, 14], rack: [27, 7], herbs: [29, 9] };
+    for (const f of furn) { const z = SZ[f.k]; if (z) IN.fsh.push(inShadowArgs(f.x, f.y, z[0], z[1], f.ang || 0, 16)); } }
   // lekeler
   for (const [x, z, r, c] of X.decals) { const m = new THREE.Mesh(GEO.disc, new THREE.MeshBasicMaterial({ color: c3(c), transparent: true, opacity: 0.55, depthWrite: false })); m.scale.set(r, 1, r * 0.8); m.position.set(x, inFloorY(x, z) + 0.7, z); root.add(m); }
   // asılı postlar
@@ -8706,6 +8988,10 @@ function inBuild(b) {
   X.lights.sort((a, c) => a.pri - c.pri); IN.lights = X.lights.slice(0, 6);
   IN.ceil = ceil;
   root.updateMatrixWorld(true);
+}
+function inShadowArgs(x, z, rx, rz, ry, h) {
+  const l = IN.mainL || { x, z: z + 1 }, dx = x - l.x, dz = z - l.z, d = Math.hypot(dx, dz) || 1, k = Math.min(h * 0.6, 1600 / (d + 40));
+  return [x + dx / d * k, inFloorY(x, z) + 0.9, z + dz / d * k, rx + k * 0.3, 1, rz, ry];
 }
 function inDispose() {
   if (!IN.root) return;
@@ -8766,6 +9052,11 @@ function render3DInterior(dt, t, yaw, pitch, bobY, sh) {
     g.position.set(q.x, inFloorY(q.x, q.y) + (q.pose === 'sleep' ? 2.5 : 0), q.y); g.rotation.y = -q.ang;
   }
   for (const [p, g] of IN.ppl) if (!seen.has(p)) { IN.root.remove(g); if (M3.dispose) M3.dispose(g); IN.ppl.delete(p); }
+  if (IN.shadow) {
+    const m = IN.shadow; m.count = 0; for (const a of IN.fsh) instAdd(m, ...a);
+    for (const q of list) { if (!q.p || q.p === L) continue; const sl = q.pose === 'sleep'; instAdd(m, ...inShadowArgs(q.x, q.y, sl ? 17 : 8.5, sl ? 9 : 7.5, -q.ang, sl ? 4 : 30)); }
+    instDone(m); MAT.inShadow.opacity = 0.5 - 0.15 * (1 - dk);
+  }
   updFlames(t); updViewModel(dt, t);
   U3.r.setClearColor(0x000000, 1);
   U3.r.render(IN.scene, cam);
@@ -9079,7 +9370,7 @@ function renderChar() {
       if (mine.length) h += `<div><small>Sırası: ${mine.map(o => `${ITEMS[o.item].ic}×${o.left >= 999 ? '∞' : o.left}`).join(' ')}</small></div>`;
     }
   }
-  $('charBox').innerHTML = h + '</div>';
+  { const box = $('charBox'), old = box.querySelector('.cl'), st = old && UI.charShown === p.id ? old.scrollTop : 0; box.innerHTML = h + '</div>'; const nw = box.querySelector('.cl'); if (nw) nw.scrollTop = st; UI.charShown = p.id; }
 }
 
 // ---- üretim menüsü
@@ -9341,11 +9632,12 @@ function showVictory(saved, left) {
 }
 
 // ---- döngü
+const TEMPO = 0.78;   // oyunun genel hızı: daha ağır, daha yavaş bir hava
 let lastT = performance.now();
 function loop(now) {
   const dt = Math.min(0.05, (now - lastT) / 1000); lastT = now;
   if (G.started && L) {
-    if (!G.paused && !G.over && !G.modal) { if (G.sleep) { for (let i = 0; i < 10 && G.sleep; i++) update(0.05); } else update(dt); }
+    if (!G.paused && !G.over && !G.modal) { if (G.sleep) { for (let i = 0; i < 10 && G.sleep; i++) update(0.05); } else update(dt * TEMPO); }
     $('sleepV').style.display = G.sleep ? 'flex' : 'none';
     if (L) { render(); hudTick(dt); }
   }
