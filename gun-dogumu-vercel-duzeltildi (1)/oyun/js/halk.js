@@ -739,11 +739,11 @@ function updHealer(p, dt, thr) {
   updGather(p, dt, 'sifaci', thr);
 }
 function pickScoutTarget(p) {
-  const z = G.zone.kasif, c = z || CAMP, R = z ? 900 : 2900;
+  const z = G.zone.kasif, c = z || CAMP, R = z ? 900 : 4200;
   let best = null, bs = 1e9;
   for (let k = 0; k < 70; k++) {
     const a = rand(0, TAU), r = Math.sqrt(Math.random()) * R, x = clamp(c.x + Math.cos(a) * r, 100, WORLD - 100), y = clamp(c.y + Math.sin(a) * r, 100, WORLD - 100);
-    if (exploredAt(x, y)) continue;
+    if (exploredAt(x, y) || isSea(x, y)) continue;
     const s = Math.hypot(x - p.x, y - p.y) + Math.hypot(x - c.x, y - c.y) * 0.5;
     if (s < bs) { bs = s; best = { x, y }; }
   }
@@ -1063,7 +1063,7 @@ function halkDawn() {
   // çocuklar
   for (const p of G.people) if (p.child) {
     p.age++;
-    if (p.age >= 3) {
+    if (p.age >= 12) {
       p.child = false; p.r = 11; p.traits = pickTraits(); p.story = 'Bu kampta doğdu; başka bir dünya bilmiyor.';
       p.maxhp = Math.round(60 * (tr(p, 'guclu') ? 1.3 : 1) * (tr(p, 'hasta') ? 0.75 : 1)); p.hp = p.maxhp; p.group = G.newGroup;
       const par = G.people.find(q => q.id === p.parentA || q.id === p.parentB);
@@ -1073,7 +1073,7 @@ function halkDawn() {
   }
   // çiftler
   const singles = G.people.filter(p => !p.child && !p.partner);
-  if (singles.length >= 2 && Math.random() < 0.35) {
+  if (singles.length >= 2 && Math.random() < 0.05) {
     const a = pick(singles), opts = singles.filter(q => q !== a && !(q.parentA && q.parentA === a.parentA));
     const b = opts.length ? pick(opts) : null;
     if (b) { a.partner = b.id; b.partner = a.id; msg(`${a.name} ve ${b.name} birbirine yakınlaştı. ❤ Artık aynı çadırı paylaşacaklar.`, '#f9c', 5); moraleAdd(3); }
@@ -1086,7 +1086,7 @@ function halkDawn() {
     done.add(a.id); done.add(b.id);
     const home = homeOf(a) || homeOf(b);
     const kids = G.people.filter(q => q.child && (q.parentA === a.id || q.parentB === a.id)).length;
-    if (home && G.morale >= 40 && foodTotal() >= 10 && kids < 2 && Math.random() < 0.22) {
+    if (home && G.morale >= 40 && foodTotal() >= 10 && kids < 2 && Math.random() < 0.03) {
       const c = mkPerson(home.x + rand(-20, 20), home.y + 30, freshName(), false, true);
       c.parentA = a.id; c.parentB = b.id; c.group = null; G.people.push(c);
       msg(`${a.name} ve ${gen(b.name)} bir bebeği oldu: ${c.name}! 👶`, '#ffd0e0', 6); moraleAdd(8); unlock('cocuk');

@@ -20,7 +20,18 @@ function pushOut(e, isDino) {
     if (d < m) { e.x = o.x + dx / d * m; e.y = o.y + dy / d * m; if (o.kind === 'build') blocked = o; }
   }
   e.x = clamp(e.x, 30, WORLD - 30); e.y = clamp(e.y, 30, WORLD - 30);
+  if (HM && groundH(e.x, e.y) < 0.6) seaPush(e);
   return blocked;
+}
+// yürüyenleri denizden karaya it: yükseklik eğimi boyunca yukarı (düzse kampa doğru)
+function seaPush(e) {
+  for (let k = 0; k < 16; k++) {
+    const h = groundH(e.x, e.y); if (h >= 0.6) return;
+    let gx = groundH(e.x + 25, e.y) - groundH(e.x - 25, e.y), gy = groundH(e.x, e.y + 25) - groundH(e.x, e.y - 25), m = Math.hypot(gx, gy);
+    if (m < 0.05) { gx = CAMP.x - e.x; gy = CAMP.y - e.y; m = Math.hypot(gx, gy) || 1; }
+    const st = clamp((0.6 - h) / 0.2, 3, 60);
+    e.x += gx / m * st; e.y += gy / m * st;
+  }
 }
 function steer(e, tx, ty, spd, dt, isDino) {
   let dx = tx - e.x, dy = ty - e.y; const d = Math.hypot(dx, dy);
@@ -63,7 +74,8 @@ function mkDino(type, x, y) {
   return { type, x, y, r: d.r, hp: d.hp, maxhp: d.hp, ang: rand(0, TAU), anim: rand(0, 9), atkCd: 0, think: 0, tgt: null, wx: x, wy: y, wt: 0,
     hurt: 0, leave: false, tamed: false, angry: 0, ko: 0, koDone: false, carry: null, carryDmg: 0, orbit: Math.random() < 0.5 ? 1 : -1,
     engaged: false, stepT: 0, rush: 0, roarT: rand(4, 10), blink: rand(1, 5), moving: false, bash: null, trapCd: 0, id: ++G.idc,
-    stuck: 0, detour: 0, alt: 0, st: 'idle', poison: 0, scouted: 0, fly: type === 'kanatli', hidden: false };
+    stuck: 0, detour: 0, alt: 0, st: 'idle', poison: 0, scouted: 0, fly: type === 'kanatli', hidden: false,
+    alert: 0, alertT: 0, fleeing: false, terr: null };
 }
 function removeDino(d) {
   if (d.dead && !G.dinos.includes(d)) return;
@@ -83,6 +95,11 @@ function hurt(t, dmg, src, poison, isProj) {
     if (t.type === 'zirhli' && src && !t.tamed) { const ad = angDiff(t.ang, angTo(t, src)); if (!(ad > 0.9 && ad < 2.3)) { dmg *= 0.3; if (Math.random() < 0.3) ftext(t.x, t.y - t.r, 'zırh!', '#ccc'); } }
     if (t.type === 'taklitci' && !t.revealed) reveal(t);
     if (t.type === 'kesici' && src && !src.type) { const al = alliesNear(src, 150); dmg *= al >= 2 ? 1.8 : al === 1 ? 1 : 0.5; if (al >= 2 && !t.retreat) t.retreat = 1.5; }
+    // gizli av: farkında olmayan otobura ilk vuruş ×2
+    if (DINO[t.type].herb && !t.tamed && !t.alert && !(t.flee > 0) && !(t.angry > 0) && src && !src.type && src.kind !== 'build' && !src.isRescue) {
+      dmg *= 2; ftext(t.x, t.y - t.r - 12, 'sessiz vuruş ×2', '#ffe08a');
+    }
+    if (!t.tamed) { t.alert = G.now || 0.01; t.alertT = 0; }
     t.hp -= dmg; t.hurt = 0.15; if (poison) t.poison = 5;
     for (let i = 0; i < 5; i++) G.parts.push({ x: t.x, y: t.y, vx: rand(-120, 120), vy: rand(-120, 120), life: rand(0.3, 0.7), col: '#7a0d0d', s: rand(2, 4) });
     if (t.carry && src && src.leader) { t.carryDmg += dmg; if (t.carryDmg >= 70) dropCarry(t, true); }
@@ -102,6 +119,7 @@ function hurt(t, dmg, src, poison, isProj) {
     return;
   }
   // ---- insan
+  if (src && src.type && guardSafe(t)) return;          // kapı nöbetçisi yaratıklardan zarar görmez
   if (src && src.type) dmg *= DIFF[G.diff].dmg;
   if (t === L && G.mount && !G.mount.dead) { const m = G.mount, md = dmg * 0.6; dmg -= md; m.hp -= md; m.hurt = 0.15; if (m.hp <= 0) killDino(m, src); }
   if (t.eq && t.eq.zirh) dmg *= 0.7;
@@ -181,9 +199,11 @@ function dismount(silent) {
 }
 
 // ---- av listesi
+const guardSafe = p => typeof doorDuty === 'function' && !p.type && !!doorDuty(p);
 function preyList() {
   const out = [];
-  for (const p of G.people) if (!p.inHut && !p.grabbed && !p.dead && !p.insideB) out.push(p);
+  const gs = typeof doorGuards === 'function' ? doorGuards() : null;   // kapı nöbetçileri av değildir (doorDuty ile aynı küme)
+  for (const p of G.people) if (!p.inHut && !p.grabbed && !p.dead && !p.insideB && !(gs ? gs.includes(p) : guardSafe(p))) out.push(p);
   for (const d of G.dinos) if (d.tamed && !d.fly && !d.mounted) out.push(d);
   if (G.rescue && L && dist(G.rescue, L) < 450) out.push(G.rescue);
   return out;
@@ -224,6 +244,38 @@ function updDino(d, dt, prey, zones) {
   return updPred(d, dt, prey, zones);
 }
 
+// ---- ses ve gizlilik
+// kişinin çıkardığı gürültü: 0 (çömelip duran) … 1 (koşan); yağmur sesi bastırır
+function noiseOf(p) {
+  if (!p || p.dead) return 0;
+  let n;
+  if (p.type) n = p.moving ? 0.6 : 0.2;                               // evcil yaratık
+  else if ((p === L && G.mount) || p.mounted) n = 0.9;
+  else if (p.sprinting) n = 1;
+  else if (p.sneak) n = p.moving ? 0.2 : 0;
+  else n = p.moving ? 0.6 : 0.25;
+  const w = G.weather && G.weather.type;
+  if (w === 'yagmur' || w === 'firtina') n *= 0.7;
+  return n;
+}
+// görüş: yaratığın önündeki ~120° koni; çömelen daha zor, ovanın uzun otlarında çömelen neredeyse görünmez
+function seesP(d, p, range) {
+  let r = range;
+  if (p.sneak && !p.sprinting) { r *= 0.5; if (biomeFast(p.x, p.y) === 4) r = Math.min(r, 70); }
+  const dx = p.x - d.x, dy = p.y - d.y, dd = Math.hypot(dx, dy);
+  return dd < r && angDiff(d.ang, Math.atan2(dy, dx)) < Math.PI / 3;
+}
+// yırtıcı bu kişiyi fark eder mi: duyarak, önündeyse görerek, çok yakındaysa kokusundan
+function predNotices(d, t, dd, sense) {
+  return dd < sense * noiseOf(t) || dd < Math.max(60, sense * 0.22 * (t.sneak ? 0.6 : 1)) || seesP(d, t, sense * 0.55);
+}
+// kamptan uzaklığa ve biyoma göre vahşilik: 0 kamp çevresi … ~1 derin orman/sis
+function wildness(x, y) {
+  const dc = Math.hypot(x - G.fire.x, y - G.fire.y), k = clamp((dc - 1900) / 1600, 0, 1);
+  const b = biomeFast(x, y);
+  return k * (b === 0 ? (dc > 3200 ? 1 : 0.6) : b === 1 ? 0.9 : b === 2 ? 1 : b === 3 ? 1.2 : b === 4 ? 0.45 : b === 5 ? 0.25 : 0);
+}
+
 function updPred(d, dt, prey, zones) {
   const def = DINO[d.type], night = isNight() || !!G.finale;
   if (d.mother) { d.motherT -= dt; if (d.motherT <= 0) d.mother = false; }
@@ -242,6 +294,12 @@ function updPred(d, dt, prey, zones) {
     return;
   }
   if (d.retreat > 0) { d.retreat -= dt; const fr = d.tgt && !d.tgt.dead ? d.tgt : G.fire, a = angTo(fr, d); steer(d, d.x + Math.cos(a) * 100, d.y + Math.sin(a) * 100, def.spd, dt, true); d.anim += dt * 12; return; }
+  // karanlıkta duran bir çift göz: yalnızca izler, yaklaşılınca kaybolur
+  if (d.watcher > 0) {
+    d.watcher -= dt; d.moving = false; d.ang = angLerp(d.ang, angTo(d, G.fire), Math.min(1, dt * 2));
+    if (d.watcher <= 0 || !isNight() || d.hurt > 0 || G.people.some(p => !p.inHut && !p.insideB && Math.hypot(p.x - d.x, p.y - d.y) < 300)) { d.watcher = 0; d.leave = true; }
+    return;
+  }
   if (d.type === 'geceavcisi' && !isNight() && !G.finale) d.leave = true;
   if (d.type === 'yelken' && d.home && d.tgt && !d.tgt.dead && Math.hypot(d.tgt.x - d.home.x, d.tgt.y - d.home.y) > 750) { d.tgt = null; d.wx = d.home.x; d.wy = d.home.y; }
   if (d.type === 'yelken' && L) { d.growlT = (d.growlT || rand(5, 10)) - dt; if (d.growlT <= 0) { d.growlT = rand(10, 20); const dd = dist(d, L); if (dd < 1100) SFX.growl(clamp(1 - dd / 1100, 0.1, 0.9), panOf(d.x)); } }
@@ -282,6 +340,12 @@ function updPred(d, dt, prey, zones) {
     if (d.mother && G.carryEgg && L) best = L;
     else for (const t of prey) {
       const dd = dist(d, t); if (dd > sense) continue;
+      // sessiz yürüyeni duymaz; ama önündeyse görür
+      if (!t.type && !t.isRescue && d.tgt !== t && !(d.rush > 0) && !d.finale && !predNotices(d, t, dd, sense)) continue;
+      // bölgesel yırtıcı kendi topraklarından çıkmaz
+      if (d.terr && !(d.rush > 0) && Math.hypot(t.x - d.terr.x, t.y - d.terr.y) > d.terr.r) continue;
+      // küçükler ürkektir: yalnız gecede tek kalanı ya da yaralıyı kollar
+      if (d.type === 'kucuk' && !bold && !t.type && !(t.downed > 0) && !(night && alliesNear(t, 220) === 0)) continue;
       let s = dd; if (!bold && inSafe(t.x, t.y, zones)) s += 500; if (t.tamed && d.type === 'kucuk') s += 800;
       if ((d.type === 'kucuk' || d.type === 'tukurgec') && !bold && (dist(t, G.fire) < 450 || alliesNear(t, 160) >= 2)) continue;
       if (t.leader) s += 40;
@@ -295,9 +359,10 @@ function updPred(d, dt, prey, zones) {
       if (L && dist(d, L) < 1000) { const v = clamp(1 - dist(d, L) / 1000, 0.1, 0.8); if (d.type === 'yirtici') SFX.screech(v, panOf(d.x)); else if (d.type === 'kucuk') SFX.chirp(v, panOf(d.x)); }
     }
     d.tgt = best;
-    if (d.type === 'yirtici' && night && G.day >= 3 && Math.random() < 0.004 * G.day * DIFF[G.diff].spawn) d.rush = rand(2, 4);
+    if (!d.terr && d.type === 'yirtici' && night && G.day >= 3 && Math.random() < 0.004 * G.day * DIFF[G.diff].spawn) d.rush = rand(2, 4);
     if (d.type === 'dev' && night && G.day >= 4 && Math.random() < 0.01) d.rush = rand(5, 9);
   }
+  if (d.terr && d.tgt && !(d.rush > 0) && Math.hypot(d.tgt.x - d.terr.x, d.tgt.y - d.terr.y) > d.terr.r * 1.25) { d.tgt = null; d.engaged = false; }
   const t = !t_dead(d.tgt) ? d.tgt : null;
   let tx, ty, spd = def.spd * (d.mother ? 1.15 : 1);
   if (t) {
@@ -327,15 +392,17 @@ function updPred(d, dt, prey, zones) {
     d.wt -= dt;
     if (d.wt <= 0 || Math.hypot(d.wx - d.x, d.wy - d.y) < 20) {
       d.wt = rand(3, 8);
-      if (night) { const a = rand(0, TAU), r = fireR() + rand(150, 500); d.wx = G.fire.x + Math.cos(a) * r; d.wy = G.fire.y + Math.sin(a) * r; }
+      if (d.terr) { const a = rand(0, TAU), r = rand(0, d.terr.r * (night ? 0.75 : 0.5)); d.wx = d.terr.x + Math.cos(a) * r; d.wy = d.terr.y + Math.sin(a) * r; }
+      else if (night) { const a = rand(0, TAU), r = fireR() + rand(150, 500); d.wx = G.fire.x + Math.cos(a) * r; d.wy = G.fire.y + Math.sin(a) * r; }
       else { d.wx = d.x + rand(-400, 400); d.wy = d.y + rand(-400, 400); }
+      if (isSea(d.wx, d.wy)) { d.wx = (d.wx + G.fire.x) / 2; d.wy = (d.wy + G.fire.y) / 2; }
     }
     tx = d.wx; ty = d.wy; spd = def.spd * 0.4;
   }
   if (tx !== undefined) {
     d.spdNow = spd;
     steer(d, tx, ty, spd, dt, true); d.anim += dt * spd / 22;
-    if (!bold) for (const z of zones) { const dx = d.x - z.x, dy = d.y - z.y, dd = Math.hypot(dx, dy) || 1; if (dd < z.r) { d.x = z.x + dx / dd * z.r; d.y = z.y + dy / dd * z.r; } }
+    for (const z of zones) { if (bold && !z.guard) continue; const dx = d.x - z.x, dy = d.y - z.y, dd = Math.hypot(dx, dy) || 1; if (dd < z.r) { d.x = z.x + dx / dd * z.r; d.y = z.y + dy / dd * z.r; } }
     if (d.bash && d.atkCd <= 0 && ((t && !inSafe(t.x, t.y, zones)) || d.type === 'dev' || bold)) { const b = d.bash; d.atkCd = def.cd; b.hp -= def.dmg * (d.type === 'dev' ? 2 : 1); b.hit = 0.2; SFX.hit(L ? clamp(1 - dist(b, L) / 700, 0, 0.5) : 0.2); if (b.hp <= 0) destroyBuild(b); }
   }
   checkTraps(d);
@@ -397,13 +464,78 @@ function updHerb(d, dt) {
       return;
     }
   }
-  if (isNight()) d.leave = true;
+  if (isNight() && dist(d, G.fire) < 1800) d.leave = true;
   if (d.leave) { const a = angTo(G.fire, d); steer(d, d.x + Math.cos(a) * 100, d.y + Math.sin(a) * 100, def.spd, dt, true); d.anim += dt * 4; if (!L || dist(d, L) > 1600) removeDino(d); return; }
+  if (fleeStep(d, dt, 1.8)) return;
+  if (preyAware(d, dt)) return;
   wanderSlow(d, dt, def.spd * 0.45);
+}
+// ---- kaçış: tehditten uzağa (denize değil), sürü halinde
+function fleeStep(d, dt, mul) {
+  d.fleeing = d.flee > 0;
+  if (!d.fleeing) return false;
+  d.flee -= dt;
+  const from = d.fleeFrom && !d.fleeFrom.dead ? d.fleeFrom : G.fire;
+  let a = angTo(from, d) + Math.sin(G.now + d.id) * 0.3;
+  for (let k = 0; k < 6; k++) { const aa = a + (k % 2 ? 1 : -1) * Math.ceil(k / 2) * 0.6; if (!isSea(d.x + Math.cos(aa) * 220, d.y + Math.sin(aa) * 220)) { a = aa; break; } }
+  steer(d, d.x + Math.cos(a) * 200, d.y + Math.sin(a) * 200, DINO[d.type].spd * mul, dt, true); d.anim += dt * 12;
+  if (d.flee <= 0) { d.fleeing = false; d.calmT = rand(3, 6); }
+  return true;
+}
+// ---- av hayvanının kulakları ve gözleri
+const PREY_HEAR = { ordek: 420, gurleyen: 450, boynuzlu: 420, zirhli: 400, uzunboyun: 520 };
+function preyNotices(d, p, dd) {
+  if (dd < (PREY_HEAR[d.type] || 440) * noiseOf(p)) return true;
+  const sr = 380 * (isNight() ? 0.55 : 1) * (G.weather && G.weather.type === 'sis' ? 0.6 : 1);
+  return seesP(d, p, sr);
+}
+// önce başını kaldırıp sese bakar (~1.2 sn, d.alert = zaman), sonra sürüce kaçar ya da (sıkışınca) saldırır
+function preyAware(d, dt) {
+  if (d.alertT > 0) {
+    d.alertT -= dt; d.moving = false;
+    const s = d.alertSrc;
+    if (s && !s.dead) d.ang = angLerp(d.ang, angTo(d, s), Math.min(1, dt * 5));
+    if (d.alertT <= 0) {
+      const dd = s && !s.dead && !s.inHut && !s.insideB ? dist(d, s) : 1e9;
+      if (dd < 140 || (dd < 1e8 && preyNotices(d, s, dd * 0.8))) preyReact(d, s, dd);
+      else { d.alert = 0; d.alertSrc = null; d.calmT = 1.5; }        // boş alarm: otlamaya döner
+    }
+    return true;
+  }
+  if (d.calmT > 0) d.calmT -= dt;
+  if (d.alert && !(d.flee > 0) && !(d.angry > 0) && G.now - d.alert > 9) d.alert = 0;
+  d.lookT = (d.lookT || 0) - dt;
+  if (d.lookT > 0 || d.calmT > 0) return false;
+  d.lookT = rand(0.2, 0.35);
+  let thr = null, td = 1e9;
+  for (const p of G.people) {
+    if (p.inHut || p.bed || p.insideB || p.grabbed || p.dead) continue;
+    const dd = dist(p, d); if (dd < 600 && dd < td && preyNotices(d, p, dd)) { thr = p; td = dd; }
+  }
+  if (!thr) for (const o of G.dinos) if (!o.tamed && !o.hidden && !o.watcher && DINO[o.type].pred && o.campI === undefined && dist(o, d) < 300) { thr = o; td = dist(o, d); break; }
+  if (!thr) return false;
+  if (thr.type || td < 60) { preyReact(d, thr, td); return d.flee > 0 || d.angry > 0; }
+  d.alert = G.now || 0.01; d.alertT = 1.2; d.alertSrc = thr; d.moving = false;
+  return true;
+}
+function preyReact(d, src, dd) {
+  d.alert = G.now || 0.01; d.alertT = 0;
+  const near = dist(d, G.fire) > 500;
+  if (d.type === 'gurleyen' && !src.type && dd < 160 && near) { d.angry = 6; d.tgt = src; SFX.honk(volOf(d, 700) * 0.6, panOf(d.x)); return; }
+  if (d.type === 'zirhli' && dd < 140) { d.angry = 6; d.tgt = src; return; }
+  if (d.type === 'boynuzlu' && dd < 100 && !src.type && near) { d.angry = 8; d.tgt = src; return; }
+  alarmHerd(d, src);
 }
 function wanderSlow(d, dt, spd) {
   d.wt -= dt;
-  if (d.wt <= 0) { d.wt = rand(5, 12); d.wx = d.x + rand(-300, 300); d.wy = d.y + rand(-300, 300); if (Math.hypot(d.wx - CAMP.x, d.wy - CAMP.y) < 450) { d.wx += 450; } }
+  if (d.wt <= 0) {
+    d.wt = rand(5, 12) * (isNight() ? 2 : 1);
+    const c = d.terr && Math.hypot(d.x - d.terr.x, d.y - d.terr.y) > d.terr.r * 0.7 ? d.terr : d;
+    d.wx = c.x + rand(-300, 300); d.wy = c.y + rand(-300, 300);
+    if (Math.hypot(d.wx - CAMP.x, d.wy - CAMP.y) < 450) { d.wx += 450; }
+    if (isSea(d.wx, d.wy)) { d.wx = d.x + (CAMP.x - d.x) * 0.05; d.wy = d.y + (CAMP.y - d.y) * 0.05; }
+  }
+  if (isNight()) spd *= 0.5;                                      // gece sürü dinlenir
   if (Math.hypot(d.wx - d.x, d.wy - d.y) > 10) { steer(d, d.wx, d.wy, spd, dt, true); d.anim += dt * 3; } else d.moving = false;
 }
 function updLong(d, dt) {
@@ -426,6 +558,8 @@ function updLong(d, dt) {
       return;
     }
   }
+  if (fleeStep(d, dt, 1.5)) return;
+  if (preyAware(d, dt)) return;
   wanderSlow(d, dt, def.spd * 0.6);
 }
 function updFlyer(d, dt) {
@@ -438,7 +572,7 @@ function updFlyer(d, dt) {
     if (d.scoutT <= 0) {
       d.scoutT = 2; let n = 0, sx = 0, sy = 0;
       for (const o of G.dinos) {
-        if (o.tamed || !DINO[o.type].pred || o.leave) continue;
+        if (o.tamed || !DINO[o.type].pred || o.leave || o.watcher) continue;
         const dd = dist(o, G.fire);
         if (dd < 1150 && dd > fireR() + 40) { o.scouted = 6; if (o.type !== 'kucuk') { n++; sx += o.x; sy += o.y; } }
       }
@@ -524,7 +658,7 @@ function spawnPos(minR = 850, maxR = 1150, around) {
   const c = around || L;
   for (let k = 0; k < 30; k++) {
     const a = rand(0, TAU), r = rand(minR, maxR), x = c.x + Math.cos(a) * r, y = c.y + Math.sin(a) * r;
-    if (x < 80 || y < 80 || x > WORLD - 80 || y > WORLD - 80) continue;
+    if (x < 80 || y < 80 || x > WORLD - 80 || y > WORLD - 80 || isSea(x, y)) continue;
     if (Math.hypot(x - G.fire.x, y - G.fire.y) < Math.max(fireR(), 320) + 300) continue;
     if (G.lakes.some(l => Math.hypot(l.x - x, l.y - y) < l.r + 40)) continue;
     return { x, y };
@@ -555,42 +689,73 @@ function ambush(v, n, type, text) {
   SFX.screech(L ? clamp(1 - dist(v, L) / 1000, 0.2, 1) : 0.4, panOf(v.x));
   return out;
 }
-function spawner() {
-  const cnt = {}; for (const d of G.dinos) if (!d.tamed && !d.leave && d.campI === undefined) cnt[d.type] = (cnt[d.type] || 0) + 1;
-  const c = k => cnt[k] || 0;
-  const day = G.day, n = isNight(), sm = DIFF[G.diff].spawn, lb = biomeFast(L.x, L.y);
-  if (!n) {
-    if (c('boynuzlu') < 4 && Math.random() < 0.25) spawnPack('boynuzlu', 1, spawnPosBiome([0, 2]));
-    if (c('uzunboyun') < 1 && Math.random() < 0.02) spawnPack('uzunboyun', 1, spawnPosBiome([0, 2], 700, 1100));
-    if (c('kanatli') < 3 && Math.random() < 0.2) { const pos = spawnPosBiome([1], 500, 1100); if (pos) spawnFlyer(pos); }
-    if (c('kucuk') < (2 + day / 2) * sm && Math.random() < 0.08) spawnPack('kucuk', ri(2, 4));
-    if (c('ordek') < 9 && Math.random() < 0.14) spawnPack('ordek', ri(3, 6), spawnPosBiome([0, 2], 700, 1200));
-    if (c('gurleyen') < 5 && Math.random() < 0.06) spawnPack('gurleyen', ri(2, 4), spawnPosBiome([0, 1], 700, 1200));
-    if (c('zirhli') < 2 && Math.random() < 0.03) spawnPack('zirhli', 1, spawnPosBiome([0, 1], 800, 1200));
-    if (c('tukurgec') < 1 + day / 4 && Math.random() < 0.03 * sm) spawnPack('tukurgec', ri(1, 2), spawnPosBiome([0, 2]));
-    if (lb === 3 && c('yirtici') < 4 * sm && Math.random() < 0.1) spawnPack('yirtici', ri(2, 3), spawnPos(500, 800));
-    // nadir gündüz pususu: kamptan uzaktaki birine
-    if (day >= 2 && Math.random() < 0.006 * sm) {
-      const far = G.people.filter(p => !p.inHut && !p.grabbed && !p.child && !p.downed && dist(p, G.fire) > 750);
-      if (far.length) ambush(pick(far), ri(2, 3), Math.random() < 0.3 ? 'tukurgec' : 'yirtici');
-    }
-  } else {
-    if (c('kucuk') < (3 + day / 2) * sm && Math.random() < 0.08) spawnPack('kucuk', ri(2, 4));
-    if (c('yirtici') < Math.min(1 + day * 0.5, 4) * sm && Math.random() < 0.035) spawnPack('yirtici', ri(1, 2));
-    if (c('tukurgec') < 2 && Math.random() < 0.015 * sm) spawnPack('tukurgec', 1, spawnPosBiome([0, 2]));
-    if (day >= 2 && c('geceavcisi') < Math.min(day, 8) * sm && Math.random() < 0.04) spawnPack('geceavcisi', ri(2, 3 + Math.floor(day / 4)));
+// bölgesel doğurma: yeri (biyom + vahşilik) uygunsa sürüyü orada kurar, d.terr = yaşam alanı
+function spawnTerr(type, n, bs, minW, r = 1100, minR = 800, maxR = 1250) {
+  for (let k = 0; k < 10; k++) {
+    const p = spawnPos(minR, maxR); if (!p) continue;
+    if (bs && !bs.includes(biomeFast(p.x, p.y))) continue;
+    if (wildness(p.x, p.y) < minW) continue;
+    const out = spawnPack(type, n, p), terr = { x: p.x, y: p.y, r };
+    for (const d of out) d.terr = terr;
+    return out;
   }
-  if (day >= 4 && c('yelken') < 1 && Math.random() < 0.003 * sm) {
-    const W = G.pools.concat(G.lakes).filter(w => { const d = Math.hypot(w.x - L.x, w.y - L.y); return d > 700 && d < 1500; });
+  return [];
+}
+// otlayan sürüler: önce ova, yoksa orman
+function spawnHerd(type, n, bs, minR = 700, maxR = 1250) {
+  for (const b of bs) {
+    const p = spawnPosBiome([b], minR, maxR); if (!p) continue;
+    const out = spawnPack(type, n, p), terr = { x: p.x, y: p.y, r: 900 };
+    for (const d of out) d.terr = terr;
+    return out;
+  }
+  return [];
+}
+function spawner() {
+  const cnt = {}; for (const d of G.dinos) if (!d.tamed && (!d.leave || DINO[d.type].herb) && d.campI === undefined && !d.watcher) cnt[d.type] = (cnt[d.type] || 0) + 1;
+  const c = k => cnt[k] || 0;
+  const day = G.day, n = isNight(), sm = DIFF[G.diff].spawn, R = Math.random;
+  // ---- av hayvanları: yaygın, sürü halinde; ovada daha çok
+  if (c('ordek') < 12 && R() < 0.12) spawnHerd('ordek', ri(4, 7), R() < 0.7 ? [4, 0] : [0, 4]);
+  if (c('gurleyen') < 7 && R() < 0.05) spawnHerd('gurleyen', ri(3, 5), R() < 0.6 ? [4, 0, 1] : [0, 1]);
+  if (c('boynuzlu') < 4 && R() < (n ? 0.02 : 0.1)) spawnHerd('boynuzlu', ri(1, 3), [4, 0, 2]);
+  if (c('zirhli') < 3 && R() < 0.03) spawnHerd('zirhli', ri(1, 2), [4, 0]);
+  if (c('uzunboyun') < 1 && R() < 0.006) spawnHerd('uzunboyun', 1, [4], 900, 1400);
+  if (!n && c('kanatli') < 3 && R() < 0.15) { const pos = spawnPosBiome([1, 5], 500, 1100); if (pos) spawnFlyer(pos); }
+  // ---- yırtıcılar: az, uzak bölgelerinde (sık orman, dağ, bataklık, sis); kamp çevresi boş
+  if (c('kucuk') < (n ? 3 : 2) && R() < 0.04) spawnTerr('kucuk', ri(2, 3), null, 0.35, 900);
+  if (c('yirtici') < (n ? 4 : 3) * sm && R() < (n ? 0.035 : 0.025)) spawnTerr('yirtici', ri(1, 3), [0, 1, 2, 3], 0.55);
+  if (n && day >= 2 && c('geceavcisi') < Math.min(2 + day / 4, 5) * sm && R() < 0.03) spawnTerr('geceavcisi', ri(2, 3), [0, 2, 3], 0.6);
+  if (c('tukurgec') < (day >= 6 ? 2 : 1) && R() < 0.005 * sm) spawnTerr('tukurgec', 1, [0, 2], 0.8, 700);
+  if (day >= 3 && c('kesici') < 1 && R() < (n ? 0.008 : 0.003) * sm) for (const d of spawnTerr('kesici', 1, [0, 3], 0.75, 1300)) d.silent = true;
+  if (day >= 4 && c('yelken') < 1 && R() < 0.0015 * sm) {
+    const W = G.pools.concat(G.lakes).filter(w => { const d = Math.hypot(w.x - L.x, w.y - L.y); return d > 700 && d < 1500 && wildness(w.x, w.y) > 0.5; });
     if (W.length) { const w = pick(W), a = rand(0, TAU), d = mkDino('yelken', w.x + Math.cos(a) * (w.r + 40), w.y + Math.sin(a) * (w.r + 40)); d.home = { x: w.x, y: w.y }; pushOut(d, true); G.dinos.push(d); }
   }
-  if (day >= 3 && c('kesici') < (day >= 7 ? 2 : 1) && Math.random() < (n ? 0.012 : 0.004) * sm) {
-    const pos = spawnPosBiome([0, 3], 750, 1100) || spawnPos(800, 1100);
-    if (pos) for (const d of spawnPack('kesici', 1, pos)) d.silent = true;
-  }
-  if (c('batakci') < 5 && Math.random() < 0.3) {
+  if (c('batakci') < 5 && R() < 0.3) {
     const pools = G.pools.filter(pl => !pl.croc && Math.hypot(pl.x - L.x, pl.y - L.y) < 1300 && Math.hypot(pl.x - L.x, pl.y - L.y) > 450);
     if (pools.length) { const pl = pick(pools), d = mkDino('batakci', pl.x, pl.y); d.home = pl; pl.croc = d; d.hidden = true; d.st = 'hide'; G.dinos.push(d); }
+  }
+  // nadir gündüz pususu: yalnızca vahşi topraklarda dolaşan birine
+  if (!n && day >= 3 && R() < 0.004 * sm) {
+    const far = G.people.filter(p => !p.inHut && !p.grabbed && !p.child && !p.downed && dist(p, G.fire) > 1800 && wildness(p.x, p.y) > 0.5);
+    if (far.length) ambush(pick(far), ri(2, 3), 'yirtici');
+  }
+  // ---- gece: çoğu gece yalnızca uzak sesler ve arada bir karanlıkta bir çift göz
+  if (n) {
+    G.ambSndT = (G.ambSndT === undefined ? rand(15, 40) : G.ambSndT) - 1.5;
+    if (G.ambSndT <= 0) {
+      G.ambSndT = rand(25, 60); const v = rand(0.05, 0.14), pn = rand(-1, 1), k = R();
+      if (k < 0.35) SFX.growl(v, pn); else if (k < 0.6) SFX.chitter(v * 1.5, pn); else if (k < 0.85) SFX.screech(v * 0.6, pn); else SFX.roar(v * 0.5, pn);
+    }
+    if (G.eyesDay !== day && R() < 0.008) {
+      G.eyesDay = day;
+      const a = rand(0, TAU), r = Math.max(fireR(), 300) + rand(480, 700), x = G.fire.x + Math.cos(a) * r, y = G.fire.y + Math.sin(a) * r;
+      if (!isSea(x, y)) {
+        const kk = R() < 0.6 ? 2 : 1;
+        for (let i = 0; i < kk; i++) { const d = mkDino(R() < 0.7 ? 'yirtici' : 'kucuk', x + i * 40, y + i * 25); d.watcher = rand(20, 40); d.silent = true; d.engaged = true; pushOut(d, true); G.dinos.push(d); }
+      }
+    }
   }
 }
 function spawnDevEvent(sudden) {
@@ -742,32 +907,20 @@ function updCannibal(d, dt, prey) {
 function alarmHerd(d, thr) {
   if (!thr) return;
   let any = false;
-  for (const o of G.dinos) if (o.type === d.type && !o.tamed && dist(o, d) < 320) { if (!(o.flee > 0)) any = true; o.flee = rand(4, 7); o.fleeFrom = thr; }
+  for (const o of G.dinos) if (!o.tamed && !(o.angry > 0) && (o.type === d.type ? dist(o, d) < 320 : DINO[o.type].herb && o.type !== 'uzunboyun' && dist(o, d) < 200)) {
+    if (!(o.flee > 0)) any = true; o.flee = rand(4, 7); o.fleeFrom = thr; o.fleeing = true; o.alert = G.now || 0.01; o.alertT = 0;
+  }
   if (any) SFX.honk(volOf(d, 900) + 0.03, panOf(d.x));
 }
 function updGrazer(d, dt) {
   const def = DINO[d.type];
   d.swing = Math.max(0, (d.swing || 0) - dt);
-  if (isNight() && !d.leave && Math.random() < dt * 0.03) d.leave = true;
+  if (isNight() && !d.leave && dist(d, G.fire) < 1800 && Math.random() < dt * 0.03) d.leave = true;
   if (d.leave) { const a = angTo(G.fire, d); steer(d, d.x + Math.cos(a) * 150, d.y + Math.sin(a) * 150, def.spd * 0.9, dt, true); d.anim += dt * 5; if (!L || dist(d, L) > 1700) removeDino(d); return; }
-  if (d.flee > 0) {
-    d.flee -= dt; const from = d.fleeFrom && !d.fleeFrom.dead ? d.fleeFrom : G.fire, a = angTo(from, d) + Math.sin(G.now + d.id) * 0.3;
-    steer(d, d.x + Math.cos(a) * 200, d.y + Math.sin(a) * 200, def.spd * 2, dt, true); d.anim += dt * 12; return;
-  }
+  if (fleeStep(d, dt, d.type === 'zirhli' ? 1.3 : 2)) return;
   const dc = dist(d, G.fire);
   if (dc < 430 && !(d.angry > 0)) { const a = angTo(G.fire, d); steer(d, d.x + Math.cos(a) * 120, d.y + Math.sin(a) * 120, def.spd, dt, true); d.anim += dt * 5; return; }
-  d.lookT = (d.lookT || 0) - dt;
-  if (d.lookT <= 0) {
-    d.lookT = 0.5;
-    if (d.type === 'ordek') {
-      let thr = null;
-      for (const p of G.people) if (!p.inHut && !p.bed && dist(p, d) < (p.moving ? 230 : 150)) { thr = p; break; }
-      if (!thr) for (const o of G.dinos) if (DINO[o.type].pred && !o.tamed && dist(o, d) < 300) { thr = o; break; }
-      if (thr) alarmHerd(d, thr);
-    } else if (d.type === 'gurleyen' && !(d.angry > 0) && dc > 500) {
-      for (const p of G.people) if (!p.inHut && !p.bed && dist(p, d) < 115) { d.angry = 6; d.tgt = p; SFX.honk(volOf(d, 700) * 0.6, panOf(d.x)); break; }
-    }
-  }
+  if (!(d.angry > 0) && preyAware(d, dt)) return;
   if (d.angry > 0) {
     d.angry -= dt; const t = d.tgt;
     if (!t_dead(t)) {
@@ -862,16 +1015,23 @@ function updKesici(d, dt, prey) {
       if (t.type || t.isRescue) continue;
       if (G.fire.fuel > 0 && inSafe(t.x, t.y, zones)) continue;
       const al = alliesNear(t, 150); if (al >= 2) continue;
-      const dd = dist(d, t); if (dd > (isNight() ? def.nsense : def.sense)) continue;
+      if (d.terr && Math.hypot(t.x - d.terr.x, t.y - d.terr.y) > d.terr.r) continue;
+      const sense = isNight() ? def.nsense : def.sense, dd = dist(d, t); if (dd > sense) continue;
+      if (d.tgt !== t && !predNotices(d, t, dd, sense)) continue;
       const s = dd + al * 300 + (t.leader ? 150 : 0);
       if (s < bs) { bs = s; best = t; }
     }
     d.tgt = best;
   }
+  if (d.terr && d.tgt && !(d.dash > 0) && Math.hypot(d.tgt.x - d.terr.x, d.tgt.y - d.terr.y) > d.terr.r * 1.25) d.tgt = null;
   const t = !t_dead(d.tgt) && !d.tgt.type ? d.tgt : null;
   if (!t) {
     d.wt -= dt;
-    if (d.wt <= 0 || Math.hypot(d.wx - d.x, d.wy - d.y) < 20) { d.wt = rand(4, 9); const a = rand(0, TAU), r = Math.max(fireR(), 300) + rand(250, 550); d.wx = G.fire.x + Math.cos(a) * r; d.wy = G.fire.y + Math.sin(a) * r; }
+    if (d.wt <= 0 || Math.hypot(d.wx - d.x, d.wy - d.y) < 20) {
+      d.wt = rand(4, 9); const C = d.terr || G.fire, a = rand(0, TAU), r = d.terr ? rand(0, d.terr.r * 0.7) : Math.max(fireR(), 300) + rand(250, 550);
+      d.wx = C.x + Math.cos(a) * r; d.wy = C.y + Math.sin(a) * r;
+      if (isSea(d.wx, d.wy)) { d.wx = (d.wx + G.fire.x) / 2; d.wy = (d.wy + G.fire.y) / 2; }
+    }
     steer(d, d.wx, d.wy, def.spd * 0.3, dt, true); d.anim += dt * 5; return;
   }
   const dd = dist(d, t);

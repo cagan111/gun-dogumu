@@ -430,7 +430,7 @@ function newDay() {
   for (const d of G.dinos) if (d.pet) { d.growth = Math.min(1, (d.growth || 0) + 0.34); d.maxhp = Math.round(30 + 50 * d.growth); d.hp = d.maxhp; }
   planNight();
   G.dayRainAt = Math.random() < 0.2 ? rand(0.1, 0.32) : -1;
-  G.rescueAt = Math.random() < 0.55 ? rand(0.1, 0.3) : -1;
+  G.rescueAt = G.day > 5 && Math.random() < 0.06 ? rand(0.1, 0.3) : -1;
   checkAch();
   saveGame('dawn');
   G.uiDirty = true;
@@ -797,7 +797,7 @@ function update(dt) {
   for (const b of G.builds) if (b.type === 'tarla' && b.built && b.planted && b.g < 1) { b.g = Math.min(1, b.g + dt / (CYCLE * 1.6) * (wt === 'yagmur' || wt === 'firtina' ? 1.4 : 1)); b.tendT = (b.tendT || 0) - dt; }
   for (const c of G.carcs) { c.age += dt; if (!c.rotten && c.age > CYCLE * 1.2 && !G.builds.some(b => b.type === 'raf' && b.built && dist(b, c) < 300)) { c.rotten = true; } if (c.age > CYCLE * 2.5) c.dead = true; }
   G.carcs = G.carcs.filter(c => !c.dead);
-  if (isNight() && G.carcs.length && Math.random() < dt * 0.02) { const c = pick(G.carcs); if (dist(c, G.fire) > fireR() + 100) spawnPack('kucuk', ri(2, 4), { x: c.x + rand(-200, 200), y: c.y + rand(-200, 200) }); }
+  if (isNight() && G.carcs.length && Math.random() < dt * 0.02) { const c = pick(G.carcs); if (dist(c, G.fire) > 900) spawnPack('kucuk', ri(2, 4), { x: c.x + rand(-200, 200), y: c.y + rand(-200, 200) }); }
   if (G.sleep) sleepTick(dt); else updLeader(dt);
   for (const p of G.people.slice()) if (p !== L && !p.dead) updPerson(p, dt, LS);
   if (G.over) return;

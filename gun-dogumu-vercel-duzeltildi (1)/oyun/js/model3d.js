@@ -16,7 +16,7 @@
 //  Mesh düğümleri oluşturulur. Geometriler r=1 biriminde kurulur, kök d.r ile ölçeklenir.
 // =============================================================
 const M3 = (function () {
-  const T3 = THREE, PI = Math.PI;
+  const T3 = THREE, PI = Math.PI, TAU2 = PI * 2;
   const cl = (v, a, b) => v < a ? a : v > b ? b : v;
   const WHITE = new T3.Color(1, 1, 1);
   const col = h => (h && h.isColor) ? h : new T3.Color(h == null ? '#888' : h);
@@ -157,6 +157,8 @@ const M3 = (function () {
     pb.ball(x, 0.05, 0, wid || 0.035, P.th * f * 1.03, P.tw * f * 1.05, k);
   }
   function topY(P, x, z) { const u = (x - 0.1) / P.tl, w = (z || 0) / P.tw; return P.th * Math.sqrt(Math.max(0, 1 - u * u - w * w)); }
+  // sırt boyunca eğriyi izleyen sırt çıkıntısı (havada asılı düz levha olmasın)
+  function ridge(pb, f, x0, x1, n, h, w, k) { for (let i = 0; i < n; i++) { const xa = x0 + (x1 - x0) * i / n, xb = x0 + (x1 - x0) * (i + 1) / n, ya = f(xa), yb = f(xb); pb.wedge(xa, xb, ya - h, ya + h * 0.55, yb - h, yb + h * 0.55, w, w, k); } }
 
   function skull(pb, P, T, c) {
     const L = P.hL, h = P.hH, w = P.hW * 0.5, tp = P.tp;
@@ -208,7 +210,7 @@ const M3 = (function () {
       pb.ball(0.52, -0.04, 0, P.tl * 0.5, P.th * 0.86, P.tw * 0.9, c.col, { belly: c.bel, by: -P.th * 0.42 });
       if (T === 'yirtici') { for (let i = -2; i <= 2; i++) stripe(pb, P, 0.1 + i * 0.26, c.dk, 0.04); for (let i = 0; i < 6; i++) { const x = -0.55 + i * 0.26; pb.cone([x, topY(P, x) - 0.03, 0], [x - 0.08, topY(P, x) + 0.22, 0], 0.085, '#c87a3a'); } }
       else if (T === 'dev') {
-        pb.wedge(-0.7, 0.85, P.th * 0.55, P.th * 0.92, P.th * 0.5, P.th * 0.98, 0.07, 0.1, c.dk);
+        ridge(pb, x => topY(P, x), -0.68, 0.6, 7, 0.07, 0.07, c.dk);
         for (let i = 0; i < 12; i++) { const x = -0.6 + (i % 6) * 0.27, z = (i < 6 ? -1 : 1) * P.tw * (0.42 + 0.1 * (i % 2)); pb.ball(x, topY(P, x, z) + 0.0, z, 0.085, 0.05, 0.07, shd(colHex, -0.3), { d: 0 }); }
         pb.box(0.15, 0.12, P.tw * 0.97, 0.5, 0.03, 0.03, '#7a2a20', 0.5); pb.box(0.25, 0.08, P.tw * 0.95, 0.42, 0.03, 0.03, '#7a2a20', 0.5); pb.box(-0.2, 0.1, -P.tw * 0.99, 0.4, 0.03, 0.03, '#6a2018', -0.6);
       } else if (T === 'yelken') {
@@ -228,10 +230,10 @@ const M3 = (function () {
         for (let i = -2; i <= 2; i++) stripe(pb, P, 0.1 + i * 0.24, '#7f928f', 0.022);
         for (let i = 0; i < 7; i++) { const x = -0.6 + i * 0.22; pb.cone([x, topY(P, x) - 0.03, 0], [x - 0.16, topY(P, x) + 0.2, 0], 0.04, '#aebfba', { n: 3 }); }
       } else if (T === 'gurleyen') {
-        pb.wedge(-0.7, 0.8, P.th * 0.6, P.th * 0.9, P.th * 0.55, P.th * 0.95, 0.1, 0.12, shd(colHex, -0.25));
+        ridge(pb, x => topY(P, x), -0.66, 0.6, 6, 0.06, 0.09, shd(colHex, -0.25));
         for (let i = 0; i < 5; i++) { const x = -0.5 + i * 0.28; for (const s of [-1, 1]) pb.ball(x, topY(P, x, s * P.tw * 0.55), s * P.tw * 0.55, 0.06, 0.04, 0.05, c.lt, { d: 0 }); }
       } else {
-        pb.wedge(-0.72, 0.85, P.th * 0.6, P.th * 0.9, P.th * 0.55, P.th * 0.95, 0.06, 0.07, c.dk);
+        ridge(pb, x => topY(P, x), -0.7, 0.6, 6, 0.05, 0.05, c.dk);
         for (let i = 0; i < 6; i++) { const x = -0.45 + i * 0.22, z = (i % 2 ? 1 : -1) * P.tw * 0.6; pb.ball(x, topY(P, x, z), z, 0.06, 0.04, 0.06, T === 'tukurgec' ? '#c8a04a' : c.lt, { d: 0 }); }
       }
     });
@@ -260,7 +262,7 @@ const M3 = (function () {
     });
     g.head = geo(key + 'head', pb => skull(pb, P, T, c));
     g.jaw = geo(key + 'jaw', pb => jawG(pb, P, T, c));
-    if (!P.herb) g.eyes = geo(key + 'eyes', pb => { for (const s of [-1, 1]) pb.ball(0.3 * P.hL, 0.6 * P.hH, s * P.hW * 0.5 * 1.0, P.eye, P.eye, P.eye * 0.55, '#fff', { d: 0 }); });
+    if (!P.herb) g.eyes = geo(key + 'eyes', pb => { for (const s of [-1, 1]) pb.ball(0.3 * P.hL, 0.6 * P.hH, s * (P.hW * 0.5 + 0.035 * P.hL), P.eye, P.eye * 0.8, P.eye * 0.5, '#fff', { d: 0 }); });
     S.eyeMat = glow(def.eye || '#f0d040');
     if (T === 'tukurgec') g.frill = geo(key + 'frill', pb => {
       const N = 10, R = 1.0;
@@ -313,50 +315,61 @@ const M3 = (function () {
     ud.mouth = { n: ud.head, x: P.hL * 0.6, y: -P.hH * 0.2 };
     ud.seat = { n: body, x: 0.1, y: P.th + 0.05 };
     ud.neckBase = { n: ud.neck, x: S.hx * 0.25, y: S.hy * 0.25, r: P.nR * 1.7 };
-    ud.side = P.tw;
+    ud.side = P.tw; ud.strideK = 4 * P.S;
   }
   function updThero(ud, d, t, dt, def) {
-    const S = ud.S, P = S.P, T = S.T, ph = d.anim || 0, id = d.id || 0, mv = ud.mv, s = Math.sin(ph), c = Math.cos(ph);
-    // saldırı / ağız
-    const cd = def.cd || 1, atk = d.atkCd > 0 ? cl((d.atkCd / cd - 0.55) / 0.45, 0, 1) : 0;
-    const roar = T === 'dev' && d.roarT > 16 ? 1 : 0;
-    let open = atk > 0 || d.carry || roar ? 1 : 0;
-    if (P.herb) open = atk > 0 ? 0.4 : 0;
-    ud.jawK += (open - ud.jawK) * Math.min(1, dt * (open ? 22 : 9));
-    const lunge = atk * atk, pant = (1 - mv) * (0.03 + 0.03 * Math.sin(t * 2.2 + id));
-    const bob = mv * Math.abs(c) * 0.06 + Math.sin(t * 2.2 + id) * 0.012;
-    const Hc = P.H + bob - lunge * 0.08;
+    const S = ud.S, P = S.P, ph = ud.ph, id = d.id || 0, mv = ud.mv, run = ud.run * mv, al = ud.alK, s = Math.sin(ph), c = Math.cos(ph);
+    const cd = def.cd || 1, u = d.atkCd > 0 ? cl(1 - d.atkCd / cd, 0, 1) : 1, herb = !!P.herb;
+    const snap = u < 0.16 ? 1 - u / 0.16 : 0, thrust = snap * snap;                       // ısırık/toslama anı
+    const tear = !herb && u > 0.12 && u < 0.5 ? Math.sin((u - 0.12) / 0.38 * PI) : 0;    // koparıp silkeleme
+    const rdy = ud.rdyK * (1 - snap), roar = ud.roarK;
+    let open = Math.max(herb ? 0 : rdy, roar * (herb ? 0.5 : 1), d.carry ? 0.45 : 0, d.frill > 0 ? 0.8 : 0) * (1 - snap);
+    ud.jawK += (open - ud.jawK) * Math.min(1, dt * (open > ud.jawK ? 9 : 30));
+    const breath = Math.sin(t * (2.0 + al * 1.8 + run * 2) + id);
+    const pant = (1 - mv) * (0.02 + 0.02 * breath) + run * (0.06 + 0.04 * Math.sin(ph * 2));
+    // gövde: adımda iniş-çıkış, koşuda öne eğilme, tetikte dikleşme
     const body = ud.body;
-    body.position.y = Hc; body.position.x = lunge * 0.12;
-    body.rotation.z = P.pitch + mv * Math.sin(ph * 2) * 0.025 - lunge * (P.herb ? 0.3 : 0.1) + roar * 0.12;
-    body.rotation.x = mv * s * 0.05;
-    const br = 1 + Math.sin(t * 2.2 + id) * 0.02; ud.torso.scale.set(1, br, br);
-    // bacaklar
+    const bob = mv * Math.abs(c) * (0.045 + run * 0.06) - mv * (0.015 + run * 0.06) + breath * 0.008 * (1 - mv);
+    const Hc = P.H + bob - rdy * 0.07 - thrust * 0.04 + al * 0.03;
+    body.position.y = Hc; body.position.x = thrust * 0.12 - rdy * 0.05;
+    body.rotation.z = P.pitch - run * 0.1 + al * 0.13 + roar * 0.1 + mv * Math.sin(ph * 2) * 0.025 - thrust * (herb ? 0.22 : 0.08) - rdy * (herb ? 0.14 : 0.05);
+    body.rotation.x = mv * s * (0.045 + run * 0.03);
+    body.rotation.y = mv * s * 0.05;
+    const br = 1 + breath * (0.018 + roar * 0.02 + al * 0.01); ud.torso.scale.set(1, br, br);
+    // bacaklar (iki kemik IK + metatars + parmaklar); salınım fazında ayak kalkar
+    const Sx = P.S * (1 + 0.45 * ud.run), hx = body.position.x * 0.5;
     for (let i = 0; i < 2; i++) {
-      const L = ud.legs[i], p = ph + (i ? PI : 0), sn = Math.sin(p), cs = Math.cos(p), lift = mv * Math.max(0, cs);
-      const fx = mv * sn * P.S + (1 - mv) * (i ? -0.1 : 0.12) + lunge * 0.05;
-      const phi = 0.38 + mv * 0.42 * sn - lift * 0.5;
-      const bx = fx, byy = S.toeH + lift * 0.3;
-      const ax = bx - P.leg[2] * Math.sin(phi), ay = byy + P.leg[2] * Math.cos(phi);
-      ik2(body.position.x * 0.5, Hc, ax, ay, P.leg[0], P.leg[1], 1);
-      L.th.position.y = Hc; L.th.position.x = body.position.x * 0.5;
-      L.th.rotation.z = IK.a; L.sh.rotation.z = IK.b - IK.a; L.me.rotation.z = phi - IK.b; L.to.rotation.z = -phi - lift * 0.7;
+      const L = ud.legs[i], p = ph + (i ? PI : 0), sn = Math.sin(p), cs = Math.cos(p), lift = mv * Math.max(0, cs) * (1 + run * 0.7);
+      const fx = mv * sn * Sx + (1 - mv) * (i ? -0.09 : 0.11) + hx;
+      const phi = 0.38 + mv * 0.42 * sn - lift * 0.45;
+      const byy = S.toeH + lift * (0.24 + run * 0.12);
+      const ax = fx - P.leg[2] * Math.sin(phi), ay = byy + P.leg[2] * Math.cos(phi);
+      ik2(hx, Hc, ax, ay, P.leg[0], P.leg[1], 1);
+      L.th.position.y = Hc; L.th.position.x = hx;
+      L.th.rotation.z = IK.a; L.sh.rotation.z = IK.b - IK.a; L.me.rotation.z = phi - IK.b; L.to.rotation.z = -phi - lift * 0.6;
     }
-    // kuyruk
-    const tw = d.moving ? ph * 0.5 : t * 1.2 + id, amp = (0.1 + mv * 0.16) * (4 / ud.tail.length);
-    for (let i = 0; i < ud.tail.length; i++) { const m = ud.tail[i]; m.rotation.y = Math.sin(tw - i * 0.7) * amp * (0.6 + i * 0.25); m.rotation.z = (i === 0 ? 0.06 : -0.02) + mv * Math.sin(ph * 2 - i * 0.6) * 0.03 + lunge * 0.05; }
-    // boyun, kafa
-    const hb = mv * Math.sin(ph * 2) * 0.05 + (1 - mv) * Math.sin(t * 1.5 + id) * 0.03;
-    const butt = P.herb ? lunge * 0.9 : 0;
-    ud.neck.rotation.z = hb - lunge * 0.45 - butt + roar * 0.3 - body.rotation.z * 0.6;
-    ud.neck.rotation.y = (1 - mv) * Math.sin(t * 0.45 + id * 1.7) * 0.28 * (1 - lunge);
-    ud.head.rotation.z = -ud.neck.rotation.z * 0.75 + ud.jawK * 0.22 - (P.herb ? 0.15 + butt * 0.4 : 0.08) + roar * 0.2;
-    ud.head.rotation.y = (1 - mv) * Math.sin(t * 0.45 + id * 1.7 + 0.6) * 0.22;
-    ud.jaw.rotation.z = -(ud.jawK * (roar ? 0.75 : 0.62) + pant);
-    if (ud.frill) { const fo = d.frill > 0 ? 1 : 0; ud.frillK += (fo - ud.frillK) * Math.min(1, dt * 14); const f = 0.16 + 0.84 * ud.frillK; ud.frill.scale.set(1, f, f * (1 + 0.05 * Math.sin(t * 40) * ud.frillK)); }
-    // kollar
-    const aa = Math.sin(t * 3 + id) * 0.12;
-    ud.arms[0].rotation.z = 0.2 + aa + lunge * 0.9 + mv * s * 0.15; ud.arms[1].rotation.z = 0.2 - aa + lunge * 0.9 - mv * s * 0.15;
+    // kuyruk: gövde salınımına karşı denge, dalga
+    const n = ud.tail.length, amp = (0.07 + mv * 0.05 - run * 0.04 + al * -0.04) * (4 / n) * (1 - (ud.watK || 0) * 0.8);
+    for (let i = 0; i < n; i++) {
+      const m = ud.tail[i], wave = mv * Math.sin(ph - i * 0.8) + (1 - mv) * Math.sin(t * 1.1 + id - i * 0.7);
+      m.rotation.y = (i === 0 ? -body.rotation.y * 1.5 : 0) + wave * amp * (0.6 + i * 0.25) + tear * Math.sin(t * 22 - i) * 0.04;
+      m.rotation.z = (i === 0 ? 0.06 - body.rotation.z * 0.6 + roar * 0.05 : -0.02 - run * 0.01) + mv * Math.sin(ph * 2 - i * 0.6) * 0.03 + thrust * 0.04;
+    }
+    // boyun, kafa: hedefe bakış, koklama, tetikte dik baş, ısırık, kükreme
+    const wk = ud.watK || 0, sniff = herb ? 0 : (1 - mv) * (1 - al) * (1 - rdy) * (1 - roar) * (1 - wk) * cl((Math.sin(t * 0.21 + id * 1.7) - 0.55) * 4, 0, 1);
+    const nod = sniff * Math.sin(t * 13 + id) * 0.05, shake = roar * Math.sin(t * 25) * 0.03;
+    const neck = ud.neck, head = ud.head;
+    neck.rotation.z = mv * Math.sin(ph * 2) * 0.04 + (1 - mv) * breath * 0.02 - thrust * (herb ? 0.7 : 0.45) - rdy * (herb ? 0.55 : 0.12) + roar * 0.4 + al * 0.45 - run * 0.14 - sniff * 0.6 - wk * 0.18 - body.rotation.z * 0.6;
+    neck.rotation.y = ud.look * 0.55 * (1 - roar * 0.5) + tear * Math.sin(t * 22) * 0.14;
+    neck.rotation.x = tear * Math.sin(t * 17 + 1) * 0.16 + shake;
+    head.rotation.z = -neck.rotation.z * 0.7 + ud.jawK * 0.22 - (herb ? 0.15 : 0.08) + roar * 0.22 - rdy * (herb ? 0.55 : 0) - thrust * (herb ? 0.4 : 0) + nod - al * 0.12 + sniff * 0.3 - run * 0.05;
+    head.rotation.y = ud.look * 0.4;
+    head.rotation.x = shake;
+    ud.jaw.rotation.z = -(ud.jawK * (0.58 + roar * 0.18) + pant);
+    if (ud.frill) { const fo = d.frill > 0 || rdy > 0.5 || al > 0.5 ? 1 : 0; ud.frillK += (fo - ud.frillK) * Math.min(1, dt * 12); const f = 0.16 + 0.84 * ud.frillK; ud.frill.scale.set(1, f, f * (1 + 0.05 * Math.sin(t * 40) * ud.frillK)); }
+    // kollar: dururken hafif oynar, koşuda kıvrılır, saldırıda pençe uzanır
+    const aa = Math.sin(t * 2.6 + id) * 0.1 * (1 - mv), reach = rdy * 0.7 + thrust * 0.9 + tear * 0.4;
+    for (let i = 0; i < 2; i++) { const sg = i ? -1 : 1; ud.arms[i].rotation.z = 0.2 + aa * sg - run * 0.35 + reach + mv * sg * s * 0.15; ud.arms[i].rotation.x = sg * (0.15 + reach * 0.2); }
   }
 
   // =============================================================
@@ -378,7 +391,7 @@ const M3 = (function () {
       pb.ball(0, 0, 0, RX, RY, RZ, c.col, { belly: c.bel, by: -RY * 0.45 });
       if (T === 'boynuzlu') {
         pb.ball(0.5, 0.06, 0, 0.55, RY * 0.95, RZ * 0.9, c.col, { belly: c.bel, by: -RY * 0.45 });
-        pb.wedge(-0.85, 0.7, RY * 0.6, RY * 0.93, RY * 0.7, RY * 1.02, 0.1, 0.14, shd(colHex, -0.25));
+        ridge(pb, x => top(x, 0), -0.9, 0.75, 7, 0.06, 0.1, shd(colHex, -0.25));
         for (let i = 0; i < 5; i++) { const x = -0.6 + i * 0.3; for (const s of [-1, 1]) pb.ball(x, top(x, s * RZ * 0.6), s * RZ * 0.6, 0.07, 0.04, 0.07, shd(colHex, -0.2), { d: 0 }); }
       } else if (T === 'zirhli') {
         pb.ball(0, RY * 0.22, 0, RX * 0.97, RY * 0.9, RZ * 0.98, shd(colHex, -0.15));
@@ -387,7 +400,7 @@ const M3 = (function () {
         for (let i = -3; i <= 3; i++) for (const s of [-1, 1]) { const x = i * 0.27 + 0.03, zz = RZ * Math.sqrt(Math.max(0.1, 1 - x * x / (RX * RX))) * 0.9; pb.cone([x, 0.06, s * zz], [x - 0.05, 0.14, s * (zz + 0.3)], 0.085, '#d8d0b8'); }
       } else if (T === 'ordek') {
         pb.ball(-0.3, 0.06, 0, 0.6, RY * 0.98, RZ * 0.98, c.col, { belly: c.bel, by: -RY * 0.45 });
-        pb.wedge(-0.9, 0.85, RY * 0.6, RY * 1.02, RY * 0.5, RY * 0.9, 0.05, 0.05, shd(colHex, -0.3));
+        ridge(pb, x => Math.max(top(x, 0), x < -0.3 ? RY * 0.98 * Math.sqrt(Math.max(0, 1 - Math.pow((x + 0.3) / 0.6, 2))) + 0.06 : 0), -0.88, 0.8, 8, 0.05, 0.045, shd(colHex, -0.3));
         for (let i = 0; i < 4; i++) { const x = -0.5 + i * 0.3, f = Math.sqrt(Math.max(0.04, 1 - x * x / (RX * RX))); pb.ball(x, 0.08, 0, 0.03, RY * f * 1.02, RZ * f * 1.04, c.lt); }
       } else if (T === 'uzunboyun') {
         pb.ball(0.45, 0.12, 0, 0.6, RY * 0.9, RZ * 0.85, c.col, { belly: c.bel, by: -RY * 0.45 });
@@ -490,41 +503,54 @@ const M3 = (function () {
     ud.mouth = { n: ud.head, x: 0.5, y: -0.15 };
     ud.seat = { n: body, x: 0, y: P.tr[1] + 0.06 };
     ud.neckBase = { n: ud.necks[0], x: 0.02, y: 0, r: P.neck.r0 * 1.12 };
-    ud.side = P.tr[2];
+    ud.side = P.tr[2]; ud.strideK = 4 * P.S;
   }
   function updQuad(ud, d, t, dt, def) {
-    const S = ud.S, P = S.P, T = S.T, ph = d.anim || 0, id = d.id || 0, mv = ud.mv;
-    const cd = def.cd || 1, atk = d.atkCd > 0 ? cl((d.atkCd / cd - 0.6) / 0.4, 0, 1) : 0, lunge = atk * atk;
-    const bob = mv * Math.abs(Math.cos(ph)) * 0.03 + Math.sin(t * 1.6 + id) * 0.008;
-    const body = ud.body, pitch = P.pitch || 0;
-    body.position.y = P.by + bob; body.position.x = lunge * 0.15;
-    body.rotation.z = pitch + mv * Math.sin(ph * 2) * 0.012; body.rotation.x = mv * Math.sin(ph) * 0.035;
-    const br = 1 + Math.sin(t * 1.6 + id) * 0.02; ud.torso.scale.set(1, br, br);
-    const cp = Math.cos(pitch), sp = Math.sin(pitch);
+    const S = ud.S, P = S.P, T = S.T, ph = ud.ph, id = d.id || 0, mv = ud.mv, run = ud.run * mv, al = ud.alK;
+    const cd = def.cd || 1, u = d.atkCd > 0 ? cl(1 - d.atkCd / cd, 0, 1) : 1;
+    const snap = u < 0.2 ? 1 - u / 0.2 : 0, thrust = snap * snap, rdy = ud.rdyK * (1 - snap);
+    const swingK = u < 0.55 ? Math.sin(u / 0.55 * PI) : 0;                       // zırhlı: topuz savuruş
+    const breath = Math.sin(t * (1.4 + al * 1.6 + run * 1.6) + id);
+    const body = ud.body, pitch = (P.pitch || 0) + (T === 'ordek' ? al * 0.06 : 0);
+    const bob = mv * Math.abs(Math.cos(ph)) * (0.025 + run * 0.035) + breath * 0.007;
+    const horn = T === 'boynuzlu' ? 1 : 0;
+    body.position.y = P.by + bob - rdy * 0.05 * horn; body.position.x = thrust * 0.16 * horn;
+    body.rotation.z = pitch + mv * Math.sin(ph * 2) * 0.012 - run * 0.03 - horn * (rdy * 0.07 + thrust * 0.05);
+    body.rotation.x = mv * Math.sin(ph) * (0.03 + run * 0.02) + (T === 'zirhli' ? swingK * 0.06 * (id % 2 ? 1 : -1) : 0);
+    body.rotation.y = mv * Math.sin(ph) * 0.03;
+    const br = 1 + breath * 0.02; ud.torso.scale.set(1, br, br);
+    const cp = Math.cos(pitch), sp = Math.sin(pitch), Sx = P.S * (1 + 0.45 * ud.run);
     for (const G4 of ud.legs) {
-      const L = G4.L, p = ph + G4.po, sn = Math.sin(p), lift = mv * Math.max(0, Math.cos(p));
-      const hx = L.x * cp - (L.y - P.by) * sp + body.position.x, hy = P.by + bob + L.x * sp + (L.y - P.by) * cp;
-      const fx = L.x + (L.x > 0 ? 0.04 : -0.02) + mv * sn * P.S, fy = lift * 0.2;
+      const L = G4.L, p = ph + G4.po, sn = Math.sin(p), lift = mv * Math.max(0, Math.cos(p)) * (1 + run * 0.5);
+      const hx = L.x * cp - (L.y - P.by) * sp + body.position.x, hy = body.position.y + L.x * sp + (L.y - P.by) * cp;
+      const fx = L.x + (L.x > 0 ? 0.04 : -0.02) + mv * sn * Sx + body.position.x * 0.6, fy = lift * (0.16 + run * 0.06);
       ik2(hx, hy, fx, fy, L.L[0], L.L[1], G4.dir);
       G4.u.position.x = hx; G4.u.position.y = hy; G4.u.rotation.z = IK.a; G4.l.rotation.z = IK.b - IK.a;
     }
     // kuyruk
-    const tw = d.moving ? ph * 0.5 : t * 1.1 + id, n = ud.tail.length, club = T === 'zirhli' && d.swing > 0 ? Math.sin(d.swing * 15) * 0.5 : 0;
-    const amp = (T === 'uzunboyun' ? 0.16 : 0.1) * (0.6 + mv * 0.5);
-    for (let i = 0; i < n; i++) { const m = ud.tail[i]; m.rotation.y = Math.sin(tw - i * 0.7) * amp * (0.5 + i * 0.3) + club * (0.4 + i * 0.25); m.rotation.z = (P.tail.dz[i] || 0) - (i === 0 ? pitch : 0) + Math.sin(t * 0.9 + i) * 0.015; }
-    // boyun
-    const nk = P.neck, nn = ud.necks.length, sw = Math.sin(t * 0.8 + id), sw2 = Math.sin(t * 0.37 + id * 2.1);
-    const down = (T === 'boynuzlu' ? 0.55 : T === 'zirhli' ? 0.15 : T === 'uzunboyun' ? 0.5 : 0.35) * lunge;
-    const graze = (T === 'ordek' || T === 'uzunboyun') ? 0 : 0;
+    const n = ud.tail.length, amp = (T === 'uzunboyun' ? 0.13 : 0.09) * (0.6 + mv * 0.5), club = T === 'zirhli' ? swingK * (id % 2 ? 1 : -1) * 0.55 : 0;
+    for (let i = 0; i < n; i++) {
+      const m = ud.tail[i], wave = mv * Math.sin(ph - i * 0.7) + (1 - mv) * Math.sin(t * 0.9 + id - i * 0.7);
+      m.rotation.y = (i === 0 ? -body.rotation.y * 1.4 : 0) + wave * amp * (0.5 + i * 0.3) + club * (0.4 + i * 0.25);
+      m.rotation.z = (P.tail.dz[i] || 0) - (i === 0 ? pitch : 0) + Math.sin(t * 0.9 + i + id) * 0.015 - al * (i === 0 ? 0.08 : 0);
+    }
+    // boyun / kafa: otlama, tetikte baş kaldırma, boynuzla toslama, bakış
+    const nk = P.neck, nn = ud.necks.length;
+    const graze = T === 'uzunboyun' ? 0 : (1 - mv) * (1 - al) * (1 - rdy) * (1 - (ud.watK || 0)) * cl((Math.sin(t * 0.15 + id * 1.3) + 0.15) * 3, 0, 1);
+    const browse = T === 'uzunboyun' ? (1 - mv) * (1 - al) * cl((Math.sin(t * 0.12 + id) + 0.2) * 2, 0, 1) : 0;
+    const gD = T === 'ordek' ? 1.05 : T === 'boynuzlu' ? 0.4 : T === 'zirhli' ? 0.22 : 0;
+    const chew = graze * Math.max(0, Math.sin(t * 7 + id)) * 0.06;
+    const down = horn * (rdy * 0.4 + thrust * -0.35) + (T === 'zirhli' ? 0 : thrust * 0.2 * (1 - horn)) + graze * gD - al * (T === 'uzunboyun' ? 0.25 : 0.35) - browse * 0.18 + run * 0.12;
     let tot = 0;
     for (let i = 0; i < nn; i++) {
-      const m = ud.necks[i]; let a = (i ? nk.da : nk.a0 - pitch) + (mv ? Math.sin(ph + i * 0.5) * 0.02 : 0) + sw2 * 0.03 - down / nn - graze;
-      m.rotation.z = a; tot += a; m.rotation.y = (T === 'uzunboyun' ? sw * 0.09 + sw2 * 0.05 : (1 - mv) * sw2 * 0.18 / nn);
+      const m = ud.necks[i], a = (i ? nk.da : nk.a0 - pitch) + mv * Math.sin(ph * 2 + i * 0.5) * 0.02 + Math.sin(t * 0.37 + id * 2.1) * 0.025 * (1 - al) - down / nn + browse * Math.sin(t * 0.5 + i) * 0.05;
+      m.rotation.z = a; tot += a; m.rotation.y = ud.look * 0.6 / nn + (T === 'uzunboyun' ? Math.sin(t * 0.33 + id) * 0.06 * (1 - al) : 0);
     }
-    ud.head.rotation.z = -(tot + pitch) + P.hp + Math.sin(t * 0.9 + id) * 0.05 - down * 0.5 + (mv ? Math.sin(ph) * 0.04 : 0);
-    ud.head.rotation.y = (1 - mv) * sw2 * 0.2;
-    ud.jawK += ((atk > 0 && T !== 'boynuzlu' ? 1 : 0) - ud.jawK) * Math.min(1, dt * 10);
-    ud.jaw.rotation.z = -(ud.jawK * 0.35 + 0.03 + 0.03 * Math.sin(t * 2.6 + id));
+    ud.head.rotation.z = -(tot + pitch) + P.hp + Math.sin(t * 0.9 + id) * 0.04 * (1 - al) - graze * (T === 'ordek' ? 0.5 : 0.3) - horn * rdy * 0.25 + horn * thrust * 0.5 + al * 0.1 + mv * Math.sin(ph * 2) * 0.03;
+    ud.head.rotation.y = ud.look * 0.4;
+    const open = Math.max(T === 'boynuzlu' ? 0 : snap, ud.roarK * 0.6);
+    ud.jawK += (open - ud.jawK) * Math.min(1, dt * 10);
+    ud.jaw.rotation.z = -(ud.jawK * 0.35 + 0.02 + chew + 0.02 * Math.sin(t * 2.6 + id) * (1 - graze));
     if (S.g.saddle) {
       const want = !!d.tamed && !d.pet;
       if (want && !ud.saddle) ud.saddle = mesh(S.g.saddle, VC, body, 0.05, P.tr[1] - 0.02, 0);
@@ -583,10 +609,10 @@ const M3 = (function () {
     ud.legs = [];
     for (const [x, s, po] of [[0.52, -1, 0], [0.52, 1, PI], [-0.42, -1, PI], [-0.42, 1, 0]]) { const m = mesh(g.leg[s < 0 ? 0 : 1], VC, body, x, -0.02, s * 0.3); M.push(m); ud.legs.push({ m, s, po }); }
     ud.mouth = { n: ud.head, x: 0.8, y: -0.05 }; ud.seat = { n: body, x: 0, y: 0.26 }; ud.side = 0.44;
-    ud.neckBase = null;
+    ud.neckBase = null; ud.strideK = 1.2;
   }
   function updCroc(ud, d, t, dt, def) {
-    const ph = d.anim || 0, id = d.id || 0, mv = ud.mv, cd = def.cd || 1;
+    const ph = ud.ph, id = d.id || 0, mv = ud.mv, cd = def.cd || 1;
     const atk = d.atkCd > 0 ? cl((d.atkCd / cd - 0.5) / 0.5, 0, 1) : 0;
     const open = atk > 0 || d.carry ? 1 : (d.st === 'lunge' ? 0.7 : 0);
     ud.jawK += (open - ud.jawK) * Math.min(1, dt * 18);
@@ -597,7 +623,7 @@ const M3 = (function () {
     for (const L of ud.legs) { const p = ph + L.po; L.m.rotation.y = -L.s * mv * Math.sin(p) * 0.55; L.m.rotation.x = -L.s * mv * Math.max(0, Math.cos(p)) * 0.3; L.m.position.y = -0.02 - mv * 0.05; }
     const sw = d.moving ? ph * 0.6 : t * 0.9 + id;
     for (let i = 0; i < 5; i++) { const m = ud.tail[i]; m.rotation.y = Math.sin(sw - i * 0.8) * (0.12 + mv * 0.2) * (0.6 + i * 0.2); m.rotation.z = i === 0 ? -0.06 : 0.02; }
-    ud.head.rotation.z = ud.jawK * 0.4; ud.head.rotation.y = -body.rotation.y + (1 - mv) * Math.sin(t * 0.5 + id) * 0.1;
+    ud.head.rotation.z = ud.jawK * 0.4 + ud.alK * 0.18; ud.head.rotation.y = -body.rotation.y + ud.look * 0.5;
     ud.jaw.rotation.z = -ud.jawK * 0.5;
   }
 
@@ -645,24 +671,46 @@ const M3 = (function () {
     M.push(ud.head = mesh(g.head, VC, body, 0.95, 0.33, 0));
     M.push(ud.jaw = mesh(g.jaw, VC, ud.head, 0.05, 0, 0));
     ud.wings = [];
-    for (let i = 0; i < 2; i++) { const s = i ? 1 : -1, wi = mesh(g.wi[i], VC, body, 0.2, 0.12, s * 0.2), wo = mesh(g.wo[i], VC, wi, 0.12, 0.03, s * 1.1); M.push(wi, wo); ud.wings.push({ wi, wo, s }); }
+    const a = new T3.Vector3(), b = new T3.Vector3();
+    for (let i = 0; i < 2; i++) {
+      const s = i ? 1 : -1, wi = mesh(g.wi[i], VC, body, 0.2, 0.12, s * 0.2), wo = mesh(g.wo[i], VC, wi, 0.12, 0.03, s * 1.1); M.push(wi, wo);
+      // yerde: kol (kanat kemiği) öne-aşağı inip ön ayak olur, dış kanat geriye katlanır
+      const qi = new T3.Quaternion().setFromUnitVectors(a.set(0.12, 0.03, s * 1.1).normalize(), b.set(-0.12, -0.84, s * 0.3).normalize());
+      const qo = new T3.Quaternion().setFromUnitVectors(a.set(-0.3, 0, s * 1.25).normalize(), b.set(-0.15, 0.25, -s * 0.95).normalize());
+      ud.wings.push({ wi, wo, s, qi, qo });
+    }
     ud.legs = []; for (const s of [-1, 1]) { const m = mesh(g.leg, VC, body, -0.35, -0.12, s * 0.16); M.push(m); ud.legs.push(m); }
     ud.mouth = { n: ud.head, x: 0.6, y: -0.05 }; ud.seat = { n: body, x: 0, y: 0.28 }; ud.side = 0.3; ud.neckBase = null;
+    ud.fp = 0; ud.turn = 0; ud.pa = null; ud.strideK = 0.8;
   }
+  const _qa = new T3.Quaternion(), _ea = new T3.Euler();
   function updFly(ud, d, t, dt) {
-    const id = d.id || 0, alt = cl(d.alt == null ? (d.fly === false ? 0 : 1) : d.alt, 0, 1), r = ud.r;
-    const fp = (d.anim || 0) * (alt > 0.5 ? 1.2 : 0.3), flap = Math.sin(fp), air = cl(alt * 3, 0, 1);
+    const id = d.id || 0, alt = cl(d.alt == null ? (d.fly === false ? 0 : 1) : +d.alt || 0, 0, 1), air = cl(alt * 2.5, 0, 1), gr = 1 - air;
+    // dönüş hızından yatış
+    const ang = d.ang || 0; if (ud.pa == null) ud.pa = ang;
+    const tr = dt > 0 ? wrapA(ang - ud.pa) / dt : 0; ud.pa = ang; ud.turn += (cl(tr, -3, 3) - ud.turn) * Math.min(1, dt * 3);
+    // kanat çırpma: kalkışta güçlü, seyirde ara ara çırpıp süzülme
+    const burst = cl((Math.sin(t * 0.45 + id * 1.7) + 0.2) * 2, 0, 1), climb = alt < 0.95 && alt > 0.02 ? 1 : 0;
+    const fa = air * Math.max(climb, d.atkCd > 0.4 ? 1 : 0, burst * 0.85);
+    ud.fp += dt * (5.5 + fa * 3);
+    const flap = Math.sin(ud.fp) * fa, flapO = Math.sin(ud.fp - 0.8) * fa;
     const body = ud.body;
-    body.position.y = 0.45 + alt * (FLY_H / r) + air * (flap * -0.1 + Math.sin(t * 0.7 + id) * 0.25);
-    body.rotation.z = (1 - air) * 0.55 + air * 0.05; body.rotation.x = air * Math.sin(t * 0.5 + id) * 0.15;
+    body.position.y = gr * 0.69 + air * (0.55 - flap * 0.08 + Math.sin(t * 0.7 + id) * 0.06);
+    body.position.x = 0;
+    body.rotation.z = gr * 0.5 + air * (0.04 - flap * 0.04);
+    body.rotation.x = air * (-ud.turn * 0.35 + Math.sin(t * 0.5 + id) * 0.06);
+    const br = 1 + Math.sin(t * 2 + id) * 0.02; ud.torso.scale.set(1, br, br);
     for (const W of ud.wings) {
-      const up = air * (0.12 + flap * 0.55) + (1 - air) * -1.25;
-      W.wi.rotation.x = -W.s * up; W.wi.rotation.y = (1 - air) * W.s * 0.5;
-      W.wo.rotation.x = -W.s * (air * (Math.sin(fp - 0.7) * 0.5 - 0.1) + (1 - air) * -0.4); W.wo.rotation.y = (1 - air) * W.s * -2.0;
+      _ea.set(-W.s * (0.1 + flap * 0.6), 0, 0); _qa.setFromEuler(_ea); W.wi.quaternion.copy(_qa).slerp(W.qi, gr); W.wi.scale.x = 1 - gr * 0.6;
+      _ea.set(-W.s * (flapO * 0.45 - 0.05), 0, 0); _qa.setFromEuler(_ea); W.wo.quaternion.copy(_qa).slerp(W.qo, gr); W.wo.scale.x = 1 - gr * 0.5;
     }
-    ud.head.rotation.z = -body.rotation.z - air * 0.25 + Math.sin(t * 1.3 + id) * 0.05; ud.head.rotation.y = Math.sin(t * 0.6 + id) * 0.3 * (1 - air * 0.6);
-    const open = d.atkCd > 0.5 ? 1 : 0; ud.jawK += (open - ud.jawK) * Math.min(1, dt * 12); ud.jaw.rotation.z = -ud.jawK * 0.45 - 0.03;
-    for (const L of ud.legs) L.rotation.z = air * -1.1 - (1 - air) * body.rotation.z;
+    // yerde paytak yürüyüş: gövde hafif yalpalar
+    const mv = ud.mv * gr, ph = ud.ph;
+    body.rotation.y = mv * Math.sin(ph) * 0.1; body.position.y += mv * Math.abs(Math.cos(ph)) * 0.03;
+    ud.head.rotation.z = -body.rotation.z - air * 0.22 + Math.sin(t * 1.3 + id) * 0.05 + gr * (0.1 - ud.alK * 0.1) + mv * Math.sin(ph * 2) * 0.05;
+    ud.head.rotation.y = ud.look * 0.6 + Math.sin(t * 0.6 + id) * 0.25 * (1 - air * 0.6);
+    const open = d.atkCd > 0.5 || ud.near ? 1 : ud.roarK; ud.jawK += (open - ud.jawK) * Math.min(1, dt * 12); ud.jaw.rotation.z = -ud.jawK * 0.45 - 0.03;
+    for (let i = 0; i < 2; i++) { const L = ud.legs[i]; L.rotation.z = air * -1.25 + gr * (-body.rotation.z + mv * Math.sin(ph + i * PI) * 0.35); }
   }
 
   // =============================================================
@@ -672,7 +720,7 @@ const M3 = (function () {
     if (GEO.mimic) return GEO.mimic;
     const sk = '#d8d0c8', dk = '#8a7f7a', g = {};
     g.torso = geo('mm_torso', pb => {
-      pb.tube([0, 0, 0], [0.6, 7, 0], 2.2, 1.5, sk, { n: 6, wz: 1.3 });
+      pb.tube([0, 0, 0], [0.6, 7.5, 0], 2.7, 1.8, sk, { n: 6, wz: 1.35 });
       pb.ball(1.6, 11.5, 0, 3.0, 5.6, 4.6, sk);
       for (let i = 0; i < 5; i++) { const y = 8 + i * 1.7, f = Math.sqrt(Math.max(0.1, 1 - Math.pow((y - 11.5) / 5.6, 2))); pb.ball(1.6, y, 0, 3.0 * f * 1.05, 0.22, 4.6 * f * 1.05, '#6a5656'); }
       for (let i = 0; i < 7; i++) pb.cone([-0.9 + i * 0.07, 1.5 + i * 2.2, 0], [-2.2 + i * 0.07, 2.3 + i * 2.2, 0], 0.55, dk);
@@ -689,11 +737,11 @@ const M3 = (function () {
     }));
     g.eye = []; for (const s of [-1, 1]) g.eye.push(geo('mm_eye' + s, pb => pb.ball(3.2, 5.0, s * 2.35, 0.55, 0.55, 0.4, '#fff', { d: 0 })));
     g.maw = geo('mm_maw', pb => { pb.ball(0.6, 1.2, 0, 1.6, 1.6, 1.5, '#2a0505', { d: 0 }); pb.tube([0.8, 1.5, 0], [3.4, 4.2, 0], 0.55, 0.12, '#8a1a1a', { n: 4 }); });
-    g.uarm = geo('mm_uarm', pb => { pb.tube([0, 0, 0], [0, -13, 0], 0.95, 0.7, sk, { n: 5 }); pb.ball(0, -13, 0, 0.95, 0.95, 0.95, dk, { d: 0 }); });
-    g.farm = geo('mm_farm', pb => pb.tube([0, 0, 0], [0, -14, 0], 0.75, 0.5, sk, { n: 5 }));
+    g.uarm = geo('mm_uarm', pb => { pb.tube([0, 0, 0], [0, -13, 0], 1.35, 0.85, sk, { n: 5 }); pb.ball(0, -4, 0, 1.4, 3.2, 1.3, sk, { d: 0 }); pb.ball(0, -13, 0, 0.95, 0.95, 0.95, dk, { d: 0 }); });
+    g.farm = geo('mm_farm', pb => { pb.tube([0, 0, 0], [0, -14, 0], 0.95, 0.6, sk, { n: 5 }); pb.ball(0, -3.5, 0, 1.15, 2.6, 1.1, sk, { d: 0 }); });
     g.hand = geo('mm_hand', pb => { pb.ball(0, -0.8, 0, 0.9, 1.3, 1.1, dk, { d: 0 }); for (let k = -1.5; k <= 1.5; k++) { pb.tube([0, -1.5, k * 0.5], [0.5, -4.8, k * 1.0], 0.28, 0.2, sk, { n: 3 }); pb.cone([0.5, -4.8, k * 1.0], [1.6, -8.4, k * 1.25], 0.22, '#1a1414', { n: 3 }); } });
-    g.thigh = geo('mm_thigh', pb => { pb.tube([0, 0.5, 0], [0, -13.5, 0], 1.3, 0.85, sk, { n: 5 }); pb.ball(0, -13.5, 0, 1.05, 1.05, 1.05, dk, { d: 0 }); });
-    g.shin = geo('mm_shin', pb => { pb.tube([0, 0, 0], [0, -12.6, 0], 0.85, 0.55, sk, { n: 5 }); pb.wedge(-1.0, 4.2, -13.5, -12.2, -13.5, -13.0, 1.0, 1.3, dk); for (const z of [-0.8, 0, 0.8]) pb.cone([4.0, -13.1, z], [5.6, -13.5, z * 1.3], 0.3, '#1a1414', { n: 3 }); });
+    g.thigh = geo('mm_thigh', pb => { pb.tube([0, 0.5, 0], [0, -13.5, 0], 1.9, 1.05, sk, { n: 5 }); pb.ball(0.3, -4, 0, 1.9, 4, 1.7, sk, { d: 0 }); pb.ball(0, -13.5, 0, 1.05, 1.05, 1.05, dk, { d: 0 }); });
+    g.shin = geo('mm_shin', pb => { pb.tube([0, 0, 0], [0, -12.6, 0], 1.15, 0.6, sk, { n: 5 }); pb.ball(-0.3, -3.5, 0, 1.3, 3, 1.2, sk, { d: 0 }); pb.wedge(-1.0, 4.2, -13.5, -12.2, -13.5, -13.0, 1.0, 1.3, dk); for (const z of [-0.8, 0, 0.8]) pb.cone([4.0, -13.1, z], [5.6, -13.5, z * 1.3], 0.3, '#1a1414', { n: 3 }); });
     return (GEO.mimic = { g, eyeMat: glow('#ff2a1a') });
   }
   function rigMimic(root, ud) {
@@ -711,8 +759,8 @@ const M3 = (function () {
     o.root.scale.setScalar(1.02);
     return o;
   }
-  function updMimic(o, d, t) {
-    const ph = d.anim || 0, mv = d.moving ? 1 : 0, s = Math.sin(ph), id = d.id || 0, at = d.swing > 0 ? cl(d.swing / 0.3, 0, 1) : 0;
+  function updMimic(o, d, t, ud) {
+    const ph = ud.ph, mv = ud.mv, s = Math.sin(ph), id = d.id || 0, at = d.swing > 0 ? cl(d.swing / 0.3, 0, 1) : 0;
     const jit = Math.sin(t * 31 + id) * Math.sin(t * 7.3) > 0.7 ? 1 : 0;
     o.torso.position.y = 27 + (mv ? Math.abs(Math.cos(ph)) * 0.8 : Math.sin(t * 1.3) * 0.3) - 1.0;
     o.torso.rotation.z = -0.3 - at * 0.25 + Math.sin(t * 0.9 + id) * 0.03; o.torso.rotation.x = Math.sin(t * 0.6 + id) * 0.05 + jit * 0.06;
@@ -730,46 +778,36 @@ const M3 = (function () {
   }
 
   // =============================================================
-  //  İNSANLAR — dünya biriminde, boy 34
+  //  İNSANLAR — dünya biriminde, boy ~34 (çocuk ~20)
+  //  Renkler geometriye işlenir (ten / tunik / saç başına önbellek), malzeme paylaşılır.
+  //  Hiyerarşi: root -> torso (kalça pivotu, y=15.5) -> head(+hair), kollar (u -> f);
+  //             root -> bacaklar (th -> sh -> foot), bacaklar IK ile yere basar.
   // =============================================================
   const PGEO = {};
+  const LEATHER = '#5e4430', LEATHER_D = '#3a2818', HIDE_SHOE = '#3e2c1e';
   function pgeo() {
-    if (PGEO.torso) return PGEO;
+    if (PGEO.pack) return PGEO;
     const W = '#ffffff', P = PGEO;
-    P.torso = geo('p_torso', pb => {
-      pb.tube([0, 0.5, 0], [0, 11.6, 0], 2.7, 3.0, W, { n: 6, wz: 1.55 });
-      pb.tube([0, -4.2, 0], [0, 1.0, 0], 3.3, 2.85, '#dcdcdc', { n: 6, wz: 1.4 });
-      pb.tube([0, 0.6, 0], [0, 1.7, 0], 2.95, 2.95, '#6a6a6a', { n: 6, wz: 1.5 });
-      pb.ball(0, 11.4, 0, 2.9, 1.5, 5.3, W, { d: 0 });
-      pb.wedge(2.3, 3.1, 7.0, 11.5, 7.6, 11.2, 1.0, 0.6, '#b8b8b8');
+    P.shin = geo('p_shin', pb => {
+      pb.tube([0, 0.2, 0], [0, -6.5, 0], 1.45, 1.08, LEATHER, { n: 6 });
+      for (let i = 0; i < 3; i++) pb.tube([0, -1.4 - i * 1.8, 0], [0, -2.0 - i * 1.8, 0], 1.42 - i * 0.12, 1.38 - i * 0.12, LEATHER_D, { n: 6 });
     });
-    P.head = geo('p_head', pb => {
-      pb.tube([0, -1.0, 0], [0, 1.2, 0], 1.35, 1.25, '#d8d8d8', { n: 5 });
-      pb.ball(0.2, 3.5, 0, 3.15, 3.5, 3.0, W);
-      pb.wedge(3.0, 3.9, 2.6, 3.8, 2.7, 3.1, 0.5, 0.3, '#dddddd');
-      for (const s of [-1, 1]) { pb.ball(2.95, 4.15, s * 1.25, 0.4, 0.5, 0.55, '#1c1c1c', { d: 0 }); pb.ball(0.2, 3.4, s * 3.0, 0.7, 0.9, 0.4, '#d0d0d0', { d: 0 }); }
-      pb.box(3.05, 1.75, 0, 0.5, 0.3, 1.5, '#7a5a5a');
+    P.foot = geo('p_foot', pb => {
+      pb.wedge(-1.25, 3.2, -1.3, 0.35, -1.3, -0.35, 1.2, 1.05, HIDE_SHOE);
+      pb.ball(0, 0, 0, 1.15, 1.0, 1.1, HIDE_SHOE, { d: 0 });
+      pb.box(0.9, -0.1, 0, 0.35, 0.9, 2.25, LEATHER_D);
     });
-    P.hair = [
-      geo('p_hair0', pb => { pb.ball(-0.5, 4.55, 0, 3.3, 2.95, 3.3, W); pb.ball(-1.6, 3.0, 0, 2.4, 2.6, 3.2, W, { d: 0 }); }),
-      geo('p_hair1', pb => { pb.ball(-0.5, 4.55, 0, 3.35, 2.95, 3.35, W); pb.ball(-1.7, 1.6, 0, 2.3, 3.6, 3.3, W); }),
-      geo('p_hair2', pb => { pb.ball(-0.5, 4.55, 0, 3.3, 2.9, 3.3, W); pb.ball(-3.4, 5.4, 0, 1.6, 1.6, 1.6, W, { d: 0 }); pb.ball(-1.6, 3.0, 0, 2.3, 2.5, 3.15, W, { d: 0 }); })
-    ];
-    P.uarm = geo('p_uarm', pb => { pb.tube([0, 0.4, 0], [0, -6.2, 0], 1.5, 1.2, W, { n: 5 }); pb.ball(0, 0.2, 0, 1.6, 1.5, 1.6, W, { d: 0 }); });
-    P.farm = geo('p_farm', pb => { pb.tube([0, 0, 0], [0, -5.4, 0], 1.12, 0.92, W, { n: 5 }); pb.ball(0, -6.1, 0, 1.15, 1.35, 1.2, '#f2f2f2', { d: 0 }); });
-    P.thigh = geo('p_thigh', pb => pb.tube([0, 0.5, 0], [0, -7.6, 0], 1.95, 1.5, W, { n: 5 }));
-    P.shin = geo('p_shin', pb => { pb.tube([0, 0, 0], [0, -6.6, 0], 1.45, 1.1, '#ffe8d8', { n: 5 }); pb.wedge(-1.3, 3.2, -7.9, -6.2, -7.9, -7.0, 1.25, 1.2, '#55504a'); });
     P.pack = geo('p_pack', pb => { pb.box(0, 0, 0, 3.4, 6.4, 6.2, W); pb.box(0, 3.4, 0, 2.6, 1.2, 5.0, '#b0b0b0'); pb.box(1.4, 0.5, 2.2, 0.8, 7.0, 0.7, '#555'); pb.box(1.4, 0.5, -2.2, 0.8, 7.0, 0.7, '#555'); });
-    P.basket = geo('p_basket', pb => { pb.tube([0, -3.2, 0], [0, 3.2, 0], 2.0, 3.0, '#b89858', { n: 7 }); pb.tube([0, 2.6, 0], [0, 3.3, 0], 3.15, 3.15, '#8a6a34', { n: 7 }); pb.tube([0, -0.4, 0], [0, 0.2, 0], 2.62, 2.68, '#8a6a34', { n: 7 }); });
+    P.basket = geo('p_basket', pb => { pb.tube([0, -3.2, 0], [0, 3.2, 0], 2.0, 3.0, '#b89858', { n: 7 }); pb.tube([0, 2.6, 0], [0, 3.3, 0], 3.15, 3.15, '#8a6a34', { n: 7 }); pb.tube([0, -0.4, 0], [0, 0.2, 0], 2.62, 2.68, '#8a6a34', { n: 7 }); pb.box(2.6, 1.5, 0, 0.5, 6, 4.6, LEATHER_D); });
     P.basketFill = geo('p_bfill', pb => pb.ball(0, 3.2, 0, 2.6, 1.3, 2.6, W, { d: 0 }));
     P.cloak = geo('p_cloak', pb => {
       const xs = [-3.0, -4.2, -5.6], ys = [11.6, 3, -7.5], ws = [5.2, 6.4, 7.6];
-      for (let i = 0; i < 2; i++) for (let j = 0; j < 4; j++) { const z0 = -1 + j * 0.5, z1 = z0 + 0.5, bow = z => -1.4 * (1 - z * z); pb.quad([xs[i] - bow(z0) * 0 + (1 - z0 * z0) * -0.8, ys[i], z0 * ws[i]], [xs[i] + (1 - z1 * z1) * -0.8, ys[i], z1 * ws[i]], [xs[i + 1] + (1 - z1 * z1) * -0.8, ys[i + 1], z1 * ws[i + 1]], [xs[i + 1] + (1 - z0 * z0) * -0.8, ys[i + 1], z0 * ws[i + 1]], (i + j) % 2 ? '#5a1c0e' : '#6a2412'); }
+      for (let i = 0; i < 2; i++) for (let j = 0; j < 4; j++) { const z0 = -1 + j * 0.5, z1 = z0 + 0.5; pb.quad([xs[i] + (1 - z0 * z0) * -0.8, ys[i], z0 * ws[i]], [xs[i] + (1 - z1 * z1) * -0.8, ys[i], z1 * ws[i]], [xs[i + 1] + (1 - z1 * z1) * -0.8, ys[i + 1], z1 * ws[i + 1]], [xs[i + 1] + (1 - z0 * z0) * -0.8, ys[i + 1], z0 * ws[i + 1]], (i + j) % 2 ? '#5a1c0e' : '#6a2412'); }
       pb.ball(0, 11.7, 0, 3.3, 1.5, 5.7, '#3a0e06', { d: 0 }); pb.ball(2.9, 11.0, 0, 0.7, 0.8, 0.8, '#d8b050', { d: 0 });
       for (let j = 0; j < 4; j++) { const z = (-0.75 + j * 0.5) * 7.6; pb.tri([-6.4, -7.5, z - 1.9], [-6.4, -7.5, z + 1.9], [-6.6, -10.2, z], '#3a0e06'); }
     });
-    P.band = geo('p_band', pb => { pb.tube([0.1, 5.0, 0], [0.1, 6.0, 0], 3.3, 3.2, '#c8402a', { n: 8 }); pb.tri([-3.0, 5.6, 0.5], [-5.6, 4.0, 1.4], [-4.6, 2.2, 0.2], '#c8402a'); pb.tri([-3.0, 5.6, -0.3], [-5.0, 2.6, -1.4], [-4.0, 1.6, -0.6], '#a03020'); pb.cone([-1.0, 5.8, 2.6], [-2.6, 10.6, 3.4], 0.55, '#e8dcc0', { n: 3 }); pb.cone([-1.4, 5.8, 2.9], [-3.6, 9.2, 3.9], 0.5, '#8a3018', { n: 3 }); });
-    P.armor = geo('p_armor', pb => { pb.tube([0, 2.2, 0], [0, 11.3, 0], 3.05, 3.4, '#8a6a3a', { n: 6, wz: 1.52 }); for (let i = 0; i < 3; i++) pb.tube([0, 3.4 + i * 2.9, 0], [0, 4.0 + i * 2.9, 0], 3.3 + i * 0.1, 3.3 + i * 0.1, '#5a4024', { n: 6, wz: 1.52 }); for (const s of [-1, 1]) pb.ball(0, 11.6, s * 5.0, 2.2, 1.3, 2.2, '#6a4a2a', { d: 0 }); });
+    P.band = geo('p_band', pb => { pb.tube([0.1, 5.4, 0], [0.1, 6.3, 0], 3.35, 3.25, '#c8402a', { n: 8 }); pb.tri([-3.0, 5.9, 0.5], [-5.6, 4.3, 1.4], [-4.6, 2.5, 0.2], '#c8402a'); pb.tri([-3.0, 5.9, -0.3], [-5.0, 2.9, -1.4], [-4.0, 1.9, -0.6], '#a03020'); pb.cone([-1.0, 6.1, 2.6], [-2.6, 10.9, 3.4], 0.55, '#e8dcc0', { n: 3 }); pb.cone([-1.4, 6.1, 2.9], [-3.6, 9.5, 3.9], 0.5, '#8a3018', { n: 3 }); });
+    P.armor = geo('p_armor', pb => { pb.tube([0, 2.2, 0], [0, 11.3, 0], 3.1, 3.45, '#8a6a3a', { n: 7, wz: 1.52 }); for (let i = 0; i < 3; i++) pb.tube([0, 3.4 + i * 2.9, 0], [0, 4.0 + i * 2.9, 0], 3.35 + i * 0.1, 3.35 + i * 0.1, '#5a4024', { n: 7, wz: 1.52 }); for (const s of [-1, 1]) pb.ball(0, 11.6, s * 5.0, 2.2, 1.3, 2.2, '#6a4a2a', { d: 0 }); for (const s of [-1, 1]) pb.cone([0, 12.3, s * 5.2], [-0.4, 14.3, s * 5.9], 0.5, BONE, { n: 4 }); });
     // --- yamyam
     const ASH = '#b9b0a2';
     P.ctorso = geo('p_ctorso', pb => {
@@ -787,8 +825,7 @@ const M3 = (function () {
       pb.ball(0, 3.5, 0, 3.1, 3.4, 3.0, '#a69c8e');
       pb.ball(-0.8, 4.6, 0, 3.2, 3.0, 3.3, '#15100c');                                                      // keçeleşmiş saç
       for (let i = 0; i < 5; i++) pb.cone([-2.4, 4 + (i % 2), (i - 2) * 1.2], [-4.6, 0.4 - (i % 3), (i - 2) * 1.6], 0.7, '#15100c', { n: 3 });
-      // kemik maske (hayvan kafatası)
-      pb.wedge(2.2, 3.7, 1.6, 7.0, 2.4, 6.4, 2.7, 2.3, BONE);
+      pb.wedge(2.2, 3.7, 1.6, 7.0, 2.4, 6.4, 2.7, 2.3, BONE);                                                // kemik maske
       pb.wedge(2.6, 4.2, -2.6, 1.8, -2.0, 2.4, 1.9, 1.3, '#dcd2ba');
       pb.wedge(3.5, 4.6, -3.2, -1.2, -2.8, -1.6, 1.0, 0.7, '#cfc4a8');
       for (const s of [-1, 1]) {
@@ -799,35 +836,147 @@ const M3 = (function () {
       }
       pb.box(4.15, 0.6, 0, 0.2, 3.2, 0.4, '#b02020'); pb.ball(4.1, 0.9, 0, 0.3, 0.7, 0.5, '#050404', { d: 0 });
     });
+    P.cthigh = geo('p_cthigh', pb => { pb.tube([0, 0.6, 0], [0, -7.6, 0], 1.8, 1.35, ASH, { n: 6 }); pb.ball(0, -7.6, 0, 1.3, 1.3, 1.3, ASH, { d: 0 }); pb.box(0.6, -3.5, 0, 2.4, 0.6, 3.0, '#7a1a12'); });
+    P.cshin = geo('p_cshin', pb => { pb.tube([0, 0.2, 0], [0, -6.5, 0], 1.3, 0.95, ASH, { n: 6 }); pb.tube([0, -5.0, 0], [0, -5.8, 0], 1.1, 1.05, '#2a1e16', { n: 6 }); });
+    P.cfoot = geo('p_cfoot', pb => { pb.wedge(-1.2, 3.0, -1.3, 0.3, -1.3, -0.4, 1.1, 0.95, '#8a8074'); pb.ball(0, 0, 0, 1.0, 0.9, 1.0, '#8a8074', { d: 0 }); });
     return P;
   }
+  // --- renk işlenmiş vücut parçaları
+  function torsoG(tun) {
+    return geo('p_torso' + tun, pb => {
+      const T = col(tun), D = shd(tun, -0.28), F = mix(tun, '#e6d8b8', 0.5);
+      pb.tube([0, 0.4, 0], [0, 11.3, 0], 2.75, 3.05, T, { n: 7, wz: 1.55 });
+      pb.ball(0, 11.1, 0, 2.95, 1.6, 5.2, T, { d: 0 });
+      pb.ball(0, 11.7, 0, 3.15, 1.25, 4.9, F);                                           // kürk yaka
+      for (let i = 0; i < 6; i++) { const a = (i / 5 - 0.5) * 2.4; pb.cone([Math.cos(a) * 2.9, 11.2, Math.sin(a) * 4.4], [Math.cos(a) * 3.5, 9.9, Math.sin(a) * 5.0], 0.55, F, { n: 3 }); }
+      pb.box(2.98, 7.6, 0, 0.3, 5.2, 0.32, D);                                          // göğüs bağcığı
+      for (let i = 0; i < 3; i++) pb.box(3.0, 6.0 + i * 1.5, 0, 0.3, 0.25, 1.3, D);
+      pb.tube([0, 9.0, 0], [0, 9.4, 0], 3.02, 3.04, D, { n: 7, wz: 1.55 });              // dikiş
+    });
+  }
+  function skirtG(tun) {
+    return geo('p_skirt' + tun, pb => {
+      const D = shd(tun, -0.28);
+      pb.tube([0, -5.4, 0], [0, 1.2, 0], 3.45, 2.9, shd(tun, -0.08), { n: 7, wz: 1.4 });
+      for (let j = 0; j < 9; j++) {                                                     // saçaklı etek ucu
+        const a0 = j / 9 * TAU2, a1 = (j + 1) / 9 * TAU2, am = (j + 0.5) / 9 * TAU2, P0 = (a, y, k) => [Math.cos(a) * 3.48 * k, y, Math.sin(a) * 4.87 * k];
+        pb.tri(P0(a0, -5.2, 1), P0(a1, -5.2, 1), P0(am, -6.9 - (j % 2) * 0.6, 1.02), D);
+      }
+      pb.tube([0, 0.4, 0], [0, 1.8, 0], 3.08, 3.0, LEATHER_D, { n: 7, wz: 1.5 });           // kemer
+      pb.ball(3.05, 1.1, 0.9, 0.62, 0.62, 0.62, '#9a7a4a', { d: 0 }); pb.box(3.2, -0.9, 1.2, 0.25, 2.6, 0.5, LEATHER_D);
+    });
+  }
+  function headG(skin) {
+    return geo('p_head' + skin, pb => {
+      const S = col(skin), Sd = shd(skin, -0.2), Lip = mix(shd(skin, -0.35), '#7a3028', 0.35);
+      pb.tube([0, -1.2, 0], [0, 1.6, 0], 1.45, 1.3, S, { n: 6 });
+      pb.ball(0.2, 3.5, 0, 3.1, 3.45, 2.95, S);
+      pb.ball(1.15, 1.85, 0, 1.95, 1.55, 2.3, S);                                          // çene hattı
+      pb.wedge(2.85, 3.95, 2.6, 3.95, 2.65, 3.15, 0.55, 0.32, Sd);                         // burun
+      for (const s of [-1, 1]) {
+        pb.ball(0.15, 3.5, s * 2.95, 0.6, 0.95, 0.35, Sd, { d: 0 });                        // kulak
+        pb.ball(2.72, 4.1, s * 1.2, 0.42, 0.42, 0.56, '#ece4d2', { d: 0 });                 // göz akı
+        pb.ball(3.06, 4.08, s * 1.2, 0.27, 0.33, 0.3, '#22160e', { d: 0 });                 // göz bebeği
+        pb.ball(2.55, 4.55, s * 1.2, 0.5, 0.25, 0.7, Sd, { d: 0 });                         // göz kapağı
+      }
+      pb.box(3.08, 2.05, 0, 0.35, 0.3, 1.35, Lip);                                          // ağız
+    });
+  }
+  const HAIRN = 6;
+  function hairG(st, beard) {
+    return geo('p_hair' + st + '_' + beard, pb => {
+      const W = '#ffffff';
+      for (const s of [-1, 1]) pb.box(3.02, 4.82, s * 1.25, 0.4, 0.34, 1.3, W, 0, 0, -s * 0.16);   // kaşlar
+      if (st === 5) pb.ball(-0.8, 4.6, 0, 3.05, 2.75, 3.15, W);
+      else pb.ball(-0.6, 4.75, 0, 3.28, 2.88, 3.22, W);
+      if (st === 1) pb.ball(-1.8, 1.9, 0, 2.2, 3.8, 3.2, W);                                      // uzun saç
+      else if (st === 2) { pb.ball(-3.0, 6.3, 0, 1.55, 1.5, 1.5, W, { d: 0 }); pb.ball(-1.8, 2.8, 0, 2.2, 2.4, 3.05, W, { d: 0 }); } // topuz
+      else if (st === 3) { pb.ball(-0.4, 5.1, 0, 3.4, 2.75, 3.4, W, { d: 0 }); for (let i = 0; i < 7; i++) { const a = (i / 6 - 0.5) * 3.2; pb.cone([-1.4 + Math.cos(a) * 1.2, 4.6, Math.sin(a) * 2.8], [-2.6 + Math.cos(a) * 1.6, 0.4 + (i % 2), Math.sin(a) * 3.6], 1.1, W, { n: 3 }); } } // dağınık
+      else if (st === 4) for (const s of [-1, 1]) { pb.tube([-0.6, 3.6, s * 2.9], [-0.3, -1.6, s * 2.7], 0.75, 0.48, W, { n: 4 }); pb.ball(-0.3, -1.9, s * 2.7, 0.55, 0.7, 0.55, W, { d: 0 }); } // örgüler
+      else if (st === 5) pb.ball(-0.5, 6.7, 0, 3.1, 1.05, 0.85, W);                                 // ibik
+      if (beard) {
+        pb.ball(1.55, 1.75, 0, 1.75, 1.45, 2.42, W);
+        pb.box(3.15, 2.55, 0, 0.42, 0.38, 1.7, W);
+        if (beard === 2) pb.cone([2.4, 1.2, 0], [2.0, -2.6, 0], 1.55, W, { n: 5 });
+        for (const s of [-1, 1]) pb.box(0.8, 3.0, s * 2.62, 1.6, 2.0, 0.4, W);                   // favori
+      }
+    });
+  }
+  function uarmG(tun, skin) {
+    return geo('p_uarm' + tun + skin, pb => {
+      pb.ball(0, 0.2, 0, 1.68, 1.6, 1.68, tun, { d: 0 });
+      pb.tube([0, 0.4, 0], [0, -3.6, 0], 1.58, 1.4, tun, { n: 6 });
+      pb.tube([0, -3.6, 0], [0, -4.1, 0], 1.48, 1.44, mix(tun, '#e6d8b8', 0.5), { n: 6 });
+      pb.tube([0, -3.8, 0], [0, -6.2, 0], 1.22, 1.08, skin, { n: 6 });
+      pb.ball(0, -6.2, 0, 1.08, 1.08, 1.08, skin, { d: 0 });
+    });
+  }
+  function farmG(skin) {
+    return geo('p_farm' + skin, pb => {
+      pb.tube([0, 0, 0], [0, -5.2, 0], 1.1, 0.88, skin, { n: 6 });
+      pb.tube([0, -3.9, 0], [0, -4.9, 0], 1.04, 0.98, LEATHER, { n: 6 });
+      pb.ball(0.15, -6.05, 0, 0.92, 1.3, 1.1, skin, { d: 0 });
+      pb.ball(0.75, -5.6, 0.55, 0.36, 0.62, 0.36, skin, { d: 0 });
+    });
+  }
+  function thighG(tun) { return geo('p_thigh' + tun, pb => { const k = shd(tun, -0.42); pb.tube([0, 0.6, 0], [0, -7.6, 0], 1.95, 1.5, k, { n: 6 }); pb.ball(0, -7.6, 0, 1.48, 1.48, 1.48, k, { d: 0 }); }); }
+  function accG(kind) {
+    return geo('p_acc_' + kind, pb => {
+      const strap = k => { pb.box(3.02, 6.2, 0, 0.3, 12.4, 0.75, k, 0, 0, 0.62); pb.box(-2.9, 6.2, 0, 0.3, 12.4, 0.75, k, 0, 0, -0.62); };
+      if (kind === 'quiver') {
+        pb.tube([-3.9, 1.0, -1.8], [-4.4, 11.2, 1.6], 1.15, 1.3, '#6a4424', { n: 6 }); pb.tube([-4.35, 10.4, 1.35], [-4.45, 11.4, 1.7], 1.42, 1.42, LEATHER_D, { n: 6 });
+        for (let i = 0; i < 4; i++) { const dz = (i - 1.5) * 0.6, tip = [-4.6 + (i % 2) * 0.4, 14.6, 2.4 + dz]; pb.tube([-4.4, 10.5, 1.5 + dz], tip, 0.16, 0.16, '#a08050', { n: 3 }); pb.tri(tip, [tip[0] - 0.4, tip[1] - 1.8, tip[2]], [tip[0] + 0.5, tip[1] - 1.6, tip[2] + 0.2], i % 2 ? '#e8e0d0' : '#a84a2a'); }
+        strap(LEATHER_D);
+      } else if (kind === 'apron' || kind === 'apronC') {
+        const k = kind === 'apron' ? '#7a5a3c' : '#d8ccae';
+        pb.quad([3.2, 8.4, -2.4], [3.2, 8.4, 2.4], [3.75, -6.3, 3.0], [3.75, -6.3, -3.0], k);
+        pb.box(3.1, 1.2, 0, 0.3, 0.5, 6.4, k); for (const s of [-1, 1]) pb.box(1.2, 10.3, s * 2.0, 3.6, 0.35, 0.4, k, -0.5);
+        if (kind === 'apron') for (let i = 0; i < 5; i++) pb.ball(3.6 - i * 0.02, 5 - i * 2.4 + (i % 2), (i % 3 - 1) * 1.3, 0.12, 0.9 + (i % 2) * 0.5, 0.7, '#6a1010', { d: 0 });
+        else pb.box(3.7, -1.0, 0, 0.12, 2.4, 3.2, '#b0a080');
+      } else if (kind === 'satchel' || kind === 'herbs') {
+        pb.box(0.6, -1.3, 4.6, 3.4, 3.4, 1.5, '#8a6a3a'); pb.box(0.6, 0.15, 4.75, 3.5, 1.2, 1.6, '#6a4a28');
+        pb.box(3.02, 6.2, 0, 0.3, 13.0, 0.75, LEATHER_D, 0, 0, -0.62); pb.box(-2.9, 6.2, 0, 0.3, 13.0, 0.75, LEATHER_D, 0, 0, 0.62);
+        if (kind === 'herbs') for (let i = 0; i < 4; i++) pb.tri([0.0 + i * 0.5, 0.5, 4.5], [0.5 + i * 0.5, 3.4 + (i % 2), 4.9], [0.9 + i * 0.5, 0.5, 4.6], i % 2 ? '#4a8a3a' : '#6aa04a');
+      } else if (kind === 'pouch') {
+        pb.box(2.2, -0.6, -3.4, 1.9, 2.4, 1.2, '#7a5a34'); pb.box(2.4, 0.8, -3.5, 0.4, 2.2, 0.5, '#9a9a9a');
+      } else if (kind === 'roll') {
+        pb.tube([-4.2, 10.4, -4.0], [-4.2, 10.4, 4.0], 1.45, 1.45, '#7a6040', { n: 7 }); for (const z of [-2.4, 2.4]) pb.tube([-4.2, 10.4, z - 0.25], [-4.2, 10.4, z + 0.25], 1.6, 1.6, LEATHER_D, { n: 7 }); strap(LEATHER_D);
+      } else if (kind === 'mantle') {
+        pb.ball(-0.6, 10.9, 0, 3.4, 1.9, 5.6, '#6a5a48'); for (let i = 0; i < 7; i++) { const a = (i / 6 - 0.5) * 2.8; pb.cone([-1.2 + Math.cos(a) * 2, 10.4, Math.sin(a) * 4.8], [-1.6 + Math.cos(a) * 2.6, 7.6, Math.sin(a) * 5.4], 0.9, '#5a4a3a', { n: 3 }); }
+      }
+    });
+  }
+  const ACC = { avci: 'quiver', kasap: 'apron', asci: 'apronC', yiyecek: 'satchel', sifaci: 'herbs', zanaat: 'pouch', mimar: 'pouch', kasif: 'roll', muhafiz: 'mantle', takip: 'mantle' };
   // --- aletler: tutma noktası orijinde, +X yönünde uzanır
   const TOOLS = {
     spear1: pb => spearG(pb, '#b89060'), spear2: pb => spearG(pb, '#9a9a9a'), spear3: pb => spearG(pb, '#eee6d0', true),
-    bow: pb => { const N = 6, R = 10; for (let i = 0; i < N; i++) { const a0 = -1.3 + i * 2.6 / N, a1 = a0 + 2.6 / N; pb.tube([Math.cos(a0) * R - R * 0.6, Math.sin(a0) * R, 0], [Math.cos(a1) * R - R * 0.6, Math.sin(a1) * R, 0], 0.45, 0.45, '#7a5a2a', { n: 4 }); } pb.tube([Math.cos(1.3) * R - R * 0.6, -Math.sin(1.3) * R, 0], [Math.cos(1.3) * R - R * 0.6, Math.sin(1.3) * R, 0], 0.1, 0.1, '#e6dcc8', { n: 3 }); },
+    bow: pb => { const N = 6, R = 10; for (let i = 0; i < N; i++) { const a0 = -1.3 + i * 2.6 / N, a1 = a0 + 2.6 / N; pb.tube([Math.cos(a0) * R - R, Math.sin(a0) * R, 0], [Math.cos(a1) * R - R, Math.sin(a1) * R, 0], 0.45, 0.45, '#7a5a2a', { n: 4 }); } pb.tube([Math.cos(1.3) * R - R, -Math.sin(1.3) * R, 0], [Math.cos(1.3) * R - R, Math.sin(1.3) * R, 0], 0.1, 0.1, '#e6dcc8', { n: 3 }); pb.tube([0, -1.6, 0], [0, 1.6, 0], 0.7, 0.7, LEATHER_D, { n: 4 }); },
     axe: pb => axeG(pb, '#7a6a5a'), axe2: pb => axeG(pb, '#a4a4a4'),
     pick: pb => { pb.tube([-3, 0, 0], [10, 0, 0], 0.5, 0.45, '#6a4a2a', { n: 4 }); pb.tube([9.5, 0, 0], [8.0, 4.6, 0], 0.7, 0.12, '#999', { n: 4 }); pb.tube([9.5, 0, 0], [8.0, -4.6, 0], 0.7, 0.12, '#999', { n: 4 }); },
     knife: pb => { pb.tube([-1.5, 0, 0], [2, 0, 0], 0.5, 0.5, '#5a3a1a', { n: 4 }); pb.wedge(2, 8, -0.9, 0.5, -0.1, 0.3, 0.14, 0.08, '#cccccc'); },
-    hammer: pb => { pb.tube([-2.5, 0, 0], [8, 0, 0], 0.48, 0.45, '#6a4a2a', { n: 4 }); pb.box(8, 0, 0, 2.4, 4.6, 2.4, '#777'); },
+    hammer: pb => { pb.tube([-2.5, 0, 0], [8, 0, 0], 0.48, 0.45, '#6a4a2a', { n: 4 }); pb.box(8, 0, 0, 2.4, 4.6, 2.4, '#777'); pb.box(8, 0, 0, 2.6, 1.0, 2.6, LEATHER_D); },
     sickle: pb => { pb.tube([-2, 0, 0], [5, 0, 0], 0.48, 0.45, '#6a4a2a', { n: 4 }); let px = 5, py = 0; for (let i = 1; i <= 5; i++) { const a = -1.2 + i * 0.62, nx = 7.5 + Math.cos(a - PI / 2) * 3.6, ny = 3.4 + Math.sin(a - PI / 2) * 3.6; pb.tube([px, py, 0], [nx, ny, 0], 0.4, 0.3 - i * 0.04, '#aaa', { n: 3, wz: 0.4 }); px = nx; py = ny; } },
+    stick: pb => { pb.tube([-2, 0, 0], [12, 0, 0], 0.42, 0.36, '#7a5a34', { n: 4 }); pb.ball(12.6, 0, 0, 1.0, 0.5, 1.0, '#6a4a2a', { d: 0 }); },
     club: pb => { pb.tube([-3, 0, 0], [7, 0, 0], 0.55, 0.9, BONE, { n: 5 }); pb.ball(-3.4, 0, 0, 1.0, 1.0, 1.0, '#dcd2ba', { d: 0 }); pb.tube([7, 0, 0], [15, 0, 0], 1.0, 1.9, '#3a2a1c', { n: 5 }); pb.ball(15, 0, 0, 2.0, 2.0, 2.0, '#33241a', { d: 0 }); for (let i = 0; i < 6; i++) { const a = i * 1.05, x = 10.5 + (i % 3) * 2.0; pb.cone([x, Math.cos(a) * 1.2, Math.sin(a) * 1.2], [x + 0.6, Math.cos(a) * 3.8, Math.sin(a) * 3.8], 0.5, BONE, { n: 3 }); } pb.box(12, 0, 0, 2.2, 3.5, 3.5, '#5a1010', 0.4, 0.3); },
     torch: pb => { pb.tube([-3, 0, 0], [7, 0, 0], 0.5, 0.6, '#5a3a1a', { n: 4 }); pb.tube([6, 0, 0], [8.5, 0, 0], 0.9, 1.0, '#2a1a10', { n: 5 }); }
   };
   function spearG(pb, tip, bone) { pb.tube([-15, 0, 0], [18, 0, 0], 0.5, 0.42, '#6a4520', { n: 4 }); pb.tube([16.5, 0, 0], [18.5, 0, 0], 0.7, 0.7, '#3a2a1a', { n: 4 }); pb.tube([18, 0, 0], [26.5, 0, 0], bone ? 1.25 : 1.5, 0.05, tip, { n: 4, wz: 0.4 }); if (bone) for (const s of [-1, 1]) pb.cone([19.5, 0, 0], [18, s * 2.2, 0], 0.4, tip, { n: 3 }); }
-  function axeG(pb, k) { pb.tube([-3, 0, 0], [10, 0, 0], 0.5, 0.45, '#6a4a2a', { n: 4 }); pb.wedge(7.2, 10.6, -0.4, 0.4, -4.4, -0.6, 0.55, 0.12, k); pb.wedge(7.6, 10.2, -0.3, 1.3, -0.2, 1.0, 0.6, 0.5, k); }
+  function axeG(pb, k) { pb.tube([-3, 0, 0], [10, 0, 0], 0.5, 0.45, '#6a4a2a', { n: 4 }); pb.wedge(7.2, 10.6, -0.4, 0.4, -4.4, -0.6, 0.55, 0.12, k); pb.wedge(7.6, 10.2, -0.3, 1.3, -0.2, 1.0, 0.6, 0.5, k); pb.box(7.8, 0, 0, 1.4, 1.2, 1.3, LEATHER_D); }
   function toolGeo(k) { return geo('tool_' + k, TOOLS[k]); }
   let FLAME = null;
   function flameGeo() { return FLAME || (FLAME = geo('flame', pb => { pb.ball(0, 0, 0, 1.5, 2.2, 1.5, '#fff', { d: 0 }); pb.cone([0, 1.2, 0], [0.4, 4.6, 0], 1.0, '#fff'); })); }
 
   const BAGCOL = { wood: '#7a5028', stone: '#999999', crystal: '#77aacc', herb: '#55aa55', poison: '#aa55cc', food: '#aa3333' };
   const ARMED = { muhafiz: 1, takip: 1, avci: 1 };
-  const WTOOL = { odun: 'axe', tas: 'pick', kasap: 'knife', zanaat: 'hammer', mimar: 'hammer', ciftci: 'sickle' };
+  const WTOOL = { odun: 'axe', tas: 'pick', kasap: 'knife', zanaat: 'hammer', mimar: 'hammer', ciftci: 'sickle', asci: 'stick', bos: 'hammer' };
+  function hashId(id) { let h = Math.imul((id | 0) ^ 0x5bd1e995, 2654435761) >>> 0; h ^= h >>> 15; return Math.imul(h, 2246822519) >>> 0; }
   function tunicOf(p) {
     if (p.downed > 0) return '#5a5050';
     if (p.leader) return '#8a3a1a';
     if (p.child) return '#b89a6a';
     const GR = typeof GROUPS !== 'undefined' ? GROUPS : null;
-    return (GR && (GR[p.group] || GR.bos) || { col: '#555' }).col;
+    const c = (GR && (GR[p.group] || GR.bos) || { col: '#6a5a48' }).col;
+    return c === '#555' ? '#6a5a48' : c;                          // boşta: ham deri
   }
   function toolOf(p, working) {
     const eq = p.eq || {};
@@ -847,44 +996,57 @@ const M3 = (function () {
   function person(p) {
     p = p || {};
     const PG = pgeo(), g = new T3.Group(), root = grp(g), ud = g.userData;
-    ud.kind = 'person'; ud.root = root; ud.can = !!p.cannibal; ud.lt = -1; ud.lie = 0; ud.thr = 0;
-    const can = ud.can;
-    ud.torso = mesh(can ? PG.ctorso : PG.torso, VC, root, 0, 15.5, 0);
-    ud.head = mesh(can ? PG.chead : PG.head, VC, ud.torso, 0, 12.3, 0);
-    if (!can) ud.hair = mesh(PG.hair[(p.id || 0) % 3], VC, ud.head);
+    ud.kind = 'person'; ud.root = root; ud.can = !!p.cannibal; ud.lt = -1; ud.thr = 0; ud.J = new Float32Array(16); ud.Jok = false; ud.lyMode = -1;
+    const h = hashId(p.id || 0); ud.h = h;
+    ud.torso = mesh(PG.ctorso, VC, root, 0, 15.5, 0);
+    ud.skirt = mesh(PG.foot, VC, root, 0, 15.5, 0);
+    ud.headG = grp(ud.torso, 0, 12.2, 0);
+    ud.head = mesh(PG.chead, VC, ud.headG);
+    if (!ud.can) ud.hair = mesh(hairG(0, 0), VC, ud.headG);
     ud.arms = []; ud.legs = [];
     for (const s of [-1, 1]) {
-      const u = mesh(PG.uarm, VC, ud.torso, 0, 11.0, s * 5.7), f = mesh(PG.farm, VC, u, 0, -6.2, 0);
+      const u = mesh(PG.shin, VC, ud.torso, 0, 10.9, s * 5.75), f = mesh(PG.shin, VC, u, 0, -6.2, 0);
       ud.arms.push({ u, f, s });
-      const th = mesh(PG.thigh, VC, root, 0, 15.5, s * 2.15), sh = mesh(PG.shin, VC, th, 0, -7.6, 0);
-      ud.legs.push({ th, sh });
+      const th = mesh(PG.cthigh, VC, root, 0, 15.5, s * 2.15), sh = mesh(PG.shin, VC, th, 0, -7.6, 0), ft = mesh(PG.foot, VC, sh, 0, -6.6, 0);
+      ud.legs.push({ th, sh, ft, s });
     }
     ud.tool = mesh(toolGeo('spear1'), VC, ud.arms[1].f, 0.3, -6.0, 0.2); ud.tool.visible = false; ud.toolK = null;
-    look(ud, p, false);
     updPerson(g, p, 0);
     return g;
   }
   function look(ud, p, working) {
-    const PG = PGEO, can = ud.can;
-    const skin = can ? '#b9b0a2' : (p.skin || '#d8a47a'), hair = p.hair || '#2a1a10', tun = can ? '#2a1e16' : tunicOf(p), hurt = p.hurtT > 0;
-    const key = skin + hair + tun + (hurt ? 1 : 0);
+    const PG = PGEO, can = ud.can, h = ud.h;
+    const skin = can ? '#b9b0a2' : (typeof p.skin === 'string' ? p.skin : '#d8a47a'), hair = typeof p.hair === 'string' ? p.hair : '#2a1a10', tun = can ? '#2a1e16' : tunicOf(p), hurt = p.hurtT > 0;
+    const adult = !p.child, grey = hair === '#bbb';
+    const st = h % HAIRN, beard = !adult || can ? 0 : ((h >>> 5) % 4 === 0 || (grey && h & 1)) ? 2 : (h >>> 5) % 4 === 1 ? 1 : 0;
+    const key = skin + hair + tun + (hurt ? 1 : 0) + st + beard;
     if (ud.lk !== key) {
       ud.lk = key;
-      const mSkin = hurt && can ? FLASH : tint(skin), mTun = hurt ? FLASH : tint(tun), mSl = hurt ? FLASH : tint('#' + shd(tun, -0.14).getHexString()), mPant = can ? mSkin : tint('#' + shd(tun, -0.45).getHexString());
-      if (can) { ud.torso.material = hurt ? FLASH : VC; ud.head.material = hurt ? FLASH : VC; }
-      else { ud.torso.material = mTun; ud.head.material = tint(skin); ud.hair.material = tint(hair); }
-      for (const A of ud.arms) { A.u.material = can ? mSkin : mSl; A.f.material = mSkin; }
-      for (const L of ud.legs) { L.th.material = mPant; L.sh.material = can ? mSkin : mPant; }
+      ud.skirt.visible = !can;
+      if (can) { ud.torso.geometry = PG.ctorso; ud.head.geometry = PG.chead; }
+      else { ud.skirt.geometry = skirtG(tun); ud.torso.geometry = torsoG(tun); ud.head.geometry = headG(skin); ud.hair.geometry = hairG(st, beard); }
+      for (const A of ud.arms) { A.u.geometry = uarmG(can ? skin : tun, skin); A.f.geometry = farmG(skin); }
+      for (const L of ud.legs) { L.th.geometry = can ? PG.cthigh : thighG(tun); L.sh.geometry = can ? PG.cshin : PG.shin; L.ft.geometry = can ? PG.cfoot : PG.foot; }
+      const m = hurt ? FLASH : VC;
+      ud.torso.material = ud.head.material = ud.skirt.material = m; if (ud.hair) ud.hair.material = hurt ? FLASH : tint(hair);
+      for (const A of ud.arms) A.u.material = A.f.material = m;
+      for (const L of ud.legs) L.th.material = L.sh.material = L.ft.material = m;
     }
-    // alet
+    // iş aksesuarı (sadak, önlük, heybe...)
+    const ak = can || p.child ? null : (p.leader ? null : ACC[p.group] || null);
+    if (ak !== ud.ak) { ud.ak = ak; if (ak && !ud.acc) ud.acc = mesh(accG(ak), VC, ud.torso); if (ud.acc) { ud.acc.visible = !!ak; if (ak) ud.acc.geometry = accG(ak); } }
+    // alet (yay sol elde)
     const tk = toolOf(p, working);
-    if (tk !== ud.toolK) { ud.toolK = tk; ud.tool.visible = !!tk; if (tk) ud.tool.geometry = toolGeo(tk); }
+    if (tk !== ud.toolK) {
+      ud.toolK = tk; ud.tool.visible = !!tk;
+      if (tk) { ud.tool.geometry = toolGeo(tk); const hand = ud.arms[tk === 'bow' ? 0 : 1].f; if (ud.tool.parent !== hand) hand.add(ud.tool); ud.tool.position.set(0.3, -6.0, tk === 'bow' ? -0.2 : 0.2); }
+    }
     // sırt yükü / sepet
     const eq = p.eq || {}, carry = p.carry > 0, bk = eq.sepet ? 2 : carry ? 1 : 0;
     if (bk !== (ud.bk || 0) || (carry && !ud.pack)) {
       ud.bk = bk;
       if (bk && !ud.pack) ud.pack = mesh(PG.pack, VC, ud.torso, -4.1, 7.2, 0);
-      if (ud.pack) { ud.pack.visible = !!bk; ud.pack.geometry = bk === 2 ? PG.basket : PG.pack; ud.pack.position.x = bk === 2 ? -5.2 : -4.1; }
+      if (ud.pack) { ud.pack.visible = !!bk; ud.pack.geometry = bk === 2 ? PG.basket : PG.pack; ud.pack.position.x = bk === 2 ? -5.4 : -4.3; if (ud.acc && ud.ak === 'quiver') ud.pack.position.x -= 1.2; }
       if (bk === 2 && !ud.fill) ud.fill = mesh(PG.basketFill, VC, ud.pack);
     }
     if (ud.pack && ud.pack.visible) {
@@ -895,12 +1057,12 @@ const M3 = (function () {
     // lider: pelerin + alın bandı
     if (!!p.leader !== !!ud.ldr) {
       ud.ldr = !!p.leader;
-      if (ud.ldr && !ud.cloak) { ud.cloak = mesh(PG.cloak, VC, ud.torso); ud.band = mesh(PG.band, VC, ud.head); }
+      if (ud.ldr && !ud.cloak) { ud.cloak = mesh(PG.cloak, VC, ud.torso); ud.band = mesh(PG.band, VC, ud.headG); }
       if (ud.cloak) ud.cloak.visible = ud.band.visible = ud.ldr;
     }
     const arm = !!eq.zirh && !can;
     if (arm !== !!ud.arm) { ud.arm = arm; if (arm && !ud.armor) ud.armor = mesh(PG.armor, VC, ud.torso); if (ud.armor) ud.armor.visible = arm; }
-    // meşale
+    // meşale (sol el)
     const torch = !!(p.torch || (p.leader && typeof G !== 'undefined' && G && G.torchOn));
     if (torch !== !!ud.tch) {
       ud.tch = torch;
@@ -908,77 +1070,175 @@ const M3 = (function () {
       if (ud.torch) ud.torch.visible = torch;
     }
   }
+  // eklem hedefleri (yumuşatılır): 0 aL 1 eL 2 sL 3 aR 4 eR 5 sR 6 lean 7 twist 8 hy 9 hz 10 hx 11 drop 12 tw2
+  const JT = new Float32Array(16);
+  const POSES = { sleep: 1, sit: 2, eat: 3, work: 4 };
+  function swingCurve(q) { return q < 0.62 ? q / 0.62 : q < 0.74 ? 1 - (q - 0.62) / 0.12 * 1.15 : -0.15 + (q - 0.74) / 0.26 * 0.15; } // yavaş kaldır, hızlı vur, toparlan
+  function legIK(L, hipX, hipY, ax, ay, toe) {
+    ik2(hipX, hipY, ax, ay, 7.6, 6.6, 1);
+    L.th.position.x = hipX; L.th.position.y = hipY;
+    L.th.rotation.z = IK.a; L.sh.rotation.z = IK.b - IK.a; L.ft.rotation.z = -IK.b + (toe || 0);
+  }
   function updPerson(g, p, t) {
     const ud = g && g.userData; if (!ud || ud.kind !== 'person') return;
     p = p || {}; t = t || 0;
     const dt = ud.lt < 0 ? 0.016 : cl(t - ud.lt, 0, 0.1); ud.lt = t;
-    const id = p.id || 0, mvB = !!p.moving, ph = p.anim || 0, s = Math.sin(ph), c = Math.cos(ph), can = ud.can;
-    const lying = p.downed > 0 || !!p.bed || !!p.carriedBy || !!p.dead || !!p.grabbed;
-    const working = !lying && !mvB && !p.child && p.work > 0.05 && !can;
+    const id = p.id || 0, can = ud.can, h = ud.h;
+    const pose = POSES[ud.pose] || 0;
+    // adım fazı: yer değiştirmeden (kaymasız), yoksa anim sayacından
+    const x = +p.x || 0, y = +p.y || 0, an = +p.anim || 0;
+    if (ud.px == null) { ud.px = x; ud.py = y; ud.ph = an; ud.la = an; ud.spd = 0; ud.mv = p.moving ? 1 : 0; }
+    let moved = Math.hypot(x - ud.px, y - ud.py); ud.px = x; ud.py = y; if (moved > 60) moved = 0;
+    let da = an - ud.la; ud.la = an; if (!(da > 0 && da < 3)) da = 0;
+    const v = dt > 0 ? moved / dt : 0; ud.spd += (v - ud.spd) * Math.min(1, dt * 6);
+    const mvB = !!p.moving && !pose;
+    ud.mv += ((mvB ? 1 : 0) - ud.mv) * Math.min(1, dt * 10);
+    const sprint = mvB && (p.sprinting || ud.spd > 150 || da / Math.max(dt, 1e-3) > 12.5) ? 1 : 0, sneak = mvB && p.sneak ? 1 : 0;
+    ud.spr = (ud.spr || 0) + (sprint - (ud.spr || 0)) * Math.min(1, dt * 5);
+    ud.snk = (ud.snk || 0) + (sneak - (ud.snk || 0)) * Math.min(1, dt * 5);
+    const sc0 = p.child ? 0.6 : can ? 1.04 : 1, stride = (13 + ud.spr * 7 - ud.snk * 4) * sc0;
+    let w = moved > 1e-3 ? moved / stride * TAU2 : (p.moving ? da : 0); w = Math.min(w, (14 + ud.spr * 6) * dt); ud.ph += w;
+    const ph = ud.ph, s = Math.sin(ph), c = Math.cos(ph), mv = ud.mv;
+    const lying = p.downed > 0 || !!p.bed || !!p.carriedBy || !!p.dead || !!p.grabbed || pose === 1;
+    const working = !lying && !mvB && !p.child && !can && (p.work > 0.05 || pose === 4);
     look(ud, p, working);
-    const root = ud.root, sc = p.child ? 0.6 : can ? 1.04 : 1;
-    if (ud.sc !== sc) { ud.sc = sc; root.scale.setScalar(sc); if (ud.head) ud.head.scale.setScalar(p.child ? 1.3 : 1); }
-    const A = ud.arms, Lg = ud.legs, torso = ud.torso, head = ud.head;
-    let aL = 0, eL = 0.15, aR = 0, eR = 0.15, xL = 0, xR = 0, lean = 0, hz = 0, hy = 0, toolPsi = null, toolLoc = 0;
+    const root = ud.root, sc = sc0;
+    if (ud.sc !== sc) { ud.sc = sc; root.scale.setScalar(sc); ud.headG.scale.setScalar(p.child ? 1.32 : 1); }
+    const A = ud.arms, Lg = ud.legs, torso = ud.torso, head = ud.headG, J = ud.J;
+    const br = Math.sin(t * 1.7 + id), breathe = Math.sin(t * 1.5 + id * 0.7);
     if (lying) {
-      const yaw = p.bed ? 0 : (id % 3) * 0.4 - 0.4, lift = p.carriedBy ? 24 : p.grabbed ? 20 : 2.9;
-      const flail = (p.grabbed && !p.dead) ? 1 : 0, alive = p.dead ? 0 : 1;
-      root.rotation.set(0, yaw, PI / 2);
-      root.position.set(Math.cos(yaw) * 17 * sc, lift * (lift < 3 ? sc : 1), -Math.sin(yaw) * 17 * sc);
-      torso.position.y = 15.5; torso.rotation.set(0, 0, p.carriedBy ? 0.25 : 0);
-      head.rotation.set(flail * Math.sin(t * 9 + id) * 0.3, alive * Math.sin(t * 0.7 + id) * 0.15 + (id % 2 ? 0.5 : -0.5) * (1 - flail), p.carriedBy ? 0.3 : -0.1);
-      const wv = p.downed > 0 && !p.dead ? Math.sin(t * 3 + id) : 0;
-      A[0].u.rotation.set(-0.9 - wv * 0.25 - flail * Math.sin(t * 11) * 0.6, 0, 1.3 + wv * 0.5 + flail * Math.sin(t * 13 + 1) * 0.8); A[0].f.rotation.z = 0.5 + wv * 0.4;
-      A[1].u.rotation.set(0.5 + flail * Math.sin(t * 12 + 2) * 0.6, 0, -0.2 + flail * Math.sin(t * 10) * 0.8); A[1].f.rotation.z = 0.4;
-      for (let i = 0; i < 2; i++) { const L = Lg[i]; L.th.position.y = 15.5; L.th.rotation.set(0, 0, (i ? 0.12 : 0.55) * (p.carriedBy ? 2 : 1) + flail * Math.sin(t * 12 + i * 3) * 0.7); L.sh.rotation.z = -(i ? 0.2 : 0.95) - flail * 0.4; L.th.rotation.x = (i ? 0.12 : -0.2); }
+      // yatan: yatak/uyku sırtüstü, yaralı yan yatıp kıvranır, taşınan omuzda, kapılan çırpınır
+      const sleep = pose === 1 || !!p.bed, yaw = sleep ? 0 : (id % 3) * 0.4 - 0.4, lift = p.carriedBy ? 24 : p.grabbed ? 20 : sleep ? 3.2 : 2.9;
+      const flail = (p.grabbed && !p.dead) ? 1 : 0, alive = p.dead ? 0 : 1, wv = p.downed > 0 && !p.dead ? Math.sin(t * 2.6 + id) : 0;
+      root.rotation.set(sleep ? 0 : wv * 0.08, yaw, PI / 2);
+      root.position.set(Math.cos(yaw) * 17 * sc, lift * (lift < 4 ? sc : 1), -Math.sin(yaw) * 17 * sc);
+      const bth = 1 + (sleep ? 0.035 : 0.02) * Math.sin(t * (sleep ? 1.1 : 2.4) + id) * alive;
+      torso.position.set(0, 15.5, 0); torso.rotation.set(0, 0, p.carriedBy ? 0.25 : wv * 0.06); torso.scale.set(1, 1, bth); ud.skirt.position.set(0, 15.5, 0); ud.skirt.rotation.set(0, 0, 0);
+      head.rotation.set(flail * Math.sin(t * 9 + id) * 0.3 + (sleep ? (h & 1 ? 0.35 : -0.35) : 0), alive * Math.sin(t * 0.7 + id) * 0.15 * (sleep ? 0.2 : 1) + (sleep ? 0 : (id % 2 ? 0.5 : -0.5)) * (1 - flail), p.carriedBy ? 0.3 : sleep ? -0.15 : -0.1);
+      if (sleep) {
+        A[0].u.rotation.set(0.12, 0, 0.1); A[0].f.rotation.z = 0.15; A[1].u.rotation.set(-0.1, 0, 0.12); A[1].f.rotation.z = 0.3;
+        for (let i = 0; i < 2; i++) { const L = Lg[i]; L.th.position.set(0, 15.5, L.s * 2.15); L.th.rotation.set(L.s * -0.04, 0, i ? 0.05 : 0.18); L.sh.rotation.z = -(i ? 0.1 : 0.35); L.ft.rotation.z = -0.9; }
+      } else {
+        A[0].u.rotation.set(0.9 + wv * 0.25 + flail * Math.sin(t * 11) * 0.6, 0, 1.3 + wv * 0.5 + flail * Math.sin(t * 13 + 1) * 0.8); A[0].f.rotation.z = 0.5 + wv * 0.4;
+        A[1].u.rotation.set(-0.5 - flail * Math.sin(t * 12 + 2) * 0.6, 0, -0.2 + flail * Math.sin(t * 10) * 0.8 + wv * 0.15); A[1].f.rotation.z = 0.4 + Math.max(0, wv) * 0.5;
+        for (let i = 0; i < 2; i++) { const L = Lg[i]; L.th.position.set(0, 15.5, L.s * 2.15); L.th.rotation.set(i ? 0.12 : -0.2, 0, (i ? 0.12 : 0.55) * (p.carriedBy ? 2 : 1) + flail * Math.sin(t * 12 + i * 3) * 0.7 + (i ? wv * 0.2 : 0)); L.sh.rotation.z = -(i ? 0.2 : 0.95) - flail * 0.4 - (i ? Math.max(0, -wv) * 0.4 : 0); L.ft.rotation.z = -0.5; }
+      }
       if (ud.tool) ud.tool.visible = false; ud.toolK = undefined;
+      if (ud.torch) ud.torch.visible = false; ud.tch = false;
       if (ud.cloak) ud.cloak.rotation.z = 0.25;
-      return;
+      if (ud.pack) ud.pack.rotation.z = 0;
+      ud.Jok = false; return;
     }
-    root.rotation.set(0, 0, 0); root.position.set(0, 0, 0);
-    const stride = mvB ? 1 : 0, br = Math.sin(t * 1.7 + id);
-    const bob = mvB ? Math.abs(c) * 0.9 : br * 0.12;
-    const fear = cl(((p.fear || 0) - 45) / 40, 0, 1), sick = p.sick ? 1 : 0;
+    root.rotation.set(0, 0, 0); root.position.set(0, 0, 0); torso.scale.set(1, 1, 1);
+    // ---- durum ağırlıkları
+    const spr = ud.spr * mv, snk = ud.snk * mv, walk = mv;
+    const fear = can ? 0 : cl(((p.fear || 0) - 55) / 35, 0, 1), sick = p.sick ? 1 : 0;
     const thr = p.swing > 0 ? cl(p.swing / 0.2, 0, 1) : 0;
-    ud.thr += (thr - ud.thr) * Math.min(1, dt * 30);
-    const k = ud.thr;
-    // bacaklar
-    for (let i = 0; i < 2; i++) {
-      const L = Lg[i], sg = i ? -1 : 1, a = stride * s * sg * 0.62 + (1 - stride) * (i ? -0.04 : 0.05) + k * (i ? -0.35 : 0.45);
-      const kn = stride * Math.max(0, -Math.cos(ph) * sg) * 1.1 + stride * 0.12 + k * (i ? 0.2 : 0.5) + (can ? 0.25 : 0) + sick * 0.15 + fear * 0.25;
-      L.th.rotation.set(0, 0, a + (can ? 0.2 : 0) + (kn - stride * 0.12) * 0.25); L.sh.rotation.z = -kn;
-      L.th.position.y = 15.5 + bob - k * 0.9 - (can ? 0.5 : 0) - fear * 0.6;
+    ud.thr += (thr - ud.thr) * Math.min(1, dt * 30); const k = ud.thr;
+    const tk = ud.toolK, spear = !!tk && tk.charAt(0) === 's' && tk !== 'sickle' && tk !== 'stick', club = tk === 'club', bow = tk === 'bow', armed = spear || club || bow;
+    const guard = !mvB && !working && !pose && !can && (!!p.post || (p.group === 'muhafiz' && !(fear > 0.3))) ? 1 : 0;
+    const cower = !mvB && !armed && !pose ? fear : 0;
+    const seated = pose === 2 || pose === 3;
+    // ---- hedef eklemler
+    let aL = 0.05, eL = 0.12, sL = 0.1, aR = 0.05, eR = 0.12, sR = 0.1, lean = 0, twist = 0, hy = 0, hz = 0, hx = 0, drop = 0;
+    let toolPsi = null, toolLoc = 0;
+    // yürüyüş/koşu/sinsi kol salınımı
+    const armSw = walk * s * (0.4 + spr * 0.55 - snk * 0.25);
+    aL = -armSw + 0.04 + br * 0.03 * (1 - walk); aR = armSw + 0.04 - br * 0.03 * (1 - walk);
+    eL = 0.15 + walk * (0.15 + Math.max(0, -s) * 0.35) + spr * 1.0 + snk * 0.5; eR = 0.15 + walk * (0.15 + Math.max(0, s) * 0.35) + spr * 1.0 + snk * 0.5;
+    lean = -walk * 0.06 - spr * 0.22 - snk * 0.42 - (can ? 0.32 : 0) - sick * 0.25;
+    drop = snk * 4.2 + (can ? 1.2 : 0) + sick * 0.6;
+    twist = walk * s * (0.08 + spr * 0.06);
+    if (snk) { aL += snk * 0.5; aR += snk * 0.5; hz += snk * 0.32; }
+    hz += spr * 0.18;
+    if (seated) {
+      lean = 0.08 + breathe * 0.015; aL = 0.55; eL = 0.75; aR = 0.55; eR = 0.75; sL = sR = 0.18; hz = -0.08;
+      if (pose === 3) { const q = (t * 0.5 + (h & 7) * 0.13) % 1, up = q < 0.35 ? Math.sin(q / 0.35 * PI) : 0; aR = 0.9 + up * 0.55; eR = 1.0 + up * 1.55; sR = 0.05 + up * 0.25; hz = -0.15 + up * 0.12; aL = 0.95; eL = 1.2; }
+      hy = Math.sin(t * 0.4 + id) * 0.25;
+    } else if (working) {
+      const grp0 = p.group, bench = pose === 4;
+      if (grp0 === 'odun' || grp0 === 'tas') {
+        const q = (t * (grp0 === 'odun' ? 1.25 : 1.05) + (h & 15) * 0.07) % 1, sw = swingCurve(q);
+        aR = 0.7 + sw * 2.1; eR = 0.25 + sw * 0.35; aL = 0.6 + sw * 1.9; eL = 0.4 + sw * 0.4; sL = 0.35; sR = -0.05;
+        lean = -0.15 - (1 - sw) * (grp0 === 'tas' ? 0.35 : 0.15) + sw * 0.08; drop = 0.8 + (1 - sw) * 0.8; twist = -0.25 + sw * 0.15; toolLoc = 0.3 - sw * 0.5; hz = -0.2 - (1 - sw) * 0.15;
+      } else if (bench || grp0 === 'zanaat' || grp0 === 'mimar' || grp0 === 'bos') {
+        const q = (t * 2.2 + (h & 15) * 0.07) % 1, sw = q < 0.55 ? q / 0.55 : 1 - (q - 0.55) / 0.45 * 1.0;
+        aR = 0.75 + sw * 0.9; eR = 1.0 + sw * 0.35; aL = 0.95; eL = 0.75; sL = 0.05; lean = -0.22; hz = -0.35; toolLoc = 0.25 - sw * 0.4; drop = 0.4;
+        if (bench && !WTOOL[grp0]) { const a = Math.sin(t * 4 + id); aR = 0.95 + a * 0.15; eR = 0.85 - a * 0.2; aL = 0.95 - a * 0.15; eL = 0.85 + a * 0.2; }
+      } else if (grp0 === 'asci') {
+        const a = t * 3.2 + id; aR = 0.85 + Math.sin(a) * 0.18; eR = 0.9 + Math.cos(a) * 0.2; sR = 0.0 + Math.cos(a) * 0.15; aL = 0.4; eL = 1.6; sL = 0.1;
+        lean = -0.2; hz = -0.4; twist = Math.sin(a) * 0.05; toolPsi = -1.3 + Math.sin(a) * 0.1; drop = 0.5;
+      } else if (grp0 === 'kasap') {
+        const a = Math.sin(t * 7 + id); aR = 0.85 + a * 0.28; eR = 0.85 - a * 0.25; aL = 0.9; eL = 0.7; sL = 0.05; lean = -0.5; hz = -0.3; drop = 1.6; toolPsi = -0.6 + a * 0.2;
+      } else if (grp0 === 'ciftci') {
+        const a = Math.sin(t * 3 + id); aR = 0.6 + a * 0.5; eR = 0.4; sR = 0.1 + a * 0.2; aL = 0.7; eL = 0.5; lean = -0.75; drop = 2.5; hz = -0.1; twist = a * 0.15; toolLoc = 0.6;
+      } else {                                                                              // toplama / şifa: eğilip toplar
+        const q = (t * 0.7 + (h & 15) * 0.07) % 1, reach = Math.sin(q * TAU2) * 0.5 + 0.5, pick2 = Math.sin(t * 6 + id) * 0.12;
+        lean = bench ? -0.25 : -0.85 - reach * 0.15; drop = bench ? 0.4 : 2.8; hz = bench ? -0.35 : 0.25;
+        aR = 0.7 + reach * 0.5 + pick2; eR = 0.3 + (1 - reach) * 0.9; sR = 0.2; aL = 0.55 + (1 - reach) * 0.4; eL = 0.8 + reach * 0.5; sL = 0.25;
+      }
+    } else if (p.carrying) {                                                                 // yaralıyı omuzda taşır
+      aL = 2.45; eL = 1.45; aR = 2.45; eR = 1.45; sL = sR = 0.35; lean -= 0.28; drop += 1.2; hz += 0.12;
+    } else if (cower > 0) {                                                                  // korkuyla sinme
+      const tr = Math.sin(t * 31 + id) * 0.03 * cower;
+      aL = aL * (1 - cower) + 2.1 * cower; eL = eL * (1 - cower) + 2.2 * cower; aR = aR * (1 - cower) + 2.0 * cower; eR = eR * (1 - cower) + 2.25 * cower;
+      sL = sR = 0.1 + cower * 0.25; lean -= cower * 0.55 + tr; drop += cower * 5.0; hz -= cower * 0.35; hy = Math.sin(t * 2.3 + id) * 0.4 * cower;
+    } else if (fear > 0 && walk > 0.5 && !armed) {                                           // panikle kaçış
+      aL += fear * 0.4; aR += fear * 0.4; eL += fear * 0.5; eR += fear * 0.5; hy = Math.sin(t * 3 + id) * 0.3 * fear; lean -= fear * 0.1;
     }
-    torso.position.y = 15.5 + bob - k * 0.9 - (can ? 0.5 : 0) - fear * 0.6;
-    lean = -(stride * 0.1) - (can ? 0.32 : 0) - sick * 0.22 - fear * 0.25 - k * 0.3;
-    // kollar
-    const tk = ud.toolK, armed = tk && tk.charAt(0) === 's' || tk === 'club';
-    if (working) {
-      const w = Math.sin(t * 11 + id), grp = p.group;
-      if (grp === 'odun' || grp === 'tas') { aR = 1.55 + w * 0.85; eR = 0.75 - w * 0.35; aL = 1.25 + w * 0.8; eL = 0.9 - w * 0.3; xL = 0.35; xR = -0.2; lean += -0.12 + w * -0.14; toolLoc = 0.25; }
-      else if (WTOOL[grp]) { aR = 0.75 + w * 0.4; eR = 1.0 - w * 0.3; aL = 0.5; eL = 1.1; lean += -0.2; toolLoc = 0.2; }
-      else { aR = 0.9 + w * 0.3; eR = 0.6; aL = 0.9 - w * 0.3; eL = 0.6; lean += -0.3; hz = -0.2; }
+    if (!working && !p.carrying && !seated) {
+      if (club) { aR = 0.5 + armSw * 0.3 + k * 1.6; eR = 1.25 - k * 1.0; toolPsi = 1.3 - k * 1.8 + Math.sin(t * 2 + id) * 0.08; aL = -armSw * 0.6 + 0.35; eL = 0.7; twist += k * 0.4; }
+      else if (bow) {
+        // germe: sol kol ileri yay, sağ el kirişi yanağa
+        if (k > 0.02) { aL = 1.5; eL = 0.0; sL = 0.05; aR = 1.45; eR = 0.6 + k * 1.9; sR = 0.4 * k; twist = -0.45 * k; hy = 0.35 * k; toolPsi = 0; }
+        else { aL = 0.25 + armSw * 0.5; eL = 0.45; toolPsi = -0.35; }
+      } else if (spear) {
+        if (guard && k < 0.02) { aR = 0.12; eR = 1.35; sR = 0.12; toolPsi = PI / 2 - 0.04; aL = 0.0; eL = 0.1; }
+        else { aR = 0.12 + armSw * 0.15 + k * 1.35; eR = 1.1 - k * 1.05; sR = 0.1 + k * 0.1; toolPsi = 1.2 * (1 - k) - 0.05 + walk * c * 0.04; aL = (aL + k * 0.9); eL += k * 0.4; twist += k * 0.45; lean -= k * 0.15; }
+      } else if (tk) { aR = armSw * 0.5 + 0.12; eR = 0.5; toolPsi = 0.6; }
+      if (ud.tch && !bow) { aL = 1.0 + br * 0.03; eL = 0.95; sL = 0.12; }
+    }
+    if (guard && !walk) { lean += 0.04; hy = Math.sin(t * 0.35 + id) * 0.55 * (Math.sin(t * 0.9 + id) > -0.5 ? 1 : 0.4); }
+    else if (!walk && !working && !seated && !cower && !can) hy += Math.sin(t * 0.45 + id * 1.3) * 0.28 + (Math.sin(t * 0.17 + id) > 0.7 ? 0.5 : 0);
+    if (sick) { hz -= 0.25; aL = aL * 0.5 + 0.5; eL = eL * 0.5 + 0.7; }
+    if (can) { hx = Math.sin(t * 0.9 + id) * 0.18; hz += 0.1 + Math.sin(t * 5 + id) * 0.04; }
+    else if (p.tilt) hx = p.tilt * 0.5;
+    // yumuşatma (pozlar arası akıcı geçiş)
+    JT[0] = aL; JT[1] = eL; JT[2] = sL; JT[3] = aR; JT[4] = eR; JT[5] = sR; JT[6] = lean; JT[7] = twist; JT[8] = hy; JT[9] = hz; JT[10] = hx; JT[11] = drop;
+    const snapJ = !ud.Jok, kk = Math.min(1, dt * (k > 0.05 ? 30 : 13));
+    for (let i = 0; i < 12; i++) J[i] = snapJ ? JT[i] : J[i] + (JT[i] - J[i]) * (i === 7 || i === 0 || i === 3 ? Math.min(1, kk * 1.6) : kk);
+    ud.Jok = true;
+    // ---- gövde ve bacaklar (IK: ayaklar yere basar)
+    const lift0 = 1.3;
+    if (seated) {
+      const hipY = 5.6;
+      torso.position.set(-0.6, hipY + breathe * 0.05, 0);
+      for (let i = 0; i < 2; i++) { const L = Lg[i]; L.th.rotation.x = L.s * -0.12; legIK(L, -0.6, hipY, 9.8 + (i ? 0.6 : -0.4), lift0, 0); }
     } else {
-      const sw = stride * s * 0.7;
-      aL = -sw + 0.04 + br * 0.03; aR = sw + 0.04 - br * 0.03; eL = 0.15 + stride * (0.35 + Math.max(0, -s) * 0.3); eR = 0.15 + stride * (0.35 + Math.max(0, s) * 0.3);
-      if (p.carrying) { aL = aR = 2.55; eL = eR = 0.85; xL = 0.25; xR = -0.25; lean -= 0.12; }
-      else if (fear > 0 && !armed) { aL = aL * (1 - fear) + 0.7 * fear; aR = aR * (1 - fear) + 0.7 * fear; eL += fear * 1.7; eR += fear * 1.7; hz -= fear * 0.2; }
-      if (tk === 'club') { aR = 0.5 + sw * 0.3 + k * 1.3 - (k > 0 ? 0 : 0); eR = 1.25 - k * 0.9; toolPsi = 1.3 - k * 1.5 + Math.sin(t * 2 + id) * 0.08; aL = -sw * 0.6 + 0.35; eL = 0.7; }
-      else if (tk === 'bow') { aR = 1.35 + k * 0.15; eR = 0.15; toolPsi = 0; aL = 0.9; eL = 1.6 - k * 0.6; }
-      else if (armed) { aR = 0.12 + sw * 0.15 + k * 0.95; eR = 1.1 - k * 0.75; toolPsi = 1.2 * (1 - k) - 0.02 + stride * c * 0.04; }
-      else if (tk) { aR = sw * 0.5 + 0.1; eR = 0.5; toolPsi = 0.5; }
-      if (ud.tch) { aL = 1.0 + br * 0.03; eL = 0.9; }
+      const bob = walk * (Math.abs(c) * (0.6 + spr * 0.9) - 0.35 - spr * 0.9) + (1 - walk) * br * 0.08;
+      const hipY = 15.25 + bob - J[11] - k * 0.9;
+      const Sx = walk * (3.4 + spr * 2.6 - snk * 1.1) * (k > 0.05 ? 0.4 : 1);
+      torso.position.set(0, hipY, 0);
+      for (let i = 0; i < 2; i++) {
+        const L = Lg[i], p2 = ph + (i ? PI : 0), sn = Math.sin(p2), cs = Math.cos(p2), lift = walk * Math.max(0, cs) * (2.0 + spr * 2.6 + snk * 0.6);
+        const stand = (1 - walk) * ((i ? -0.6 : 0.8) + guard * (i ? -0.3 : 0.3) + k * (i ? -2.6 : 3.6) + cower * (i ? -0.8 : 1.0));
+        L.th.rotation.x = L.s * -(0.03 + guard * 0.04 + snk * 0.06);
+        legIK(L, 0, hipY, sn * Sx + stand + (can ? 1.2 : 0), lift0 + lift, walk * Math.max(0, -cs) * sn * -0.4 + lift * 0.06);
+      }
     }
-    torso.rotation.set(0, stride * s * 0.1 + k * 0.25, lean);
-    head.rotation.set(0, hy + (1 - stride) * Math.sin(t * 0.5 + id * 1.3) * 0.25 * (working ? 0 : 1), hz - lean * 0.7 + (can ? 0.1 + Math.sin(t * 5 + id) * 0.04 : 0) - sick * 0.2);
-    if (can) head.rotation.x = Math.sin(t * 0.9 + id) * 0.18;
-    else if (p.tilt) head.rotation.x = p.tilt * 0.5; else head.rotation.x = 0;
-    A[0].u.rotation.set(-0.07 - xL, 0, aL); A[0].f.rotation.z = eL;
-    A[1].u.rotation.set(0.07 - xR, 0, aR); A[1].f.rotation.z = eR;
-    if (ud.tool.visible) { ud.tool.rotation.z = toolPsi == null ? toolLoc : toolPsi - (aR + eR + lean); ud.tool.position.x = 0.3 + k * 5; }
-    if (ud.torch && ud.torch.visible) { ud.torch.rotation.z = 1.35 - (aL + eL + lean); const f = 0.85 + 0.25 * Math.sin(t * 23 + id) * Math.sin(t * 7.1); ud.flame.scale.set(f, 0.8 + 0.4 * Math.abs(Math.sin(t * 17)), f); }
-    if (ud.cloak && ud.cloak.visible) ud.cloak.rotation.z = 0.06 + stride * (0.22 + s * 0.06) + Math.sin(t * 1.3) * 0.02;
-    if (ud.pack && ud.pack.visible) ud.pack.rotation.z = 0.08 + stride * s * 0.03;
+    torso.rotation.set(0, J[7], J[6]);
+    ud.skirt.position.copy(torso.position); ud.skirt.rotation.set(0, J[7] * 0.5, seated ? 0.35 : J[6] * 0.3);
+    head.rotation.set(J[10], J[8], J[9] - J[6] * 0.65 - walk * Math.sin(ph * 2) * 0.03);
+    A[0].u.rotation.set(J[2], 0, J[0]); A[0].f.rotation.z = J[1];
+    A[1].u.rotation.set(-J[5], 0, J[3]); A[1].f.rotation.z = J[4];
+    if (ud.tool.visible) {
+      const bowT = tk === 'bow', aa = bowT ? J[0] + J[1] : J[3] + J[4];
+      ud.tool.rotation.z = toolPsi == null ? toolLoc : toolPsi - (aa + J[6]); ud.tool.position.x = 0.3 + (spear ? k * 5 : 0);
+      ud.tool.rotation.x = bowT ? -0.15 : 0;
+    }
+    if (ud.torch && ud.torch.visible) { ud.torch.rotation.z = 1.35 - (J[0] + J[1] + J[6]); const f = 0.85 + 0.25 * Math.sin(t * 23 + id) * Math.sin(t * 7.1); ud.flame.scale.set(f, 0.8 + 0.4 * Math.abs(Math.sin(t * 17)), f); }
+    if (ud.cloak && ud.cloak.visible) ud.cloak.rotation.z = 0.06 + walk * (0.22 + s * 0.06) + spr * 0.15 + Math.sin(t * 1.3) * 0.02;
+    if (ud.pack && ud.pack.visible) ud.pack.rotation.z = 0.08 + walk * s * 0.03;
   }
 
   // =============================================================
@@ -995,7 +1255,7 @@ const M3 = (function () {
   function dino(d) {
     d = d || {};
     const T = d.type, def = defOf(T), g = new T3.Group(), ud = g.userData;
-    ud.lt = -1; ud.meshes = []; ud.fl = 0; ud.mv = d.moving ? 1 : 0; ud.jawK = 0; ud.hidK = d.hidden ? 1 : 0; ud.type = T;
+    ud.lt = -1; ud.meshes = []; ud.fl = 0; ud.mv = d.moving ? 1 : 0; ud.jawK = 0; ud.strideK = 1.7; ud.hidK = d.hidden ? 1 : 0; ud.type = T;
     if (T === 'yamyam') { ud.kind = 'cannibal'; ud.pg = person(fakeOf(d, ud)); g.add(ud.pg); updDino(g, d, 0); return g; }
     if (T === 'taklitci') { ud.kind = 'mimic'; updDino(g, d, 0); return g; }
     const colHex = '#' + col(d.col || def.col || '#586').getHexString();
@@ -1008,6 +1268,46 @@ const M3 = (function () {
     ud.S = S; ud.kind = S.kind; ud.r = 0;
     updDino(g, d, 0);
     return g;
+  }
+  // ortak hareket durumu: yere kilitli adım fazı (kayma yok), hız -> koşu, bakış takibi, tetikte, kükreme
+  function wrapA(a) { return ((a + PI) % TAU2 + TAU2) % TAU2 - PI; }
+  function motion(ud, d, t, dt, def, r) {
+    const x = +d.x || 0, y = +d.y || 0, id = d.id || 0, an = +d.anim || 0;
+    if (ud.px == null) { ud.px = x; ud.py = y; ud.ph = an; ud.la = an; ud.spd = 0; ud.run = 0; ud.look = 0; ud.alK = 0; ud.roarK = 0; ud.rt = +d.roarT || 0; ud.r0 = -9; ud.near = 0; ud.rdyK = 0; }
+    let moved = Math.hypot(x - ud.px, y - ud.py); ud.px = x; ud.py = y;
+    if (moved > r * 4 + 60) moved = 0;                              // ışınlanma / ilk kare
+    let da = an - ud.la; ud.la = an; if (!(da > 0 && da < 3)) da = 0;
+    const v = dt > 0 ? moved / dt : 0;
+    ud.spd += (v - ud.spd) * Math.min(1, dt * 5);
+    const mvT = d.moving || v > 6 ? 1 : 0;
+    ud.mv += (mvT - ud.mv) * Math.min(1, dt * 7);
+    const base = def.spd || 120, flee = d.fleeing || d.flee > 0 || d.retreat > 0 || d.dash > 0 ? 1 : 0;
+    const runT = mvT * Math.max(flee, d.st === 'lunge' ? 1 : 0, cl((ud.spd / base - 0.8) / 0.7, 0, 1));
+    ud.run += (runT - ud.run) * Math.min(1, dt * 3);
+    // faz: yer değiştirmeye göre (ayak kaymaz); yerinde sayıyorsa yapay zekânın anim sayacından
+    const L = (ud.strideK || 1.7) * r * (1 + 0.45 * ud.run);
+    let w = moved > 1e-3 ? moved / L * TAU2 : (d.moving ? da * 0.7 : 0);
+    const wMax = 15 / Math.sqrt(Math.max(1, r / 9)) * (1 + ud.run * 0.5) * dt; if (w > wMax) w = wMax;
+    ud.ph += w;
+    // bakış: hedefe (göreli açı), yoksa ara sıra baş çevirme; tetikteyse etrafı kollama
+    const al = d.alertT > 0 && !d.moving ? 1 : 0, wat = d.watcher > 0 && !d.moving ? 1 : 0;
+    ud.watK = (ud.watK || 0) + (wat - (ud.watK || 0)) * Math.min(1, dt * 3);
+    ud.alK += (al - ud.alK) * Math.min(1, dt * 4);
+    let ly, tg = d.tgt; ud.near = 0;
+    if (tg && typeof tg === 'object' && tg !== d && isFinite(tg.x) && isFinite(tg.y)) {
+      const dx = tg.x - x, dy = tg.y - y, dd = Math.hypot(dx, dy);
+      ly = dd < 1500 ? -cl(wrapA(Math.atan2(dy, dx) - (d.ang || 0)), -0.85, 0.85) : 0;
+      ud.near = dd < r * 2.4 + (tg.r || 10) + 30 ? 1 : 0;
+    } else if (wat) ly = 0;
+    else if (al) ly = 0.75 * Math.sign(Math.sin(t * 0.8 + id)) * (Math.sin(t * 1.9 + id) > -0.3 ? 1 : 0.2);
+    else ly = (1 - ud.mv) * 0.5 * Math.sign(Math.sin(t * 0.29 + id * 2.3)) * (Math.sin(t * 0.13 + id) > -0.1 ? 1 : 0.1);
+    ud.look += (ly - ud.look) * Math.min(1, dt * (al ? 5 : 2.5));
+    // kükreme: roarT sayacı yeniden kurulunca (yukarı sıçrama)
+    const rt = +d.roarT || 0; if (rt > ud.rt + 2) ud.r0 = t; ud.rt = rt;
+    const rk = t - ud.r0; ud.roarK = rk < 0 ? 0 : rk < 0.3 ? rk / 0.3 : rk < 1.5 ? 1 : Math.max(0, 1 - (rk - 1.5) / 0.4);
+    // ısırık hazırlığı: hedef yakın ve saldırı hazır
+    const ready = ud.near && !(d.atkCd > (def.cd || 1) * 0.3) ? 1 : 0;
+    ud.rdyK += (ready - ud.rdyK) * Math.min(1, dt * 6);
   }
   function setFlash(ud, f) {
     if (ud.fl === f) return; ud.fl = f;
@@ -1025,14 +1325,14 @@ const M3 = (function () {
       if (!rev && !ud.pg) { ud.pg = person(fakeOf(d, ud)); g.add(ud.pg); ud.tell = mesh(geo('mm_tell', pb => { for (const s of [-1, 1]) pb.ball(3.2, 4.15, s * 1.25, 0.42, 0.42, 0.5, '#fff', { d: 0 }); }), glow('#ffffff'), ud.pg.userData.head); }
       if (ud.pg) ud.pg.visible = !rev;
       if (ud.mon) ud.mon.root.visible = rev;
-      if (rev) { updMimic(ud.mon, d, t); setFlash(ud, d.hurt > 0 ? 1 : 0); }
+      if (rev) { ud.strideK = 2.6; motion(ud, d, t, dt, defOf('taklitci'), 12); updMimic(ud.mon, d, t, ud); setFlash(ud, d.hurt > 0 ? 1 : 0); }
       else { updPerson(ud.pg, fakeOf(d, ud), t); ud.tell.visible = Math.sin(t * 2 + (d.id || 0)) > 0.85; }
       return;
     }
     const def = defOf(d.type), root = ud.root;
     const r = (d.r > 0 ? d.r : def.r) || 20;
     if (ud.r !== r) { ud.r = r; root.scale.setScalar(r); }
-    ud.mv += ((d.moving ? 1 : 0) - ud.mv) * Math.min(1, dt * 9);
+    motion(ud, d, t, dt, def, r);
     setFlash(ud, d.hurt > 0 ? 1 : d.poison > 0 ? 2 : 0);
     if (ud.kind === 'thero') updThero(ud, d, t, dt, def);
     else if (ud.kind === 'quad') updQuad(ud, d, t, dt, def);
