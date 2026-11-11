@@ -807,7 +807,11 @@ function update(dt) {
   if (isNight() && G.carcs.length && Math.random() < dt * 0.02) { const c = pick(G.carcs); if (dist(c, G.fire) > 900) spawnPack('kucuk', ri(2, 4), { x: c.x + rand(-200, 200), y: c.y + rand(-200, 200) }); }
   if (G.sleep) sleepTick(dt); else updLeader(dt);
   for (const q of G.people) kbStep(q, dt);
-  for (const p of G.people.slice()) if (p !== L && !p.dead) updPerson(p, dt, LS);
+  for (const p of G.people.slice()) if (p !== L && !p.dead) {
+    const ox = p.x, oy = p.y; updPerson(p, dt, LS);
+    // duruma göre yürüme / koşma: gerçek hıza bakılır (kaçarken, kovalarken, yardıma giderken koşar)
+    if (dt > 0) { const v = Math.hypot(p.x - ox, p.y - oy) / dt, base = pSpeed(p); p.vel = (p.vel || 0) * 0.8 + v * 0.2; p.sprinting = !p.sneak && !(p.kbT > 0) && p.moving && p.vel > base * 1.12; }
+  }
   if (G.over) return;
   const prey = preyList();
   for (const d of G.dinos.slice()) if (!d.dead) updDino(d, dt, prey, zones);
