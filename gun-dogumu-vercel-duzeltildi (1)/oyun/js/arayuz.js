@@ -146,7 +146,7 @@ function buildTools() {
     + X('craft', '⚒️ Üretim emirleri', 'C' + (G.orders.length ? ' · ' + G.orders.length + ' emir' : ''))
     + X('in', '🏠 Oda düzeni', 'I · mağara / kulübe') + `</div>`;
   for (const [ad, ks] of BCATS) h += `<div class="cat">İnşa — ${ad}</div><div class="mrow">${ks.map(bb).join('')}</div>`;
-  $('tools').innerHTML = h;
+  { const t = $('tools'), st = t.scrollTop; if (t._h !== h) { t.innerHTML = h; t._h = h; t.scrollTop = st; } }
 }
 function toggleMap() { const b = $('miniBox'); if (b.style.display === 'none') { b.style.display = 'block'; b.classList.remove('big'); } else if (!b.classList.contains('big')) b.classList.add('big'); else { b.classList.remove('big'); if (innerWidth <= 700) b.style.display = 'none'; } drawMini(); }
 $('miniBox').addEventListener('pointerdown', e => {

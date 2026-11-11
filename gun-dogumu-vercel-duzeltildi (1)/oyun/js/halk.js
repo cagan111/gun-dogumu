@@ -1120,7 +1120,7 @@ function killPerson(p, src, silent) {
 function halkDawn() {
   let tired = 0;
   for (const p of G.people) { p.tired = !!p.watched && !tr(p, 'uykusuz'); p.watched = false; if (p.tired) tired++; }
-  if (tired) msg(`${tired} muhafız gece nöbetinden yorgun: bugün yavaşlar.`, '#bbb', 4);
+  if (tired && G.day % 5 === 2) msg(`${tired} muhafız gece nöbetinden yorgun: bugün yavaşlar. İkinci bir muhafız nöbeti paylaşır.`, '#bbb', 4);
   for (const p of G.people.slice()) if (p.bed && G.day >= p.bedUntil && !(p.injury && p.injury.type !== 'kanama') && !p.sick && p.hp >= p.maxhp * 0.6) releaseBed(p);
   // salgın
   let spread = 0;

@@ -2182,7 +2182,7 @@ function killPerson(p, src, silent) {
 function halkDawn() {
   let tired = 0;
   for (const p of G.people) { p.tired = !!p.watched && !tr(p, 'uykusuz'); p.watched = false; if (p.tired) tired++; }
-  if (tired) msg(`${tired} muhafız gece nöbetinden yorgun: bugün yavaşlar.`, '#bbb', 4);
+  if (tired && G.day % 5 === 2) msg(`${tired} muhafız gece nöbetinden yorgun: bugün yavaşlar. İkinci bir muhafız nöbeti paylaşır.`, '#bbb', 4);
   for (const p of G.people.slice()) if (p.bed && G.day >= p.bedUntil && !(p.injury && p.injury.type !== 'kanama') && !p.sick && p.hp >= p.maxhp * 0.6) releaseBed(p);
   // salgın
   let spread = 0;
@@ -3727,7 +3727,11 @@ function finishBuild(b, quiet) {
 }
 function tryPlace() {
   const t = G.placing; if (!t) return;
-  const p = placePos();
+  let p = placePos();
+  if (!placeOk(t, p) && !(t === 'gemi' && shipBlock(p))) {   // hoşgörülü yerleştirme: yakındaki ilk uygun noktayı bul
+    const fx = Math.cos(G.yaw), fy = Math.sin(G.yaw);
+    search: for (const r of [40, 80, 120, 170]) for (let k = 0; k < 8; k++) { const a = k / 8 * TAU, q = { x: p.x + Math.cos(a) * r, y: p.y + Math.sin(a) * r }; if ((q.x - L.x) * fx + (q.y - L.y) * fy > 30 && placeOk(t, q)) { p = q; break search; } }
+  }
   if (!placeOk(t, p)) { msg((t === 'gemi' && shipBlock(p)) || 'Buraya inşa edilemez.', '#e99', 3); return; }
   if (!canAfford(BUILD[t].cost)) { msg('Malzeme bitti.', '#e99', 2); cancelPlace(); return; }
   pay(BUILD[t].cost); makeBuild(t, p.x, p.y, L.ang); SFX.build();
@@ -3816,7 +3820,7 @@ function newDay() {
       free--; assignHomes();
     }
     if (came) moraleAdd(2);
-  } else if (!free) msg('Ateşinizi gören yabancılar uzaktan baktı... Kalacak yer olmadığı için gelmediler. ⛺ Çadır, 🛖 kulübe ya da yeni bir yatakhane odası lazım.', '#ccc', 6);
+  } else if (!free && G.day > 3 && Math.random() < 0.05) msg('Ateşinizi gören yabancılar uzaktan baktı... Kalacak yer olmadığı için gelmediler. ⛺ Çadır, 🛖 kulübe ya da yeni bir yatakhane odası lazım.', '#ccc', 6);
   // yumurtalar ve yavrular
   const keep = [];
   for (const e of G.eggs) {
@@ -4153,11 +4157,11 @@ const TUT = [
   { t: 'Ateşin yanında E basılı tut: ateşe odun at. Ateş sönerse karanlıktaki her şey cesaretlenir.', done: () => G.tutFire > 0 },
   { t: 'Sağdaki HALK panelinde gruplara + ile kişi aktar. Her grubun bir becerisi var; çalıştıkça seviye atlarlar.', done: () => G.tutGroup },
   { t: 'Bir gruba ★ ile yönetici ata: grubu hızlandırır, ⚡ yetenek ve 📍 bölge emri verir.', done: () => GORDER.some(g => G.managers[g]) },
-  { t: 'Alttaki 🎯 Av Emri (G) ile bir hayvana dokun: avcılar onu avlar, et ustaları leşi temizler.', done: () => (G.stats.hunts || 0) > 0 || !!G.hunt },
-  { t: 'Bir 🔨 Atölye planla (alttaki düğmeler). Mimarlar inşa eder.', done: () => G.builds.some(b => b.type === 'atolye') },
+  { t: '☰ Eylemler → 🎯 Av emri (G): bir hayvana bak ve seç. Avcılar onu avlar, et ustaları leşi temizler.', done: () => (G.stats.hunts || 0) > 0 || !!G.hunt },
+  { t: '☰ Eylemler → İnşa: bir ⛺ Çadır planla (önüne bak, Saldır / tıkla). Mimarlar inşa eder.', done: () => G.builds.some(b => b.type !== 'magara') },
   { t: 'Üretim menüsünü aç (C) ve zanaatkârlara bir emir ver: balta, kazma, ok...', done: () => G.orders.length > 0 || IORDER.some(k => k !== 'mizrak' && k !== 'balta' && k !== 'bandaj' && k !== 'ilac' && G.stock[k] > 0) },
   { t: 'Kâşif grubuna birini ekle (🧭), sonra haritada (M) bilinmeyen bir yere dokun.', done: () => !!G.zone.kasif },
-  { t: 'I ile mağaranın içine bak: odalara görev ver, içeriden birine dokunup karakter kartını aç.', done: () => !!G.tutIn },
+  { t: 'Mağaranın kapısına git ve E / Topla ile içeri gir. İçeride birine bakıp E ile emir ver; I ile odaları düzenle.', done: () => !!G.tutIn },
   { t: 'Halkın büyümesi için yer gerekir: ⛺ çadır (1 hane), 🛖 kulübe ya da yeni bir yatakhane odası (2 hane). Yeni insanlar çok nadir gelir; her canın kıymeti var.', done: () => freeHomes() > 0 || G.builds.some(b => b.type === 'kulube' || b.type === 'cadir') },
   { t: 'Gece geliyor. Ateşi doldur, halkını ışıkta tut. İyi şanslar.', done: () => isNight() }
 ];
@@ -9209,7 +9213,7 @@ function buildTools() {
     + X('craft', '⚒️ Üretim emirleri', 'C' + (G.orders.length ? ' · ' + G.orders.length + ' emir' : ''))
     + X('in', '🏠 Oda düzeni', 'I · mağara / kulübe') + `</div>`;
   for (const [ad, ks] of BCATS) h += `<div class="cat">İnşa — ${ad}</div><div class="mrow">${ks.map(bb).join('')}</div>`;
-  $('tools').innerHTML = h;
+  { const t = $('tools'), st = t.scrollTop; if (t._h !== h) { t.innerHTML = h; t._h = h; t.scrollTop = st; } }
 }
 function toggleMap() { const b = $('miniBox'); if (b.style.display === 'none') { b.style.display = 'block'; b.classList.remove('big'); } else if (!b.classList.contains('big')) b.classList.add('big'); else { b.classList.remove('big'); if (innerWidth <= 700) b.style.display = 'none'; } drawMini(); }
 $('miniBox').addEventListener('pointerdown', e => {
