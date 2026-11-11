@@ -101,7 +101,7 @@ if (isTouch) {
 // ---- araç çubuğu
 function toggleMenu(force) {
   if (!playing()) return; const t = $('tools'), open = force !== undefined ? force : !t.classList.contains('open');
-  t.classList.toggle('open', open); $('menuBtn').classList.toggle('on', open); if (open) { unlockPtr(); buildTools(); }
+  t.classList.toggle('open', open); $('menuBtn').classList.toggle('on', open); document.body.classList.toggle('menuOpen', open); if (open) { unlockPtr(); buildTools(); }
 }
 $('menuBtn').addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); audioInit(); toggleMenu(); });
 $('tools').addEventListener('pointerdown', e => {

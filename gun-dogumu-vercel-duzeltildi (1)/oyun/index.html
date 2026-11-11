@@ -127,6 +127,7 @@ button.wide{width:100%;margin-top:6px}
 #touch{display:none;position:fixed;inset:0;pointer-events:none}
 #joy{position:absolute;left:0;bottom:64px;width:50%;height:calc(62% - 64px);pointer-events:auto}
 body.sideOpen #tbtns{display:none}
+body.menuOpen #tbtns,body.menuOpen #joy{display:none}
 #knobBase{position:absolute;width:110px;height:110px;border-radius:50%;border:2px solid rgba(255,255,255,.18);display:none}
 #knob{position:absolute;width:48px;height:48px;border-radius:50%;background:rgba(255,255,255,.22);left:31px;top:31px}
 #tbtns{position:absolute;right:10px;bottom:120px;display:grid;grid-template-columns:repeat(3,58px);gap:8px;pointer-events:auto}
@@ -164,7 +165,7 @@ summary{cursor:pointer;color:#e8d4b0}
   #res{gap:5px;font-size:11px}#res2{font-size:10px}
   #miniBox{top:auto;bottom:66px;left:auto;right:8px}#miniBox canvas{width:84px!important;height:84px!important}
   #side{width:min(300px,46vw);max-height:calc(100vh - 80px);font-size:11px}
-  #msgs{top:6px;width:min(44vw,420px)}#msgs div{font-size:11px}
+  #msgs{top:6px;width:min(44vw,420px)}#msgs div{font-size:11px}#msgs div:nth-child(n+3){display:none}
   #tutBox{bottom:auto;top:auto;bottom:118px;font-size:11px;max-width:44vw;padding:4px 8px}
   #tbtns{bottom:66px;grid-template-columns:repeat(3,50px);gap:6px}
   #tbtns div{width:50px;height:50px;font-size:10px}
