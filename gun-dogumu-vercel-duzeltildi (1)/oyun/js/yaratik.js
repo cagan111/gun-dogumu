@@ -261,6 +261,63 @@ function updDino(d, dt, prey, zones) {
 
 // ---- ses ve gizlilik
 // kişinin çıkardığı gürültü: 0 (çömelip duran) … 1 (koşan); yağmur sesi bastırır
+// Rüzgârın açısı, estiği yönü gösterir. Koku noktaları kısa ömürlü ve sınırlıdır. (Codex)
+function updScent(dt) {
+  if (!G.wind) G.wind = { a: rand(0, TAU), s: 0.55, ta: rand(0, TAU), ts: 0.55, t: 0 };
+  if (!G.scents) G.scents = [];
+  const w = G.wind;
+  w.t -= dt;
+  if (w.t <= 0) { w.t = rand(12, 25); w.ta = w.a + rand(-0.8, 0.8); w.ts = rand(0.3, 1); }
+  w.a = angLerp(w.a, w.ta, Math.min(1, dt * 0.035));
+  w.s += (w.ts - w.s) * Math.min(1, dt * 0.08);
+  for (const q of G.scents) q.age += dt;
+  G.scents = G.scents.filter(q => q.age < 24 && q.src && !q.src.dead);
+  for (const p of G.people) {
+    if (p.dead || p.inHut || p.insideB || p.grabbed || guardSafe(p)) continue;
+    p.scentT = (p.scentT || 0) - dt;
+    const moving = p.moving || p.sprinting;
+    if (p.scentT > 0 || (!moving && Math.random() > dt * 0.12)) continue;
+    const strong = (p.haul === 'et' || p.haul === 'cigEt' ? 1.7 : 1) * (p.hp < p.maxhp * 0.5 ? 1.65 : 1);
+    p.scentT = (moving ? rand(0.65, 1.05) : rand(1.8, 2.8)) / strong;
+    G.scents.push({ x: p.x + rand(-5, 5), y: p.y + rand(-5, 5), age: 0, power: strong, src: p });
+  }
+  if (G.scents.length > 200) G.scents.splice(0, G.scents.length - 200);
+}
+// Pozitif "along": hayvan rüzgâr altında; negatif: rüzgâr üstünde.
+function scentReach(d, src, base, power) {
+  if (!G.wind || !src || guardSafe(src)) return 0;
+  const dx = d.x - src.x, dy = d.y - src.y, dd = Math.hypot(dx, dy) || 1;
+  const wx = Math.cos(G.wind.a), wy = Math.sin(G.wind.a);
+  const down = clamp((dx * wx + dy * wy) / dd, -1, 1);
+  const cross = Math.abs(dx * wy - dy * wx);
+  const plume = base * (0.42 + G.wind.s * 0.38) * (down > 0 ? 1 + down * 1.25 : 1 + down * 0.55) * (power || 1);
+  if (cross > plume * (0.3 + Math.max(0, down) * 0.55)) return 0;
+  return plume;
+}
+function smellsP(d, p, base) {
+  if (!p || p.dead || p.inHut || p.insideB || p.grabbed || guardSafe(p)) return false;
+  let power = 1;
+  if (p.haul === 'et' || p.haul === 'cigEt') power *= 1.7;
+  if (p.hp < p.maxhp * 0.5) power *= 1.65;
+  return dist(d, p) < scentReach(d, p, base, power);
+}
+// En güçlü taze izi seçer; yaşlı izler zayıflar ve kaybolur.
+function scentTrailFor(d, base) {
+  if (!G.scents || !G.scents.length || !G.wind) return null;
+  let best = null, bestScore = 0;
+  for (let i = G.scents.length - 1; i >= 0; i--) {
+    const q = G.scents[i];
+    if (!q.src || q.src.dead || guardSafe(q.src)) continue;
+    if (d.terr && Math.hypot(q.x - d.terr.x, q.y - d.terr.y) > d.terr.r) continue;
+    const freshness = clamp(1 - q.age / 24, 0, 1);
+    if (freshness <= 0) continue;
+    const reach = scentReach(d, q, base * freshness, q.power), dd = Math.hypot(d.x - q.x, d.y - q.y);
+    if (dd >= reach) continue;
+    const score = freshness * q.power * (1 - dd / Math.max(1, reach));
+    if (score > bestScore) { bestScore = score; best = q; }
+  }
+  return best;
+}
 function noiseOf(p) {
   if (!p || p.dead) return 0;
   let n;
@@ -283,7 +340,7 @@ function seesP(d, p, range) {
 }
 // yırtıcı bu kişiyi fark eder mi: duyarak, önündeyse görerek, çok yakındaysa kokusundan
 function predNotices(d, t, dd, sense) {
-  return dd < sense * noiseOf(t) || dd < Math.max(60, sense * 0.22 * (t.sneak ? 0.6 : 1)) || seesP(d, t, sense * 0.55);
+  return dd < sense * noiseOf(t) || dd < Math.max(60, sense * 0.22 * (t.sneak ? 0.6 : 1)) || smellsP(d, t, sense * 0.72) || seesP(d, t, sense * 0.55);
 }
 // kamptan uzaklığa ve biyoma göre vahşilik: 0 kamp çevresi … ~1 derin orman/sis
 function wildness(x, y) {
@@ -375,6 +432,7 @@ function updPred(d, dt, prey, zones) {
       if (L && dist(d, L) < 1000) { const v = clamp(1 - dist(d, L) / 1000, 0.1, 0.8); if (d.type === 'yirtici') SFX.screech(v, panOf(d.x)); else if (d.type === 'kucuk') SFX.chirp(v, panOf(d.x)); }
     }
     d.tgt = best;
+    d.scent = best ? null : scentTrailFor(d, sense * 0.9);
     if (!d.terr && d.type === 'yirtici' && night && G.day >= 3 && Math.random() < 0.004 * G.day * DIFF[G.diff].spawn) d.rush = rand(2, 4);
     if (d.type === 'dev' && night && G.day >= 4 && Math.random() < 0.01) d.rush = rand(5, 9);
   }
@@ -404,7 +462,10 @@ function updPred(d, dt, prey, zones) {
         tx = undefined;
       }
     }
+  } else if (d.scent && d.scent.age < 24 && d.scent.src && !d.scent.src.dead && !guardSafe(d.scent.src) && Math.hypot(d.scent.x - d.x, d.scent.y - d.y) > 18) {
+    tx = d.scent.x; ty = d.scent.y; spd = def.spd * (0.3 + 0.25 * clamp(1 - d.scent.age / 24, 0, 1));   // koku izini takip (Codex)
   } else {
+    d.scent = null;
     d.wt -= dt;
     if (d.wt <= 0 || Math.hypot(d.wx - d.x, d.wy - d.y) < 20) {
       d.wt = rand(3, 8);
@@ -501,7 +562,9 @@ function fleeStep(d, dt, mul) {
 // ---- av hayvanının kulakları ve gözleri
 const PREY_HEAR = { ordek: 420, gurleyen: 450, boynuzlu: 420, zirhli: 400, uzunboyun: 520 };
 function preyNotices(d, p, dd) {
-  if (dd < (PREY_HEAR[d.type] || 440) * noiseOf(p)) return true;
+  const hear = PREY_HEAR[d.type] || 440;
+  if (dd < hear * noiseOf(p)) return true;
+  if (smellsP(d, p, hear * 0.65)) return true;
   const sr = 380 * (isNight() ? 0.55 : 1) * (G.weather && G.weather.type === 'sis' ? 0.6 : 1);
   return seesP(d, p, sr);
 }

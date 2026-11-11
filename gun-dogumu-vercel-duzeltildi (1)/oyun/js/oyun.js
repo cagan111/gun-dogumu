@@ -798,6 +798,7 @@ function updTut() {
 // =============================================================
 function update(dt) {
   G.now += dt; G.dt = dt;
+  updScent(dt);
   const prevP = phase(); G.t += dt; if (phase() < prevP) newDay();
   if (G.over) return;
   const LS = lights(), zones = safeZones();
