@@ -215,6 +215,7 @@ function drawLabelsIn() {
     ctx.font = Math.round(11 * k) + 'px Georgia'; ctx.fillStyle = 'rgba(0,0,0,.7)'; ctx.fillText(q.p.name, s.x + 1, s.y + 1); ctx.fillStyle = look ? '#ffd27a' : '#eadcc0'; ctx.fillText(q.p.name, s.x, s.y);
     const ic = q.pose === 'sleep' ? '💤' : q.pose === 'eat' ? '🍲' : q.pose === 'work' ? '⚒️' : '';
     if (ic) { ctx.font = Math.round(12 * k) + 'px serif'; ctx.fillText(ic, s.x, s.y - 14 * k); }
+    if (q.p.stageAd && d < 250) { ctx.font = '10px Georgia'; ctx.fillStyle = 'rgba(0,0,0,.7)'; ctx.fillText(q.p.stageAd, s.x + 1, s.y + 13); ctx.fillStyle = '#cfe0b0'; ctx.fillText(q.p.stageAd, s.x, s.y + 12); }
     if (look) { ctx.strokeStyle = 'rgba(255,210,122,.8)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(s.x - 6, s.y + 6); ctx.lineTo(s.x, s.y + 12); ctx.lineTo(s.x + 6, s.y + 6); ctx.stroke(); }
   }
   ctx.globalAlpha = 1;
@@ -239,6 +240,7 @@ function drawLabels3D(LS, dk) {
     if (p.downed > 0) ic = '🩸' + Math.ceil(p.downed);
     else { if (p.injury) ic += p.injury.type === 'kanama' ? '🩸' : p.injury.type === 'kirik' ? '🦴' : '🤢'; if (p.sick) ic += '🤒'; if (p.tired) ic += '😴'; if (p.fear >= 80) ic += '❗'; }
     label(s, (isM ? '★ ' : '') + p.name, p.fear >= 80 ? '#f99' : isM ? '#ffd27a' : '#eadcc0', ic);
+    if (p.stageAd && s.z < 250) { ctx.globalAlpha = clamp((250 - s.z) / 80, 0, 1); ctx.font = '10px Georgia'; ctx.fillStyle = 'rgba(0,0,0,.7)'; ctx.fillText(p.stageAd, s.x + 1, s.y + 13); ctx.fillStyle = '#cfe0b0'; ctx.fillText(p.stageAd, s.x, s.y + 12); ctx.globalAlpha = 1; }
     if ((p.hp < p.maxhp * 0.75 || p.hurtT > 0) && s.z < 380) hpBar(s.x, s.y + 4, p.hp / p.maxhp, 26);
   }
   for (const d of G.dinos) {
