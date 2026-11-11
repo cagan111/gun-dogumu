@@ -220,6 +220,7 @@ $('charM').addEventListener('pointerdown', e => {
   const c = b.dataset.c, v = b.dataset.v;
   if (c === 'close') return closeChar();
   if (c === 'grp') setGroup(p, v);
+  if (c === 'cmd' && v === 'carry') { const q = woundedNear(p, 2500); if (!q) msg('Yakında taşınacak yaralı yok.', '#ccc', 2); else { p.carryOrder = q.id; msg(`${p.name}, ${acc(q.name)} taşımaya gidiyor.`, '#9fd', 3); } closeChar(); return; }
   if (c === 'cmd') { if (v === 'follow') { if (p.group !== 'takip') p.prevG = p.group; setGroup(p, 'takip'); msg(`${p.name} seni izliyor.`, '#cde', 2); } else { setGroup(p, p.prevG && p.prevG !== 'takip' ? p.prevG : 'bos'); msg(`${p.name} işine döndü.`, '#cde', 2); } closeChar(); return; }
   if (c === 'mgr') setManager(p.group, p);
   if (c === 'ord') addOrder(v, 1, p.id);
@@ -249,7 +250,7 @@ function renderChar() {
   h += `<div><small>Kuşandığı: ${eq}</small></div>`;
   if (p.injury || p.sick) h += `<div><small>Sağlık: ${p.injury ? { kanama: 'kanama', kirik: 'kırık bacak', enfeksiyon: 'enfeksiyon (ilaç gerek)' }[p.injury.type] : ''} ${p.sick ? '· hastalık (' + p.sick.d + '. gün)' : ''}${p.bed ? ' · şifahanede, ' + Math.max(0, p.bedUntil - G.day) + ' gün daha' : ''}</small></div>`;
   if (!p.child) {
-    h += `<div class="cat">Emir</div><div class="gsel"><button data-c="cmd" data-v="follow" class="${p.group === 'takip' ? 'on' : ''}">👣 Beni izle</button><button data-c="cmd" data-v="free">↩️ İşine dön</button></div>`;
+    h += `<div class="cat">Emir</div><div class="gsel"><button data-c="cmd" data-v="follow" class="${p.group === 'takip' ? 'on' : ''}">👣 Beni izle</button><button data-c="cmd" data-v="free">↩️ İşine dön</button><button data-c="cmd" data-v="carry">🩹 Yaralıyı taşı</button></div>`;
     h += `<div class="cat">Görev</div><div class="gsel">${GORDER.map(g => `<button data-c="grp" data-v="${g}" class="${p.group === g ? 'on' : ''}" title="${GROUPS[g].desc}">${GROUPS[g].ic} ${GROUPS[g].ad}${GROUPS[g].sk ? ' ' + lvl(p, GROUPS[g].sk) : ''}</button>`).join('')}</div>`;
     h += `<button data-c="mgr" class="wide ${G.managers[p.group] === p.id ? 'on' : ''}">★ ${GROUPS[p.group].ad} grubunun yöneticisi yap</button>`;
     h += `<div class="cat">Günlük rutin</div><div class="gsel">${Object.keys(SLOTS).map(s => { const g = p.routine && p.routine[s]; return `<button data-c="rt" data-v="${s}" class="${g ? 'on' : ''}">${SLOTS[s]}: ${g ? GROUPS[g].ic + ' ' + GROUPS[g].ad : '—'}</button>`; }).join('')}</div><small class="hint">Dokundukça sıradaki mesleğe geçer. Rutin varsa o saatte meslek kendiliğinden değişir; akşam herkes evine döner.</small>`;

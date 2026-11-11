@@ -70,6 +70,8 @@ function updLeader(dt) {
     const b = G.inside.b; if (!b || b.dead) { exitBuilding(); return; }
     p.moving = m > 0.1; p.sprinting = false; p.stam = clamp(p.stam + 16 * dt, 0, 100);
     if (p.moving) { inMove(mx / m, my / m, 110 * Math.min(1, m) * (p.sneak ? 0.5 : 1), dt); p.anim += dt * 9; }
+    { const I = G.inside, rm = inRooms(b).find(r => r.t === 'sifa' && I.x >= r.x && I.x <= r.x + r.w && I.y >= r.y && I.y <= r.y + r.h);
+      if (rm) leaderHeal(dt, 5); else G.healT = 0; }
     p.x = b.x; p.y = b.y; p.insideB = b; p.ang = G.yaw; p.atkCd -= dt; p.swing = Math.max(0, p.swing - dt);
     G.interact = findInteract(); G.lookP = G.interact && G.interact.kind === 'person' ? G.interact.o : null; G.actT = 0; G.actProg = 0;
     return;
@@ -100,6 +102,7 @@ function updLeader(dt) {
       p.anim += dt * (p.sprinting ? 14 : 9); G.tutMoved += spd * k * dt;
     }
   }
+  { const sh = G.builds.find(b => b.type === 'sifahane' && b.built && !b.dead && dist(b, p) < b.r + 34); if (sh) leaderHeal(dt, 3.5); else G.healT = 0; }
   let aim = p.ang;
   p.ang = G.yaw; aim = G.yaw;
   // yakın dövüş
@@ -799,6 +802,7 @@ function update(dt) {
   G.carcs = G.carcs.filter(c => !c.dead);
   if (isNight() && G.carcs.length && Math.random() < dt * 0.02) { const c = pick(G.carcs); if (dist(c, G.fire) > 900) spawnPack('kucuk', ri(2, 4), { x: c.x + rand(-200, 200), y: c.y + rand(-200, 200) }); }
   if (G.sleep) sleepTick(dt); else updLeader(dt);
+  for (const q of G.people) kbStep(q, dt);
   for (const p of G.people.slice()) if (p !== L && !p.dead) updPerson(p, dt, LS);
   if (G.over) return;
   const prey = preyList();
@@ -924,4 +928,16 @@ function setSail(b) {
   if (saved.length < Math.min(G.people.length, 8)) { msg('Halkın çoğu uzakta. Herkesi kıyıya topla (Takip grubu), sonra yelken aç.', '#e99', 5); return; }
   G.over = true; G.won = true; try { localStorage.removeItem('sonAtesKayit4'); } catch (e) {}
   showVictory(saved, left);
+}
+
+// ---- lider şifa odasına / şifahaneye girince kendiliğinden tedavi görür
+function leaderHeal(dt, rate) {
+  const hurt = L.hp < L.maxhp || L.injury || L.sick;
+  if (!hurt) { G.healT = 0; return; }
+  if (!G.healT) msg('⛑️ Şifa yerindesin. Yaraların sarılıyor…', '#9fd', 3);
+  G.healT = (G.healT || 0) + dt;
+  const healer = members('sifaci').length ? 1.6 : 1;
+  L.hp = Math.min(L.maxhp, L.hp + rate * healer * dt);
+  if (L.injury && G.healT > 5) { const t = L.injury.type; if (t !== 'enfeksiyon' || (G.stock.ilac || 0) > 0) { if (t === 'enfeksiyon') G.stock.ilac--; L.injury = null; msg(t === 'kirik' ? 'Kırığın sarıldı ve sabitlendi.' : t === 'enfeksiyon' ? 'İlaç verildi; enfeksiyon geçti.' : 'Yaran sarıldı.', '#9f9', 3); G.healT = 0.01; } }
+  if (L.sick && G.healT > 8) { L.sick = 0; msg('Ateşin düştü.', '#9f9', 3); }
 }

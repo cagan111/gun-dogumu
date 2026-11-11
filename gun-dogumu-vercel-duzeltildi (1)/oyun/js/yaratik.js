@@ -125,6 +125,12 @@ function hurt(t, dmg, src, poison, isProj) {
   if (t.eq && t.eq.zirh) dmg *= 0.7;
   if (t.downed > 0) { killPerson(t, src); return; }
   t.hp -= dmg; t.hurtT = 0.2; t.lastHurt = 0; t.fear = Math.min(100, t.fear + 12);
+  if (src && src.type && !isProj && !t.bed && !t.inHut) {   // savrulma: büyük yaratık daha uzağa fırlatır
+    const a = angTo(src, t), k = clamp((src.r || 15) * 9 + dmg * 4, 120, 620);
+    t.kvx = Math.cos(a) * k; t.kvy = Math.sin(a) * k; t.kbT = clamp((src.r || 15) / 60, 0.25, 0.7);
+    if ((src.r || 0) > 30) t.fear = Math.min(100, t.fear + 25);
+    if (t === L) G.shake = Math.max(G.shake, 10 + (src.r || 15) * 0.3);
+  }
   for (let i = 0; i < 6; i++) G.parts.push({ x: t.x, y: t.y, vx: rand(-100, 100), vy: rand(-100, 100), life: rand(0.3, 0.8), col: '#9a1010', s: rand(2, 4) });
   if (t === L) { G.red = 0.6; G.shake = Math.max(G.shake, 8); }
   if (dmg >= 8 && Math.random() < 0.3) injure(t);
