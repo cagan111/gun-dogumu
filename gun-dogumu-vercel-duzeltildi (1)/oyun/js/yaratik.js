@@ -216,7 +216,7 @@ function preyList() {
   if (G.rescue && L && dist(G.rescue, L) < 450) out.push(G.rescue);
   return out;
 }
-function t_dead(t) { return !t || t.dead || t.inHut || t.grabbed || (t.kind === 'build' && (!t.occ || !t.occ.length)) || (t.isRescue && G.rescue !== t) || (t.mounted); }
+function t_dead(t) { return !t || t.dead || t.inHut || t.insideB || guardSafe(t) || t.grabbed || (t.kind === 'build' && (!t.occ || !t.occ.length)) || (t.isRescue && G.rescue !== t) || (t.mounted); }
 function isBold(d) {
   if (G.fire.fuel <= 0 || d.mother || d.finale) return true;
   if (d.type === 'kucuk') return false;
@@ -270,7 +270,12 @@ function updScent(dt) {
   if (w.t <= 0) { w.t = rand(12, 25); w.ta = w.a + rand(-0.8, 0.8); w.ts = rand(0.3, 1); }
   w.a = angLerp(w.a, w.ta, Math.min(1, dt * 0.035));
   w.s += (w.ts - w.s) * Math.min(1, dt * 0.08);
-  for (const q of G.scents) q.age += dt;
+  // Yağmur eski izi yıkar; kar biraz daha uzun tutar (Codex). Yağış sorgusu iz başına saniyede bir.
+  for (const q of G.scents) {
+    q.washT = (q.washT || 0) - dt;
+    if (q.washT <= 0) { q.washT = 1; const local = typeof precipAt === 'function' ? precipAt(q.x, q.y) : null; q.washRate = local === 'yagmur' ? (G.weather && G.weather.type === 'firtina' ? 5 : 3) : local === 'kar' ? 0.8 : 1; }
+    q.age += dt * q.washRate;
+  }
   G.scents = G.scents.filter(q => q.age < 24 && q.src && !q.src.dead);
   for (const p of G.people) {
     if (p.dead || p.inHut || p.insideB || p.grabbed || guardSafe(p)) continue;

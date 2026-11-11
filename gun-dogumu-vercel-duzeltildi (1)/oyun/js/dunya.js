@@ -520,8 +520,9 @@ const isPrecip = w => w === 'yagmur' || w === 'firtina' || w === 'kar';
 function precipAt(x, y) {
   const w = G.weather && G.weather.type;
   if (!isPrecip(w)) return null;
-  if (Math.hypot(x - G.fire.x, y - G.fire.y) < 600) return w === 'kar' ? 'kar' : 'yagmur';
-  return tempAt(x, y) < 0.5 ? 'kar' : 'yagmur';
+  // Kamp çevresinde yapay yağış çemberi yok; kampın kar/yağmur histerezisi yerel sıcaklığa uygulanır (Codex).
+  const T = tempAt(x, y);
+  return (w === 'kar' ? T <= 1.5 : T < -0.5) ? 'kar' : 'yagmur';
 }
 // kar derinliği (0..1.5): 100'lük yükseklik bantlarında saklanır, yerel değer bant arası + biyom
 function snowAt(x, y, h) {

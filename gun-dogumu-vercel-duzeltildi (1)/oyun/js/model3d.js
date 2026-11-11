@@ -32,6 +32,131 @@ const M3 = (function () {
   const DV = LM({ vertexColors: true, flatShading: false });
   const DFLASH = LM({ color: 0xffe2e2, emissive: 0x5a3030, flatShading: false });
   const DPOIS = LM({ vertexColors: true, color: 0xa4c070, flatShading: false });
+  // Yalnız yırtıcı pilotu: dış varlık yok, ortak 128x128 doğrusal kabartı.
+  let RAPTOR_LOOK = null;
+  function raptorLook() {
+    if (RAPTOR_LOOK) return RAPTOR_LOOK;
+    const size = 128, pixels = new Uint8Array(size * size * 4);
+    for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+      const row = (y / 16) | 0;
+      const u = (((x + (row & 1) * 8) % 16) + 0.5) / 16 - 0.5;
+      const v = ((y % 16) + 0.5) / 16 - 0.5;
+      const dome = 1 - Math.min(1, Math.hypot(u / 0.52, v / 0.48));
+      const grain = ((Math.imul(x + 1, 73856093) ^ Math.imul(y + 1, 19349663)) >>> 0) % 17 / 17;
+      const c = Math.round(255 * (0.25 + 0.65 * Math.sqrt(dome) + grain * 0.035));
+      const i = (y * size + x) * 4;
+      pixels[i] = pixels[i + 1] = pixels[i + 2] = c; pixels[i + 3] = 255;
+    }
+    const bump = new T3.DataTexture(pixels, size, size, T3.RGBAFormat);
+    bump.name = 'Son Ates - ozgun yirtici derisi';
+    bump.wrapS = bump.wrapT = T3.RepeatWrapping;
+    bump.magFilter = T3.LinearFilter; bump.minFilter = T3.LinearMipmapLinearFilter;
+    bump.generateMipmaps = true; bump.needsUpdate = true;
+    const skin = new T3.MeshStandardMaterial({
+      vertexColors: true, roughness: 0.86, metalness: 0,
+      bumpMap: bump, bumpScale: 0.08, flatShading: false
+    });
+    const flash = skin.clone(); flash.color.set(0xffe2e2); flash.emissive.set(0x5a3030);
+    const poison = skin.clone(); poison.color.set(0xa4c070);
+    const eye = new T3.MeshStandardMaterial({ color: 0xb6a15e, roughness: 0.25, metalness: 0 });
+    return (RAPTOR_LOOK = { skin, flash, poison, eye });
+  }
+  function raptorUV(g) {
+    const p = g.attributes.position, uv = new Float32Array(p.count * 2);
+    for (let i = 0; i < p.count; i += 3) {
+      const ax = p.getX(i + 1) - p.getX(i), ay = p.getY(i + 1) - p.getY(i), az = p.getZ(i + 1) - p.getZ(i);
+      const bx = p.getX(i + 2) - p.getX(i), by = p.getY(i + 2) - p.getY(i), bz = p.getZ(i + 2) - p.getZ(i);
+      const nx = Math.abs(ay * bz - az * by), ny = Math.abs(az * bx - ax * bz), nz = Math.abs(ax * by - ay * bx);
+      const axis = nx >= ny && nx >= nz ? 0 : ny >= nz ? 1 : 2;
+      for (let j = i; j < i + 3; j++) {
+        uv[j * 2] = (axis === 0 ? p.getZ(j) : p.getX(j)) * 3.2;
+        uv[j * 2 + 1] = (axis === 1 ? p.getZ(j) : p.getY(j)) * 3.2;
+      }
+    }
+    g.setAttribute('uv', new T3.BufferAttribute(uv, 2));
+    return g;
+  }
+  // Özgün masaüstü sanat geçişi; ortak dokular, varlık başına doku yok.
+  const ANIMAL_LOOKS = {};
+  function animalLook(type) {
+    const coat = type === 'bozkirat', membrane = type === 'kanatli';
+    const key = coat ? 'coat' : membrane ? 'membrane' : 'scales';
+    if (ANIMAL_LOOKS[key]) return ANIMAL_LOOKS[key];
+    if (key === 'scales') return (ANIMAL_LOOKS[key] = raptorLook());
+    const size = 128, pixels = new Uint8Array(size * size * 4);
+    for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+      const h = ((Math.imul(x + 7, 73856093) ^ Math.imul(y + 11, 19349663)) >>> 0) / 4294967295;
+      const wave = coat ? Math.sin(x * 1.8 + Math.sin(y * 0.17) * 0.5) : Math.sin(x * 0.24 + Math.sin(y * 0.15)) * 0.6;
+      const v = Math.round(128 + wave * (coat ? 24 : 18) + h * 14);
+      const i = (y * size + x) * 4;
+      pixels[i] = pixels[i + 1] = pixels[i + 2] = v; pixels[i + 3] = 255;
+    }
+    const bump = new T3.DataTexture(pixels, size, size, T3.RGBAFormat);
+    bump.name = 'Son Ates - ' + key; bump.wrapS = bump.wrapT = T3.RepeatWrapping;
+    bump.magFilter = T3.LinearFilter; bump.minFilter = T3.LinearMipmapLinearFilter;
+    bump.generateMipmaps = true; bump.needsUpdate = true;
+    const skin = new T3.MeshStandardMaterial({ vertexColors: true, metalness: 0,
+      roughness: coat ? 0.94 : 0.78, bumpMap: bump, bumpScale: coat ? 0.018 : 0.035 });
+    const flash = skin.clone(); flash.color.set(0xffe2e2); flash.emissive.set(0x5a3030);
+    const poison = skin.clone(); poison.color.set(0xa4c070);
+    return (ANIMAL_LOOKS[key] = { skin, flash, poison, eye: raptorLook().eye });
+  }
+  const ART_COLORS = {
+    kucuk: '#77815a', geceavcisi: '#47545a', tukurgec: '#73764e',
+    kesici: '#766653', yirtici: '#68705a', yelken: '#70634e',
+    dev: '#666054', gurleyen: '#897e66', boynuzlu: '#8c7b61',
+    zirhli: '#706e56', ordek: '#8b825e', uzunboyun: '#7b876d',
+    batakci: '#59634b', kanatli: '#927965', bozkirat: '#8b7052'
+  };
+  function artPalette(type, c) {
+    if (!ART_COLORS[type]) return;
+    c.col = mix(c.col, ART_COLORS[type], 0.65);
+    c.dk = mix(c.col, '#25291f', 0.5); c.lt = shd(c.col, 0.16);
+    c.bel = mix(c.col, '#d1c5a5', type === 'bozkirat' ? 0.3 : 0.48);
+    if (c.jaw) c.jaw = shd(c.col, -0.12);
+    if (c.m1) { c.m1 = mix(c.col, '#98775b', 0.35); c.m2 = shd(c.col, -0.3); }
+  }
+  // Yüzey parçaları aynı geometriye eklenir: ek sahne düğümü oluşturmaz.
+  function animalDetail(pb, key) {
+    const match = /^(th|q)\|([^|]+)\|#[0-9a-f]{6}(.*)$/i.exec(key);
+    const type = match ? match[2] : key.indexOf('croc|') === 0 ? 'batakci' : key.indexOf('fly|') === 0 ? 'kanatli' : '';
+    const part = match ? match[3] : key.replace(/^[^|]+\|#[0-9a-f]{6}/i, '');
+    if (!type || !ART_COLORS[type]) return;
+    const base = ART_COLORS[type], dark = shd(base, -0.3);
+    if (match && match[1] === 'th') {
+      const P = Object.assign({}, TP0, TP[type]);
+      if (part === 'torso') {
+        const count = type === 'dev' ? 9 : type === 'kucuk' ? 5 : 7;
+        for (const side of [-1, 1]) for (let i = 0; i < count; i++) {
+          const x = -P.tl * 0.64 + i * P.tl * 1.38 / (count - 1);
+          const q = torsoProf(P)(cl((x - (0.1 - P.tl * 0.98)) / (P.tl * 2), 0, 1));
+          const z = side * q[4] * 0.72, y = topY(P, x, z);
+          pb.ball(x, y, z, P.tl * 0.065, P.th * 0.045, P.tw * 0.09, i % 3 ? dark : base, { d: 0 });
+        }
+      } else if (part === 'head') {
+        for (const side of [-1, 1]) for (let i = 0; i < 4; i++) {
+          const x = P.hL * (0.3 + i * 0.13), z = side * P.hW * (0.43 - i * 0.035);
+          pb.ball(x, P.hH * (0.65 - i * 0.06), z, P.hL * 0.043, P.hH * 0.04, P.hW * 0.035, dark, { d: 0 });
+        }
+        if (type === 'dev') for (const side of [-1, 1])
+          pb.tube([P.hL * 0.14, P.hH * 0.82, side * P.hW * 0.34], [P.hL * 0.43, P.hH * 0.74, side * P.hW * 0.39], 0.045, 0.022, dark, { n: 6 });
+      }
+    } else if (match && match[1] === 'q' && part === 'torso' && type !== 'bozkirat') {
+      const P = QP[type], f = quadProf(P, type), N = type === 'zirhli' ? 7 : 6;
+      for (const side of [-1, 1]) for (let i = 0; i < N; i++) {
+        const q = f(0.18 + i * 0.64 / (N - 1));
+        pb.ball(q[0], q[1] + q[2] * 0.62, side * q[4] * 0.8,
+          P.tr[0] * 0.075, 0.022, P.tr[2] * 0.07, dark, { d: 0 });
+      }
+    } else if (type === 'batakci' && part === 'torso') {
+      for (const side of [-1, 1]) for (let i = 0; i < 10; i++) {
+        const x = -0.75 + i * 0.16, e = Math.sqrt(Math.max(0.1, 1 - x * x));
+        pb.ball(x, 0.12 * e, side * 0.4 * e, 0.065, 0.045, 0.035, dark, { d: 0 });
+      }
+    } else if (type === 'kanatli' && part === 'head') {
+      for (const side of [-1, 1]) pb.tube([0.18, 0.1, side * 0.06], [0.48, 0.025, side * 0.045], 0.014, 0.004, dark, { n: 4 });
+    }
+  }
   const MATS = {};
   function tint(h) { const k = 't' + h; return MATS[k] || (MATS[k] = LM({ color: col(h), vertexColors: true })); }
   function glow(h) { const k = 'g' + h; return MATS[k] || (MATS[k] = LM({ color: 0x0a0a0a, emissive: col(h) })); }
@@ -188,7 +313,7 @@ const M3 = (function () {
   };
   const GEO = {};
   let seedN = 3;
-  function geo(key, fn) { let g = GEO[key]; if (!g) { const pb = new PB(seedN += 17); fn(pb); g = GEO[key] = pb.build(); } return g; }
+  function geo(key, fn) { let g = GEO[key]; if (!g) { const pb = new PB(seedN += 17); fn(pb); animalDetail(pb, key); g = pb.build(); if (/^(th\||q\||croc\||fly\|)/.test(key)) raptorUV(g); GEO[key] = g; } return g; }
   function mesh(g, mat, parent, x, y, z) { const m = new T3.Mesh(g, mat || VC); m.position.set(x || 0, y || 0, z || 0); if (parent) parent.add(m); return m; }
   function grp(parent, x, y, z) { const m = new T3.Group(); m.position.set(x || 0, y || 0, z || 0); if (parent) parent.add(m); return m; }
 
@@ -204,6 +329,7 @@ const M3 = (function () {
 
   // ---------------------------------------------------------------- veri
   const FB = { // DINO tablosu yoksa yedek
+    bozkirat: { r: 19, col: '#8b7052', eye: '#806137', cd: 1.2, spd: 185 },
     kucuk: { r: 9, col: '#6b7d3a', eye: '#b6ff5a', cd: 0.7 }, geceavcisi: { r: 12, col: '#3a3f4a', eye: '#7cff9a', cd: 0.8 }, tukurgec: { r: 13, col: '#5a6a4a', eye: '#ff9a3a', cd: 0.9 },
     kesici: { r: 17, col: '#4a3a2e', eye: '#ff4040', cd: 1.4 }, yirtici: { r: 20, col: '#8a4b2a', eye: '#ffd23a', cd: 0.9 }, yelken: { r: 56, col: '#5a4a3a', eye: '#ffb030', cd: 1.5 },
     dev: { r: 62, col: '#3e3b35', eye: '#ff3a1a', cd: 1.6 }, ordek: { r: 26, col: '#8a7a50', eye: '#ddd', cd: 1 }, gurleyen: { r: 20, col: '#7a6a5a', eye: '#ddd', cd: 1.1 },
@@ -225,7 +351,7 @@ const M3 = (function () {
     geceavcisi: { H: 1.2, th: 0.31, tw: 0.26, nL: 0.7, nA: 0.85, nR: 0.14, hL: 0.7, hH: 0.3, hW: 0.32, lr: 0.125, tailR: 0.2, tailL: 1.9, arm: 0.5, eye: 0.115 },
     tukurgec: { H: 1.2, th: 0.35, tw: 0.29, nL: 0.85, nA: 1.0, nR: 0.14, hL: 0.7, hH: 0.28, hW: 0.3, lr: 0.14, tailR: 0.22 },
     kesici: { H: 1.25, th: 0.35, tw: 0.27, nL: 0.7, nA: 0.7, nR: 0.17, hL: 0.9, hH: 0.33, hW: 0.32, tp: 0.5, teeth: 6, arm: 0.62, lr: 0.15, tailL: 2.05, tailN: 5, tailR: 0.22, leg: [0.6, 0.68, 0.42], S: 0.5, eye: 0.065 },
-    yirtici: { H: 1.2, th: 0.42, tw: 0.36, hL: 0.88, hH: 0.42, hW: 0.4, nR: 0.23, teeth: 6, arm: 0.45 },
+    yirtici: { H: 1.28, tl: 0.92, th: 0.36, tw: 0.3, hL: 0.8, hH: 0.3, hW: 0.33, nR: 0.18, nL: 0.62, nA: 0.65, teeth: 8, arm: 0.58, tailL: 2.35, tailN: 5, tailR: 0.25, leg: [0.62, 0.76, 0.38], lr: 0.165, S: 0.5, eye: 0.045 },
     yelken: { H: 1.15, tl: 0.95, th: 0.44, tw: 0.38, tailL: 2.1, tailN: 5, tailR: 0.3, nL: 0.72, nA: 0.72, nR: 0.24, hL: 1.3, hH: 0.36, hW: 0.34, tp: 0.42, teeth: 9, arm: 0.62, lr: 0.2, eye: 0.05 },
     dev: { H: 1.32, tl: 0.92, th: 0.54, tw: 0.47, tailL: 1.85, tailN: 5, tailR: 0.38, nL: 0.5, nA: 0.72, nR: 0.37, hL: 1.25, hH: 0.66, hW: 0.64, tp: 0.66, teeth: 8, arm: 0.26, lr: 0.25, leg: [0.66, 0.7, 0.42], eye: 0.055 },
     gurleyen: { H: 1.12, th: 0.4, tw: 0.36, nL: 0.6, nA: 0.8, nR: 0.2, hL: 0.6, hH: 0.34, hW: 0.36, teeth: 0, arm: 0.34, herb: true, tailR: 0.28, lr: 0.16 }
@@ -233,7 +359,7 @@ const M3 = (function () {
   // ---- deri desenleri (köşe rengi). u: boy boyunca 0..1, up: -1 karın .. 1 sırt
   const wob = (x, y, z) => Math.sin(x * 17.1 + y * 3.3 + 1.7) * Math.sin(y * 13.7 + z * 11.3) * Math.sin(z * 9.1 + x * 7.7 + 0.5);
   const PAT = {
-    yirtici: ['#3a1608', (u, up, x, y, z) => sstep(0.3, 0.75, Math.sin(x * 15 + Math.abs(z) * 6 + Math.sin(y * 9) * 0.8)) * sstep(-0.45, 0.1, up)],
+    yirtici: ['#323b2c', (u, up, x, y, z) => sstep(0.25, 0.85, Math.sin(x * 9.5 + Math.abs(z) * 4 + Math.sin(y * 5) * 0.6)) * sstep(-0.25, 0.3, up) * (0.45 + 0.25 * sstep(-0.4, 0.4, wob(x * 0.7, y * 0.7, z * 0.7)))],
     kesici: ['#16100a', (u, up, x, y, z) => sstep(0.25, 0.5, Math.sin(x * 19 - Math.abs(z) * 5)) * sstep(-0.5, -0.05, up)],
     geceavcisi: ['#8a9e9a', (u, up, x, y, z) => sstep(0.82, 0.96, Math.sin(x * 22 + Math.abs(z) * 3)) * sstep(-0.3, 0.1, up)],
     dev: ['#1c1a16', (u, up, x, y, z) => sstep(0.08, 0.32, wob(x * 0.8, y * 0.8, z * 0.8)) * 0.8],
@@ -299,7 +425,7 @@ const M3 = (function () {
       const ex = 0.27 * L, ey = 0.64 * h, ez = w * 0.9;
       pb.ball(ex, ey, s * (ez - E * 0.08), E * 1.4, E * 1.12, E * 0.45, '#140e0a', { d: 1 });
       pb.ball(ex, ey, s * (ez + E * 0.4), E * 0.2, E * 0.66, E * 0.1, '#050303', { d: 0 });
-      pb.ball(ex - 0.02 * L, ey + E * 1.0, s * (ez - E * 0.1), E * 2.5, E * 0.62, E * 0.85, T === 'yirtici' ? '#c87a3a' : c.dk, { az: -0.32 });
+      pb.ball(ex - 0.02 * L, ey + E * 1.0, s * (ez - E * 0.1), E * 2.5, E * 0.62, E * 0.85, c.dk, { az: -0.32 });
       pb.ball(0.96 * L, 0.44 * h, s * w * tp * 0.52, 0.035 * L, 0.028 * L, 0.02 * L, '#0a0806', { d: 0 });       // burun deliği
       pb.ball(0.6 * L, 0.36 * h, s * wAt(0.6 * L)[2] * 0.9, 0.3 * L, 0.06 * h, 0.02 * L, shd(c.col, -0.25), { d: 1 }); // dudak çizgisi
     }
@@ -324,12 +450,17 @@ const M3 = (function () {
     if (GEO[key]) return GEO[key];
     const P = Object.assign({}, TP0, TP[T] || TP.yirtici), def = defOf(T);
     const c = { col: col(colHex), dk: shd(colHex, -0.45), lt: shd(colHex, 0.25), bel: mix(shd(colHex, 0.35), '#d0c098', 0.35), jaw: shd(colHex, -0.12) };
-    if (T === 'geceavcisi') c.bel = shd(colHex, 0.12);
+    if (T === 'yirtici') {
+      c.col = mix(colHex, '#68705a', 0.5); c.dk = mix(c.col, '#293023', 0.52);
+      c.bel = mix(c.col, '#c8bda0', 0.58); c.jaw = shd(c.col, -0.12);
+    }
+    artPalette(T, c);
+    if (T === 'geceavcisi') c.bel = shd(c.col, 0.12);
     const S = { kind: 'thero', P, T, g: {} }, g = S.g, tf = torsoProf(P);
     g.torso = geo(key + 'torso', pb => {
-      const secs = []; for (let i = 0; i <= 12; i++) secs.push(tf(i / 12));
-      pb.loft(secs, skin(T, c, { n: 14 }));
-      if (T === 'yirtici') { for (let i = 0; i < 6; i++) { const x = -0.55 + i * 0.26; pb.cone([x, topY(P, x) - 0.04, 0], [x - 0.08, topY(P, x) + 0.2, 0], 0.075, '#c87a3a', { n: 5 }); } }
+      const secs = []; for (let i = 0; i <= 18; i++) secs.push(tf(i / 18));
+      pb.loft(secs, skin(T, c, { n: 20 }));
+      if (T === 'yirtici') { for (let i = 0; i < 9; i++) { const x = -0.63 + i * 0.17; pb.ball(x, topY(P, x) + 0.014, 0, 0.09, 0.03, 0.045, c.dk, { d: 0 }); } }
       else if (T === 'dev') {
         ridge(pb, x => topY(P, x), -0.72, 0.62, 9, 0.05, 0.08, c.dk);
         for (let i = 0; i < 12; i++) { const x = -0.6 + (i % 6) * 0.27, z = (i < 6 ? -1 : 1) * P.tw * (0.45 + 0.1 * (i % 2)); pb.ball(x, topY(P, x, z) - 0.01, z, 0.08, 0.045, 0.065, shd(colHex, -0.3), { d: 0 }); }
@@ -361,7 +492,7 @@ const M3 = (function () {
       g.tail.push(geo(key + 'tail' + i, pb => {
         const off = tx0 - i * S.tsl;
         pb.loft([[0.07, 0, r0, r0 * 0.92, r0 * 0.82], [-S.tsl * 0.5, 0, rm, rm * 0.9, rm * 0.78], [-S.tsl, 0, r1, r1 * 0.9, r1 * 0.76]], skin(T, c, { n: 10, pat: pt ? (u, up, x, y, z) => pt[1](u, up, x + off, y, z) : null }));
-        if (T === 'yirtici' && i < 2) pb.cone([-S.tsl * 0.5, rm * 0.8, 0], [-S.tsl * 0.6, rm * 0.8 + 0.15, 0], 0.06, '#c87a3a', { n: 5 });
+        if (T === 'yirtici' && i < 2) pb.ball(-S.tsl * 0.5, rm * 0.85, 0, S.tsl * 0.18, 0.025, 0.045, c.dk, { d: 0 });
         if (T === 'dev' || T === 'gurleyen') for (let k = 0; k < 3; k++) { const x = -S.tsl * (0.15 + k * 0.33), r = lerp(r0, r1, 0.15 + k * 0.33); pb.ball(x, r * 0.92, 0, S.tsl * 0.12, r * 0.25 + 0.01, r * 0.3 + 0.01, c.dk); }
         if (T === 'geceavcisi' && i < 3) pb.cone([-S.tsl * 0.4, r0 * 0.8, 0], [-S.tsl * 0.75, r0 + 0.14, 0], 0.035, '#aebfba', { n: 4 });
       }));
@@ -379,7 +510,7 @@ const M3 = (function () {
     g.head = geo(key + 'head', pb => skull(pb, P, T, c));
     g.jaw = geo(key + 'jaw', pb => jawG(pb, P, T, c));
     if (!P.herb) g.eyes = geo(key + 'eyes2', pb => { for (const s of [-1, 1]) pb.ball(0.27 * P.hL, 0.64 * P.hH, s * (P.hW * 0.5 * 0.9), P.eye * 0.95, P.eye * 0.78, P.eye * 0.45, '#fff', { d: 1 }); });
-    S.eyeMat = glow(def.eye || '#f0d040');
+    S.eyeMat = animalLook(T).eye;
     if (T === 'tukurgec') g.frill = geo(key + 'frill', pb => {
       const N = 10, R = 1.0;
       for (let i = 0; i < N; i++) {
@@ -412,7 +543,7 @@ const M3 = (function () {
       const a = P.arm, k = P.herb ? c.col : shd(colHex, -0.2), r0 = 0.14 * a + 0.022, r1 = 0.09 * a + 0.014, r2 = 0.06 * a + 0.01;
       pb.loft([[0, 0.05, r0, r0, r0 * 0.9], [-0.12 * a, -0.5 * a, r1 * 1.1, r1 * 1.1, r1], [0.26 * a, -0.86 * a, r2, r2, r2 * 0.9]], { n: 7, col: k, dk: c.dk, bel: c.bel, back: 0.3 });
       const cn = T === 'kesici' || T === 'yelken' ? 0.34 : 0.2;
-      for (const z of [-0.07, 0.07]) pb.cone([0.26 * a, -0.86 * a, z * a], [(0.26 + cn * 0.6) * a, (-0.86 - cn) * a, z * a * 1.8], 0.05 * a + 0.006, T === 'kesici' ? BONE : CLAW, { n: 5 });
+      for (const z of (T === 'yirtici' ? [-0.09, 0, 0.09] : [-0.07, 0.07])) pb.cone([0.26 * a, -0.86 * a, z * a], [(0.26 + cn * 0.6) * a, (-0.86 - cn) * a, z * a * 1.8], 0.05 * a + 0.006, T === 'kesici' ? BONE : CLAW, { n: 5 });
     });
     return (GEO[key] = S);
   }
@@ -498,6 +629,7 @@ const M3 = (function () {
   //  DÖRT AYAKLILAR
   // =============================================================
   const QP = {
+    bozkirat: { by: 1.28, tr: [0.88, 0.42, 0.31], fl: { x: 0.53, y: 1.2, z: 0.23, L: [0.58, 0.64], r: 0.085 }, bl: { x: -0.52, y: 1.24, z: 0.25, L: [0.64, 0.62], r: 0.12 }, tail: { x: -0.8, y: 0.16, len: 1.0, n: 4, r: 0.07, dz: [0.95, 0.18, 0.08, 0.03] }, neck: { x: 0.63, y: 0.08, n: 2, len: 0.95, a0: 1.12, da: -0.12, r0: 0.24, r1: 0.13 }, hp: -0.58, S: 0.43 },
     boynuzlu: { by: 0.92, tr: [1.02, 0.52, 0.6], fl: { x: 0.56, y: 0.86, z: 0.46, L: [0.46, 0.46], r: 0.19 }, bl: { x: -0.56, y: 0.94, z: 0.46, L: [0.5, 0.5], r: 0.21 }, tail: { x: -0.9, y: 0.05, len: 0.95, n: 3, r: 0.22, dz: [-0.35, -0.1, 0.05] }, neck: { x: 0.82, y: -0.02, n: 1, len: 0.34, a0: -0.05, da: 0, r0: 0.36, r1: 0.3 }, hp: -0.12, S: 0.26 },
     zirhli: { by: 0.6, tr: [1.05, 0.38, 0.72], fl: { x: 0.58, y: 0.5, z: 0.5, L: [0.28, 0.27], r: 0.17 }, bl: { x: -0.56, y: 0.55, z: 0.52, L: [0.31, 0.29], r: 0.19 }, tail: { x: -0.92, y: 0.0, len: 1.0, n: 4, r: 0.2, dz: [-0.05, 0.03, 0.03, 0.03] }, neck: { x: 0.88, y: -0.06, n: 1, len: 0.22, a0: -0.1, da: 0, r0: 0.26, r1: 0.24 }, hp: 0, S: 0.2 },
     ordek: { by: 1.18, pitch: -0.14, tr: [1.0, 0.5, 0.46], fl: { x: 0.62, y: 0.8, z: 0.32, L: [0.43, 0.42], r: 0.11 }, bl: { x: -0.3, y: 1.18, z: 0.36, L: [0.62, 0.62], r: 0.2 }, tail: { x: -0.82, y: 0.08, len: 1.5, n: 4, r: 0.3, dz: [0.2, -0.02, -0.03, -0.03] }, neck: { x: 0.78, y: 0.1, n: 2, len: 0.75, a0: 0.95, da: -0.25, r0: 0.25, r1: 0.16 }, hp: -0.2, S: 0.36 },
@@ -519,13 +651,20 @@ const M3 = (function () {
     const key = 'q|' + T + '|' + colHex;
     if (GEO[key]) return GEO[key];
     const P = QP[T], c = { col: col(colHex), dk: shd(colHex, -0.42), lt: shd(colHex, 0.25), bel: mix(shd(colHex, 0.35), '#d0c098', 0.35) };
+    artPalette(T, c);
     const S = { kind: 'quad', P, T, g: {} }, g = S.g, [RX, RY, RZ] = P.tr, qf = quadProf(P, T);
     const top = (x, z) => { const q = qf(cl((x + RX * 1.02) / (2.04 * RX), 0, 1)), w = (z || 0) / q[4]; return q[1] + q[2] * Math.sqrt(Math.max(0, 1 - w * w)); };
     const sk = o => skin(T, c, o);
     g.torso = geo(key + 'torso', pb => {
-      const secs = []; for (let i = 0; i <= 12; i++) secs.push(qf(i / 12));
-      pb.loft(secs, sk({ n: 14, e: T === 'zirhli' ? 0.8 : 1 }));
-      if (T === 'boynuzlu') {
+      const secs = []; for (let i = 0; i <= 18; i++) secs.push(qf(i / 18));
+      pb.loft(secs, sk({ n: 20, e: T === 'zirhli' ? 0.8 : 1 }));
+      if (T === 'bozkirat') {
+        for (const side of [-1, 1]) {
+          pb.ball(0.52, 0.03, side * 0.22, 0.29, 0.35, 0.14, c.col, { d: 1 });
+          pb.ball(-0.5, 0.02, side * 0.22, 0.31, 0.37, 0.16, c.col, { d: 1 });
+        }
+        pb.ball(0.35, 0.37, 0, 0.28, 0.08, 0.16, c.dk, { d: 1 });
+      } else if (T === 'boynuzlu') {
         ridge(pb, x => top(x, 0), -0.9, 0.75, 9, 0.04, 0.07, shd(colHex, -0.25));
         for (let i = 0; i < 5; i++) { const x = -0.6 + i * 0.3; for (const s of [-1, 1]) pb.ball(x, top(x, s * RZ * 0.6) - 0.01, s * RZ * 0.6, 0.07, 0.035, 0.07, shd(colHex, -0.2), { d: 0 }); }
       } else if (T === 'zirhli') {
@@ -548,6 +687,9 @@ const M3 = (function () {
           for (const s of [-1, 1]) pb.cone([-S.tsl * 0.5, 0, s * rm * 0.9], [-S.tsl * 0.6, 0.03, s * (rm + 0.16)], 0.05, '#d8d0b8', { n: 5 });
           if (i === tl.n - 1) { pb.ball(-S.tsl - 0.08, 0, 0.13, 0.2, 0.15, 0.17, shd(colHex, -0.3)); pb.ball(-S.tsl - 0.08, 0, -0.13, 0.2, 0.15, 0.17, shd(colHex, -0.3)); pb.ball(-S.tsl - 0.2, 0, 0, 0.14, 0.12, 0.14, '#3a3626'); }
         }
+        if (T === 'bozkirat') {
+          pb.loft([[0, 0, r0, r0, r0], [-S.tsl * 0.6, 0, rm * 1.3, rm * 1.3, rm], [-S.tsl, 0, r1 * 1.4, r1 * 1.4, r1]], { n: 7, col: '#30291f', dk: '#211d17', bel: '#5c4b35' });
+        }
         if (T === 'uzunboyun' && i < 3) pb.ball(-S.tsl * 0.5, rm * 0.9, 0, 0.08, 0.035, 0.08, c.dk, { d: 1 });
         if (T === 'ordek') for (let k = 0; k < 2; k++) pb.ball(-S.tsl * (0.25 + k * 0.5), lerp(r0, r1, 0.25 + k * 0.5) * 0.95, 0, S.tsl * 0.2, 0.03, 0.025, shd(colHex, -0.3));
       }));
@@ -558,13 +700,25 @@ const M3 = (function () {
       g.neck.push(geo(key + 'neck' + i, pb => {
         pb.loft([[x0, 0, r0 * k0, r0 * k0 * 1.08, r0 * k0 * 0.9], [S.nsl * 0.5, 0, (r0 + r1) / 2, (r0 + r1) / 2 * 1.1, (r0 + r1) / 2 * 0.86], [S.nsl + 0.03, 0, r1, r1 * 1.08, r1 * 0.84]], sk({ n: 10, pat: null }));
         if (T === 'uzunboyun') for (let k = 0; k < 2; k++) pb.ball(S.nsl * (0.25 + k * 0.5), lerp(r0, r1, 0.25 + k * 0.5) * 0.92, 0, S.nsl * 0.18, 0.03, 0.04, c.dk);
+        if (T === 'bozkirat') {
+          for (let j = 0; j < 5; j++) { const x = S.nsl * (j + 0.5) / 5, r = lerp(r0, r1, (j + 0.5) / 5);
+            pb.tube([x, r * 0.83, 0], [x - 0.08, r + 0.13, 0], 0.045, 0.017, '#30291f', { n: 5 }); }
+        }
         if (T === 'ordek') pb.ball(S.nsl * 0.5, (r0 + r1) / 2 * 0.95, 0, S.nsl * 0.45, 0.03, 0.025, shd(colHex, -0.3));
       }));
     }
     const hl = (A, o) => A.map(([x, t, b, w]) => [x, (t + b) / 2, (t - b) / 2, (t - b) / 2, w]);
     const eye = (pb, x, y, z, r) => { for (const s of [-1, 1]) { pb.ball(x, y, s * z, r * 1.4, r * 1.15, r * 0.5, shd(colHex, -0.5), { d: 1 }); pb.ball(x, y, s * (z + r * 0.15), r, r * 0.9, r * 0.45, '#d8c890', { d: 1 }); pb.ball(x + r * 0.15, y, s * (z + r * 0.45), r * 0.45, r * 0.6, r * 0.12, '#0a0806', { d: 0 }); pb.ball(x - r * 0.1, y + r * 1.05, s * (z - r * 0.1), r * 1.9, r * 0.45, r * 0.7, shd(colHex, -0.35)); } };
     g.head = geo(key + 'head', pb => {
-      if (T === 'boynuzlu') {
+      if (T === 'bozkirat') {
+        pb.loft(hl([[-0.13, 0.19, -0.14, 0.13], [0.1, 0.22, -0.17, 0.15], [0.3, 0.12, -0.2, 0.12], [0.58, 0.02, -0.21, 0.095], [0.67, -0.06, -0.2, 0.09]]), sk({ n: 14, pat: null }));
+        pb.ball(0.6, -0.13, 0, 0.13, 0.08, 0.105, '#514839', { d: 1 });
+        for (const side of [-1, 1]) {
+          pb.loft([[-0.015, 0.16, 0.07, 0.07, 0.048, side * 0.105], [-0.04, 0.33, 0.055, 0.055, 0.04, side * 0.14], [-0.06, 0.45, 0.004, 0.004, 0.004, side * 0.16]], { n: 8, col: c.col, dk: c.dk, bel: '#b29b80' });
+          pb.ball(0.58, -0.1, side * 0.095, 0.045, 0.028, 0.012, '#1d1c17', { d: 1 });
+        }
+        eye(pb, 0.12, 0.095, 0.135, 0.032);
+      } else if (T === 'boynuzlu') {
         const fk = shd(colHex, -0.18), fx = -0.1, fy = 0.36, az = 0.5;
         pb.ball(fx, fy, 0, 0.1, 0.62, 0.74, fk, { az });
         pb.ball(fx + 0.06, fy - 0.02, 0, 0.08, 0.42, 0.52, mix(colHex, '#8a3a2a', 0.45), { az });
@@ -594,6 +748,7 @@ const M3 = (function () {
     g.jaw = geo(key + 'jaw', pb => {
       const jo = (A, k) => pb.loft(hl(A), { n: 8, col: k || c.bel, dk: shd(colHex, -0.1), bel: c.bel, back: 0, top: MAW });
       if (T === 'boynuzlu') { jo([[0.0, -0.25, -0.4, 0.2], [0.35, -0.26, -0.37, 0.17], [0.6, -0.26, -0.34, 0.11], [0.74, -0.26, -0.31, 0.05]], shd(colHex, -0.1)); pb.cone([0.66, -0.3, 0], [0.84, -0.34, 0], 0.05, '#3a3024', { n: 5 }); }
+      else if (T === 'bozkirat') jo([[0.02, -0.13, -0.24, 0.1], [0.3, -0.18, -0.26, 0.085], [0.62, -0.2, -0.24, 0.08]], c.col);
       else if (T === 'zirhli') jo([[0, -0.17, -0.27, 0.22], [0.3, -0.16, -0.24, 0.18], [0.48, -0.15, -0.22, 0.1]], shd(colHex, -0.2));
       else if (T === 'ordek') jo([[0, -0.11, -0.19, 0.12], [0.4, -0.1, -0.16, 0.12], [0.72, -0.07, -0.11, 0.17]], '#b89a5c');
       else jo([[0, -0.08, -0.16, 0.1], [0.4, -0.07, -0.11, 0.07]]);
@@ -603,7 +758,8 @@ const M3 = (function () {
       g[nm + 'u'] = geo(key + nm + 'u', pb => { pb.loft([[0, 0.12, r * 1.25, r * 1.3, r * 1.15], [0, -L.L[0] * 0.25, r * 1.5, r * 1.55, r * 1.25], [0, -L.L[0] * 0.65, r * 1.15, r * 1.15, r * 0.98], [0, -L.L[0], r * 0.88, r * 0.88, r * 0.82], [0, -L.L[0] - r * 0.55, r * 0.3, r * 0.3, r * 0.3]], Object.assign({ n: 10 }, lk)); });
       g[nm + 'l'] = geo(key + nm + 'l', pb => {
         pb.loft([[0, r * 0.3, r * 0.6, r * 0.6, r * 0.6], [0, 0, r * 0.86, r * 0.9, r * 0.8], [0, -L.L[1] * 0.4, r * 0.8, r * 0.82, r * 0.74], [0, -L.L[1] + r * 0.5, r * 0.78, r * 0.8, r * 0.74], [0.02 * r, -L.L[1] + r * 0.12, r * 1.02, r * 0.95, r * 0.95], [0.03 * r, -L.L[1] - r * 0.02, r * 1.0, r * 0.95, r * 0.94]], Object.assign({ n: 10 }, lk, { col: shd(colHex, -0.12), e: 0.9 }));
-        for (const z of [-0.55, 0, 0.55]) pb.ball(r * 0.88, -L.L[1] + r * 0.14, z * r * 1.05, r * 0.24, r * 0.2, r * 0.22, T === 'ordek' ? CLAW : '#d8d0b8', { d: 1 });
+        if (T === 'bozkirat') pb.loft([[0, -L.L[1] + r * 0.7, r, r, r], [r * 0.3, -L.L[1] + r * 0.2, r * 1.13, r * 1.13, r * 1.13], [r * 0.35, -L.L[1] - r * 0.04, r * 1.05, r * 1.05, r * 1.15]], { n: 10, col: '#36322a', dk: '#24221d', bel: '#625845', e: 0.75 });
+        else for (const z of [-0.55, 0, 0.55]) pb.ball(r * 0.88, -L.L[1] + r * 0.14, z * r * 1.05, r * 0.24, r * 0.2, r * 0.22, T === 'ordek' ? CLAW : '#d8d0b8', { d: 1 });
       });
     };
     legG(P.fl, 'f'); legG(P.bl, 'b');
@@ -668,7 +824,7 @@ const M3 = (function () {
     const nk = P.neck, nn = ud.necks.length;
     const graze = T === 'uzunboyun' ? 0 : (1 - mv) * (1 - al) * (1 - rdy) * (1 - (ud.watK || 0)) * cl((Math.sin(t * 0.15 + id * 1.3) + 0.15) * 3, 0, 1);
     const browse = T === 'uzunboyun' ? (1 - mv) * (1 - al) * cl((Math.sin(t * 0.12 + id) + 0.2) * 2, 0, 1) : 0;
-    const gD = T === 'ordek' ? 1.05 : T === 'boynuzlu' ? 0.4 : T === 'zirhli' ? 0.22 : 0;
+    const gD = T === 'bozkirat' ? 1.4 : T === 'ordek' ? 1.05 : T === 'boynuzlu' ? 0.4 : T === 'zirhli' ? 0.22 : 0;
     const chew = graze * Math.max(0, Math.sin(t * 7 + id)) * 0.06;
     const down = horn * (rdy * 0.4 + thrust * -0.35) + (T === 'zirhli' ? 0 : thrust * 0.2 * (1 - horn)) + graze * gD - al * (T === 'uzunboyun' ? 0.25 : 0.35) - browse * 0.18 + run * 0.12;
     let tot = 0;
@@ -695,6 +851,7 @@ const M3 = (function () {
     const key = 'croc|' + colHex;
     if (GEO[key]) return GEO[key];
     const c = { col: col(colHex), dk: shd(colHex, -0.4), bel: mix(shd(colHex, 0.35), '#c8c090', 0.4) };
+    artPalette('batakci', c);
     const S = { kind: 'croc', T: 'batakci', g: {}, P: {} }, g = S.g;
     g.torso = geo(key + 'torso', pb => {
       { const secs = []; for (let i = 0; i <= 10; i++) { const t = i / 10, e = Math.pow(Math.sin(PI * (0.05 + 0.9 * t)), 0.5); secs.push([-1.0 + 2 * t, 0, 0.25 * (0.4 + 0.6 * e), 0.2 * (0.4 + 0.6 * e), 0.44 * (0.45 + 0.55 * e)]); } pb.loft(secs, skin('batakci', c, { n: 12, e: 0.85 })); }
@@ -714,7 +871,7 @@ const M3 = (function () {
       for (const s of [-1, 1]) for (let i = 0; i < 6; i++) { const u = (i + 0.5) / 6, x = 0.35 + u * 0.8, w = 0.24 + (0.09 - 0.24) * u; pb.cone([x, -0.02, s * w * 0.9], [x, 0.08, s * w * 0.9], 0.03, BONE, { n: 3 }); }
     });
     g.eyes = geo(key + 'eyes', pb => { for (const s of [-1, 1]) pb.ball(0.19, 0.235, s * 0.2, 0.05, 0.045, 0.045, '#fff', { d: 0 }); });
-    S.eyeMat = glow(defOf('batakci').eye || '#cf6');
+    S.eyeMat = animalLook('batakci').eye;
     g.leg = [];
     for (const s of [-1, 1]) g.leg.push(geo(key + 'leg' + s, pb => {
       pb.tube([0, 0, 0], [0.05, -0.02, s * 0.24], 0.11, 0.08, c.dk, { n: 5 });
@@ -761,6 +918,7 @@ const M3 = (function () {
     const key = 'fly|' + colHex;
     if (GEO[key]) return GEO[key];
     const c = { col: col(colHex), dk: shd(colHex, -0.45), m1: shd(colHex, -0.1), m2: shd(colHex, -0.3), bel: shd(colHex, 0.3) };
+    artPalette('kanatli', c);
     const S = { kind: 'fly', T: 'kanatli', g: {}, P: {} }, g = S.g;
     g.torso = geo(key + 'torso', pb => {
       pb.ball(0, 0, 0, 0.7, 0.27, 0.3, c.col, { belly: c.bel, by: -0.08 });
@@ -779,6 +937,7 @@ const M3 = (function () {
       g.wi.push(geo(key + 'wi' + s, pb => {
         pb.tube([0, 0, 0], [0.12, 0.03, s * 1.1], 0.06, 0.045, c.dk, { n: 4 });
         pb.quad([0.05, 0, 0], [0.12, 0.02, s * 1.1], [-0.72, 0, s * 1.0], [-0.7, 0, 0], c.m1);
+        for (const f of [0.25, 0.5, 0.75]) pb.tube([0.12 * f, 0.018 * f + 0.004, s * 1.1 * f], [-0.7 + f * 0.1, 0.004, s * f], 0.007, 0.003, c.m2, { n: 4 });
         pb.tri([0.3, 0, s * 0.02], [0.12, 0.02, s * 1.1], [0.05, 0, 0], c.m2);
       }));
       g.wo.push(geo(key + 'wo' + s, pb => {
@@ -1415,7 +1574,7 @@ const M3 = (function () {
   // =============================================================
   //  YARATIK GİRİŞ NOKTALARI
   // =============================================================
-  const QUADS = { boynuzlu: 1, zirhli: 1, ordek: 1, uzunboyun: 1 };
+  const QUADS = { bozkirat: 1, boynuzlu: 1, zirhli: 1, ordek: 1, uzunboyun: 1 };
   function fakeOf(d, ud) {
     const f = ud.fake || (ud.fake = { eq: {}, bag: {}, carry: 0, work: 0 });
     f.id = d.id; f.anim = d.anim; f.moving = d.moving; f.hurtT = d.hurt; f.swing = d.swing || 0;
@@ -1436,6 +1595,11 @@ const M3 = (function () {
     else if (T === 'kanatli') { S = flySpec(colHex); rigFly(S, root, ud); }
     else if (QUADS[T]) { S = quadSpec(T, colHex); rigQuad(S, root, ud); }
     else { S = theroSpec(TP[T] ? T : 'yirtici', colHex); rigThero(S, root, ud); }
+    if (ART_COLORS[T]) {
+      const look = animalLook(T);
+      ud.baseMat = look.skin; ud.flashMat = look.flash; ud.poisonMat = look.poison;
+      for (const m of ud.meshes) m.material = look.skin;
+    }
     ud.S = S; ud.kind = S.kind; ud.r = 0;
     updDino(g, d, 0);
     return g;
@@ -1482,7 +1646,7 @@ const M3 = (function () {
   }
   function setFlash(ud, f) {
     if (ud.fl === f) return; ud.fl = f;
-    const m = f === 1 ? DFLASH : f === 2 ? DPOIS : DV;
+    const m = f === 1 ? (ud.flashMat || DFLASH) : f === 2 ? (ud.poisonMat || DPOIS) : (ud.baseMat || DV);
     for (const x of ud.meshes) x.material = m;
   }
   function updDino(g, d, t) {
