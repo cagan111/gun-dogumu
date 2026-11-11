@@ -9,6 +9,8 @@
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--ink);font-family:Georgia,"Times New Roman",serif;user-select:none;-webkit-user-select:none;touch-action:none}
 canvas{display:block}
+#c3,#c{position:fixed;left:0;top:0;width:100%;height:100%}
+#c{touch-action:none}
 button{font-family:Georgia,serif;color:var(--ink);cursor:pointer}
 .bar{position:relative;height:7px;background:rgba(255,255,255,.1);border-radius:4px;overflow:hidden;flex:1;min-width:40px}
 .bar i{position:absolute;left:0;top:0;bottom:0;width:50%;background:#7c6;border-radius:4px;transition:width .15s}
@@ -115,6 +117,8 @@ button.wide{width:100%;margin-top:6px}
 .ctabs{display:flex;gap:6px;padding:8px 12px 0}
 .obtns{display:flex;gap:3px;flex:none;flex-wrap:wrap;justify-content:flex-end;max-width:46%}
 .card .obtns button{padding:4px 7px;background:#2b2419;border-color:#5a4a30}
+#sleepV{position:fixed;inset:0;display:none;align-items:center;justify-content:center;text-align:center;background:radial-gradient(ellipse at center,rgba(0,0,0,.93) 0%,#000 75%);color:#9a8f7a;font-size:20px;line-height:1.6;z-index:3;pointer-events:none}
+#lockHint{position:fixed;left:50%;top:38%;transform:translateX(-50%);background:rgba(0,0,0,.6);border:1px solid #5a4a30;border-radius:8px;padding:6px 14px;font-size:14px;color:#e8d4b0;display:none;pointer-events:none;z-index:2}
 #touch{display:none;position:fixed;inset:0;pointer-events:none}
 #joy{position:absolute;left:0;bottom:64px;width:50%;height:calc(62% - 64px);pointer-events:auto}
 body.sideOpen #tbtns{display:none}
@@ -165,6 +169,7 @@ summary{cursor:pointer;color:#e8d4b0}
 </style>
 </head>
 <body>
+<canvas id="c3"></canvas>
 <canvas id="c"></canvas>
 
 <div id="hud">
@@ -198,6 +203,8 @@ summary{cursor:pointer;color:#e8d4b0}
 <div id="charM" class="modalw"><div id="charBox"></div></div>
 <div id="toast"></div>
 
+<div id="sleepV"><div>😴<br><b>Uyuyorsun…</b><br><small id="sleepTxt">uyanmak için dokun / bir tuşa bas</small></div></div>
+<div id="lockHint">Etrafa bakmak için ekrana tıkla · Esc: fareyi bırak</div>
 <div id="touch">
   <div id="joy"><div id="knobBase"><div id="knob"></div></div></div>
   <div id="tbtns">
@@ -209,6 +216,7 @@ summary{cursor:pointer;color:#e8d4b0}
 <div id="pause">DURAKLATILDI</div>
 <div id="screen"><div class="box" id="screenBox"></div></div>
 
+<script src="js/three.min.js"></script>
 <script src="js/temel.js"></script>
 <script src="js/ses.js"></script>
 <script src="js/dunya.js"></script>
@@ -216,6 +224,8 @@ summary{cursor:pointer;color:#e8d4b0}
 <script src="js/yaratik.js"></script>
 <script src="js/oyun.js"></script>
 <script src="js/cizim.js"></script>
+<script src="js/model3d.js"></script>
+<script src="js/uc.js"></script>
 <script src="js/arayuz.js"></script>
 <script>
 (function(){const t=document.getElementById('top');try{if(localStorage.getItem('sonAtesTop')==='0')t.classList.add('kapali')}catch(e){}

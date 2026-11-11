@@ -57,14 +57,17 @@ function autoAim(range) {
 }
 function updLeader(dt) {
   const p = L;
+  if (G.yaw == null || isNaN(G.yaw)) { G.yaw = angTo(L, G.cave || G.fire); G.pitch = 0; }
   let mx = 0, my = 0;
   if (keys.KeyW || keys.ArrowUp) my -= 1; if (keys.KeyS || keys.ArrowDown) my += 1;
-  if (keys.KeyA || keys.ArrowLeft) mx -= 1; if (keys.KeyD || keys.ArrowRight) mx += 1;
+  if (keys.KeyA) mx -= 1; if (keys.KeyD) mx += 1;
+  if (keys.ArrowLeft) G.yaw -= 2.3 * dt; if (keys.ArrowRight) G.yaw += 2.3 * dt;
   if (touch.jx || touch.jy) { mx = touch.jx; my = touch.jy; }
+  { const fx = Math.cos(G.yaw), fy = Math.sin(G.yaw), f = -my, r = mx; mx = fx * f - fy * r; my = fy * f + fx * r; }
   const m = Math.hypot(mx, my);
   p.sprinting = (keys.ShiftLeft || keys.ShiftRight || touch.run) && m > 0.1 && p.stam > 1;
   p.stam = clamp(p.stam + (p.sprinting ? -28 : 16) * dt, 0, 100);
-  const mouseAim = mouse.used && !isTouch;
+  const mouseAim = !isTouch;
   if (G.mount) {
     const d = G.mount; d.ramCd = (d.ramCd || 0) - dt;
     if (m > 0.1) {
@@ -80,23 +83,21 @@ function updLeader(dt) {
       }
     } else d.moving = false;
     p.x = d.x; p.y = d.y; p.moving = false;
-    if (!mouseAim && m > 0.1) p.ang = d.ang;
   } else {
     p.moving = m > 0.1;
     if (p.moving) {
       const k = Math.min(1, m), spd = pSpeed(p) * (p.sprinting ? 1.6 : 1);
       p.x += mx / m * spd * k * dt; p.y += my / m * spd * k * dt; pushOut(p, false);
       p.anim += dt * (p.sprinting ? 14 : 9); G.tutMoved += spd * k * dt;
-      if (!mouseAim) p.ang = angLerp(p.ang, Math.atan2(my, mx), Math.min(1, dt * 12));
     }
   }
   let aim = p.ang;
-  if (mouseAim) { const w = screenToWorld(mouse.x, mouse.y); aim = Math.atan2(w.y - p.y, w.x - p.x); p.ang = aim; }
+  p.ang = G.yaw; aim = G.yaw;
   // yakın dövüş
   p.atkCd -= dt; p.swing = Math.max(0, p.swing - dt);
   const atk = (mouse.down && !G.placing) || keys.Space || touch.atk;
   if (atk && p.atkCd <= 0 && !G.placing) {
-    if (!mouseAim) { const best = autoAim(160); if (best) { aim = angTo(p, best); p.ang = aim; } }
+    { const best = autoAim(150); if (best && Math.abs(angDiff(angTo(p, best), G.yaw)) < (isTouch ? 1.0 : 0.5)) aim = angTo(p, best); }
     p.atkCd = 0.42; p.swing = 0.2; SFX.swing();
     const reach = G.mount ? 60 : 34, hx = p.x + Math.cos(aim) * reach, hy = p.y + Math.sin(aim) * reach;
     let hit = false;
@@ -120,7 +121,7 @@ function updLeader(dt) {
   if (shoot && G.shootCd <= 0) {
     if (!(p.eq && p.eq.yay)) { if (!G.flags.noBow) { G.flags.noBow = 1; msg('Yayın yok. Zanaatkârlara Yay ve Ok ürettir (C).', '#ccc', 3); } }
     else {
-      if (!mouseAim) { const best = autoAim(420); if (best) aim = angTo(p, best); p.ang = aim; }
+      { const best = autoAim(420); if (best && Math.abs(angDiff(angTo(p, best), G.yaw)) < (isTouch ? 0.6 : 0.2)) aim = angTo(p, best); }
       G.shootCd = 0.65; if (shootArrow(p, p.x + Math.cos(aim) * 300, p.y + Math.sin(aim) * 300, 22)) p.swing = 0.2;
     }
   }
@@ -260,8 +261,9 @@ function startPlace(t) {
 function cancelPlace() { G.placing = null; }
 function placePos() {
   if (G.tapPlace) return G.tapPlace;
-  if (mouse.used && !isTouch) { const w = screenToWorld(mouse.x, mouse.y); const dx = w.x - L.x, dy = w.y - L.y, d = Math.hypot(dx, dy); if (d > 220) return { x: L.x + dx / d * 220, y: L.y + dy / d * 220 }; return w; }
-  return { x: L.x + Math.cos(L.ang) * (G.mount ? 90 : 60), y: L.y + Math.sin(L.ang) * (G.mount ? 90 : 60) };
+  const pt = G.pitch || 0, r = (BUILD[G.placing] && BUILD[G.placing].r) || 20;
+  const d = clamp(pt < -0.08 ? 30 / Math.tan(-pt) : 260, 50, 260) + r * 0.5;
+  return { x: L.x + Math.cos(G.yaw) * d, y: L.y + Math.sin(G.yaw) * d };
 }
 function placeOk(t, p) {
   const r = BUILD[t].r;
@@ -708,7 +710,7 @@ function markExplored(x, y, r, who) {
   for (const n of G.nests) if (!n.found && Math.hypot(x - n.x, y - n.y) < r) n.found = true;
 }
 const TUT = [
-  { t: 'Hareket et: WASD / oklar (telefonda ekranın sol yarısı).', done: () => G.tutMoved > 150 },
+  { t: 'Kendi gözünden görüyorsun. Hareket: WASD, bakış: fare (telefonda sol yarı yürür, sağ yarıyı sürükleyince bakarsın).', done: () => G.tutMoved > 150 },
   { t: 'Ateşin yanında E basılı tut: ateşe odun at. Ateş sönerse karanlıktaki her şey cesaretlenir.', done: () => G.tutFire > 0 },
   { t: 'Sağdaki HALK panelinde gruplara + ile kişi aktar. Her grubun bir becerisi var; çalıştıkça seviye atlarlar.', done: () => G.tutGroup },
   { t: 'Bir gruba ★ ile yönetici ata: grubu hızlandırır, ⚡ yetenek ve 📍 bölge emri verir.', done: () => GORDER.some(g => G.managers[g]) },
@@ -760,7 +762,7 @@ function update(dt) {
   for (const c of G.carcs) { c.age += dt; if (!c.rotten && c.age > CYCLE * 1.2 && !G.builds.some(b => b.type === 'raf' && b.built && dist(b, c) < 300)) { c.rotten = true; } if (c.age > CYCLE * 2.5) c.dead = true; }
   G.carcs = G.carcs.filter(c => !c.dead);
   if (isNight() && G.carcs.length && Math.random() < dt * 0.02) { const c = pick(G.carcs); if (dist(c, G.fire) > fireR() + 100) spawnPack('kucuk', ri(2, 4), { x: c.x + rand(-200, 200), y: c.y + rand(-200, 200) }); }
-  updLeader(dt);
+  if (G.sleep) sleepTick(dt); else updLeader(dt);
   for (const p of G.people.slice()) if (p !== L && !p.dead) updPerson(p, dt, LS);
   if (G.over) return;
   const prey = preyList();
@@ -830,4 +832,50 @@ function update(dt) {
   G.routineT = (G.routineT || 0) - dt;
   G.shake *= Math.pow(0.02, dt); G.red = Math.max(0, G.red - dt); G.scare = Math.max(0, G.scare - dt);
   const before = G.msgs.length; for (const m of G.msgs) m.life -= dt; G.msgs = G.msgs.filter(m => m.life > 0); if (G.msgs.length !== before) G.msgDirty = true;
+}
+
+// ---- uyku: lider gece mağarada/evinde uyur; zaman hızlanır. Kapıdaki gözcü tehlikede uyandırır.
+const SMALLD = ['kucuk', 'tukurgec'];
+function threatNear(d, x, y) { if (!hostile(d) || d.hidden || d.dead) return false; const ds = Math.hypot(d.x - x, d.y - y); if (ds < (SMALLD.includes(d.type) ? 110 : 190)) return true; return ds < 420 && !!(d.siege || d.rush > 0 || d.st === 'lunge' || (d.engaged && !SMALLD.includes(d.type))); }
+function sleepSpot() {
+  let best = null, bd = 230;
+  for (const b of G.builds) { if (!b.built || b.dead) continue; if (b.type !== 'magara' && b.type !== 'kulube' && b.type !== 'cadir') continue; const d = dist(L, b) - b.r; if (d < bd) { bd = d; best = b; } }
+  return best;
+}
+function harmSig() { let n = G.deaths * 10 + (G.lost || 0) * 10; for (const p of G.people) { if (p.downed > 0 || p.grabbed) n += 5; } let h = 0; for (const b of G.builds) if (b.built) h += b.hp || 0; return { n, h, hp: L.hp }; }
+function trySleep() {
+  if (G.sleep) { wakeUp('Uyandın.'); return; }
+  if (!goHome()) { msg('Henüz uyku vakti değil. Karanlık çökünce uyuyabilirsin.', '#ccc', 3); return; }
+  if (G.mount) { msg('Önce bineğinden in.', '#ccc', 2); return; }
+  const b = sleepSpot();
+  if (!b) { msg('Uyumak için mağaranın ya da bir barınağın yanına git.', '#ccc', 3); return; }
+  if (G.dinos.some(d => threatNear(d, L.x, L.y))) { msg('Yakında bir şey var. Şimdi uyuyamazsın.', '#e99', 3); return; }
+  G.sleep = { b, sig: harmSig(), t: 0, day: G.day };
+  if (G.placing) cancelPlace(); G.huntMode = false;
+  const g = doorGuard();
+  msg(g ? `😴 Uyuyorsun. ${g.name} kapıda nöbette.` : '😴 Uyuyorsun. Kapıda gözcü yok…', g ? '#cde' : '#e99', 4);
+}
+function wakeUp(why, alarm) {
+  if (!G.sleep) return;
+  const b = G.sleep.b; G.sleep = null; L.insideB = null;
+  if (b && !b.dead) { const q = stnPos(b); L.x = q.x; L.y = q.y + 14; G.yaw = Math.PI / 2; G.pitch = 0; }
+  if (alarm) { G.scare = Math.max(G.scare, 0.5); SFX.alarm ? SFX.alarm() : SFX.thump(0.8); }
+  if (why) msg(why, alarm ? '#f88' : '#ffd27a', 4);
+}
+function sleepTick(dt) {
+  const s = G.sleep, b = s.b; s.t += dt;
+  if (!b || b.dead) { wakeUp('Barınağın yıkıldı!', true); return; }
+  L.x = b.x; L.y = b.y; L.insideB = b; L.moving = false; L.sprinting = false;
+  L.hp = Math.min(L.maxhp, L.hp + 1.2 * dt); L.stam = Math.min(100, L.stam + 20 * dt);
+  G.interact = null;
+  if (!goHome() && (G.day !== s.day || phase() < 0.3)) { wakeUp('☀️ Sabah oldu. Dinlenmiş uyandın.'); return; }
+  const g = doorGuard();
+  if (g) {
+    const q = stnPos(b);
+    const foe = G.dinos.find(d => threatNear(d, q.x, q.y));
+    if (foe) { wakeUp(`⚠️ ${g.name}: "UYAN! ${(DINO[foe.type] && DINO[foe.type].ad) || 'Bir şey'} geliyor!"`, true); return; }
+  }
+  const h = harmSig();
+  if (h.n > s.sig.n || h.h < s.sig.h - 4 || h.hp < s.sig.hp - 1 || G.over) { wakeUp(G.sleepWhy = '❗ Çığlıklarla uyandın!', true); return; }
+  s.sig.h = Math.max(s.sig.h, h.h); s.sig.hp = Math.max(s.sig.hp, h.hp);
 }

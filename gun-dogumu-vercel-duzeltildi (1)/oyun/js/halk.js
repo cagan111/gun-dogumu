@@ -767,7 +767,14 @@ function updGuard(p, dt) {
   }
   let foe = null, fd = 1e9;
   for (const d of G.dinos) { if (!hostile(d)) continue; if (dist(d, c) < defR) { const dd = dist(d, p); if (dd < fd) { fd = dd; foe = d; } } }
+  const dp = doorDuty(p);
+  if (foe && dp && Math.hypot(foe.x - dp.x, foe.y - dp.y) > 260) foe = null;   // kapı nöbetçisi yerinden uzaklaşmaz
   if (foe && !((foe.type === 'dev' || foe.type === 'yelken') && p.fear > 55 && !ab)) return rangedOrMelee(p, foe, dt);
+  if (dp) {
+    if (Math.hypot(p.x - dp.x, p.y - dp.y) > 5) { steer(p, dp.x, dp.y, pSpeed(p), dt, false); p.anim += dt * 9; }
+    else { p.moving = false; p.ang = angLerp(p.ang, Math.PI / 2 + Math.sin(G.now * 0.4 + p.id) * 0.5, Math.min(1, dt * 3)); }
+    return;
+  }
   p.seat += dt * 0.18;
   const pr = z ? 140 : (ab ? baseR * 0.5 : baseR * 0.72);
   steer(p, c.x + Math.cos(p.seat) * pr, c.y + Math.sin(p.seat) * pr, 75, dt, false); p.anim += dt * 6;
@@ -1093,4 +1100,21 @@ function halkDawn() {
     removePerson(th); moraleAdd(-5);
   } else if (G.morale < 20) msg('Halkın morali çok düşük. Fısıltılar başladı...', '#fb9', 5);
   G.uiDirty = true;
+}
+
+// ---- kapı nöbeti: gece, görev yeri olmayan muhafızlardan biri (4+ ise ikisi) mağaranın kapısında bekler
+function doorBuilding() { return (G.cave && !G.cave.dead && G.cave.built) ? G.cave : null; }
+function doorGuards() {
+  if (!goHome() || !doorBuilding()) return [];
+  const ms = members('muhafiz').filter(p => !p.dead && !(p.downed > 0) && !p.bed && !p.grabbed && !(p.post && !p.post.dead));
+  return ms.slice(0, ms.length >= 4 ? 2 : 1);
+}
+function doorDuty(p) {
+  const gs = doorGuards(), i = gs.indexOf(p); if (i < 0) return null;
+  const b = doorBuilding(), q = stnPos(b);
+  return { x: q.x + (gs.length > 1 ? (i ? 26 : -26) : 22), y: q.y + 16 };
+}
+function doorGuard() {
+  const b = doorBuilding(); if (!b) return null; const q = stnPos(b);
+  return doorGuards().find(p => Math.hypot(p.x - q.x, p.y - q.y) < 90) || null;
 }

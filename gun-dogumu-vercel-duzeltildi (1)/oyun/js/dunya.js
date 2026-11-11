@@ -176,6 +176,7 @@ function lights() {
     if (b.type === 'mesale' && b.built) out.push({ x: b.x, y: b.y - 20, r: 150 * lm * (0.97 + Math.random() * 0.04), warm: 0.6 });
     if (b.type === 'kule' && b.built) out.push({ x: b.x, y: b.y - 10, r: 220 * lm * (0.97 + Math.random() * 0.03), warm: 0.6 });
   }
+  { const g = typeof doorGuard === 'function' && doorGuard(); if (g) out.push({ x: g.x, y: g.y, r: 165 * lm * (0.96 + Math.random() * 0.05), warm: 0.7, guard: 1 }); }
   if (L && G.torchOn && L.hp > 0) out.push({ x: L.x, y: L.y, r: 175 * lm * (0.95 + Math.random() * 0.06), warm: 0.7 });
   if (G.rift) out.push({ x: G.rift.x, y: G.rift.y, r: G.finale ? 420 : 240, warm: 0, blue: 1 });
   for (const c of G.ccamps || []) if (c.alive) out.push({ x: c.x, y: c.y, r: 170 * (0.94 + Math.random() * 0.08), warm: 0.9, red: 1 });
@@ -204,6 +205,7 @@ function safeZones() {
   if (n) {
     for (const b of G.builds) { if (b.type === 'mesale' && b.built) z.push({ x: b.x, y: b.y, r: 125 * lm }); if (b.type === 'kule' && b.built) z.push({ x: b.x, y: b.y, r: 180 * lm }); }
     if (G.torchOn && L) z.push({ x: L.x, y: L.y, r: 135 * lm });
+    { const g = typeof doorGuard === 'function' && doorGuard(); if (g) z.push({ x: g.x, y: g.y, r: 140 * lm }); }
   }
   return z;
 }

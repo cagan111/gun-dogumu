@@ -15,11 +15,14 @@ addEventListener('keydown', e => {
   if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(e.code)) e.preventDefault();
   const first = !keys[e.code]; keys[e.code] = true;
   if (!playing()) return;
+  if (G.sleep) { if (first) wakeUp('Uyandın.'); return; }
   if (e.code === 'KeyE' && first) onActPress();
+  if (e.code === 'KeyU' && first) trySleep();
   if (e.code === 'KeyT') toggleTorch();
   if (e.code === 'KeyC') toggleCraft();
   if (e.code === 'KeyM') toggleMap();
-  if (e.code === 'KeyH') toggleSide();
+  if (e.code === 'KeyH') { toggleSide(); unlockPtr(); }
+  if (e.code === 'Tab') unlockPtr();
   if (e.code === 'KeyG') toggleHunt();
   if (e.code === 'KeyI') { if (UI.inB) closeInterior(); else openInterior(); }
   if (e.code === 'Escape') { if (UI.char) closeChar(); else if (UI.inB) closeInterior(); else if (G.modal) toggleCraft(false); else if (G.placing) cancelPlace(); else if (G.huntMode) G.huntMode = false; else togglePause(); }
@@ -28,16 +31,25 @@ addEventListener('keydown', e => {
   if (n >= 1 && n <= 9) { const list = BORDER.filter(buildUnlocked); if (list[n - 1]) startPlace(list[n - 1]); }
 });
 addEventListener('keyup', e => { keys[e.code] = false; });
-cv.addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.clientY; mouse.used = true; });
+const locked = () => document.pointerLockElement === cv;
+function look(dx, dy, k) { if (!playing() || G.sleep) return; G.yaw = (G.yaw || 0) + dx * k; G.pitch = clamp((G.pitch || 0) - dy * k * 0.8, -1.1, 1.1); }
+function unlockPtr() { if (document.pointerLockElement) document.exitPointerLock(); mouse.down = mouse.right = false; }
+addEventListener('mousemove', e => { if (locked()) look(e.movementX || 0, e.movementY || 0, 0.0024); });
+document.addEventListener('pointerlockchange', () => { if (!locked()) mouse.down = mouse.right = false; $('lockHint').style.display = (!isTouch && playing() && !locked()) ? 'block' : 'none'; });
+const lookT = { id: null, x: 0, y: 0 };
+cv.addEventListener('pointermove', e => { if (e.pointerId !== lookT.id) return; look(e.clientX - lookT.x, e.clientY - lookT.y, 0.0075); lookT.x = e.clientX; lookT.y = e.clientY; });
+const lookEnd = e => { if (e.pointerId === lookT.id) lookT.id = null; };
+cv.addEventListener('pointerup', lookEnd); cv.addEventListener('pointercancel', lookEnd);
 cv.addEventListener('pointerdown', e => {
   audioInit();
-  if (e.pointerType === 'mouse') { mouse.x = e.clientX; mouse.y = e.clientY; mouse.used = true; }
   if (!playing()) return;
-  if (G.huntMode && e.button !== 2) { pickHuntTarget(e.clientX, e.clientY); return; }
+  if (G.sleep) { wakeUp('Uyandın.'); return; }
   if (e.pointerType !== 'mouse') {
-    if (G.placing) { const w = screenToWorld(e.clientX, e.clientY); if (Math.hypot(w.x - L.x, w.y - L.y) < 260) { G.tapPlace = w; tryPlace(); G.tapPlace = null; } }
+    if (lookT.id === null) { lookT.id = e.pointerId; lookT.x = e.clientX; lookT.y = e.clientY; try { cv.setPointerCapture(e.pointerId); } catch (_) {} }
     return;
   }
+  if (!locked()) { try { const r = cv.requestPointerLock(); if (r && r.catch) r.catch(() => {}); } catch (_) {} return; }
+  if (G.huntMode && e.button !== 2) { pickHuntTarget(); return; }
   if (e.button === 2) { if (G.placing) cancelPlace(); else mouse.right = true; return; }
   if (G.placing) { tryPlace(); return; }
   mouse.down = true;
@@ -45,20 +57,20 @@ cv.addEventListener('pointerdown', e => {
 addEventListener('mouseup', e => { if (e.button === 2) mouse.right = false; else mouse.down = false; });
 cv.addEventListener('contextmenu', e => e.preventDefault());
 document.addEventListener('visibilitychange', () => { if (document.hidden && playing()) { saveGame('auto'); if (!G.paused) togglePause(); } });
-function togglePause() { if (!playing()) return; G.paused = !G.paused; $('pause').style.display = G.paused ? 'flex' : 'none'; }
+function togglePause() { if (!playing()) return; unlockPtr(); G.paused = !G.paused; $('pause').style.display = G.paused ? 'flex' : 'none'; }
 
 // ---- av emri
 function toggleHunt() {
   if (!playing()) return;
   if (G.hunt) { G.hunt = null; G.huntMode = false; msg('Av emri iptal edildi.', '#ccc', 2); return; }
   G.huntMode = !G.huntMode; if (G.placing) cancelPlace();
-  if (G.huntMode) msg('🎯 Avlanacak hayvana dokun / tıkla.', '#ffd27a', 3);
+  if (G.huntMode) msg(isTouch ? '🎯 Hayvana bak, sonra Saldır düğmesine bas.' : '🎯 Hayvana bak ve tıkla.', '#ffd27a', 4);
 }
 function pickHuntTarget(sx, sy) {
-  const w = screenToWorld(sx, sy); let best = null, bd = 90;
-  for (const d of G.dinos) { if (d.tamed || d.hidden || (d.type === 'taklitci' && !d.revealed)) continue; if (!visible(d.x, d.y, d.r)) continue; const dd = Math.hypot(d.x - w.x, d.y - w.y) - d.r; if (dd < bd) { bd = dd; best = d; } }
+  let best = null, bd = 0.22;   // nişangâha en yakın hayvan
+  for (const d of G.dinos) { if (d.tamed || d.hidden || (d.type === 'taklitci' && !d.revealed)) continue; if (!visible(d.x, d.y, d.r)) continue; const ds = dist(d, L); if (ds > 1300) continue; const dd = Math.abs(angDiff(angTo(L, d), G.yaw)) - Math.atan2(d.r, ds); if (dd < bd) { bd = dd; best = d; } }
   G.huntMode = false;
-  if (!best) { msg('Orada avlanacak bir şey yok.', '#ccc', 2); return; }
+  if (!best) { msg('Baktığın yerde avlanacak bir şey yok.', '#ccc', 2); return; }
   G.hunt = { t: best };
   const n = members('avci').length;
   msg(n ? `🎯 ${n} avcı ${DINO[best.type].ad} için yola çıktı.${members('takip').length ? ' Takipçilerin de saldıracak.' : ''}` : `🎯 Hedef: ${DINO[best.type].ad}. Ama hiç 🏹 Avcın yok!`, n ? '#ffd27a' : '#e99', 4);
@@ -69,13 +81,13 @@ function pickHuntTarget(sx, sy) {
 if (isTouch) {
   $('touch').style.display = 'block';
   const joy = $('joy'), base = $('knobBase'), knob = $('knob');
-  joy.addEventListener('pointerdown', e => { audioInit(); if (G.huntMode) { pickHuntTarget(e.clientX, e.clientY); return; } touch.id = e.pointerId; touch.ox = e.clientX; touch.oy = e.clientY; base.style.display = 'block'; base.style.left = (e.clientX - 55) + 'px'; base.style.top = (e.clientY - 55 - joy.getBoundingClientRect().top) + 'px'; joy.setPointerCapture(e.pointerId); });
+  joy.addEventListener('pointerdown', e => { audioInit(); if (G.sleep) { wakeUp('Uyandın.'); return; } touch.id = e.pointerId; touch.ox = e.clientX; touch.oy = e.clientY; base.style.display = 'block'; base.style.left = (e.clientX - 55) + 'px'; base.style.top = (e.clientY - 55 - joy.getBoundingClientRect().top) + 'px'; joy.setPointerCapture(e.pointerId); });
   joy.addEventListener('pointermove', e => { if (e.pointerId !== touch.id) return; let dx = e.clientX - touch.ox, dy = e.clientY - touch.oy; const m = Math.hypot(dx, dy); if (m > 45) { dx *= 45 / m; dy *= 45 / m; } touch.jx = dx / 45; touch.jy = dy / 45; knob.style.left = (31 + dx) + 'px'; knob.style.top = (31 + dy) + 'px'; });
   const end = e => { if (e.pointerId !== touch.id) return; touch.id = null; touch.jx = touch.jy = 0; base.style.display = 'none'; knob.style.left = knob.style.top = '31px'; };
   joy.addEventListener('pointerup', end); joy.addEventListener('pointercancel', end);
   const hold = (id, k) => {
     const el = $(id);
-    el.addEventListener('pointerdown', e => { audioInit(); e.preventDefault(); touch[k] = true; if (k === 'atk' && G.placing) { tryPlace(); touch[k] = false; } if (k === 'act') onActPress(); });
+    el.addEventListener('pointerdown', e => { audioInit(); e.preventDefault(); if (G.sleep) { wakeUp('Uyandın.'); return; } if (k === 'atk' && G.huntMode) { pickHuntTarget(); return; } touch[k] = true; if (k === 'atk' && G.placing) { tryPlace(); touch[k] = false; } if (k === 'act') onActPress(); });
     const up = () => touch[k] = false; el.addEventListener('pointerup', up); el.addEventListener('pointerleave', up); el.addEventListener('pointercancel', up);
   };
   hold('tAtk', 'atk'); hold('tAct', 'act'); hold('tRun', 'run'); hold('tShoot', 'shoot');
@@ -92,12 +104,14 @@ $('tools').addEventListener('pointerdown', e => {
   if (b.dataset.x === 'torch') toggleTorch();
   if (b.dataset.x === 'hunt') toggleHunt();
   if (b.dataset.x === 'in') openInterior();
+  if (b.dataset.x === 'sleep') trySleep();
 });
 function buildTools() {
   const bl = bestLvl('insaat');
   $('tools').innerHTML = `<button data-x="hunt" class="hl ${G.huntMode || G.hunt ? 'on' : ''}">🎯 ${G.hunt ? 'Avı bırak' : 'Av Emri'}<br><small>[G]</small></button>`
     + `<button data-x="craft" class="hl">⚒️ Üretim<br><small>[C]${G.orders.length ? ' · ' + G.orders.length + ' emir' : ''}</small></button>`
     + `<button data-x="in" class="hl">🏠 İçeri<br><small>[I]</small></button>`
+    + `<button data-x="sleep" class="hl ${goHome() ? '' : 'no'}">😴 Uyu<br><small>[U]</small></button>`
     + BORDER.map(k => { const lk = BUILD[k].lvl > bl; return `<button data-b="${k}" class="${G.placing === k ? 'on' : ''} ${lk || !canAfford(BUILD[k].cost) ? 'no' : ''}" title="${BUILD[k].desc}">${BUILD[k].ic} ${BUILD[k].ad}<br><small>${lk ? '🔒 📐' + BUILD[k].lvl : costTxt(BUILD[k].cost)}</small></button>`; }).join('')
     + ((G.stock.mesale || 0) > 0 ? `<button data-x="torch" class="${G.torchOn ? 'on' : ''}">🔥 Meşale<br><small>[T]</small></button>` : '')
     + `<button data-x="map">🗺️ Harita<br><small>[M]</small></button>`;
@@ -195,7 +209,7 @@ function renderSide() {
 }
 
 // ---- karakter kartı
-function openChar(id) { UI.char = id; $('charM').style.display = 'flex'; G.modal = true; renderChar(); }
+function openChar(id) { unlockPtr(); UI.char = id; $('charM').style.display = 'flex'; G.modal = true; renderChar(); }
 function closeChar() { UI.char = 0; $('charM').style.display = 'none'; G.modal = $('craft').style.display === 'flex' || !!UI.inB; }
 $('charM').addEventListener('pointerdown', e => {
   if (e.target.id === 'charM') { closeChar(); return; }
@@ -251,6 +265,7 @@ function renderChar() {
 
 // ---- üretim menüsü
 function toggleCraft(force) {
+  unlockPtr();
   if (!playing()) return;
   const open = force !== undefined ? force : $('craft').style.display !== 'flex';
   $('craft').style.display = open ? 'flex' : 'none'; G.modal = open || !!UI.char;
@@ -294,6 +309,7 @@ const INB = { sifahane: 'sifa', kasaphane: 'kasap', atolye: 'atolye', cadir: 'ya
 const interiorTargets = () => G.builds.filter(b => b.built && !b.dead && (isRoomy(b) || INB[b.type]));
 const roomsOf = b => isRoomy(b) ? b.rooms : [INB[b.type]];
 function openInterior(b) {
+  unlockPtr();
   if (!playing()) return;
   if (!b) b = interiorTargets().filter(x => dist(x, L) < x.r + 220).sort((a, c) => dist(a, L) - dist(c, L))[0] || G.cave;
   if (!b) return;
@@ -457,7 +473,7 @@ function startScreen() {
   <label class="chk"><input type="checkbox" id="tutChk" ${tutDone ? '' : 'checked'}> Öğretici ile başla</label><br>
   <button id="go" class="big">${sv ? 'YENİ OYUN' : 'ATEŞİ YAK'}</button>
   ${best ? `<p>En uzun hayatta kalma: <b>${best} gün</b></p>` : ''}
-  <details><summary>Nasıl oynanır?</summary><div class="keys">${isTouch ? `<b>Sol taraf</b> hareket · <b>Saldır</b> mızrak · <b>Ok</b> yay · <b>Topla/Kullan</b> toplama, ateş, tedavi, taşıma, evcilleştirme, binme` : `<b>WASD</b> hareket · <b>Shift</b> koş · <b>Fare/Boşluk</b> mızrak · <b>F / sağ tık</b> ok<br><b>E</b> (basılı) topla · ateşe odun · tedavi · inşaata yardım · kurtar · (bas) bin/in, yaralı taşı<br><b>G</b> av emri · <b>C</b> üretim · <b>M</b> harita · <b>H</b> halk paneli · <b>1-9</b> inşa planı · <b>T</b> meşale · <b>P</b> duraklat`}<br>
+  <details><summary>Nasıl oynanır?</summary><div class="keys">${isTouch ? `<b>Sol taraf</b> yürü · <b>sağ tarafı sürükle</b> etrafa bak · <b>😴 Uyu</b> gece barınağın yanında · <b>Saldır</b> mızrak · <b>Ok</b> yay · <b>Topla/Kullan</b> toplama, ateş, tedavi, taşıma, evcilleştirme, binme` : `<b>Fare</b> etrafa bak (ekrana tıkla; Esc/Tab bırakır) · <b>U</b> gece uyu · <b>WASD</b> hareket · <b>Shift</b> koş · <b>Fare/Boşluk</b> mızrak · <b>F / sağ tık</b> ok<br><b>E</b> (basılı) topla · ateşe odun · tedavi · inşaata yardım · kurtar · (bas) bin/in, yaralı taşı<br><b>G</b> av emri · <b>C</b> üretim · <b>M</b> harita · <b>H</b> halk paneli · <b>1-9</b> inşa planı · <b>T</b> meşale · <b>P</b> duraklat`}<br>
   <b>Halk</b>: 13 meslek grubu. Herkes yaptığı işte seviye atlar (1-10). Karakter kartından (ⓘ) becerileri gör, görev ve doğrudan üretim emri ver.<br>
   <b>Yiyecek</b>: asıl kaynak avcılık. 🎯 ile bir hayvan seç; avcılar mesafeyi koruyarak avlar. Leşi 🔪 Et Ustası temizlemezse çiğ et salgın getirebilir. Tarlalar da ekilebilir.<br>
   <b>Mağara ve odalar</b>: halk mağarada başlar. <b>I</b> ile mağaranın, kulübenin ve diğer yapıların içini gör, odalara görev ver (yatakhane, depo, mutfak, şifa, et temizleme, atölye), içeriden karakter seç.<br>
@@ -510,7 +526,8 @@ let lastT = performance.now();
 function loop(now) {
   const dt = Math.min(0.05, (now - lastT) / 1000); lastT = now;
   if (G.started && L) {
-    if (!G.paused && !G.over && !G.modal) update(dt);
+    if (!G.paused && !G.over && !G.modal) { if (G.sleep) { for (let i = 0; i < 10 && G.sleep; i++) update(0.05); } else update(dt); }
+    $('sleepV').style.display = G.sleep ? 'flex' : 'none';
     if (L) { render(); hudTick(dt); }
   }
   requestAnimationFrame(loop);
