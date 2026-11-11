@@ -245,6 +245,8 @@ function depotOf(p) {
   if (!best._dp) best._dp = { x: best.x, y: best.y + best.r * 0.85 + 30 };
   return best._dp;
 }
+// tek seferde taşınan yük: bir kütük (3 odun) ya da bir kucak taş (2); meyve/ot sepetle
+const tripCap = (p, g) => g === 'odun' ? 3 + (tr(p, 'guclu') ? 1 : 0) : g === 'tas' ? 2 + (tr(p, 'guclu') ? 1 : 0) : carryCap(p);
 const carryCap = p => 5 + (tr(p, 'guclu') ? 3 : 0) + (p.eq && p.eq.sepet ? 4 : 0);
 
 // ---- tehlike
@@ -494,6 +496,7 @@ function updFear(p, dt, LS, night) {
 const HOME_GROUPS = ['odun', 'tas', 'yiyecek', 'kasap', 'asci', 'ciftci', 'sifaci', 'zanaat', 'mimar', 'kasif', 'bos', 'avci'];
 function updPerson(p, dt, LS) {
   p.insideB = null; if (p.group !== 'avci') p.sneak = false;
+  p.haul = p.carry > 0 ? (Object.keys(p.bag)[0] || 'mat') : null;   // görünür yük: wood → omuzda kütük, stone → kucakta taş, meyve/herb → sepet, et/cigEt → et
   if (p.grabbed) return;
   p.atkCd -= dt; p.hurtT = Math.max(0, p.hurtT - dt); p.lastHurt += dt; p.swing = Math.max(0, p.swing - dt);
   if (p.work > 0 && p.moving) p.work = 0;
@@ -694,7 +697,7 @@ function updGather(p, dt, g, thr, isAlt) {
   if (goHome()) return homeBehavior(p, dt);
   if (thr && thr.type !== 'kucuk' && p.fear > 35) { steer(p, G.fire.x, G.fire.y, pSpeed(p) * 1.35, dt, false); p.anim += dt * 12; return; }
   const spd = pSpeed(p);
-  if (p.st === 'return' || p.carry >= carryCap(p)) {
+  if (p.st === 'return' || p.carry >= tripCap(p, g)) {
     p.st = 'return';
     if (steer(p, depotOf(p).x + Math.cos(p.seat) * 55, depotOf(p).y + Math.sin(p.seat) * 55, spd, dt, false) || dist(p, depotOf(p)) < 70) { deposit(p); p.st = 'idle'; }
     p.anim += dt * 9; return;
@@ -716,7 +719,7 @@ function updGather(p, dt, g, thr, isAlt) {
     if (L && dist(p, L) < 500) { if (r === 'wood') SFX.chop(); else if (r === 'stone' || r === 'crystal') SFX.rock(); }
     if (o.kind === 'tree') o.shake = 0.2;
     if (o.amt < 1 || o.dead) p.tgt = null;
-    if (p.carry >= carryCap(p) || !p.tgt) p.st = 'return';
+    if (p.carry >= tripCap(p, g) || !p.tgt) p.st = 'return';
   }
 }
 function updHealer(p, dt, thr) {

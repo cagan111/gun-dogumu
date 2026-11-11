@@ -101,7 +101,9 @@ function hurt(t, dmg, src, poison, isProj) {
     }
     if (!t.tamed) { t.alert = G.now || 0.01; t.alertT = 0; }
     t.hp -= dmg; t.hurt = 0.15; if (poison) t.poison = 5;
-    for (let i = 0; i < 5; i++) G.parts.push({ x: t.x, y: t.y, vx: rand(-120, 120), vy: rand(-120, 120), life: rand(0.3, 0.7), col: '#7a0d0d', s: rand(2, 4) });
+    { const n = clamp(Math.round(4 + dmg * 0.5), 5, 18), a0 = src ? angTo(src, t) : rand(0, TAU);
+      for (let i = 0; i < n; i++) { const a = a0 + rand(-0.9, 0.9), v = rand(40, 190); G.parts.push({ x: t.x, y: t.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: rand(0.35, 0.9), col: '#7a0d0d', s: rand(2, 5), blood: 1 }); }
+      bloodStain(t.x + rand(-t.r, t.r) * 0.6, t.y + rand(-t.r, t.r) * 0.6, clamp(4 + dmg * 0.35, 5, 16)); t.bleedT = 0; }
     if (t.carry && src && src.leader) { t.carryDmg += dmg; if (t.carryDmg >= 70) dropCarry(t, true); }
     if (t.hidden) { t.hidden = false; t.st = 'lunge'; t.lungeT = 5; t.tgt = src; }
     if (!t.tamed) {
@@ -229,7 +231,14 @@ function isBold(d) {
   return false;
 }
 
+function bloodStain(x, y, r) { G.stains.push({ x, y, r, life: 110 }); if (G.stains.length > 220) G.stains.splice(0, G.stains.length - 220); }
 function updDino(d, dt, prey, zones) {
+  // yaralı hayvan kan kaybeder: yerde iz bırakır (yaralı avı izle)
+  if (!d.tamed && d.hp > 0 && d.hp < d.maxhp * 0.7) {
+    d.bleedT = (d.bleedT || 0) - dt;
+    if (d.bleedT <= 0) { const sev = 1 - d.hp / d.maxhp; d.bleedT = (d.moving ? 0.5 : 1.6) * (1.3 - sev); bloodStain(d.x + rand(-4, 4), d.y + rand(-4, 4), rand(2.5, 5) * clamp(d.r / 22, 0.7, 2.2));
+      G.parts.push({ x: d.x, y: d.y, vx: rand(-12, 12), vy: rand(-12, 12), life: 0.6, col: '#7a0d0d', s: 3, blood: 1, drip: 1 }); }
+  }
   d.atkCd -= dt; d.hurt = Math.max(0, d.hurt - dt); d.blink -= dt; if (d.blink < -0.15) d.blink = rand(1.5, 5);
   d.trapCd = Math.max(0, d.trapCd - dt); d.rush = Math.max(0, d.rush - dt); if (d.scouted > 0) d.scouted -= dt; d.frill = Math.max(0, (d.frill || 0) - dt);
   if (d.poison > 0) {
