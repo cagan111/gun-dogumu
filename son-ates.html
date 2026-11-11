@@ -184,7 +184,7 @@ summary{cursor:pointer;color:#e8d4b0}
 
 <div id="hud">
   <div id="top">
-    <div class="row"><b id="dayTxt">1. Gün</b><span id="todTxt">☀️</span><div class="bar"><i id="todBar"></i></div></div>
+    <div class="row"><b id="dayTxt">1. Gün</b><span id="todTxt">☀️</span><span id="seaTxt" style="font-size:11px;opacity:.85;white-space:nowrap">🌱</span><div class="bar"><i id="todBar"></i></div></div>
     <div id="res"></div>
     <div id="res2"></div>
     <div class="row" title="Ateş">🔥<div class="bar"><i id="fireBar"></i></div></div>
@@ -976,13 +976,14 @@ function darkness() {
   const w = G.weather && G.weather.type;
   if (w === 'yagmur' || w === 'firtina') d = Math.max(d, 0.28);
   if (w === 'sis') d = Math.max(d, 0.2);
+  if (w === 'kar') d = Math.max(d, G.weather.heavy ? 0.24 : 0.14);
   if (G.finale) d = Math.max(d, 0.6);
   if (G.flash > 0) d *= 0.15;
   return d;
 }
 const isNight = () => baseDark() > 0.55;
 const goHome = () => { const p = phase(); return p > 0.46 && p < 0.93; };
-const lightMul = () => G.weather && G.weather.type === 'sis' ? 0.65 : G.weather && G.weather.type === 'firtina' ? 0.85 : 1;
+const lightMul = () => G.weather && G.weather.type === 'sis' ? 0.65 : G.weather && (G.weather.type === 'firtina' || (G.weather.type === 'kar' && G.weather.heavy)) ? 0.85 : 1;
 function fireR() { return G.fire.fuel <= 0 ? 0 : (90 + G.fire.fuel * 2.6) * lightMul(); }
 function lights() {
   const lm = lightMul(), out = [];
@@ -1036,8 +1037,13 @@ function lightLevel(x, y, LS) {
 //  HAVA
 // =============================================================
 function setWeather(type, t) {
-  const old = G.weather.type; G.weather = { type, t };
+  // yağış türü sıcaklığa göre: soğukta yağmur/fırtına kara döner (fırtına → yoğun kar)
+  let heavy = 0;
+  if ((type === 'yagmur' || type === 'firtina') && tempAt(G.fire.x, G.fire.y, type) < 0.5) { heavy = type === 'firtina' ? 1 : 0; type = 'kar'; }
+  if (type === 'kar' && t === undefined) t = 0;
+  const old = G.weather.type; G.weather = heavy ? { type, t, heavy } : { type, t };
   if (type === old) return;
+  if (type === 'kar') msg(heavy ? 'Tipi! Kar savruluyor, göz gözü görmüyor.' : 'Kar yağmaya başladı. Ateşi besleyin, sıcak tutun.', '#dfeaff', 5);
   if (type === 'yagmur') msg('Yağmur başladı. Ateş daha hızlı sönecek.', '#9bd', 4);
   if (type === 'firtina') msg('Fırtına! Şimşekler karanlığı yırtıyor...', '#bcf', 5);
   if (type === 'sis') msg('Yoğun bir sis çöktü. Işık zayıfladı.', '#bbc', 5);
@@ -1046,7 +1052,8 @@ function setWeather(type, t) {
 function updWeather(dt) {
   const w = G.weather;
   if (w.t > 0) { w.t -= dt; if (w.t <= 0 && !isNight()) setWeather('acik', 0); }
-  if (A.ctx) A.rain.gain.setTargetAtTime(w.type === 'yagmur' ? 0.05 : w.type === 'firtina' ? 0.09 : 0, A.ctx.currentTime, 1.5);
+  updSeasons(dt);
+  if (A.ctx) { const lp = L ? precipAt(L.x, L.y) : null; A.rain.gain.setTargetAtTime(lp === 'yagmur' ? (w.type === 'firtina' ? 0.09 : 0.05) : 0, A.ctx.currentTime, 1.5); }
   if (w.type === 'firtina') {
     G.lightT = (G.lightT || 6) - dt;
     if (G.lightT <= 0) {
@@ -1056,6 +1063,113 @@ function updWeather(dt) {
     }
   }
   G.flash = Math.max(0, (G.flash || 0) - dt);
+}
+
+// =============================================================
+//  MEVSİMLER, SICAKLIK, KAR
+//  4 mevsim × 50 gün, yinelenir (1. gün = ilkbahar). Mevsim geçişleri ±3 gün yumuşatılır.
+// =============================================================
+const SEASON_LEN = 50, SEASON_BLEND = 3, SNOW_H = [0, 100, 200, 300, 400, 500], LAPSE = 0.055;
+const SEASONS = [
+  { key: 'ilkbahar', ad: 'İlkbahar', ic: '🌱', T0: 7, T1: 16, amp: 5, wx: [0.58, 0.2, 0.1, 0.12], dayRain: 0.22, grow: 1.1, berry: 1 },
+  { key: 'yaz', ad: 'Yaz', ic: '☀️', T0: 21, T1: 23, amp: 6, wx: [0.72, 0.08, 0.12, 0.08], dayRain: 0.12, grow: 1, berry: 1 },
+  { key: 'sonbahar', ad: 'Sonbahar', ic: '🍂', T0: 14, T1: 4, amp: 5, wx: [0.52, 0.2, 0.08, 0.2], dayRain: 0.25, grow: 0.7, berry: 0.45 },
+  { key: 'kis', ad: 'Kış', ic: '❄️', T0: -4, T1: -5, amp: 4, wx: [0.5, 0.34, 0.06, 0.1], dayRain: 0.3, grow: 0, berry: 0 }];
+const BIO_T = [-0.5, 0, 1, -1.5, 0, 1.5, 2, 0];
+function seasonOf(day) {
+  const d = Math.max(0, (day || 1) - 1), i = Math.floor(d / SEASON_LEN) % 4;
+  return { i, key: SEASONS[i].key, ad: SEASONS[i].ad, ic: SEASONS[i].ic, day: d % SEASON_LEN + 1, t: (d % SEASON_LEN) / SEASON_LEN };
+}
+// sürekli gün (0 = 1. günün başı); newDay'de phase 1→0 sararken day++ olduğundan kesintisiz
+const dayF = () => Math.max(0, (G.day || 1) - 1 + phase());
+// mevsim ağırlıkları [ilkbahar, yaz, sonbahar, kış]: sınırda son/ilk 3 gün komşu mevsimle karışır
+function seasonW(df) {
+  if (df === undefined) df = dayF();
+  const w = [0, 0, 0, 0], k = Math.floor(df / SEASON_LEN), i = k % 4, u = df - k * SEASON_LEN, B = SEASON_BLEND;
+  const sm = x => { x = clamp(x, 0, 1); return x * x * (3 - 2 * x); };
+  if (u < B && df >= B) { const a = sm((u + B) / (2 * B)); w[i] += a; w[(i + 3) % 4] += 1 - a; }
+  else if (u > SEASON_LEN - B) { const a = sm((u - (SEASON_LEN - B)) / (2 * B)); w[i] += 1 - a; w[(i + 1) % 4] += a; }
+  else w[i] = 1;
+  return w;
+}
+// mevsim içi ilerlemeye göre değer (ör. sonbahar başta ılık, sonda soğuk), sınırlarda karışık
+function seasonVal(f, df) {
+  if (df === undefined) df = dayF();
+  const w = seasonW(df), k = Math.floor(df / SEASON_LEN), u = (df - k * SEASON_LEN) / SEASON_LEN, i = k % 4;
+  let v = 0;
+  for (let j = 0; j < 4; j++) if (w[j] > 0) { const t = j === i ? u : j === (i + 3) % 4 ? 1 : 0; v += w[j] * f(SEASONS[j], t); }
+  return v;
+}
+function dayAnom(d) { const h = Math.sin(d * 127.1 + ((G.seed || 1) % 1000) * 0.37) * 43758.5453; return ((h - Math.floor(h)) - 0.5) * 6; }
+// kamp düzlüğündeki (yükseklik ~8, orman) hava sıcaklığı, °C. Kare başına önbellekli.
+const _TC = { t: -1, w: '', v: 0 };
+function baseTemp(wt) {
+  const w = wt || (G.weather && G.weather.type) || 'acik', ck = wt ? '!' + wt : w;
+  if (_TC.t === G.t && _TC.w === ck) return _TC.v;
+  const df = dayF(), p = phase();
+  let T = seasonVal((s, u) => s.T0 + (s.T1 - s.T0) * u, df);
+  const A = seasonVal(s => s.amp, df);
+  T += A * Math.cos((p - 0.3) * TAU);                        // en sıcak öğleden sonra, en soğuk gece yarısı sonrası
+  const d0 = Math.floor(df), fr = df - d0, sf = fr * fr * (3 - 2 * fr);
+  T += dayAnom(d0) + (dayAnom(d0 + 1) - dayAnom(d0)) * sf;   // günden güne yumuşak sapma
+  T += wt ? wxOff(w) : G.wxOff !== undefined ? G.wxOff : wxOff(w);   // hava etkisi: updSeasons'ta yumuşatılır (sıçrama yok)
+  _TC.t = G.t; _TC.w = ck; _TC.v = T;
+  return T;
+}
+const wxOff = w => (w === 'yagmur' ? -1.5 : w === 'firtina' ? -3 : w === 'kar' ? -1 : w === 'sis' ? -1 : 0.5) - 2 * baseDark();
+// yerel sıcaklık: mevsim + gün saati + yükseklik + biyom + hava
+function tempAt(x, y, wt) {
+  const h = typeof groundH === 'function' && HM ? groundH(x, y) : 8;
+  return baseTemp(wt) - LAPSE * Math.max(0, h - 8) + (BIO_T[biomeFast(x, y)] || 0);
+}
+const isPrecip = w => w === 'yagmur' || w === 'firtina' || w === 'kar';
+// tek yağış kaynağı: kampta G.weather.type; başka yerde aynı yağış, yerel sıcaklığa göre kar/yağmur
+function precipAt(x, y) {
+  const w = G.weather && G.weather.type;
+  if (!isPrecip(w)) return null;
+  if (Math.hypot(x - G.fire.x, y - G.fire.y) < 600) return w === 'kar' ? 'kar' : 'yagmur';
+  return tempAt(x, y) < 0.5 ? 'kar' : 'yagmur';
+}
+// kar derinliği (0..1.5): 100'lük yükseklik bantlarında saklanır, yerel değer bant arası + biyom
+function snowAt(x, y, h) {
+  const B = G.snowB; if (!B) return 0;
+  if (h === undefined) h = groundH(x, y);
+  if (h < 1) return 0;
+  const f = clamp(h / 100, 0, SNOW_H.length - 1), i = Math.min(SNOW_H.length - 2, f | 0), u = f - i, d = B[i] + (B[i + 1] - B[i]) * u;
+  const b = biomeFast(x, y); return d * (b === 5 ? 0.55 : b === 2 ? 0.75 : b === 6 ? 0 : 1);
+}
+// mevsim görünüm ağırlıkları + kar özeti (uc.js yeniden boyama tetikleyicisi)
+function seasonLook() { const w = seasonW(); return { sp: w[0], su: w[1], au: w[2], wi: w[3], snow: G.snowB ? G.snowB.slice() : [0, 0, 0, 0, 0, 0] }; }
+function updSeasons(dt) {
+  if (!G.snowB || G.snowB.length !== SNOW_H.length) G.snowB = SNOW_H.map(() => 0);
+  G.season = seasonOf(G.day);
+  { const tg = wxOff(G.weather.type); G.wxOff = G.wxOff === undefined ? tg : G.wxOff + (tg - G.wxOff) * Math.min(1, dt / 40); }
+  G.seasonT = (G.seasonT || 0) - dt;
+  if (G.seasonT > 0) return;
+  const step = 1 + (-G.seasonT); G.seasonT = 1;
+  const w = G.weather, wt = w.type, T0 = baseTemp(), Tc = tempAt(G.fire.x, G.fire.y);
+  G.tempCamp = Tc;
+  // kampta yağış türü: histerezisli yağmur ⇄ kar
+  if ((wt === 'yagmur' || wt === 'firtina') && Tc < -0.5) { G.weather = { type: 'kar', t: w.t, heavy: wt === 'firtina' ? 1 : 0 }; msg('Yağmur kara döndü.', '#dfeaff', 4); }
+  else if (wt === 'kar' && Tc > 1.5) { G.weather = { type: w.heavy ? 'firtina' : 'yagmur', t: w.t }; msg('Kar sulu sepkene, sonra yağmura döndü.', '#9bd', 4); }
+  // kar birikimi / erime (yükseklik bantları)
+  const pr = isPrecip(G.weather.type), hv = G.weather.heavy ? 1.6 : G.weather.type === 'firtina' ? 1.3 : 1;
+  for (let i = 0; i < SNOW_H.length; i++) {
+    const Tb = T0 - LAPSE * Math.max(0, SNOW_H[i] - 8);
+    let d = G.snowB[i];
+    if (pr && Tb < 0.5) d += step * 0.0026 * hv;
+    if (Tb > 0) d -= step * Tb * 0.0007 * (pr ? 2 : 1);
+    G.snowB[i] = clamp(d, 0, 1.5);
+  }
+  // göller: -2'nin altında bir süre kalınca donar, +2'nin üstünde bir süre kalınca çözülür
+  let fz = 0, th = 0;
+  for (const l of G.lakes || []) {
+    const T = tempAt(l.x, l.y);
+    if (!l.frozen) { l.iceT = T < -2 ? (l.iceT || 0) + step : Math.max(0, (l.iceT || 0) - step); if (l.iceT > 90) { l.frozen = true; l.iceT = 0; if (dist(l, G.fire) < 3200) fz++; } }
+    else { l.iceT = T > 2 ? (l.iceT || 0) + step : Math.max(0, (l.iceT || 0) - step); if (l.iceT > 90) { l.frozen = false; l.iceT = 0; if (dist(l, G.fire) < 3200) th++; } }
+  }
+  if (fz) msg('🧊 Kampa yakın göl buz tuttu. Balıkçılar orada balık tutamaz.', '#cfe8ff', 5);
+  if (th) msg('💧 Gölün buzu çözüldü. Balıkçılar yeniden ağ atabilir.', '#9cf', 4);
 }
 
 </script>
@@ -2297,9 +2411,9 @@ function kbStep(p, dt) {
 
 // ---- balıkçı: en yakın suyun kıyısında balık tutar, balığı depoya taşır
 function fishSpot(p) {
-  if (p.fspot && p.fspotT > G.now) return p.fspot;
+  if (p.fspot && p.fspotT > G.now && !(p.fspot.lake && p.fspot.lake.frozen)) return p.fspot;
   let best = null, bd = 1e9;
-  for (const l of G.lakes) { const d = dist(l, G.fire) * 0.6 + dist(l, p); if (dist(l, G.fire) < 3200 && d < bd) { bd = d; const a = angTo(l, p) + ((p.id * 0.7) % 1 - 0.5); best = { x: l.x + Math.cos(a) * (l.r + 10), y: l.y + Math.sin(a) * (l.r + 10), fx: l.x, fy: l.y }; } }
+  for (const l of G.lakes) { if (l.frozen) continue; const d = dist(l, G.fire) * 0.6 + dist(l, p); if (dist(l, G.fire) < 3200 && d < bd) { bd = d; const a = angTo(l, p) + ((p.id * 0.7) % 1 - 0.5); best = { x: l.x + Math.cos(a) * (l.r + 10), y: l.y + Math.sin(a) * (l.r + 10), fx: l.x, fy: l.y, lake: l }; } }
   if (!best && G.harbor && dist(G.harbor, G.fire) < 7000) best = { x: G.harbor.x, y: G.harbor.y, fx: G.harbor.x + Math.cos(G.harbor.a || 0) * 80, fy: G.harbor.y + Math.sin(G.harbor.a || 0) * 80 };
   p.fspot = best; p.fspotT = G.now + 60; return best;
 }
@@ -2312,6 +2426,7 @@ function updFisher(p, dt) {
     p.anim += dt * 9; return;
   }
   const sp = fishSpot(p);
+  if (!sp && G.lakes.some(l => l.frozen && dist(l, G.fire) < 3200)) { if (!G.flags.lakeIce) { G.flags.lakeIce = 1; msg('🧊 Göl donmuş — balıkçılar balık tutamıyor, başka işe yardım ediyor.', '#cfe8ff', 5); } return updIdle(p, dt, true); }
   if (!sp) { if (!G.flags.noWater) { G.flags.noWater = 1; msg('Yakında balık tutulacak su yok. Balıkçılar boşta.', '#e99', 4); } return updIdle(p, dt, true); }
   if (Math.hypot(p.x - sp.x, p.y - sp.y) > 14) { steer(p, sp.x, sp.y, pSpeed(p), dt, false); p.anim += dt * 9; return; }
   p.moving = false; p.ang = Math.atan2(sp.fy - p.y, sp.fx - p.x); p.work = 1;
@@ -2584,6 +2699,63 @@ function updDino(d, dt, prey, zones) {
 
 // ---- ses ve gizlilik
 // kişinin çıkardığı gürültü: 0 (çömelip duran) … 1 (koşan); yağmur sesi bastırır
+// Rüzgârın açısı, estiği yönü gösterir. Koku noktaları kısa ömürlü ve sınırlıdır. (Codex)
+function updScent(dt) {
+  if (!G.wind) G.wind = { a: rand(0, TAU), s: 0.55, ta: rand(0, TAU), ts: 0.55, t: 0 };
+  if (!G.scents) G.scents = [];
+  const w = G.wind;
+  w.t -= dt;
+  if (w.t <= 0) { w.t = rand(12, 25); w.ta = w.a + rand(-0.8, 0.8); w.ts = rand(0.3, 1); }
+  w.a = angLerp(w.a, w.ta, Math.min(1, dt * 0.035));
+  w.s += (w.ts - w.s) * Math.min(1, dt * 0.08);
+  for (const q of G.scents) q.age += dt;
+  G.scents = G.scents.filter(q => q.age < 24 && q.src && !q.src.dead);
+  for (const p of G.people) {
+    if (p.dead || p.inHut || p.insideB || p.grabbed || guardSafe(p)) continue;
+    p.scentT = (p.scentT || 0) - dt;
+    const moving = p.moving || p.sprinting;
+    if (p.scentT > 0 || (!moving && Math.random() > dt * 0.12)) continue;
+    const strong = (p.haul === 'et' || p.haul === 'cigEt' ? 1.7 : 1) * (p.hp < p.maxhp * 0.5 ? 1.65 : 1);
+    p.scentT = (moving ? rand(0.65, 1.05) : rand(1.8, 2.8)) / strong;
+    G.scents.push({ x: p.x + rand(-5, 5), y: p.y + rand(-5, 5), age: 0, power: strong, src: p });
+  }
+  if (G.scents.length > 200) G.scents.splice(0, G.scents.length - 200);
+}
+// Pozitif "along": hayvan rüzgâr altında; negatif: rüzgâr üstünde.
+function scentReach(d, src, base, power) {
+  if (!G.wind || !src || guardSafe(src)) return 0;
+  const dx = d.x - src.x, dy = d.y - src.y, dd = Math.hypot(dx, dy) || 1;
+  const wx = Math.cos(G.wind.a), wy = Math.sin(G.wind.a);
+  const down = clamp((dx * wx + dy * wy) / dd, -1, 1);
+  const cross = Math.abs(dx * wy - dy * wx);
+  const plume = base * (0.42 + G.wind.s * 0.38) * (down > 0 ? 1 + down * 1.25 : 1 + down * 0.55) * (power || 1);
+  if (cross > plume * (0.3 + Math.max(0, down) * 0.55)) return 0;
+  return plume;
+}
+function smellsP(d, p, base) {
+  if (!p || p.dead || p.inHut || p.insideB || p.grabbed || guardSafe(p)) return false;
+  let power = 1;
+  if (p.haul === 'et' || p.haul === 'cigEt') power *= 1.7;
+  if (p.hp < p.maxhp * 0.5) power *= 1.65;
+  return dist(d, p) < scentReach(d, p, base, power);
+}
+// En güçlü taze izi seçer; yaşlı izler zayıflar ve kaybolur.
+function scentTrailFor(d, base) {
+  if (!G.scents || !G.scents.length || !G.wind) return null;
+  let best = null, bestScore = 0;
+  for (let i = G.scents.length - 1; i >= 0; i--) {
+    const q = G.scents[i];
+    if (!q.src || q.src.dead || guardSafe(q.src)) continue;
+    if (d.terr && Math.hypot(q.x - d.terr.x, q.y - d.terr.y) > d.terr.r) continue;
+    const freshness = clamp(1 - q.age / 24, 0, 1);
+    if (freshness <= 0) continue;
+    const reach = scentReach(d, q, base * freshness, q.power), dd = Math.hypot(d.x - q.x, d.y - q.y);
+    if (dd >= reach) continue;
+    const score = freshness * q.power * (1 - dd / Math.max(1, reach));
+    if (score > bestScore) { bestScore = score; best = q; }
+  }
+  return best;
+}
 function noiseOf(p) {
   if (!p || p.dead) return 0;
   let n;
@@ -2594,6 +2766,7 @@ function noiseOf(p) {
   else n = p.moving ? 0.6 : 0.25;
   const w = G.weather && G.weather.type;
   if (w === 'yagmur' || w === 'firtina') n *= 0.7;
+  else if (w === 'kar') n *= 0.8;   // kar sesi yutar
   return n;
 }
 // görüş: yaratığın önündeki ~120° koni; çömelen daha zor, ovanın uzun otlarında çömelen neredeyse görünmez
@@ -2605,7 +2778,7 @@ function seesP(d, p, range) {
 }
 // yırtıcı bu kişiyi fark eder mi: duyarak, önündeyse görerek, çok yakındaysa kokusundan
 function predNotices(d, t, dd, sense) {
-  return dd < sense * noiseOf(t) || dd < Math.max(60, sense * 0.22 * (t.sneak ? 0.6 : 1)) || seesP(d, t, sense * 0.55);
+  return dd < sense * noiseOf(t) || dd < Math.max(60, sense * 0.22 * (t.sneak ? 0.6 : 1)) || smellsP(d, t, sense * 0.72) || seesP(d, t, sense * 0.55);
 }
 // kamptan uzaklığa ve biyoma göre vahşilik: 0 kamp çevresi … ~1 derin orman/sis
 function wildness(x, y) {
@@ -2697,6 +2870,7 @@ function updPred(d, dt, prey, zones) {
       if (L && dist(d, L) < 1000) { const v = clamp(1 - dist(d, L) / 1000, 0.1, 0.8); if (d.type === 'yirtici') SFX.screech(v, panOf(d.x)); else if (d.type === 'kucuk') SFX.chirp(v, panOf(d.x)); }
     }
     d.tgt = best;
+    d.scent = best ? null : scentTrailFor(d, sense * 0.9);
     if (!d.terr && d.type === 'yirtici' && night && G.day >= 3 && Math.random() < 0.004 * G.day * DIFF[G.diff].spawn) d.rush = rand(2, 4);
     if (d.type === 'dev' && night && G.day >= 4 && Math.random() < 0.01) d.rush = rand(5, 9);
   }
@@ -2726,7 +2900,10 @@ function updPred(d, dt, prey, zones) {
         tx = undefined;
       }
     }
+  } else if (d.scent && d.scent.age < 24 && d.scent.src && !d.scent.src.dead && !guardSafe(d.scent.src) && Math.hypot(d.scent.x - d.x, d.scent.y - d.y) > 18) {
+    tx = d.scent.x; ty = d.scent.y; spd = def.spd * (0.3 + 0.25 * clamp(1 - d.scent.age / 24, 0, 1));   // koku izini takip (Codex)
   } else {
+    d.scent = null;
     d.wt -= dt;
     if (d.wt <= 0 || Math.hypot(d.wx - d.x, d.wy - d.y) < 20) {
       d.wt = rand(3, 8);
@@ -2823,7 +3000,9 @@ function fleeStep(d, dt, mul) {
 // ---- av hayvanının kulakları ve gözleri
 const PREY_HEAR = { ordek: 420, gurleyen: 450, boynuzlu: 420, zirhli: 400, uzunboyun: 520 };
 function preyNotices(d, p, dd) {
-  if (dd < (PREY_HEAR[d.type] || 440) * noiseOf(p)) return true;
+  const hear = PREY_HEAR[d.type] || 440;
+  if (dd < hear * noiseOf(p)) return true;
+  if (smellsP(d, p, hear * 0.65)) return true;
   const sr = 380 * (isNight() ? 0.55 : 1) * (G.weather && G.weather.type === 'sis' ? 0.6 : 1);
   return seesP(d, p, sr);
 }
@@ -3413,7 +3592,7 @@ function resetState(diff) {
     shake: 0, red: 0, flash: 0, over: false, won: false, rescue: null, rescueAt: -1, kills: 0, deaths: 0, lost: 0,
     placing: null, flags: {}, stokeT: 0, spawnT: 0, actT: 0, hbT: 0, ambT: 3, uiT: 0, regrowT: 0, postT: 0, expT: 0, achT: 0, saveT: 45,
     interact: null, usedNames: new Set(), started: true, paused: false, modal: false, danger: 0,
-    nightPlan: [], nightWeather: 'acik', eproj: [], raid: null, scare: 0, vis: null, campT: 0, weather: { type: 'acik', t: 0 }, mimic: null, finale: null, dayRainAt: -1,
+    nightPlan: [], nightWeather: 'acik', eproj: [], raid: null, scare: 0, vis: null, campT: 0, weather: { type: 'acik', t: 0 }, mimic: null, finale: null, dayRainAt: -1, snowB: [0, 0, 0, 0, 0, 0], season: null, coldMsgDay: -9,
     explored: new Uint8Array(MAPN * MAPN), stats: { fireNights: 0, noLoss: 0, tamed: 0, hunts: 0 }, lossToday: false, fireOutTonight: false,
     tut: { on: false, step: 0 }, idc: 0, devDone: false, leaveDone: false, scoutCd: 0, silent: false, devSeenEver: false, riftHint: false,
     tutMoved: 0, tutWood: 0, tutFire: 0, tutGroup: false, uiDirty: true, toolsDirty: true, msgDirty: true, shootCd: 0
@@ -3790,6 +3969,7 @@ function toggleTorch() {
 //  GÜN DÖNGÜSÜ ve KORKU OLAYLARI
 // =============================================================
 function newDay() {
+  const sPrev = seasonOf(G.day).i;
   G.day++; G.flags = {}; G.devDone = false; G.leaveDone = false; G.mimic = null; G.tracks = []; G.silent = false;
   let tn = 0; for (const d of G.dinos) if (d.tamed) tn += d.type === 'boynuzlu' ? 3 : d.type === 'uzunboyun' ? 5 : 1;
   const need = 10;
@@ -3801,6 +3981,7 @@ function newDay() {
   G.stats.fireNights = G.fireOutTonight ? 0 : G.stats.fireNights + 1; G.fireOutTonight = false;
   G.stats.noLoss = G.lossToday ? 0 : G.stats.noLoss + 1; G.lossToday = false;
   SFX.bell();
+  seasonDawn(sPrev);
   halkDawn();
   // yeni gelenler
   assignHomes();
@@ -3834,11 +4015,22 @@ function newDay() {
   G.eggs = keep;
   for (const d of G.dinos) if (d.pet) { d.growth = Math.min(1, (d.growth || 0) + 0.34); d.maxhp = Math.round(30 + 50 * d.growth); d.hp = d.maxhp; }
   planNight();
-  G.dayRainAt = Math.random() < 0.2 ? rand(0.1, 0.32) : -1;
+  G.dayRainAt = Math.random() < seasonVal(s => s.dayRain) ? rand(0.1, 0.32) : -1;
   G.rescueAt = G.day > 5 && Math.random() < 0.06 ? rand(0.1, 0.3) : -1;
   checkAch();
   saveGame('dawn');
   G.uiDirty = true;
+}
+// mevsim değişimi mesajı + kış soğuğu (yataksız ya da ateşten uzak yatanlar üşür)
+function seasonDawn(sPrev) {
+  const S = G.season = seasonOf(G.day);
+  if (S.i !== sPrev) msg([`🌱 İlkbahar geldi (${G.day}. gün). Kar eriyor, çalılar yeniden meyve verecek.`, `☀️ Yaz geldi. Uzun, sıcak günler; tarlalar ve çalılar bol.`, `🍂 Sonbahar geldi. Yapraklar sararıyor; çalılar yavaş yenileniyor. Kış için stok yapın!`, `❄️ Kış geldi. Çalılar meyve vermez, tarlalar büyümez; yatak ve ateş hayati.`][S.i], '#ffe6a0', 8);
+  else if (S.i === 2 && S.day === 44) msg('🍂 Kış yaklaşıyor (6 gün). Kurutma rafı, depo ve yataklar hazır mı?', '#fda', 7);
+  const w = seasonW();
+  if (w[3] > 0.5 && (G.tempCamp === undefined || G.tempCamp < 4)) {
+    const cold = G.people.filter(q => !q.dead && (!(q.own && q.own.yatak) || (!q.inHut && !q.homeT && dist(q, G.fire) > 420))).length;
+    if (cold) { moraleAdd(-Math.min(2.5, cold * 0.25)); if (G.day - G.coldMsgDay >= 4) { G.coldMsgDay = G.day; msg(`🥶 ${cold} kişi gece üşüdü (yatak yok ya da ateşten uzak). Yatak ürettirin, ateşi canlı tutun.`, '#cde', 6); } }
+  }
 }
 function makeTracks() {
   const a = rand(0, TAU); let x = G.fire.x + Math.cos(a) * 1050, y = G.fire.y + Math.sin(a) * 1050;
@@ -3851,7 +4043,8 @@ function makeTracks() {
 }
 function planNight() {
   const d = G.day, ev = [];
-  const W = Math.random(); G.nightWeather = W < 0.65 ? 'acik' : W < 0.77 ? 'yagmur' : W < 0.87 ? 'firtina' : 'sis';
+  { const W = Math.random(), sw = k => seasonVal(s => s.wx[k]), a = sw(0), b = a + sw(1), c = b + sw(2);   // mevsime göre gece havası
+    G.nightWeather = W < a ? 'acik' : W < b ? 'yagmur' : W < c ? 'firtina' : 'sis'; }
   if (d <= 2) { G.nightPlan = ev; return; }
   // çoğu gece sakin geçer; olaylar nadir ama ani
   let n = Math.random() < (d < 10 ? 0.8 : d < 40 ? 0.72 : 0.65) ? 0 : (d > 30 && Math.random() < 0.15 ? 2 : 1);
@@ -4051,14 +4244,14 @@ function gameOver() {
 //  KAYIT
 // =============================================================
 function serialize() {
-  const pf = ['id', 'name', 'x', 'y', 'leader', 'child', 'age', 'traits', 'story', 'group', 'hp', 'maxhp', 'fear', 'skin', 'hair', 'injury', 'downed', 'tired', 'watched', 'partner', 'parentA', 'parentB', 'stam', 'seat', 'r', 'sk', 'sick', 'wasDowned', 'bedUntil', 'routine', 'alt', 'hunger', 'own', 'joinHunt'];
+  const pf = ['id', 'name', 'x', 'y', 'leader', 'child', 'age', 'traits', 'story', 'group', 'hp', 'maxhp', 'fear', 'skin', 'hair', 'injury', 'downed', 'tired', 'watched', 'partner', 'parentA', 'parentB', 'stam', 'seat', 'r', 'sk', 'sick', 'wasDowned', 'bedUntil', 'routine', 'alt', 'hunger', 'own', 'joinHunt', 'bag', 'carry', 'cookGot', 'batch'];
   let ex = ''; for (let i = 0; i < G.explored.length; i++) ex += G.explored[i] ? '1' : '0';
   return JSON.stringify({
     v: 4, wrecks: (G.wrecks || []).map(w => !!w.found), inside: G.inside ? G.builds.indexOf(G.inside.b) : -1, seed: G.seed, diff: G.diff, t: G.t, day: G.day, stock: G.stock, fuel: G.fire.fuel, morale: G.morale, orders: G.orders.map(o => Object.assign({}, o, { worker: 0 })), oid: G.oid, unclean: G.unclean,
     carcs: G.carcs.filter(c => !c.dead).map(c => ({ x: c.x, y: c.y, r: c.r, type: c.type, ang: c.ang, meat: c.meat, bone: c.bone, hide: c.hide, age: c.age, rotten: c.rotten })),
     managers: G.managers, zone: G.zone, newGroup: G.newGroup, autoEq: !!G.autoEq, torchFuel: G.torchFuel, nightPlan: G.nightPlan, nightWeather: G.nightWeather, weather: G.weather,
     eggs: G.eggs, usedNames: [...G.usedNames], stats: G.stats, idc: G.idc, kills: G.kills, deaths: G.deaths, lost: G.lost,
-    devSeenEver: G.devSeenEver, riftFound: G.rift.found, riftHint: G.riftHint, rescueAt: G.rescueAt, dayRainAt: G.dayRainAt,
+    devSeenEver: G.devSeenEver, riftFound: G.rift.found, riftHint: G.riftHint, rescueAt: G.rescueAt, dayRainAt: G.dayRainAt, snowB: G.snowB, lakesF: (G.lakes || []).map(l => l.frozen ? 1 : 0),
     flags: G.flags, leaveDone: G.leaveDone, devDone: G.devDone, tut: G.tut.on ? G.tut.step : -1,
     trees: G.trees.map(o => o.amt), rocks: G.rocks.map(o => o.dead ? 0 : o.amt), crystals: G.crystals.map(o => o.dead ? 0 : o.amt),
     bushes: G.bushes.map(o => o.amt), herbs: G.herbs.map(o => o.amt), poisons: G.poisons.map(o => o.amt), nests: G.nests.map(n => n.eggs),
@@ -4085,6 +4278,9 @@ function loadGame(s) {
     weather: D.weather || { type: 'acik', t: 0 }, eggs: D.eggs || [], stats: Object.assign(G.stats, D.stats || {}), idc: D.idc, kills: D.kills, deaths: D.deaths, lost: D.lost,
     devSeenEver: D.devSeenEver, riftHint: D.riftHint, rescueAt: -1, dayRainAt: D.dayRainAt || -1, flags: D.flags || {}, leaveDone: D.leaveDone, devDone: D.devDone });
   G.autoEq = !!D.autoEq;
+  G.snowB = Array.isArray(D.snowB) ? SNOW_H.map((_, i) => clamp(+D.snowB[i] || 0, 0, 1.5)) : SNOW_H.map(() => 0);
+  (D.lakesF || []).forEach((f, i) => { if (G.lakes[i]) G.lakes[i].frozen = !!f; });
+  G.season = seasonOf(G.day);
   Object.assign(G.stock, D.stock); G.fire.fuel = D.fuel; G.rift.found = !!D.riftFound;
   (D.wrecks || []).forEach((f, i) => { if (G.wrecks && G.wrecks[i]) G.wrecks[i].found = f; });
   G.usedNames = new Set(D.usedNames); G.orders = D.orders || []; G.oid = D.oid || 0; G.unclean = D.unclean || 0;
@@ -4098,6 +4294,7 @@ function loadGame(s) {
   for (const s2 of D.people) {
     const p = mkPerson(s2.x, s2.y, s2.name, s2.leader, s2.child);
     Object.assign(p, s2); p.inHut = null; p.homeT = null; p.bed = null; p.eq = {}; p.sk = Object.assign({}, p.sk || {});
+    p.bag = s2.bag && typeof s2.bag === 'object' ? Object.assign({}, s2.bag) : {}; p.carry = +s2.carry || 0; p.cookGot = s2.cookGot || null; p.batch = s2.batch || null; p.cook = p.cook || 0;
     const ht = G.builds[s2.homeT]; if (s2.homeT >= 0 && ht && ht.type === 'cadir') moveHome(p, ht);
     if (s2.bed) { const sb = G.builds[s2.bed[0]]; if (sb && sb.type === 'sifahane' && sb.built) { sb.beds[s2.bed[1]] = p.id; p.bed = { s: sb, i: s2.bed[1] }; } }
     G.people.push(p); if (p.leader) L = p;
@@ -4176,12 +4373,13 @@ function updTut() {
 // =============================================================
 function update(dt) {
   G.now += dt; G.dt = dt;
+  updScent(dt);
   const prevP = phase(); G.t += dt; if (phase() < prevP) newDay();
   if (G.over) return;
   const LS = lights(), zones = safeZones();
   // ateş
   const wt = G.weather.type;
-  G.fire.fuel = Math.max(0, G.fire.fuel - dt * (isNight() ? 0.3 : 0.14) * DIFF[G.diff].burn * (wt === 'yagmur' ? 1.8 : wt === 'firtina' ? 2.2 : 1));
+  G.fire.fuel = Math.max(0, G.fire.fuel - dt * (isNight() ? 0.3 : 0.14) * DIFF[G.diff].burn * (wt === 'yagmur' ? 1.8 : wt === 'firtina' ? 2.2 : wt === 'kar' ? (G.weather.heavy ? 1.45 : 1.25) : 1));
   G.stokeT -= dt;
   if (G.stokeT <= 0) {
     G.stokeT = 1;
@@ -4193,7 +4391,8 @@ function update(dt) {
   G.regrowT -= dt;
   if (G.regrowT <= 0) {
     G.regrowT = 2;
-    if (!isNight()) { for (const b of G.bushes) if (b.amt < b.max && Math.random() < 0.03) b.amt++; for (const b of G.herbs) if (b.amt < b.max && Math.random() < 0.012) b.amt++; for (const b of G.poisons) if (b.amt < b.max && Math.random() < 0.01) b.amt++; }
+    const bk = seasonVal(s => s.berry) * (G.weather.type === 'kar' ? 0 : 1);   // sonbaharda yavaş, kışın hiç
+    if (!isNight()) { for (const b of G.bushes) if (b.amt < b.max && Math.random() < 0.03 * bk) b.amt++; for (const b of G.herbs) if (b.amt < b.max && Math.random() < 0.012) b.amt++; for (const b of G.poisons) if (b.amt < b.max && Math.random() < 0.01) b.amt++; }
   }
   for (const g of GORDER) { const a = G.abil[g]; a.cd = Math.max(0, a.cd - dt); a.act = Math.max(0, a.act - dt); }
   G.scoutCd -= dt;
@@ -4201,7 +4400,7 @@ function update(dt) {
   G.vis = visionSources();
   G.eqT -= dt; if (G.eqT <= 0) { G.eqT = 1; assignEquip(); }
   G.homeT2 -= dt; if (G.homeT2 <= 0) { G.homeT2 = 2; assignHomes(); assignBeds(); }
-  for (const b of G.builds) if (b.type === 'tarla' && b.built && b.planted && b.g < 1) { b.g = Math.min(1, b.g + dt / (CYCLE * 1.6) * (wt === 'yagmur' || wt === 'firtina' ? 1.4 : 1)); b.tendT = (b.tendT || 0) - dt; }
+  for (const b of G.builds) if (b.type === 'tarla' && b.built && b.planted && b.g < 1) { b.g = Math.min(1, b.g + dt / (CYCLE * 1.6) * (wt === 'yagmur' || wt === 'firtina' ? 1.4 : wt === 'kar' ? 0 : 1) * seasonVal(s => s.grow)); b.tendT = (b.tendT || 0) - dt; }
   for (const c of G.carcs) { c.age += dt; if (!c.rotten && c.age > CYCLE * 1.2 && !G.builds.some(b => b.type === 'raf' && b.built && dist(b, c) < 300)) { c.rotten = true; } if (c.age > CYCLE * 2.5) c.dead = true; }
   G.carcs = G.carcs.filter(c => !c.dead);
   if (isNight() && G.carcs.length && Math.random() < dt * 0.02) { const c = pick(G.carcs); if (dist(c, G.fire) > 900) spawnPack('kucuk', ri(2, 4), { x: c.x + rand(-200, 200), y: c.y + rand(-200, 200) }); }
@@ -4254,7 +4453,7 @@ function update(dt) {
   G.hbT -= dt; if (G.danger > 0.15 && G.hbT <= 0) { G.hbT = 1.1 - G.danger * 0.65; SFX.heart(0.25 + G.danger * 0.5); }
   // ortam sesleri
   if (A.ctx) {
-    const n = darkness(); A.wind.gain.setTargetAtTime(0.04 + n * 0.06 + (wt === 'firtina' ? 0.08 : 0), A.ctx.currentTime, 1); A.drone.gain.setTargetAtTime(n * 0.05 + G.danger * 0.08, A.ctx.currentTime, 1);
+    const n = darkness(); A.wind.gain.setTargetAtTime(0.04 + n * 0.06 + (wt === 'firtina' ? 0.08 : wt === 'kar' ? (G.weather.heavy ? 0.09 : 0.03) : 0), A.ctx.currentTime, 1); A.drone.gain.setTargetAtTime(n * 0.05 + G.danger * 0.08, A.ctx.currentTime, 1);
     G.ambT -= dt;
     if (G.ambT <= 0) {
       G.ambT = rand(2, 7);
@@ -4517,7 +4716,7 @@ function drawOverlay3D() {
   ctx.clearRect(0, 0, VW, VH);
   const dk = darkness(), LS = U3.LS && U3.LS.length ? U3.LS : lights();
   if (SUN.grade) { ctx.fillStyle = SUN.grade; ctx.fillRect(0, 0, VW, VH); }
-  if ((G.weather.type === 'yagmur' || G.weather.type === 'firtina') && !G.inside && (G.pitch || 0) > -0.2) {
+  if (L && precipAt(L.x, L.y) === 'yagmur' && !G.inside && (G.pitch || 0) > -0.2) {
     // merceğe düşen birkaç damla (yağmur çizgileri 3B sahnede)
     for (let i = 0; i < 9; i++) { const ph = (G.now * 0.35 + i * 0.37) % 1, x = (i * 211.7) % VW, y = (i * 133.1) % VH + ph * 24, a = (1 - ph) * 0.16; ctx.fillStyle = `rgba(200,215,240,${a})`; ell(x, y, 4 + (i % 3), 5 + (i % 3)); }
   }
@@ -4758,7 +4957,11 @@ function render2D() {
   } else { ctx.fillStyle = 'rgba(255,225,160,.035)'; ctx.fillRect(0, 0, VW, VH); }
   drawFog(cx, cy);
   if (dk > 0.5) drawEyes(LS, cx, cy);
-  if (G.weather.type === 'yagmur' || G.weather.type === 'firtina') {
+  const lpr = L ? precipAt(L.x, L.y) : null;
+  if (lpr === 'kar') {
+    ctx.fillStyle = 'rgba(240,245,255,.7)'; const n = G.weather.heavy ? 260 : 140;
+    for (let i = 0; i < n; i++) { const x = (i * 137.5 + G.now * (G.weather.heavy ? 90 : 20) + Math.sin(G.now + i) * 12) % VW, y = (i * 91.3 + G.now * 70) % VH; ell(x, y, 1.6 + (i % 3) * 0.6, 1.6 + (i % 3) * 0.6); }
+  } else if (lpr === 'yagmur') {
     ctx.strokeStyle = 'rgba(170,190,220,.35)'; ctx.lineWidth = 1; ctx.beginPath();
     const n = G.weather.type === 'firtina' ? 220 : 130;
     for (let i = 0; i < n; i++) { const x = (i * 137.5 + G.now * 60) % VW, y = (i * 91.3 + G.now * 900) % VH; ctx.moveTo(x, y); ctx.lineTo(x - 3, y + 14); }
@@ -7225,6 +7428,7 @@ function initMat() {
   MAT.rockV = triPatch(L_({ vertexColors: true, flatShading: true }), 0.045, 0.45);
   MAT.ground = L_({ map: TEX.ground, vertexColors: true });
   MAT.water = L_({ color: 0x2a6a88, emissive: 0x06141c, transparent: true, opacity: 0.9 });
+  MAT.ice = L_({ color: 0x80a4bc, emissive: 0x060e14 });
   MAT.sand = L_({ color: 0x968258 });
   MAT.swamp = L_({ color: 0x2f3a22, emissive: 0x040603 });
   // yumuşak leke gölge: merkezde koyu, kenara doğru sönen radyal geçiş (alphaMap = G kanalı)
@@ -7478,7 +7682,7 @@ const BIOME_GR = [1, 0.25, 0.8, 0.7, 1, 0, 0, 1];
 const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
 let TC = null;
 function terColor(x, z, h, ny, out) {
-  if (!TC) TC = { b: BIOME_COL.map(c => new THREE.Color(c)), rock: new THREE.Color('#6b655c'), rock2: new THREE.Color('#57524b'), snow: new THREE.Color('#e9eef3'), sand: new THREE.Color('#e6d3a2'), wet: new THREE.Color('#a8946a'), deep: new THREE.Color('#1f4250'), dirt: new THREE.Color('#6e5638'), litter: new THREE.Color('#5a4a2c'), t: new THREE.Color() };
+  if (!TC) TC = { b: BIOME_COL.map(c => new THREE.Color(c)), rock: new THREE.Color('#6b655c'), rock2: new THREE.Color('#57524b'), snow: new THREE.Color('#f2f5f8'), sand: new THREE.Color('#e6d3a2'), wet: new THREE.Color('#a8946a'), deep: new THREE.Color('#1f4250'), dirt: new THREE.Color('#6e5638'), litter: new THREE.Color('#5a4a2c'), au1: new THREE.Color('#8a6a2c'), au2: new THREE.Color('#7a4a24'), straw: new THREE.Color('#7e7452'), fresh: new THREE.Color('#5c9a30'), t: new THREE.Color() };
   let r = 0, g = 0, b = 0, gr = 0;
   for (let k = 0; k < 4; k++) { const bi = bioAt(x + (k & 1 ? 55 : -55), z + (k & 2 ? 55 : -55)), c = TC.b[bi]; r += c.r; g += c.g; b += c.b; gr += BIOME_GR[bi]; }
   out.setRGB(r / 4, g / 4, b / 4); gr /= 4;
@@ -7490,11 +7694,58 @@ function terColor(x, z, h, ny, out) {
   if (rk > 0) { TC.t.copy(n2 > 0.5 ? TC.rock : TC.rock2).multiplyScalar(0.85 + n1 * 0.3); out.lerp(TC.t, rk); gr *= 1 - rk; }
   const sn = smooth(430, 500, h + (n1 - 0.5) * 140 + (n2 - 0.5) * 40) * (1 - smooth(0.5, 0.75, slope));
   if (sn > 0) { out.lerp(TC.snow, sn); gr *= 1 - sn; }
+  { const S = U3.sl;                                                                 // mevsim: bitki örtüsü rengi
+    if (S && gr > 0.05) { const k = Math.min(1, gr * 1.3);
+      if (S.au > 0.01) out.lerp(n1 > 0.5 ? TC.au1 : TC.au2, S.au * 0.5 * k);
+      if (S.wi > 0.01) out.lerp(TC.straw, S.wi * 0.5 * k);
+      if (S.sp > 0.01) out.lerp(TC.fresh, S.sp * 0.22 * k); }
+    TC.sc = snowCover(x, z, h, n2) * (1 - smooth(0.5, 0.75, slope)); }                 // kar örtüsü (derinlik alanından, yamalı) — sonda uygulanır
   TC.sk = 0; { const bs = bioAt(x, z) === 5 ? 1 : 0, s = Math.max(h < 8 ? smooth(8, 1.2, h + (n2 - 0.5) * 3) : 0, bs * (1 - rk)); if (s > 0) { out.lerp(TC.sand, s * 0.92); gr *= 1 - s; TC.sk = s; } }
   if (h < SEA_Y + 0.6) { out.lerp(TC.wet, smooth(SEA_Y + 0.6, -3, h)); out.lerp(TC.deep, smooth(-2, -45, h)); gr = 0; }
   const dc = Math.hypot(x - CAMP.x, z - CAMP.y); if (dc < 320) { out.lerp(TC.dirt, smooth(320, 60, dc) * (0.75 + n2 * 0.2)); gr *= 0.4 + 0.6 * smooth(60, 320, dc); }
   if (G.lakes) for (const l of G.lakes) { const dl = Math.hypot(x - l.x, z - l.y); if (dl < l.r + 70) { const s = smooth(l.r + 70, l.r, dl) * 0.75; out.lerp(TC.wet, s); gr *= 1 - s; } }
+  if (TC.sc > 0 && h > SEA_Y + 0.6) { const sc = TC.sc * (dc < 320 ? 0.6 + 0.4 * smooth(60, 320, dc) : 1) * (1 - TC.sk * 0.5); out.lerp(TC.snow, sc * 0.97); gr *= 1 - sc; if (sc > 0.3) TC.sk = 0; }
   return gr;
+}
+// kar örtüsü 0..1: dunya.js derinlik bantlarından (U3.sl.snow, yeniden boyama anındaki kopya); az karda yamalı
+function snowCover(x, z, h, n) {
+  const S = U3.sl; if (!S || h < 1) return 0;
+  const B = S.snow, f = clamp(h / 100, 0, B.length - 1), i = Math.min(B.length - 2, f | 0), u = f - i;
+  let d = B[i] + (B[i + 1] - B[i]) * u; if (d < 0.01) return 0;
+  const b = bioAt(x, z); d *= b === 5 ? 0.55 : b === 2 ? 0.75 : b === 6 ? 0 : 1;
+  if (n === undefined) n = vnoise3(x * 0.017, z * 0.017, 8.1);
+  const th = 0.04 + n * 0.32; return smooth(th, th + 0.22, d);
+}
+// mevsim/kar değişince görünen parçaları yeniden boya: kare başına birkaç parça, en yakından başlayarak
+function terColorsOf(x0, z0, size, geo) {
+  const N = TER.N, V = (N + 1) * (N + 1), pos = geo.attributes.position.array, nor = geo.attributes.normal.array, col = geo.attributes.color.array, grs = geo.attributes.aG.array;
+  for (let v = 0; v < V; v++) {
+    const gx = x0 + pos[v * 3], gz = z0 + pos[v * 3 + 2], g = terColor(gx, gz, pos[v * 3 + 1], nor[v * 3 + 1], _col), n = 0.92 + hash2(gx, gz) * 0.16;
+    col[v * 3] = _col.r * n; col[v * 3 + 1] = _col.g * n; col[v * 3 + 2] = _col.b * n; grs[v] = g > 0.02 ? g : -TC.sk;
+  }
+  const ed = [[0, 1], [N * (N + 1), 1], [0, N + 1], [N, N + 1]];
+  ed.forEach(([s, st], q) => { for (let k = 0; k <= N; k++) { const a = s + k * st, b = V + q * (N + 1) + k; col[b * 3] = col[a * 3]; col[b * 3 + 1] = col[a * 3 + 1]; col[b * 3 + 2] = col[a * 3 + 2]; grs[b] = grs[a]; } });
+  geo.attributes.color.needsUpdate = true; geo.attributes.aG.needsUpdate = true;
+}
+function seasonSync(dt, cx, cz) {
+  const now = performance.now();
+  if (!U3.sl || !(now < U3.slT)) {
+    U3.slT = now + 500;
+    const n = seasonLook(), o = U3.sl;
+    let ch = !o, chI = !o;
+    if (o) { const dS = Math.max(Math.abs(n.sp - o.sp), Math.abs(n.au - o.au), Math.abs(n.wi - o.wi)); let dN = 0; for (let i = 0; i < n.snow.length; i++) dN = Math.max(dN, Math.abs(n.snow[i] - o.snow[i])); ch = dS > 0.04 || dN > 0.03; }
+    if (ch) { U3.sl = n; TER.gen = (TER.gen || 0) + 1; GR.gen = (GR.gen || 0) + 1; U3.instX = 1e9; }
+  }
+  // en fazla 3 parça / ~3 ms; o karede yeni parça kurulduysa yalnız 1 (yeni parçalar asla bekletilmez)
+  const t0 = performance.now(), lim = TER.builtLast ? 1 : 3; let done = 0;
+  while (done < lim && performance.now() - t0 < 3) {
+    let best = null, bd = 1e18;
+    for (const k of TER.want || []) { const nd = TER.nodes.get(k); if (!nd || nd.gen === TER.gen || !nd.m.visible) continue; const x0 = nd.x0 + nd.s / 2 - cx, z0 = nd.z0 + nd.s / 2 - cz, d = x0 * x0 + z0 * z0; if (d < bd) { bd = d; best = nd; } }
+    if (!best) break;
+    terColorsOf(best.x0, best.z0, best.s, best.m.geometry); best.gen = TER.gen; done++;
+  }
+  U3.recolN = done;
+  grassReseason(2);
 }
 function terIndex() {
   if (TER.idx) return TER.idx;
@@ -7529,7 +7780,7 @@ function terBuild(key) {
   geo.boundingSphere = new THREE.Sphere(new THREE.Vector3(size / 2, (ymin + ymax) / 2, size / 2), Math.hypot(size * 0.71, (ymax - ymin) / 2 + sk));
   const m = new THREE.Mesh(geo, MAT.terrain); m.position.set(x0, 0, z0); m.matrixAutoUpdate = false; m.updateMatrix(); m.visible = false;
   TER.group.add(m);
-  return { m, used: 0 };
+  return { m, used: 0, gen: TER.gen || 0, x0, z0, s: size };
 }
 function terWant(cx, cz) {
   const out = [], R = TER.ROOT, o = WORLD / 2 - R / 2, M = 2600;
@@ -7550,6 +7801,7 @@ function terUpdate(cx, cz, budget) {
     if (!n) { if (built >= budget) { ready = false; continue; } n = terBuild(k); TER.nodes.set(k, n); built++; }
     n.used = U3.frame;
   }
+  TER.builtLast = built;
   if (ready && TER.shown !== TER.wantSet) {
     TER.shown = TER.wantSet;
     for (const [k, n] of TER.nodes) n.m.visible = TER.shown.has(k);
@@ -7604,7 +7856,7 @@ function initTerrainMat() {
 }
 
 // ---- yakın çevre otları: kamerayı izleyen karo halkası; her karonun örnekli ağda sabit yuvası var
-const GR = { T: 80, R: 4, nB: 30, nF: 10, nE: 3, slots: new Map(), free: [], cx: 1e9, cz: 1e9 };
+const GR = { T: 80, R: 4, nB: 30, nF: 10, nE: 3, slots: new Map(), free: [], cx: 1e9, cz: 1e9, sg: new Map(), gen: 0 };
 function initGrass() {
   // ot öbeği: dışa eğik 5 yaprak, dipte koyu
   { const p = [], c = [];
@@ -7642,19 +7894,27 @@ function grassFill(ti, tj, slot) {
     const b = bioAt(x, z), h = gh(x, z);
     const dens = [0.6, 0.3, 0.75, 0.55, 1, 0.14][b] || 0.6;
     if (r1 > dens || h < 2 || h > 470 || !ok(x, z)) continue;
-    const pal = GR_COL[b] || GR_COL[0], meadow = b === 4, s = (meadow ? 9 : b === 2 ? 8 : b === 5 ? 7 : 5.5) * (0.65 + r2 * 0.7);
-    B.setMatrixAt(ib, mat4(x, h - 0.5, z, s * 1.1, s * (meadow ? 1.5 : 1.1), s * 1.1, 0, r3 * TAU, 0)); B.setColorAt(ib, _col.set(pal[Math.floor(r3 * pal.length)]).multiplyScalar(0.85 + r2 * 0.3)); ib++;
-    if (ifl < eF && (meadow ? R() < 0.42 : b === 0 ? R() < 0.06 : b === 3 ? R() < 0.04 : false)) {
+    const sc = snowCover(x, z, h); if (sc > 0.45 + r2 * 0.4) continue;                // karın altında kalan ot
+    const pal = GR_COL[b] || GR_COL[0], meadow = b === 4, s = (meadow ? 9 : b === 2 ? 8 : b === 5 ? 7 : 5.5) * (0.65 + r2 * 0.7) * (1 - sc * 0.4);
+    B.setMatrixAt(ib, mat4(x, h - 0.5, z, s * 1.1, s * (meadow ? 1.5 : 1.1), s * 1.1, 0, r3 * TAU, 0)); B.setColorAt(ib, seaTint(_col.set(pal[Math.floor(r3 * pal.length)]).multiplyScalar(0.85 + r2 * 0.3), 2, r3, sc * 0.6)); ib++;
+    const flOk = !U3.sl || (U3.sl.au + U3.sl.wi < r2 * 1.4 && sc < 0.1);              // sonbahar/kışta çiçek yok
+    if (ifl < eF && flOk && (meadow ? R() < 0.42 : b === 0 ? R() < 0.06 : b === 3 ? R() < 0.04 : false)) {
       const fc = meadow ? FL_COL[Math.floor(R() * FL_COL.length)] : '#eeeadf', fs = 1.3 + R() * 0.9, fh = s * (meadow ? 1.05 : 0.8);
       F.setMatrixAt(ifl, mat4(x + 2, h, z + 1, fs, fh, fs, 0, r1 * 9, 0)); F.setColorAt(ifl, _col.set(fc)); ifl++;
     }
     if (ie < eE && (b === 0 || b === 2) && R() < 0.12) {
-      const fs = 10 + R() * 8; E.setMatrixAt(ie, mat4(x, h - 0.5, z, fs, fs * 0.9, fs, 0, r2 * 9, 0)); E.setColorAt(ie, _col.set(b === 2 ? '#4a5a2a' : '#3c6e2c').multiplyScalar(0.8 + r3 * 0.4)); ie++;
+      const fs = 10 + R() * 8; E.setMatrixAt(ie, mat4(x, h - 0.5, z, fs, fs * 0.9, fs, 0, r2 * 9, 0)); E.setColorAt(ie, seaTint(_col.set(b === 2 ? '#4a5a2a' : '#3c6e2c').multiplyScalar(0.8 + r3 * 0.4), 2, r3, sc * 0.6)); ie++;
     }
   }
   for (; ib < eB; ib++) B.setMatrixAt(ib, _zeroM);
   for (; ifl < eF; ifl++) F.setMatrixAt(ifl, _zeroM);
   for (; ie < eE; ie++) E.setMatrixAt(ie, _zeroM);
+}
+// mevsim/kar değişince ot karolarını yavaşça (kare başına birkaç) yeniden doldur
+function grassReseason(budget) {
+  let n = 0;
+  for (const [k, sl] of GR.slots) { if (GR.sg.get(k) === GR.gen) continue; if (n >= budget) break; const [i, j] = k.split(',').map(Number); grassFill(i, j, sl); GR.sg.set(k, GR.gen); n++; }
+  if (n) for (const m of [U3.grB, U3.grF, U3.grE]) instDone(m);
 }
 function grassUpdate(cx, cz, budget) {
   const T = GR.T, ci = Math.floor(cx / T), cj = Math.floor(cz / T);
@@ -7667,7 +7927,7 @@ function grassUpdate(cx, cz, budget) {
   const order = [...want].filter(k => !GR.slots.has(k)).sort((a, b) => { const [ai, aj] = a.split(',').map(Number), [bi, bj] = b.split(',').map(Number); return ((ai - ci) ** 2 + (aj - cj) ** 2) - ((bi - ci) ** 2 + (bj - cj) ** 2); });
   for (const k of order) {
     if (done >= budget || !GR.free.length) { GR.pend = true; break; }
-    const [i, j] = k.split(',').map(Number), s = GR.free.pop(); GR.slots.set(k, s); grassFill(i, j, s); done++;
+    const [i, j] = k.split(',').map(Number), s = GR.free.pop(); GR.slots.set(k, s); grassFill(i, j, s); GR.sg.set(k, GR.gen); done++;
   }
   if (done || order.length) for (const m of [U3.grB, U3.grF, U3.grE]) instDone(m);
 }
@@ -7680,11 +7940,11 @@ function buildWorld() {
   for (const m of [U3.ents, U3.builds, U3.carcs, U3.camps]) { for (const e of m.values()) { if (m === U3.ents) dropEnt(e); else dropStatic(e); } m.clear(); }
   const W = U3.world = new THREE.Group(); U3.scene.add(W);
   // zemin: dörtlü ağaç arazi + deniz (her karede terUpdate ile güncellenir)
-  terReset(); TER.group = new THREE.Group(); W.add(TER.group);
+  terReset(); TER.group = new THREE.Group(); W.add(TER.group); U3.sl = typeof seasonLook === 'function' ? seasonLook() : null;
   U3.sea = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), MAT.sea); U3.sea.rotation.x = -Math.PI / 2; U3.sea.scale.set(30000, 30000, 1); U3.sea.renderOrder = 2; W.add(U3.sea);
   // göller ve bataklık havuzları: kıyı yüksekliklerinin en düşüğüne oturan düz su
   const waterY = (o, r) => { let m = 1e9; for (let i = 0; i < 8; i++) { const a = i / 8 * TAU; m = Math.min(m, gh(o.x + Math.cos(a) * r, o.y + Math.sin(a) * r)); } return Math.max(m, gh(o.x, o.y)) + 0.8; };
-  for (const l of G.lakes) { const m = new THREE.Mesh(GEO.disc, MAT.water); m.scale.set(l.r + 6, 1, l.r + 6); m.position.set(l.x, l.h !== undefined ? l.h : waterY(l, l.r), l.y); W.add(m); }
+  U3.lakeM = []; for (const l of G.lakes) { const m = new THREE.Mesh(GEO.disc, l.frozen ? MAT.ice : MAT.water); m.scale.set(l.r + 6, 1, l.r + 6); m.position.set(l.x, l.h !== undefined ? l.h : waterY(l, l.r), l.y); W.add(m); U3.lakeM.push([l, m]); }
   for (const p of G.pools) { const m = new THREE.Mesh(GEO.disc, MAT.swamp); m.scale.set(p.r + 4, 1, p.r + 4); m.position.set(p.x, p.h !== undefined ? p.h : waterY(p, p.r) - 0.3, p.y); W.add(m); }
   U3.grassN = -1; GR.cx = 1e9; GR.slots.clear(); GR.free = []; for (let i = 0; i < (2 * GR.R + 1) ** 2; i++) GR.free.push(i);
   for (const m of [U3.grB, U3.grF, U3.grE]) { for (let i = 0; i < m.count; i++) m.setMatrixAt(i, _zeroM); instDone(m); }
@@ -7759,13 +8019,25 @@ function rebuildNests() {
     g.add(gb.mesh());
   }
 }
-const TREE_C = {};
+const TREE_C = {}, _fa = new THREE.Color(), _fb = new THREE.Color(), _fc = new THREE.Color();
 function treeCols(b, tone) {
   const key = b + '_' + Math.floor(tone * 6);
   let o = TREE_C[key]; if (o) return o;
   const pals = TREE_PAL[b] || TREE_PAL[0], pal = pals[Math.floor(tone * pals.length) % pals.length], v = 0.9 + (Math.floor(tone * 6) % 3) * 0.1;
   o = TREE_C[key] = { a: new THREE.Color(pal[1]).multiplyScalar(v * 1.15), b: new THREE.Color(pal[2]).multiplyScalar(v), c: new THREE.Color(pal[3] || pal[2]).multiplyScalar(v * 0.95), t: new THREE.Color(b === 3 ? '#4a443e' : b === 2 ? '#4a3a26' : b === 5 ? '#7a6448' : '#5a3d26').multiplyScalar(0.85 + (Math.floor(tone * 6) % 2) * 0.2) };
   return o;
+}
+// mevsim rengi: kind 0 iğne yapraklı, 1 geniş yapraklı, 2 ot/çalı; sc = kar örtüsü (beyazlatma)
+const SEA_C = { au: ['#c8782a', '#b04a22', '#d4aa3a'].map(c => new THREE.Color(c)), sp: new THREE.Color('#72b442'), bare: new THREE.Color('#6a5c4e'), straw: new THREE.Color('#a39462'), snow: new THREE.Color('#eef2f6') };
+function seaTint(col, kind, tone, sc) {
+  const S = U3.sl;
+  if (S) {
+    if (kind === 1) { if (S.au > 0.01) col.lerp(SEA_C.au[Math.floor(tone * 3) % 3], S.au * 0.85); if (S.wi > 0.01) col.lerp(SEA_C.bare, S.wi * 0.9); if (S.sp > 0.01) col.lerp(SEA_C.sp, S.sp * 0.3); }
+    else if (kind === 2) { if (S.au > 0.01) col.lerp(SEA_C.straw, S.au * 0.45); if (S.wi > 0.01) col.lerp(SEA_C.straw, S.wi * 0.6); if (S.sp > 0.01) col.lerp(SEA_C.sp, S.sp * 0.25); }
+    else if (S.wi > 0.01) col.multiplyScalar(1 - S.wi * 0.12);
+  }
+  if (sc > 0) col.lerp(SEA_C.snow, Math.min(1, sc));
+  return col;
 }
 function worldSig() {
   let s = 0, r = 0, c = 0, b = 0, h = 0, n = 0;
@@ -7802,17 +8074,18 @@ function rebuildInst(cx, cy) {
         for (let m = 0; m < 3; m++) instAdd(I.moss, ex + (m - 1) * 3, ey, ez + ((m * 5) % 3 - 1) * 3, 2.6, 16 + ((i + m) % 3) * 9, 2.6, a + m, mossC, Math.PI, 0); }
       if (r2 < 0.3) instAdd(I.blob, t.x, y0 + th + 6, t.y, cr * 0.6, H * 0.12, cr * 0.6, t.sw, C.b);
     } else if (b === 1 || b === 3 || (b === 0 && r2 < 0.55)) {   // iğne yapraklı: üç kat
-      const thin = b === 3 ? 0.7 : b === 1 ? 0.82 : 1, base = Math.max(40, H * 0.22), sn = y0 > 400 ? clamp((y0 - 400) / 120, 0, 0.7) : 0;
+      const thin = b === 3 ? 0.7 : b === 1 ? 0.82 : 1, base = Math.max(40, H * 0.22), sn = Math.max(y0 > 400 ? clamp((y0 - 400) / 120, 0, 0.7) : 0, snowCover(t.x, t.y, y0) * 0.75);
       instAdd(I.trunk, t.x, y0, t.y, 8, H * 0.8, 8, t.sw, C.t);
       const cs = [C.a, C.b, C.c];
-      for (let i = 0; i < 3; i++) { const yy = base + i * (H - base) * 0.27, rr = cr * (0.86 - i * 0.2) * thin, hh = (H - base) * (0.52 - i * 0.07); col.copy(cs[i]); if (sn) col.lerp(snowC, sn * (0.5 + i * 0.2)); instAdd(I.cone, t.x, y0 + yy, t.y, rr, hh, rr, t.sw + i * 0.7, col); }
+      for (let i = 0; i < 3; i++) { const yy = base + i * (H - base) * 0.27, rr = cr * (0.86 - i * 0.2) * thin, hh = (H - base) * (0.52 - i * 0.07); col.copy(cs[i]); seaTint(col, 0, t.tone, 0); if (sn) col.lerp(snowC, sn * (0.5 + i * 0.2)); instAdd(I.cone, t.x, y0 + yy, t.y, rr, hh, rr, t.sw + i * 0.7, col); }
     } else {                                             // geniş yapraklı (çayırda tek, iri)
-      const lone = b === 4, th = H * (lone ? 0.5 : 0.62), cw = lone ? 1.45 : 1.05, tw = lone ? 12 : 9.5;
+      const lone = b === 4, th = H * (lone ? 0.5 : 0.62), wi = U3.sl ? U3.sl.wi : 0, cw = (lone ? 1.45 : 1.05) * (1 - wi * 0.35), tw = lone ? 12 : 9.5, tsc = snowCover(t.x, t.y, y0) * 0.55;
+      const fa = seaTint(_fa.copy(C.a), 1, t.tone, tsc), fb = seaTint(_fb.copy(C.b), 1, (t.tone * 3.7) % 1, tsc), fc = seaTint(_fc.copy(C.c), 1, (t.tone * 7.3) % 1, tsc);
       instAdd(I.trunk, t.x, y0, t.y, tw, th, tw, t.sw, C.t, Math.sin(t.sw) * 0.04, Math.cos(t.sw) * 0.04);
       if (lone) for (let i = 0; i < 3; i++) { const a = t.sw + i * 2.1; instAdd(I.trunk, t.x, y0 + th * 0.7, t.y, 4, cr * 0.7, 4, a, C.t, 0, 0.9); }
-      instAdd(I.blob, t.x, y0 + th + cr * 0.25, t.y, cr * 1.05 * cw, H * (lone ? 0.22 : 0.27), cr * 1.05 * cw, t.sw, C.a);
-      instAdd(I.blob, t.x + Math.cos(t.sw) * cr * 0.45 * cw, y0 + th + H * 0.18, t.y + Math.sin(t.sw) * cr * 0.45 * cw, cr * 0.72 * cw, H * 0.2, cr * 0.72 * cw, t.sw * 2, C.b);
-      instAdd(I.blob, t.x - Math.cos(t.sw + 0.8) * cr * 0.5 * cw, y0 + th + H * 0.08, t.y - Math.sin(t.sw + 0.8) * cr * 0.5 * cw, cr * 0.62 * cw, H * 0.17, cr * 0.62 * cw, t.sw * 3, C.c);
+      instAdd(I.blob, t.x, y0 + th + cr * 0.25, t.y, cr * 1.05 * cw, H * (lone ? 0.22 : 0.27) * (1 - wi * 0.3), cr * 1.05 * cw, t.sw, fa);
+      instAdd(I.blob, t.x + Math.cos(t.sw) * cr * 0.45 * cw, y0 + th + H * 0.18, t.y + Math.sin(t.sw) * cr * 0.45 * cw, cr * 0.72 * cw, H * 0.2 * (1 - wi * 0.3), cr * 0.72 * cw, t.sw * 2, fb);
+      instAdd(I.blob, t.x - Math.cos(t.sw + 0.8) * cr * 0.5 * cw, y0 + th + H * 0.08, t.y - Math.sin(t.sw + 0.8) * cr * 0.5 * cw, cr * 0.62 * cw, H * 0.17 * (1 - wi * 0.3), cr * 0.62 * cw, t.sw * 3, fc);
     }
   }
   for (const r of G.rocks) {
@@ -7826,7 +8099,7 @@ function rebuildInst(cx, cy) {
   for (const b of G.bushes) {
     if (!near(b, BUSH_R)) continue;
     const h = hash2(b.x, b.y), y0 = gh(b.x, b.y);
-    col.set('#2f5a24').multiplyScalar(0.85 + h * 0.4);
+    seaTint(col.set('#2f5a24').multiplyScalar(0.85 + h * 0.4), 2, h, snowCover(b.x, b.y, y0) * 0.6);
     instAdd(I.bush, b.x, y0 + b.r * 0.45, b.y, b.r * 1.15, b.r * 0.8, b.r * 1.15, h * 6, col);
     instAdd(I.bush, b.x - 7, y0 + b.r * 0.4, b.y - 4, b.r * 0.75, b.r * 0.6, b.r * 0.75, h * 9, col);
     if (near(b, 520)) { const n = Math.min(7, b.amt + Math.floor(b.amt / 2)), bc = c3(b.col); for (let i = 0; i < n; i++) { const q = b.berries[i], rr = (q[0] * q[0] + q[1] * q[1]) / (b.r * b.r * 1.3); instAdd(I.berry, b.x + q[0], y0 + b.r * 0.45 + Math.sqrt(Math.max(0.05, 1 - rr)) * b.r * 0.8, b.y + q[1], 2.3, 2.3, 2.3, i, bc); } }
@@ -8322,13 +8595,29 @@ function initWeather() {
   const n = 900, g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n * 6), 3));
   U3.rain = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: 0xaab8cc, transparent: true, opacity: 0.4, depthWrite: false })); U3.rain.frustumCulled = false; U3.rain.visible = false; U3.scene.add(U3.rain);
   U3.rainSeed = []; const R = mulberry32(41); for (let i = 0; i < n; i++) U3.rainSeed.push([R(), R(), R(), R()]);
+  { const ns = 1400, sg = new THREE.BufferGeometry(); sg.setAttribute('position', new THREE.BufferAttribute(new Float32Array(ns * 3), 3));
+    U3.snowP = new THREE.Points(sg, new THREE.PointsMaterial({ color: 0xffffff, size: 2.6, map: TEX.soft, alphaTest: 0.05, transparent: true, opacity: 0.85, depthWrite: false, fog: true })); U3.snowP.frustumCulled = false; U3.snowP.visible = false; U3.scene.add(U3.snowP); }
   U3.mist = []; for (let i = 0; i < 12; i++) { const s = sprite(TEX.soft, 0xffffff, false, true); s.visible = false; U3.scene.add(s); U3.mist.push(s); }
   U3.clouds = []; const C = mulberry32(57);
   for (let i = 0; i < 11; i++) { const s = sprite(TEX.cloud, 0xffffff, false, false); s.renderOrder = -7; s.userData = { a: C() * TAU, d: 3000 + C() * 2200, h: 900 + C() * 900, w: 1400 + C() * 1600, sp: 0.5 + C() }; U3.scene.add(s); U3.clouds.push(s); }
 }
 function updWeather3D(dt, t, dk) {
-  const w = G.weather.type, cp = U3.cam.position, wet = w === 'yagmur' || w === 'firtina', st = w === 'firtina';
+  const w = G.weather.type, cp = U3.cam.position, lp = precipAt(L.x, L.y), wet = lp === 'yagmur', st = w === 'firtina' || (w === 'kar' && G.weather.heavy);
   U3.rainK = (U3.rainK || 0) + ((wet && !G.inside ? 1 : 0) - (U3.rainK || 0)) * Math.min(1, dt * 1.5);
+  // kar taneleri: yavaş düşer, salınır; tipide yana savrulur
+  U3.snowK = (U3.snowK || 0) + ((lp === 'kar' && !G.inside ? 1 : 0) - (U3.snowK || 0)) * Math.min(1, dt * 1.2);
+  { const SP = U3.snowP; SP.visible = U3.snowK > 0.02;
+    if (SP.visible) {
+      const pa = SP.geometry.attributes.position, n = pa.count, B = 260, H = 220, act = Math.floor(n * U3.snowK * (st ? 1 : 0.6)), wx = st ? 60 : 8;
+      for (let i = 0; i < n; i++) {
+        const q = U3.rainSeed[i % U3.rainSeed.length], q3 = (q[3] + i * 0.618) % 1;
+        if (i >= act) { pa.setXYZ(i, 0, -9999, 0); continue; }
+        const ph = (t * (st ? 70 : 38) / H + q[2] + q3) % 1, dx = Math.sin(t * 0.9 + q3 * 20) * 6 + wx * ph * 3, dz = Math.cos(t * 0.7 + q[0] * 20) * 6;
+        const x = cp.x + ((((q[0] + q3 * 0.37) % 1) * B * 2 - (cp.x % (B * 2)) + B * 4) % (B * 2)) - B, z = cp.z + ((((q[1] + q3 * 0.71) % 1) * B * 2 - (cp.z % (B * 2)) + B * 4) % (B * 2)) - B;
+        pa.setXYZ(i, x + dx, cp.y + H * 0.55 - ph * H, z + dz);
+      }
+      pa.needsUpdate = true; SP.material.opacity = 0.9 * U3.snowK * (1 - dk * 0.55); SP.material.size = st ? 4.6 : 3.8;
+    } }
   const RN = U3.rain; RN.visible = U3.rainK > 0.02;
   if (RN.visible) {
     const pa = RN.geometry.attributes.position, n = pa.count / 2, B = 420, H = 300, wx = st ? 0.35 : 0.08, sp = st ? 1300 : 950, len = st ? 30 : 22, act = Math.floor(n * U3.rainK * (st ? 1 : 0.7));
@@ -8355,7 +8644,7 @@ function updWeather3D(dt, t, dk) {
     const u = s.userData, a = u.a + t * 0.0025 * u.sp;
     s.visible = !G.inside; s.position.set(cp.x + Math.cos(a) * u.d, u.h, cp.z + Math.sin(a) * u.d); s.scale.set(u.w, u.w * 0.42, 1);
     s.material.color.copy(c3(0xffffff)).lerp(U3.scene.fog.color, 0.35 + (1 - cl) * 0.4).lerp(c3(0x1a1e26), clamp(dk * 1.1, 0, 0.85));
-    if (wet || w === 'sis') s.material.color.multiplyScalar(0.72);
+    if (wet || w === 'sis' || w === 'kar') s.material.color.multiplyScalar(0.72);
     s.material.opacity = (0.55 + cl * 0.35) * over * (i % 3 === 2 && w === 'acik' ? 0.4 : 1);
   });
 }
@@ -8368,7 +8657,7 @@ function updAtmos(dt, t, LS) {
   const dk = darkness(), p = phase(), w = G.weather.type, cam = U3.cam, cp = cam.position;
   const bm = biomeFast(L.x, L.y);
   // sis yoğunluğu hedefi (hava + sisli vadi), yumuşak geçiş
-  const tk = (w === 'sis' ? 0.4 : w === 'firtina' ? 0.6 : w === 'yagmur' ? 0.72 : 1) * (bm === 3 ? 0.42 : bm === 2 ? 0.8 : 1);
+  const tk = (w === 'sis' ? 0.4 : w === 'firtina' ? 0.6 : w === 'yagmur' ? 0.72 : w === 'kar' ? (G.weather.heavy ? 0.45 : 0.7) : 1) * (bm === 3 ? 0.42 : bm === 2 ? 0.8 : 1);
   U3.fogK += (tk - U3.fogK) * Math.min(1, dt * 0.8);
   const grayK = clamp((1 - U3.fogK) * 1.5, 0, 1);
   let warm = 0;
@@ -8482,7 +8771,10 @@ function render3D(dt) {
   if (Math.abs(cam.fov - fov) > 0.01 || cam.aspect !== U3.camA) { cam.fov += (fov - cam.fov) * Math.min(1, dt * 6); if (Math.abs(cam.fov - fov) < 0.05) cam.fov = fov; U3.camA = cam.aspect; cam.updateProjectionMatrix(); }
   cam.updateMatrixWorld();
   // ---- arazi, deniz, otlar
+  if (!U3.sl) U3.sl = seasonLook();
   terUpdate(cam.position.x, cam.position.z, U3.frame < 3 ? 1e9 : 8);
+  seasonSync(dt, cam.position.x, cam.position.z);
+  if (U3.lakeM) { const sk = Math.min(1, ((U3.sl && U3.sl.snow[0]) || 0) * 1.4); MAT.ice.color.setRGB(0.5 + 0.25 * sk, 0.64 + 0.18 * sk, 0.74 + 0.12 * sk); for (const [l, m] of U3.lakeM) { const mt = l.frozen ? MAT.ice : MAT.water; if (m.material !== mt) m.material = mt; } }
   U3.sea.position.set(Math.round(cam.position.x / 500) * 500, SEA_Y, Math.round(cam.position.z / 500) * 500);
   { const nb = G.builds.reduce((a, b) => a + (b.dead ? 0 : 1), 0); if (nb !== U3.grassN) { U3.grassN = nb; GR.slots.clear(); GR.free = []; for (let i = 0; i < (2 * GR.R + 1) ** 2; i++) GR.free.push(i); GR.cx = 1e9; } }
   grassUpdate(cam.position.x, cam.position.z, U3.frame < 3 ? 1e9 : 10);
@@ -9538,11 +9830,13 @@ function toast(html) { const t = $('toast'); const d = document.createElement('d
 function renderMsgs() { $('msgs').innerHTML = G.msgs.map(m => `<div style="color:${m.col};opacity:${clamp(m.life, 0, 1)}">${m.t}</div>`).join(''); G.msgDirty = false; }
 
 // ---- HUD
-const WIC = { acik: '', yagmur: '🌧️', firtina: '⛈️', sis: '🌫️' };
+const WIC = { acik: '', yagmur: '🌧️', firtina: '⛈️', sis: '🌫️', kar: '🌨️' };
 function updateHUD() {
   const p = phase(), n = isNight();
+  const S = G.season || seasonOf(G.day), lp = precipAt(L.x, L.y), wk = lp ? (lp === 'kar' ? 'kar' : G.weather.type === 'kar' ? 'yagmur' : G.weather.type) : G.weather.type;
   $('dayTxt').textContent = `${G.day}. Gün`;
-  $('todTxt').textContent = (n ? '🌑 Gece' : p > 0.42 ? '🌇 Akşam' : '☀️ Gündüz') + ' ' + WIC[G.weather.type] + (G.finale ? ' 🌀' : '');
+  $('todTxt').textContent = (n ? '🌑 Gece' : p > 0.42 ? '🌇 Akşam' : '☀️ Gündüz') + ' ' + (WIC[wk] || '') + (G.finale ? ' 🌀' : '');
+  { const st = $('seaTxt'); if (st) { st.textContent = `${S.ic} ${S.ad} ${S.day}/${SEASON_LEN} · ${Math.round(tempAt(L.x, L.y))}°C`; st.title = 'Mevsim, mevsimin günü ve bulunduğun yerdeki sıcaklık'; } }
   $('todBar').style.width = (p * 100) + '%';
   const fl = k => Math.floor(G.stock[k] || 0);
   $('res').innerHTML = ['wood', 'stone', 'food', 'meyve', 'et'].map(k => `<span title="${RESN[k]}">${RES[k]} <b>${fl(k)}</b></span>`).join('') + `<span title="Halk · boş yer">👥 <b>${G.people.length}</b><small>/🛏️${freeHomes()}</small></span>`;
