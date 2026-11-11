@@ -15,6 +15,16 @@ Dinozorlar çağında geçen bir hayatta kalma / korku / halk yönetimi oyunu. S
 | `js/cizim.js` | grafikler: güneşe göre gölgeler, dokular, ışık, sis, efektler, harita |
 | `js/arayuz.js` | girdi, halk paneli, karakter kartı, üretim menüsü, av emri, ekranlar |
 
+## 3B birinci şahıs
+Oyun liderin gözünden oynanır (three.js, `js/uc.js` çizici, `js/model3d.js` modeller). Simülasyon 2B kalır; arazi yüksekliği `groundH(x,y)` ile gelir.
+- **Ada**: 16000 birimlik ada; orman, dağ sıraları, tepeler, çayırlar, bataklık, sisli vadi, kumsal ve deniz.
+- **Mağara içi**: kapıda E ile içeri gir, dolaş; yatağa bak → uyu, üretim masasına bak → üretim, kişiye bak → emir ver (`js/ic.js`).
+- **Uyku ve gözcü**: gece barınakta uyursun (U), zaman hızlanır. Kapıdaki meşaleli gözcü tehlikede uyandırır; gözcü zarar görmez.
+- **Sessiz av**: X / Ctrl ile eğil. Av hayvanları sesi duyar; habersiz hayvana ilk vuruş 2 kat.
+- **Sakin geceler**: yırtıcılar kamptan uzakta kendi bölgelerinde yaşar; keşif tehlikelidir, kamp çoğu gece sakindir.
+- **Hedef**: en az 200 gün hayatta kal, kıyılardaki 3 gemi enkazını bul, halat ve yelken bezi ürettir, 6. seviye mimarla kıyıya ⛵ Gemi kur (15+ kişi), 100 yiyecekle yelken aç.
+- Yeni insan katılımı ve doğum çok nadirdir.
+
 ## Oynanış
 - **Halk ve meslekler (14 grup)**: Oduncu, Taşçı, Toplayıcı, Avcı, Et Ustası, Aşçı, Çiftçi, Şifacı, Zanaatkâr, Mimar, Kâşif, Muhafız, Takip, Boşta.
 - **Beceriler ve seviye (1-10)**: herkes yaptığı işte ustalaşır; usta daha hızlı ve daha iyi çalışır, gelişmiş eşya ve yapıları açar.
@@ -42,8 +52,8 @@ Dinozorlar çağında geçen bir hayatta kalma / korku / halk yönetimi oyunu. S
 - **Kaçırılma işareti**: kaçırılan birinin izi yalnızca kısa bir süre ve yakındayken görünür.
 - **Benzeyen**: halktan birinin kılığına girip kampa yaklaşan şey. Aynı isim iki kez görünür. Yaklaşınca yüzünü gösterir.
 - **Bilinmezlik**: dünyayı yalnızca halkının gördüğü kadar görürsün; Kâşifler bilinmeyene gider. Gece olaylarının zamanı bilinmez.
-- **Hedef**: yarığı bul, halkını 30 kişiye çıkar, 6. seviye bir zanaatkâra Yarık Taşı yaptır, son savaşı kazan.
 
 ## Kontroller
-WASD hareket · Shift koş · Fare/Boşluk mızrak · F/sağ tık ok · E (basılı) topla/kullan/tedavi/inşaata yardım · E (bas) bin/in, yaralı taşı ·
-I iç görünüm · G av emri · C üretim · M harita · H halk paneli · 1-9 inşa planı · T meşale · P duraklat. Telefonda sanal kol ve düğmeler.
+Fare bakış (ekrana tıkla; Esc/Tab bırakır) · WASD hareket · Shift koş · X/Ctrl eğil · Sol tık/Boşluk mızrak · F/sağ tık ok · E etkileşim / içeri gir / emir ver ·
+U uyu · I oda düzeni · G av emri (hayvana bak ve tıkla) · C üretim · M harita · H halk paneli · 1-9 inşa planı · T meşale · P duraklat.
+Telefonda: sol yarı yürüme, sağ yarıyı sürükle bakış, düğmeler sağda.
