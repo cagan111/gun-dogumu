@@ -28,11 +28,15 @@ const IN_FURN = {
   sifa: [['healbed', .3, .4, 0], ['healbed', .7, .4, 0], ['herbs', .5, .8, 0]],
   kasap: [['block', .4, .5, 0], ['rack', .78, .35, 0]],
   atolye: [['bench', .45, .45, 0], ['rack', .8, .7, 0]],
+  okcu: [['bench', .45, .45, 0], ['rack', .8, .7, 0]],
+  tabak: [['bench', .45, .45, 0], ['rack', .8, .7, 0]],
   bos: [],
 };
 function inFurn(b) {
   const D = inDims(b), out = [];
-  for (const r of inRooms(b)) for (const f of (IN_FURN[r.t] || [])) out.push({ k: f[0], x: r.x + r.w * f[1], y: r.y + r.h * f[2], ang: f[3], room: r.i, t: r.t });
+  // yatak: yalnızca burada oturanlara zimmetli yatak kadar; kalanı yer yatağı (mat)
+  let beds = 0; for (const q of G.people) if (q.own && q.own.yatak && typeof homeOf === 'function' && homeOf(q) === b) beds++;
+  for (const r of inRooms(b)) for (const f of (IN_FURN[r.t] || [])) { let k = f[0]; if (k === 'bed') { if (beds > 0) beds--; else k = 'mat'; } out.push({ k, x: r.x + r.w * f[1], y: r.y + r.h * f[2], ang: f[3], room: r.i, t: r.t }); }
   out.push({ k: 'door', x: D.w / 2, y: D.h, ang: 0, room: -1 });
   if (b.type === 'magara') { out.push({ k: 'hearth', x: D.w / 2, y: D.h * 0.62, ang: 0, room: -1, main: 1 }); out.push({ k: 'paint', x: D.w * 0.5, y: 2, ang: 0, room: -1 }); out.push({ k: 'torch', x: D.w * 0.3, y: D.h - 6, ang: 0, room: -1 }); out.push({ k: 'torch', x: D.w * 0.7, y: D.h - 6, ang: 0, room: -1 }); }
   return out;
@@ -45,14 +49,14 @@ function inPeople(b) {
     list.forEach((p, j) => {
       if (p === L) return;
       let x = r.x + r.w * (0.3 + 0.4 * ((j * 0.37) % 1)), y = r.y + r.h * (0.35 + 0.4 * ((j * 0.61) % 1)), ang = Math.PI / 2, pose = 'stand';
-      const beds = f.filter(q => q.k === 'bed' || q.k === 'healbed');
+      const beds = f.filter(q => q.k === 'bed' || q.k === 'mat' || q.k === 'healbed');
       if ((p.inHut === b || (p.bed && p.bed.s === b)) && beds.length) { const q = beds[j % beds.length]; x = q.x + (j >= beds.length ? 12 : 0); y = q.y; ang = 0; pose = 'sleep'; }
       else if (r.t === 'mutfak') {
         const tb = f.find(q => q.k === 'table'), hz = f.find(q => q.k === 'hearth');
         if (p.group === 'asci' && hz && !(G.meal && p.ate)) { x = hz.x + 22; y = hz.y + 6; ang = Math.PI; pose = 'work'; }
         else if (tb) { const a = j * 1.3; x = tb.x + Math.cos(a) * 34; y = tb.y + Math.sin(a) * 26; ang = a + Math.PI; pose = G.meal ? 'eat' : 'sit'; }
       }
-      else if (r.t === 'atolye' || r.t === 'kasap') { const q = f.find(z => z.k === 'bench' || z.k === 'block'); if (q) { x = q.x + (j ? 26 : 0); y = q.y + 22; ang = -Math.PI / 2; pose = 'work'; } }
+      else if (r.t === 'atolye' || r.t === 'kasap' || r.t === 'okcu' || r.t === 'tabak') { const q = f.find(z => z.k === 'bench' || z.k === 'block'); if (q) { x = q.x + (j ? 26 : 0); y = q.y + 22; ang = -Math.PI / 2; pose = 'work'; } }
       else if (r.t === 'sifa') { const q = f.find(z => z.k === 'herbs'); if (q) { x = q.x + j * 18; y = q.y - 16; ang = Math.PI / 2; pose = 'work'; } }
       out.push({ p, x, y, ang, pose });
     });
@@ -73,7 +77,7 @@ function exitBuilding() {
 function inMove(mx, my, spd, dt) {
   const I = G.inside, D = inDims(I.b); let x = I.x + mx * spd * dt, y = I.y + my * spd * dt;
   x = clamp(x, 14, D.w - 14); y = clamp(y, 14, D.h - 10);
-  for (const f of inFurn(I.b)) { if (f.k === 'door' || f.k === 'paint' || f.k === 'torch') continue; const r = f.k === 'table' ? 30 : f.k === 'hearth' ? 22 : 18, dx = x - f.x, dy = y - f.y, d = Math.hypot(dx, dy); if (d < r && d > 0.01) { x = f.x + dx / d * r; y = f.y + dy / d * r; } }
+  for (const f of inFurn(I.b)) { if (f.k === 'door' || f.k === 'paint' || f.k === 'torch' || f.k === 'mat') continue; const r = f.k === 'table' ? 30 : f.k === 'hearth' ? 22 : 18, dx = x - f.x, dy = y - f.y, d = Math.hypot(dx, dy); if (d < r && d > 0.01) { x = f.x + dx / d * r; y = f.y + dy / d * r; } }
   I.x = x; I.y = y;
 }
 function inInteract() {
@@ -83,7 +87,7 @@ function inInteract() {
   for (const q of inPeople(b)) test(q.x, q.y, { kind: 'person', p: q.p, label: `${q.p.name} — emir ver` }, 150);
   for (const f of inFurn(b)) {
     if (f.k === 'door') test(f.x, f.y, { kind: 'exit', label: 'Dışarı çık' }, 80);
-    else if (f.k === 'bed') test(f.x, f.y, { kind: 'sleep', label: goHome() ? 'Uyu' : 'Yatak (gece uyuyabilirsin)' }, 70);
+    else if (f.k === 'bed' || f.k === 'mat') test(f.x, f.y, { kind: 'sleep', label: goHome() ? 'Uyu' : 'Yatak (gece uyuyabilirsin)' }, 70);
     else if (f.k === 'bench') test(f.x, f.y, { kind: 'craft', label: 'Üretim masası' }, 80);
     else if (f.k === 'crate') test(f.x, f.y, { kind: 'store', label: 'Depo — oda türünü değiştir (I)' }, 60);
   }

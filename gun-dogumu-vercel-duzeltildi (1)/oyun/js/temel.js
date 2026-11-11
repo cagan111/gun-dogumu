@@ -81,6 +81,7 @@ const GROUPS = {
   odun:    { ad: 'Oduncu',     ic: '🪓', col: '#8a5a32', sk: 'toplama',  desc: 'Ağaç keser. Balta ile %50 hızlı.' },
   tas:     { ad: 'Taşçı',      ic: '⛏️', col: '#7c7c7c', sk: 'toplama',  desc: 'Taş kırar; kazma ile dağlarda kristal çıkarır.' },
   yiyecek: { ad: 'Toplayıcı',  ic: '🫐', col: '#7a3a6a', sk: 'toplama',  desc: 'Meyve toplar.' },
+  balik:   { ad: 'Balıkçı',    ic: '🎣', col: '#3a6a8a', sk: 'avcilik',  desc: 'En yakın göl ya da kıyıda balık tutar; balığı depoya getirir.' },
   avci:    { ad: 'Avcı',       ic: '🏹', col: '#6a4a1a', sk: 'avcilik',  desc: 'Av emri verilen hayvana mesafe koruyarak saldırır. Yiyecek azalınca kendiliğinden ava çıkar.' },
   kasap:   { ad: 'Et Ustası',  ic: '🔪', col: '#8a2a2a', sk: 'kasaplik', desc: 'Leşlerden getirilen çiğ eti temizler. Temiz et hastalık yapmaz. İş yoksa leşten et taşır.' },
   asci:    { ad: 'Aşçı',       ic: '🍲', col: '#b06a2a', sk: 'asci',     desc: 'Temiz et ve meyveden yemek pişirir, yemek vaktinde masaya koyar.' },
@@ -93,11 +94,12 @@ const GROUPS = {
   takip:   { ad: 'Takip',      ic: '👣', col: '#5c6b2a', sk: 'savas',    desc: 'Seninle gelir, yanında savaşır.' },
   bos:     { ad: 'Boşta',      ic: '💤', col: '#555',    sk: null,       desc: 'Ateşi besler, inşaata yardım eder, dinlenir.' }
 };
-const GORDER = ['odun', 'tas', 'yiyecek', 'avci', 'kasap', 'asci', 'ciftci', 'sifaci', 'zanaat', 'mimar', 'kasif', 'muhafiz', 'takip', 'bos'];
+const GORDER = ['odun', 'tas', 'yiyecek', 'balik', 'avci', 'kasap', 'asci', 'ciftci', 'sifaci', 'zanaat', 'mimar', 'kasif', 'muhafiz', 'takip', 'bos'];
 const ABIL = {
   odun:    { ad: 'Toplu Kesim',    desc: '30 sn: odun ×2', dur: 30, cd: 120 },
   tas:     { ad: 'Damar Bul',      desc: '30 sn: taş/kristal ×2', dur: 30, cd: 120 },
   yiyecek: { ad: 'Hasat Bereketi', desc: 'Kampa yakın çalılar dolar', dur: 0, cd: 150 },
+  balik:   { ad: 'Bereketli Ağ',   desc: '30 sn: balık ×2', dur: 30, cd: 120 },
   avci:    { ad: 'Sürek Avı',      desc: '30 sn: avcılar hızlı ve öldürücü', dur: 30, cd: 110 },
   kasap:   { ad: 'Hızlı Kesim',    desc: '30 sn: et işleme ×2', dur: 30, cd: 100 },
   asci:    { ad: 'Şölen',          desc: 'Bir sonraki yemekte herkes +25 can, moral +10', dur: 0, cd: 240 },
@@ -136,7 +138,9 @@ const BUILD = {
   cadir:     { ad: 'Çadır',            ic: '⛺', cost: { wood: 6, hide: 2 },            r: 22, hp: 120, lvl: 1, work: 18, desc: 'Bir hane: tek kişi ya da bir çift ve çocukları', rooms: [] },
   kulube:    { ad: 'Kulübe',           ic: '🛖', cost: { wood: 30, stone: 10, hide: 4 }, r: 54, hp: 400, lvl: 2, work: 60, desc: '4 odalı büyük yapı; odaları sen seçersin', rooms: ['yatak', 'yatak', 'bos', 'bos'] },
   magara:    { ad: 'Mağara',           ic: '🪨', cost: {},                               r: 78, hp: 99999, lvl: 99, work: 1, desc: 'Halkın ilk yuvası', rooms: ['yatak', 'yatak', 'yatak', 'yatak', 'depo', 'mutfak', 'atolye'] },
-  atolye:    { ad: 'Atölye',           ic: '🔨', cost: { wood: 12, stone: 6 },          r: 30, hp: 200, lvl: 1, work: 30, desc: 'Zanaatkârlar burada alet ve silah üretir' },
+  oktezgah:  { ad: 'Ok ve Yay Tezgâhı', ic: '🏹', cost: { wood: 10, stone: 4 },          r: 26, hp: 160, lvl: 2, work: 26, desc: 'Ok, yay ve zehirli ok burada üretilir' },
+  tabakhane: { ad: 'Deri Tezgâhı',     ic: '🟫', cost: { wood: 10, hide: 4 },           r: 26, hp: 160, lvl: 2, work: 26, desc: 'Zırh, eyer, halat ve yelken bezi burada üretilir' },
+  atolye:    { ad: 'Alet Tezgâhı',     ic: '🔨', cost: { wood: 12, stone: 6 },          r: 30, hp: 200, lvl: 1, work: 30, desc: 'Zanaatkârlar burada alet ve silah üretir' },
   kasaphane: { ad: 'Kasap Tezgâhı',    ic: '🔪', cost: { wood: 8, stone: 4 },           r: 24, hp: 150, lvl: 1, work: 20, desc: 'Et ustaları burada çalışır: %25 daha çok et' },
   tarla:     { ad: 'Tarla',            ic: '🌾', cost: { wood: 4 },                     r: 42, hp: 999, lvl: 1, work: 14, flat: true, desc: 'Çiftçiler eker; iki günde hasat' },
   cit:       { ad: 'Kazık Çit',        ic: '🪵', cost: { wood: 4 },                     r: 20, hp: 140, lvl: 1, work: 5,  desc: 'Yaratıkları durdurur, halk geçebilir' },
@@ -148,7 +152,7 @@ const BUILD = {
   gemi:      { ad: 'Gemi', ic: '⛵', cost: { wood: 400, hide: 40, halat: 20, yelkenBezi: 4, gemiParca: 3 }, r: 120, hp: 3000, lvl: 6, work: 900, desc: 'Eve dönüş. Kıyıya kurulur; 200. günden sonra, 3 enkaz parçasıyla' },
   kule:      { ad: 'Gözetleme Kulesi', ic: '🗼', cost: { wood: 12, stone: 8 },          r: 24, hp: 300, lvl: 3, work: 45, desc: 'Geniş ışık ve görüş; muhafız çıkarsa ok atar' }
 };
-const BORDER = ['cadir', 'kulube', 'atolye', 'kasaphane', 'tarla', 'cit', 'mesale', 'tuzak', 'duvar', 'raf', 'sifahane', 'kule', 'gemi'];
+const BORDER = ['cadir', 'kulube', 'atolye', 'oktezgah', 'tabakhane', 'kasaphane', 'tarla', 'cit', 'mesale', 'tuzak', 'duvar', 'raf', 'sifahane', 'kule', 'gemi'];
 
 // ---- üretilebilen eşyalar (by: hangi beceri üretir; lvl: gereken seviye; work: saniye)
 const ITEMS = {
@@ -156,20 +160,21 @@ const ITEMS = {
   kazma:       { ad: 'Kazma',          ic: '⛏️', by: 'zanaat', lvl: 1, cost: { wood: 3, stone: 3 },  work: 12, desc: 'Bir taşçı %50 hızlı; kristal için gerekli' },
   mizrak:      { ad: 'Taş Mızrak',     ic: '🗡️', by: 'zanaat', lvl: 1, cost: { wood: 3, stone: 2 },  work: 10, desc: 'Bir savaşçı/avcı daha sert vurur' },
   sepet:       { ad: 'Sepet',          ic: '🧺', by: 'zanaat', lvl: 1, cost: { wood: 2, herb: 1 },   work: 8,  desc: 'Bir işçi +4 fazla taşır' },
-  ok:          { ad: 'Ok (×10)',       ic: '➶',  by: 'zanaat', lvl: 1, cost: { wood: 2, bone: 1 },   work: 8,  qty: 10, desc: 'Yaylar için' },
+  ok:          { stn: 'okcu', ad: 'Ok (×10)',       ic: '➶',  by: 'zanaat', lvl: 1, cost: { wood: 2, bone: 1 },   work: 8,  qty: 10, desc: 'Yaylar için' },
   mesale:      { ad: 'El Meşalesi',    ic: '🔥', by: 'zanaat', lvl: 1, cost: { wood: 3 },            work: 6,  desc: 'Lider için taşınabilir ışık [T]' },
-  yay:         { ad: 'Yay',            ic: '🏹', by: 'zanaat', lvl: 2, cost: { wood: 5, hide: 1 },   work: 16, desc: 'Bir avcı/muhafız uzaktan ok atar' },
-  zirh:        { ad: 'Deri Zırh',      ic: '🦺', by: 'zanaat', lvl: 2, cost: { hide: 4, bone: 1 },   work: 16, desc: 'Giyen %30 daha az hasar alır' },
-  zok:         { ad: 'Zehirli Ok (×10)', ic: '☠️', by: 'zanaat', lvl: 3, cost: { wood: 2, bone: 1, poison: 2 }, work: 10, qty: 10, desc: 'Zehirler: saniyede ek hasar' },
-  eyer:        { ad: 'Eyer',           ic: '🐎', by: 'zanaat', lvl: 3, cost: { hide: 6, wood: 4 },   work: 20, desc: 'Evcil Boynuzlu’ya bin (yanında E)' },
+  yay:         { stn: 'okcu', ad: 'Yay',            ic: '🏹', by: 'zanaat', lvl: 2, cost: { wood: 5, hide: 1 },   work: 16, desc: 'Bir avcı/muhafız uzaktan ok atar' },
+  zirh:        { stn: 'tabak', ad: 'Deri Zırh',      ic: '🦺', by: 'zanaat', lvl: 2, cost: { hide: 4, bone: 1 },   work: 16, desc: 'Giyen %30 daha az hasar alır' },
+  zok:         { stn: 'okcu', ad: 'Zehirli Ok (×10)', ic: '☠️', by: 'zanaat', lvl: 3, cost: { wood: 2, bone: 1, poison: 2 }, work: 10, qty: 10, desc: 'Zehirler: saniyede ek hasar' },
+  eyer:        { stn: 'tabak', ad: 'Eyer',           ic: '🐎', by: 'zanaat', lvl: 3, cost: { hide: 6, wood: 4 },   work: 20, desc: 'Evcil Boynuzlu’ya bin (yanında E)' },
   kemikMizrak: { ad: 'Kemik Mızrak',   ic: '🦴', by: 'zanaat', lvl: 4, cost: { bone: 4, wood: 2, crystal: 1 }, work: 22, desc: 'En güçlü yakın dövüş silahı' },
-  halat:       { ad: 'Halat',          ic: '🪢', by: 'zanaat', lvl: 3, cost: { hide: 3, herb: 2 }, work: 25, desc: 'Gemi için gerekli (20 adet)' },
-  yelkenBezi:  { ad: 'Yelken Bezi',    ic: '🏳️', by: 'zanaat', lvl: 5, cost: { hide: 12, herb: 4 }, work: 70, desc: 'Gemi için gerekli (4 adet)' },
+  yatak:       { ad: 'Yatak',          ic: '🛏️', by: 'zanaat', lvl: 1, cost: { hide: 2, wood: 2 }, work: 18, desc: 'Bir kişiye verilir. Yatağı olmayan yerde yatar, iyi dinlenemez' },
+  halat:       { stn: 'tabak', ad: 'Halat',          ic: '🪢', by: 'zanaat', lvl: 3, cost: { hide: 3, herb: 2 }, work: 25, desc: 'Gemi için gerekli (20 adet)' },
+  yelkenBezi:  { stn: 'tabak', ad: 'Yelken Bezi',    ic: '🏳️', by: 'zanaat', lvl: 5, cost: { hide: 12, herb: 4 }, work: 70, desc: 'Gemi için gerekli (4 adet)' },
   yarikTasi:   { ad: 'Yarık Taşı',     ic: '🌀', by: 'zanaat', lvl: 6, cost: { crystal: 25, stone: 40, wood: 40 }, work: 90, reqPop: 30, desc: 'Zaman yarığını açar. Halkın en az 30 kişi olmalı.' },
   bandaj:      { ad: 'Sargı',          ic: '🩹', by: 'sifa',   lvl: 1, cost: { hide: 1, herb: 1 },   work: 6,  qty: 2, desc: 'Kanamayı anında durdurur, can verir' },
   ilac:        { ad: 'İlaç',           ic: '💊', by: 'sifa',   lvl: 2, cost: { herb: 3 },            work: 10, desc: 'Enfeksiyon ve salgına iyi gelir' }
 };
-const IORDER = ['balta', 'kazma', 'mizrak', 'sepet', 'ok', 'mesale', 'yay', 'zirh', 'zok', 'eyer', 'kemikMizrak', 'halat', 'yelkenBezi', 'bandaj', 'ilac'];
+const IORDER = ['balta', 'kazma', 'mizrak', 'sepet', 'ok', 'mesale', 'yay', 'zirh', 'zok', 'eyer', 'kemikMizrak', 'yatak', 'halat', 'yelkenBezi', 'bandaj', 'ilac'];
 
 const RES = { wood: '🪵', stone: '🪨', food: '🍲', meyve: '🫐', et: '🍖', cigEt: '🥩', bone: '🦴', hide: '🟫', herb: '🌿', poison: '🧪', crystal: '💎' };
 const RESN = { wood: 'Odun', stone: 'Taş', food: 'Pişmiş yemek', meyve: 'Meyve ve tahıl', et: 'Temiz et', cigEt: 'Çiğ et (temizlenmemiş)', bone: 'Kemik', hide: 'Deri', herb: 'Şifalı ot', poison: 'Zehir', crystal: 'Kristal' };
@@ -180,10 +185,12 @@ const ROOMS = {
   mutfak: { ad: 'Mutfak',       ic: '🍲', desc: 'Aşçılar burada pişirir; yemek vakti herkes buradaki masaya gelir' },
   sifa:   { ad: 'Şifa Odası',   ic: '⛑️', desc: '2 hasta yatağı' },
   kasap:  { ad: 'Et Temizleme', ic: '🔪', desc: 'Et ustaları burada eti temizler (+%25 et)' },
-  atolye: { ad: 'Atölye',       ic: '🔨', desc: 'Zanaatkârlar burada üretir' },
+  atolye: { ad: 'Alet Tezgâhı', ic: '🔨', desc: 'Balta, kazma, mızrak, sepet, yatak burada yapılır' },
+  okcu:   { ad: 'Ok ve Yay Tezgâhı', ic: '🏹', desc: 'Ok, yay ve zehirli ok burada yapılır' },
+  tabak:  { ad: 'Deri Tezgâhı', ic: '🟫', desc: 'Zırh, eyer, halat ve yelken bezi burada yapılır' },
   bos:    { ad: 'Boş Oda',      ic: '⬜', desc: 'Henüz bir işe ayrılmadı' }
 };
-const RORDER = ['yatak', 'depo', 'mutfak', 'sifa', 'kasap', 'atolye', 'bos'];
+const RORDER = ['yatak', 'depo', 'mutfak', 'sifa', 'kasap', 'atolye', 'okcu', 'tabak', 'bos'];
 const SLOTS = { sabah: 'Sabah', ogle: 'Öğle', ikindi: 'İkindi' };
 const icOf = k => RES[k] || (ITEMS[k] && ITEMS[k].ic) || k;
 

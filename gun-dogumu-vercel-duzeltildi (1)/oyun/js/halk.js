@@ -56,16 +56,25 @@ function addXP(p, s, a) {
 
 // ---- kuşanım: stoktaki aletler önceliğe göre dağıtılır
 const EQP = { kemikMizrak: ['L', 'avci', 'muhafiz', 'takip'], mizrak: ['L', 'avci', 'muhafiz', 'takip', 'kasif'], yay: ['L', 'avci', 'muhafiz', 'takip'], zirh: ['L', 'muhafiz', 'avci', 'takip', 'kasif'], balta: ['odun'], kazma: ['tas'], sepet: ['yiyecek', 'odun', 'tas', 'kasap', 'ciftci', 'sifaci'] };
-function assignEquip() {
-  for (const p of G.people) p.eq = {};
+// Eşyalar kişiye zimmetlenir (p.own); zimmetlenmeyen depoda durur. G.autoEq açıksa boşta kalan eşya uygun kişilere kendiliğinden dağıtılır.
+const OWNABLE = Object.keys(EQP).concat(['yatak']);
+function ownedCount(k) { let n = 0; for (const p of G.people) if (p.own && p.own[k]) n++; return n; }
+const freeItems = k => Math.max(0, (G.stock[k] || 0) - ownedCount(k));
+function giveItem(p, k) { if (freeItems(k) < 1) return false; p.own = p.own || {}; p.own[k] = true; p.eq = Object.assign({}, p.own); return true; }
+function takeItem(p, k) { if (p.own) delete p.own[k]; p.eq = Object.assign({}, p.own || {}); }
+function autoDistribute() {
   for (const k in EQP) {
-    let n = G.stock[k] || 0;
     for (const g of EQP[k]) {
-      if (n <= 0) break;
       const list = g === 'L' ? (L ? [L] : []) : members(g).sort((a, b) => lvl(b, GROUPS[g].sk) - lvl(a, GROUPS[g].sk));
-      for (const p of list) { if (n <= 0) break; if (k === 'mizrak' && p.eq.kemikMizrak) continue; p.eq[k] = true; n--; }
+      for (const p of list) { if (freeItems(k) < 1) break; if (p.own && p.own[k]) continue; if (k === 'mizrak' && p.own && p.own.kemikMizrak) continue; giveItem(p, k); }
     }
   }
+  for (const p of G.people) { if (freeItems('yatak') < 1) break; if (!(p.own && p.own.yatak)) giveItem(p, 'yatak'); }
+}
+function assignEquip() {
+  for (const k of OWNABLE) { let over = ownedCount(k) - (G.stock[k] || 0); if (over > 0) for (const p of G.people.slice().reverse()) { if (over <= 0) break; if (p.own && p.own[k]) { delete p.own[k]; over--; } } }
+  if (G.autoEq) autoDistribute();
+  for (const p of G.people) p.eq = Object.assign({}, p.own || {});
 }
 const spearTier = p => p && p.eq && p.eq.kemikMizrak ? 3 : p && p.eq && p.eq.mizrak ? 2 : 1;
 const arrows = () => (G.stock.ok || 0) + (G.stock.zok || 0);
@@ -299,7 +308,7 @@ const freeHomes = () => homeBuildings().reduce((n, b) => n + Math.max(0, homeCap
 const emptyTents = freeHomes;
 const homelessCount = () => G.people.filter(p => !p.leader && !homeOf(p)).length;
 // ---- istasyonlar: bağımsız yapı ya da mağara/kulübe odası
-const STN = { kasap: 'kasaphane', atolye: 'atolye', sifa: 'sifahane', mutfak: '' };
+const STN = { kasap: 'kasaphane', atolye: 'atolye', okcu: 'oktezgah', tabak: 'tabakhane', sifa: 'sifahane', mutfak: '' };
 const isRoomy = b => b.type === 'magara' || b.type === 'kulube';
 function stations(type) { return G.builds.filter(b => b.built && !b.dead && (b.type === STN[type] || (b.rooms && b.rooms.includes(type)))); }
 function station(type, from) { const S = stations(type); if (!S.length) return null; const f = from || G.fire; return S.sort((a, b) => dist(a, f) - dist(b, f))[0]; }
@@ -547,13 +556,15 @@ function updPerson(p, dt, LS) {
     else p.moving = false;
     return;
   }
-  if (G.meal && !p.ate && !p.carrying && !p.desert && !(p.post) && dist(p, G.meal.table) < 1600 && !(thr && dist(thr, p) < 150)) return mealStep(p, dt);
+  if (G.meal && !p.ate && !p.carrying && !p.desert && !(p.post) && dist(p, G.meal.table) < 3600 && !(thr && dist(thr, p) < 150)) return mealStep(p, dt);
   if (p.child) return updChild(p, dt);
   if (p.carryOrder) { if (carryOrderStep(p, dt)) return; p.carryOrder = 0; }
   applyRoutine(p);
   const fighter = p.group === 'muhafiz' || p.group === 'takip' || p.group === 'avci';
   if (thr && dist(thr, p) - thr.r < 26 && p.atkCd <= 0 && (fighter || thr.type === 'kucuk' || p.fear < 50)) personAttack(p, thr);
+  if (p.joinHunt && p.group !== 'avci' && G.hunt && G.hunt.t && !G.hunt.t.dead && !goHome() && p.hp > p.maxhp * 0.5) return updHunter(p, dt, thr);
   switch (p.group) {
+    case 'balik': return updFisher(p, dt);
     case 'muhafiz': return updGuard(p, dt);
     case 'takip': return updFollow(p, dt);
     case 'sifaci': return updHealer(p, dt, thr);
@@ -593,7 +604,7 @@ function updChild(p, dt) {
   sitByFire(p, dt, p.sr || 60);
 }
 // ---- günlük rutin, yedek iş, yemek vakti, et taşıma
-const ALTS = { yiyecek: '🫐 Meyve topla', odun: '🪓 Odun kes', tas: '⛏️ Taş kır', tasima: '🥩 Leşten et taşı', mimar: '📐 İnşaata yardım', bos: '💤 Dinlen' };
+const ALTS = { balik: '🎣 Balık tut', yiyecek: '🫐 Meyve topla', odun: '🪓 Odun kes', tas: '⛏️ Taş kır', tasima: '🥩 Leşten et taşı', mimar: '📐 İnşaata yardım', bos: '💤 Dinlen' };
 function applyRoutine(p) {
   if (!p.routine || p.child || p.leader) return;
   const ph = phase(), slot = ph < 0.16 ? 'sabah' : ph < 0.31 ? 'ogle' : ph < 0.46 ? 'ikindi' : null;
@@ -605,6 +616,7 @@ function altJob(p, dt) {
   const a = p.alt || 'yiyecek';
   if (goHome()) return homeBehavior(p, dt);
   if (a === 'odun' || a === 'tas' || a === 'yiyecek') return updGather(p, dt, a, null, true);
+  if (a === 'balik') return updFisher(p, dt);
   if (a === 'tasima') { if (haulJob(p, dt)) return; return updIdle(p, dt, true); }
   if (a === 'mimar') { if (updBuilder(p, dt, true)) return; return updIdle(p, dt, true); }
   return updIdle(p, dt, true);
@@ -813,7 +825,7 @@ function huntTarget(p) {
       if (d.tamed || d.dead || !DINO[d.type].herb || d.type === 'uzunboyun' || d.ko > 0) continue;
       if (d.type === 'zirhli' && lvl(p, 'avcilik') < 3) continue;
       if (!visible(d.x, d.y, d.r)) continue;
-      const dc = dist(d, G.fire); if (dc > 1500) continue;
+      const dc = dist(d, G.fire); if (dc > 3400) continue;
       const s = dist(d, p) + dc * 0.3 + (d.type === 'ordek' ? -200 : 0);
       if (s < bs) { bs = s; best = d; }
     }
@@ -929,8 +941,9 @@ function canDoOrder(p, o) {
   return true;
 }
 function workOrder(p, dt, by, stn) {
-  const o = G.orders.find(o => ITEMS[o.item].by === by && canDoOrder(p, o) && (o.paid || canAfford(ITEMS[o.item].cost)));
+  const o = G.orders.find(o => ITEMS[o.item].by === by && canDoOrder(p, o) && (o.paid || canAfford(ITEMS[o.item].cost)) && (by !== 'zanaat' || station(ITEMS[o.item].stn || 'atolye', p)));
   if (!o) return false;
+  if (by === 'zanaat') stn = station(ITEMS[o.item].stn || 'atolye', p);
   o.worker = p.id;
   const it0 = ITEMS[o.item];
   if (!o.paid && o.trips === undefined) { o.trips = Math.min(3, Math.max(1, Object.keys(it0.cost).length)); o.leg = 'get'; }
@@ -967,7 +980,7 @@ function workOrder(p, dt, by, stn) {
 }
 function updCrafter(p, dt) {
   if (goHome()) return homeBehavior(p, dt);
-  const st = station('atolye', p);
+  const st = station('atolye', p) || station('okcu', p) || station('tabak', p);
   if (!st) {
     if (!G.flags.noAtolye && G.orders.some(o => ITEMS[o.item].by === 'zanaat')) { G.flags.noAtolye = 1; msg('Zanaatkârların çalışması için bir 🔨 Atölye inşa et.', '#e99', 5); }
     return altJob(p, dt);
@@ -1175,4 +1188,28 @@ function kbStep(p, dt) {
   p.kbT -= dt; p.x += p.kvx * dt; p.y += p.kvy * dt; p.kvx *= Math.pow(0.02, dt); p.kvy *= Math.pow(0.02, dt);
   p.tilt = Math.max(0, p.kbT * 2); if (p !== L) pushOut(p, false);
   if (p.kbT <= 0) { p.tilt = 0; if (p === L) pushOut(p, false); }
+}
+
+// ---- balıkçı: en yakın suyun kıyısında balık tutar, balığı depoya taşır
+function fishSpot(p) {
+  if (p.fspot && p.fspotT > G.now) return p.fspot;
+  let best = null, bd = 1e9;
+  for (const l of G.lakes) { const d = dist(l, G.fire) * 0.6 + dist(l, p); if (dist(l, G.fire) < 3200 && d < bd) { bd = d; const a = angTo(l, p) + ((p.id * 0.7) % 1 - 0.5); best = { x: l.x + Math.cos(a) * (l.r + 10), y: l.y + Math.sin(a) * (l.r + 10), fx: l.x, fy: l.y }; } }
+  if (!best && G.harbor && dist(G.harbor, G.fire) < 7000) best = { x: G.harbor.x, y: G.harbor.y, fx: G.harbor.x + Math.cos(G.harbor.a || 0) * 80, fy: G.harbor.y + Math.sin(G.harbor.a || 0) * 80 };
+  p.fspot = best; p.fspotT = G.now + 60; return best;
+}
+function updFisher(p, dt) {
+  if (goHome()) return homeBehavior(p, dt);
+  if (p.fear > 45) { steer(p, G.fire.x, G.fire.y, pSpeed(p) * 1.3, dt, false); p.anim += dt * 12; return; }
+  if (p.carry >= 4 || (p.carry > 0 && p.st === 'return')) {
+    p.st = 'return'; const dp = depotOf(p);
+    if (steer(p, dp.x, dp.y, pSpeed(p), dt, false) || Math.hypot(p.x - dp.x, p.y - dp.y) < 34) { deposit(p); p.st = 'idle'; }
+    p.anim += dt * 9; return;
+  }
+  const sp = fishSpot(p);
+  if (!sp) { if (!G.flags.noWater) { G.flags.noWater = 1; msg('Yakında balık tutulacak su yok. Balıkçılar boşta.', '#e99', 4); } return updIdle(p, dt, true); }
+  if (Math.hypot(p.x - sp.x, p.y - sp.y) > 14) { steer(p, sp.x, sp.y, pSpeed(p), dt, false); p.anim += dt * 9; return; }
+  p.moving = false; p.ang = Math.atan2(sp.fy - p.y, sp.fx - p.x); p.work = 1;
+  p.fishT = (p.fishT || 0) + dt * skillMul(lvl(p, 'avcilik')) * (abilOn('balik') ? 2 : 1) * (isNight() ? 0.5 : 1);
+  if (p.fishT >= 11) { p.fishT = 0; p.bag.et = (p.bag.et || 0) + 1; p.carry++; addXP(p, 'avcilik', 3); ftext(p.x, p.y - 30, '🐟', '#9cf'); }
 }

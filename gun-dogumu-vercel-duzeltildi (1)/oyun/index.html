@@ -73,12 +73,17 @@ button{font-family:Georgia,serif;color:var(--ink);cursor:pointer}
 #bars{display:flex;gap:8px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:5px 10px;font-size:12px;width:min(420px,94vw)}
 #hpBar{background:linear-gradient(90deg,#922,#e44)}
 #stBar{background:linear-gradient(90deg,#aa7,#ee9)}
-#tools{display:flex;gap:5px;pointer-events:auto;overflow-x:auto;max-width:100%;padding-bottom:2px}
-#tools button{flex:none;background:var(--panel);border:1px solid #5a4a30;border-radius:8px;font-size:12px;padding:5px 8px;white-space:nowrap;line-height:1.25}
+#menuBtn{pointer-events:auto;background:var(--panel);border:1px solid #c88a40;border-radius:8px;font-size:13px;padding:6px 14px;color:inherit}
+#menuBtn.on{box-shadow:0 0 8px rgba(255,138,42,.5)}#menuBtn small{color:var(--muted)}
+#tools{display:none;position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(680px,94vw);max-height:84vh;overflow:auto;background:#15110c;border:1px solid #6a5030;border-radius:12px;padding:10px 12px 12px;pointer-events:auto;z-index:4;flex-direction:column;gap:4px}
+#tools.open{display:flex}
+#tools .mhead{display:flex;justify-content:space-between;align-items:center;font-size:16px}
+#tools .cat{margin-top:6px}
+#tools .mrow{display:flex;flex-wrap:wrap;gap:5px}
+#tools button{background:#2b2419;border:1px solid #5a4a30;border-radius:8px;font-size:12px;padding:6px 9px;line-height:1.3;color:inherit}
 #tools button small{color:var(--muted)}
 #tools button.on{border-color:var(--fire);box-shadow:0 0 8px rgba(255,138,42,.5)}
 #tools button.no{opacity:.45}
-#tools button.hl{border-color:#c88a40}
 #craft{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:4;pointer-events:auto}
 #craftBox{background:#15110c;border:1px solid #6a5030;border-radius:12px;width:min(640px,94vw);max-height:86vh;display:flex;flex-direction:column}
 .ch{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line);flex-wrap:wrap}
@@ -164,7 +169,6 @@ summary{cursor:pointer;color:#e8d4b0}
   #tbtns{bottom:66px;grid-template-columns:repeat(3,50px);gap:6px}
   #tbtns div{width:50px;height:50px;font-size:10px}
   #bottom{gap:3px;padding:0 6px 4px}
-  #tools button{font-size:11px;padding:4px 7px}
 }
 </style>
 </head>
@@ -194,8 +198,9 @@ summary{cursor:pointer;color:#e8d4b0}
   <div id="bottom">
     <div id="prompt"></div>
     <div id="bars">❤<div class="bar"><i id="hpBar"></i></div>⚡<div class="bar"><i id="stBar"></i></div></div>
-    <div id="tools"></div>
+    <button id="menuBtn">☰ Eylemler <small>[B]</small></button>
   </div>
+  <div id="tools"></div>
 </div>
 
 <div id="craft"><div id="craftBox"></div></div>

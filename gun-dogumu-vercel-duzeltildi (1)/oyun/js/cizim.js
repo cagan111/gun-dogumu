@@ -79,7 +79,9 @@ const TREE_PAL = [
   [['#163a14', '#24561e', '#3f7a2c', '#7aa84a'], ['#1a3a1e', '#285a30', '#3f7a40', '#7ab070'], ['#24391a', '#3a5a22', '#58782e', '#9ab05a']],
   null,
   [['#283018', '#3a4622', '#54602e', '#88904a'], ['#24301e', '#34422a', '#4c5a36', '#7a8a5a']],
-  [['#1c2224', '#283234', '#3a4648', '#6a7a7c'], ['#20241e', '#2e3428', '#40483a', '#6a7460']]
+  [['#1c2224', '#283234', '#3a4648', '#6a7a7c'], ['#20241e', '#2e3428', '#40483a', '#6a7460']],
+  [['#2e5a1c', '#4a8a2a', '#64a23a', '#9ac85a'], ['#3a5e1e', '#5a8e30', '#76a640', '#a8c860']],
+  [['#2a4a18', '#3e7a26', '#5a9a34', '#8ab84a'], ['#345a1c', '#4a8228', '#62a036', '#94c05a']]
 ];
 const treeCache = new Map();
 function treeSprite(b, tone, cr) {
@@ -161,29 +163,29 @@ function drawOverlay3D() {
   ctx.clearRect(0, 0, VW, VH);
   const dk = darkness(), LS = U3.LS && U3.LS.length ? U3.LS : lights();
   if (SUN.grade) { ctx.fillStyle = SUN.grade; ctx.fillRect(0, 0, VW, VH); }
-  if (G.weather.type === 'yagmur' || G.weather.type === 'firtina') {
-    const st = G.weather.type === 'firtina';
-    ctx.strokeStyle = 'rgba(170,190,220,.35)'; ctx.lineWidth = 1; ctx.beginPath();
-    const n = st ? 220 : 130, sl = st ? 9 : 3;
-    for (let i = 0; i < n; i++) { const x = (i * 137.5 + G.now * 60) % VW, y = (i * 91.3 + G.now * 900) % VH, l = 14 + (i % 5) * 4; ctx.moveTo(x, y); ctx.lineTo(x - sl, y + l); }
-    ctx.stroke();
-    ctx.fillStyle = 'rgba(190,210,240,.2)'; for (let i = 0; i < 24; i++) { const x = (i * 211.7 + G.now * 37) % VW, y = VH * 0.62 + (i * 133.1 + G.now * 53) % (VH * 0.38); ell(x, y, 3, 1.2); }
+  if ((G.weather.type === 'yagmur' || G.weather.type === 'firtina') && !G.inside && (G.pitch || 0) > -0.2) {
+    // merceğe düşen birkaç damla (yağmur çizgileri 3B sahnede)
+    for (let i = 0; i < 9; i++) { const ph = (G.now * 0.35 + i * 0.37) % 1, x = (i * 211.7) % VW, y = (i * 133.1) % VH + ph * 24, a = (1 - ph) * 0.16; ctx.fillStyle = `rgba(200,215,240,${a})`; ell(x, y, 4 + (i % 3), 5 + (i % 3)); }
   }
   if (G.flash > 0) { ctx.fillStyle = `rgba(220,230,255,${Math.min(0.85, G.flash * 1.5)})`; ctx.fillRect(0, 0, VW, VH); }
   // dünyaya bağlı yazılar
   ctx.textAlign = 'center';
   ctx.font = 'bold 13px Georgia';
-  for (const t of G.texts) { const s = w2s(t.x, t.y, 30 + (1.3 - t.life) * 14); if (!s || !s.on || s.z > 900) continue; ctx.globalAlpha = clamp(t.life, 0, 1); ctx.fillStyle = '#000'; ctx.fillText(t.t, s.x + 1, s.y + 1); ctx.fillStyle = t.col; ctx.fillText(t.t, s.x, s.y); }
+  if (!G.inside) for (const t of G.texts) { const s = w2s(t.x, t.y, 30 + (1.3 - t.life) * 14); if (!s || !s.on || s.z > 900) continue; ctx.globalAlpha = clamp(t.life, 0, 1); ctx.fillStyle = '#000'; ctx.fillText(t.t, s.x + 1, s.y + 1); ctx.fillStyle = t.col; ctx.fillText(t.t, s.x, s.y); }
   ctx.globalAlpha = 1;
-  drawLabels3D(LS, dk);
-  edgeMarker(G.fire.x, G.fire.y, '🔥', dist(L, G.fire) > 450 || G.carryEgg);
-  if (G.rescue) edgeMarker(G.rescue.x, G.rescue.y, '🆘', true);
-  if (G.rift.found || (G.riftHint && isNight())) edgeMarker(G.rift.x, G.rift.y, '🌀', true);
-  if (G.hunt && G.hunt.t && !G.hunt.t.dead) edgeMarker(G.hunt.t.x, G.hunt.t.y, '🎯', true);
-  for (const p of G.people) if ((p.grabbed && p.grabT > 0 && dist(p, L) < 1100) || p.desert > 0 || p.downed > 0) edgeMarker(p.x, p.y, p.downed > 0 ? '🩸' : '❗', true);
-  for (const c of G.ccamps) if (c.captives.length) edgeMarker(c.x, c.y, '⛓️', true);
+  if (G.inside) drawLabelsIn();
+  else {
+    drawLabels3D(LS, dk);
+    edgeMarker(G.fire.x, G.fire.y, '🔥', dist(L, G.fire) > 450 || G.carryEgg);
+    if (G.rescue) edgeMarker(G.rescue.x, G.rescue.y, '🆘', true);
+    if (G.rift.found || (G.riftHint && isNight())) edgeMarker(G.rift.x, G.rift.y, '🌀', true);
+    if (G.hunt && G.hunt.t && !G.hunt.t.dead) edgeMarker(G.hunt.t.x, G.hunt.t.y, '🎯', true);
+    for (const p of G.people) if ((p.grabbed && p.grabT > 0 && dist(p, L) < 1100) || p.desert > 0 || p.downed > 0) edgeMarker(p.x, p.y, p.downed > 0 ? '🩸' : '❗', true);
+    for (const c of G.ccamps) if (c.captives.length) edgeMarker(c.x, c.y, '⛓️', true);
+    for (const w of G.wrecks || []) if (!w.found && dist(w, L) < 900) edgeMarker(w.x, w.y, '⚓', true);
+  }
   // karartma, tehlike, hasar
-  const fearV = Math.max(G.danger * 0.8, dk * 0.5);
+  const fearV = G.inside ? 0.35 : Math.max(G.danger * 0.8, dk * 0.5);
   const vg = ctx.createRadialGradient(VW / 2, VH / 2, Math.min(VW, VH) * (0.42 - fearV * 0.15), VW / 2, VH / 2, Math.max(VW, VH) * 0.75);
   vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, `rgba(${Math.round(40 * G.danger)},0,0,${0.36 + fearV * 0.4})`);
   ctx.fillStyle = vg; ctx.fillRect(0, 0, VW, VH);
@@ -199,6 +201,23 @@ function drawOverlay3D() {
     let ic = (L.injury ? (L.injury.type === 'kanama' ? '🩸' : L.injury.type === 'kirik' ? '🦴' : '🤢') : '') + (L.sick ? '🤒' : '') + (G.carryEgg ? '🥚' : '');
     if (ic) { ctx.font = '16px serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#fff'; ctx.fillText(ic, cx, cy + 40); }
   }
+}
+// içeride: yakındaki insanların adı + duruşu
+function drawLabelsIn() {
+  if (typeof inPeople !== 'function') return;
+  const I = G.inside; ctx.textAlign = 'center';
+  for (const q of inPeople(I.b)) {
+    if (!q.p || q.p === L) continue;
+    const d = Math.hypot(q.x - I.x, q.y - I.y); if (d > 260) continue;
+    const s = w2s(q.x, q.y, q.pose === 'sleep' ? 14 : q.pose === 'sit' || q.pose === 'eat' ? 32 : 42); if (!s || !s.on) continue;
+    const look = G.lookP === q.p, k = clamp(200 / Math.max(80, s.z), 0.8, 1.3);
+    ctx.globalAlpha = clamp((260 - d) / 80, 0, 1);
+    ctx.font = Math.round(11 * k) + 'px Georgia'; ctx.fillStyle = 'rgba(0,0,0,.7)'; ctx.fillText(q.p.name, s.x + 1, s.y + 1); ctx.fillStyle = look ? '#ffd27a' : '#eadcc0'; ctx.fillText(q.p.name, s.x, s.y);
+    const ic = q.pose === 'sleep' ? '💤' : q.pose === 'eat' ? '🍲' : q.pose === 'work' ? '⚒️' : '';
+    if (ic) { ctx.font = Math.round(12 * k) + 'px serif'; ctx.fillText(ic, s.x, s.y - 14 * k); }
+    if (look) { ctx.strokeStyle = 'rgba(255,210,122,.8)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(s.x - 6, s.y + 6); ctx.lineTo(s.x, s.y + 12); ctx.lineTo(s.x + 6, s.y + 6); ctx.stroke(); }
+  }
+  ctx.globalAlpha = 1;
 }
 function drawLabels3D(LS, dk) {
   ctx.textAlign = 'center';
@@ -235,9 +254,9 @@ function drawLabels3D(LS, dk) {
     if (d.tamed) { ctx.fillStyle = '#9cf'; ctx.font = '12px Georgia'; ctx.fillText('♥', s.x, s.y - 5); }
   }
   for (const b of G.builds) {
-    if (b.dead || Math.abs(b.x - L.x) > 480 || Math.abs(b.y - L.y) > 480) continue;
-    const T = b.type, flat = BUILD[T].flat;
-    const top = T === 'magara' ? 60 : T === 'kulube' ? 66 : T === 'kule' ? 122 : flat ? 22 : T === 'cit' || T === 'duvar' ? 42 : 50;
+    if (b.dead || Math.abs(b.x - L.x) > 480 || Math.abs(b.y - L.y) > 480 || !BUILD[b.type]) continue;
+    const T = b.type, flat = (BUILD[T] || {}).flat;
+    const top = T === 'magara' ? 95 : T === 'kulube' ? 66 : T === 'kule' ? 122 : T === 'gemi' ? 90 : flat ? 22 : T === 'cit' || T === 'duvar' ? 42 : 50;
     const s = w2s(b.x, T === 'magara' ? b.y + b.r * 0.95 : b.y, top); if (!s || !s.on || s.z > 480) continue;
     if (!b.built) { hpBar(s.x, s.y, b.prog / b.need, 34); continue; }
     if (b.hp < b.maxhp && !flat) hpBar(s.x, s.y, b.hp / b.maxhp, 30);
@@ -963,40 +982,73 @@ function drawFlyer(d) {
   if (d.tamed) { ctx.fillStyle = '#9cf'; ctx.font = '11px Georgia'; ctx.textAlign = 'center'; ctx.fillText('♥', d.x, d.y - lift - r - 6); }
 }
 
-// ---- mini harita
-let fogC = null;
+// ---- mini harita: kabartma gölgeli ada (dunya.js groundH/biomeFast'tan bir kez üretilir)
+let fogC = null, miniBase = null, miniKey = null;
+function miniBaseCanvas() {
+  if (typeof groundH !== 'function' || typeof biomeFast !== 'function' || !G.bmap) return biomeMini;
+  if (miniBase && miniKey === G.bmap) return miniBase;
+  const N = 400, c = document.createElement('canvas'); c.width = c.height = N;
+  const g = c.getContext('2d'), id = g.createImageData(N, N), d = id.data, cs = WORLD / N;
+  const BC = [[58, 92, 40], [118, 112, 98], [56, 70, 36], [74, 82, 84], [112, 142, 58], [214, 192, 140], [30, 62, 86], [58, 92, 40]];
+  const H = new Float32Array((N + 2) * (N + 2));
+  for (let j = 0; j < N + 2; j++) for (let i = 0; i < N + 2; i++) H[j * (N + 2) + i] = groundH((i - 0.5) * cs, (j - 0.5) * cs);
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+    const e = (j + 1) * (N + 2) + i + 1, h = H[e], o = (j * N + i) * 4; let r, gg, b;
+    if (h < 0) { const k = Math.min(1, -h / 140); r = 70 - 50 * k; gg = 140 - 96 * k; b = 158 - 88 * k; if (h > -4) { r += 40; gg += 40; b += 30; } }
+    else {
+      const bc = BC[biomeFast((i + 0.5) * cs, (j + 0.5) * cs)] || BC[0]; r = bc[0]; gg = bc[1]; b = bc[2];
+      if (h < 4) { r = 214; gg = 194; b = 142; }
+      if (h > 360) { const k = Math.min(1, (h - 360) / 120) * 0.7; r += (128 - r) * k; gg += (122 - gg) * k; b += (112 - b) * k; }
+      if (h > 470) { const k = Math.min(1, (h - 470) / 80); r += (236 - r) * k; gg += (240 - gg) * k; b += (244 - b) * k; }
+      const sh = Math.max(0.5, Math.min(1.5, 1 + ((H[e - 1] - H[e + 1]) + (H[e - N - 2] - H[e + N + 2])) * 0.012));
+      r *= sh; gg *= sh; b *= sh;
+    }
+    d[o] = r; d[o + 1] = gg; d[o + 2] = b; d[o + 3] = 255;
+  }
+  g.putImageData(id, 0, 0);
+  g.fillStyle = 'rgba(40,90,120,.9)'; for (const l of G.lakes || []) { g.beginPath(); g.arc(l.x / cs, l.y / cs, Math.max(1, l.r / cs), 0, TAU); g.fill(); }
+  g.fillStyle = 'rgba(46,62,40,.9)'; for (const p of G.pools || []) { g.beginPath(); g.arc(p.x / cs, p.y / cs, Math.max(1, p.r / cs), 0, TAU); g.fill(); }
+  miniBase = c; miniKey = G.bmap; return c;
+}
 function drawMini() {
   const c = $('mini'); if (!c || !G.explored || $('miniBox').style.display === 'none') return;
   const big = $('miniBox').classList.contains('big');
   const size = big ? Math.min(innerWidth, innerHeight) * 0.8 : 150;
   const px = Math.round(size * DPR);
   if (c.width !== px) { c.width = c.height = px; c.style.width = c.style.height = size + 'px'; }
-  const g = c.getContext('2d'), S = px, k = S / WORLD;
-  g.imageSmoothingEnabled = false; g.drawImage(biomeMini, 0, 0, S, S);
+  const g = c.getContext('2d'), S = px, base = miniBaseCanvas();
+  // görünen pencere: büyük harita tüm ada (tıklama eşlemesi buna bağlı), küçük harita oyuncunun çevresi
+  const me = G.inside && G.inside.b ? G.inside.b : L;
+  const vw = big ? WORLD : 3600, vx = big ? 0 : clamp(me.x - vw / 2, 0, WORLD - vw), vy = big ? 0 : clamp(me.y - vw / 2, 0, WORLD - vw), k = S / vw;
+  const X = x => (x - vx) * k, Y = y => (y - vy) * k;
+  g.fillStyle = '#12304a'; g.fillRect(0, 0, S, S);
+  g.imageSmoothingEnabled = true; g.drawImage(base, vx / WORLD * base.width, vy / WORLD * base.height, vw / WORLD * base.width, vw / WORLD * base.height, 0, 0, S, S);
   if (!fogC) { fogC = document.createElement('canvas'); fogC.width = fogC.height = MAPN; }
   const fg = fogC.getContext('2d'), id = fg.createImageData(MAPN, MAPN);
-  for (let i = 0; i < MAPN * MAPN; i++) id.data[i * 4 + 3] = G.explored[i] ? 0 : 245;
+  for (let i = 0; i < MAPN * MAPN; i++) { id.data[i * 4] = 8; id.data[i * 4 + 1] = 10; id.data[i * 4 + 2] = 14; id.data[i * 4 + 3] = G.explored[i] ? 0 : 236; }
   fg.putImageData(id, 0, 0);
-  g.imageSmoothingEnabled = true; g.drawImage(fogC, 0, 0, S, S);
-  const dot = (x, y, r, col) => { g.fillStyle = col; g.beginPath(); g.arc(x * k, y * k, r * DPR, 0, TAU); g.fill(); };
-  for (const b of G.builds) dot(b.x, b.y, 1.5, b.built ? '#c9a46a' : '#8ab');
+  g.drawImage(fogC, vx / MAPC, vy / MAPC, vw / MAPC, vw / MAPC, 0, 0, S, S);
+  const dot = (x, y, r, col) => { const sx = X(x), sy = Y(y); if (sx < -10 || sy < -10 || sx > S + 10 || sy > S + 10) return; g.fillStyle = col; g.beginPath(); g.arc(sx, sy, r * DPR, 0, TAU); g.fill(); };
+  for (const b of G.builds) dot(b.x, b.y, b.type === 'gemi' ? 3 : 1.5, b.type === 'gemi' ? '#e8d8a8' : b.built ? '#c9a46a' : '#8ab');
   dot(G.fire.x, G.fire.y, 3.5, '#ff8a2a');
   if (G.rift.found) dot(G.rift.x, G.rift.y, 4, '#7ab0ff');
   for (const n of G.nests) if (n.found && n.eggs > 0) dot(n.x, n.y, 2.5, '#efe4c8');
+  for (const w of G.wrecks || []) if (w.found || exploredAt(w.x, w.y)) { dot(w.x, w.y, 3, w.found ? '#7a8a9a' : '#9cf'); if (!w.found) { g.fillStyle = '#fff'; g.font = `${9 * DPR}px serif`; g.textAlign = 'center'; g.fillText('⚓', X(w.x), Y(w.y) - 4 * DPR); } }
   for (const c2 of G.carcs) if (exploredAt(c2.x, c2.y)) dot(c2.x, c2.y, 2, c2.rotten ? '#665' : '#a44');
   for (const z of GORDER) if (G.zone[z]) dot(G.zone[z].x, G.zone[z].y, 2.5, GROUPS[z].col);
-  for (const c2 of G.ccamps) if (c2.found) { dot(c2.x, c2.y, 4, c2.alive ? '#d22' : '#633'); if (c2.alive) { g.fillStyle = '#fff'; g.font = `${9 * DPR}px serif`; g.textAlign = 'center'; g.fillText('☠', c2.x * k, c2.y * k + 3 * DPR); } }
-  if (G.zone.kasif) { g.strokeStyle = '#ffd27a'; g.lineWidth = 1.5 * DPR; g.beginPath(); g.arc(G.zone.kasif.x * k, G.zone.kasif.y * k, 7 * DPR, 0, TAU); g.stroke(); }
+  for (const c2 of G.ccamps) if (c2.found) { dot(c2.x, c2.y, 4, c2.alive ? '#d22' : '#633'); if (c2.alive) { g.fillStyle = '#fff'; g.font = `${9 * DPR}px serif`; g.textAlign = 'center'; g.fillText('☠', X(c2.x), Y(c2.y) + 3 * DPR); } }
+  if (G.zone.kasif) { g.strokeStyle = '#ffd27a'; g.lineWidth = 1.5 * DPR; g.beginPath(); g.arc(X(G.zone.kasif.x), Y(G.zone.kasif.y), 7 * DPR, 0, TAU); g.stroke(); }
   for (const p of G.people) if (!p.inHut && !p.insideB && p !== L && !(p.grabbed && !(p.grabT > 0))) dot(p.x, p.y, 1.4, p.downed > 0 || p.grabbed ? '#f44' : '#e8dcc0');
   for (const d of G.dinos) { if (d.tamed) dot(d.x, d.y, 2, '#8f8'); else if ((d.scouted > 0 || visible(d.x, d.y)) && hostile(d)) dot(d.x, d.y, 2, '#f33'); else if (visible(d.x, d.y) && DINO[d.type].herb) dot(d.x, d.y, 1.8, '#dc8'); }
-  if (G.hunt && G.hunt.t && !G.hunt.t.dead) { g.strokeStyle = '#f63'; g.lineWidth = 1.5 * DPR; g.beginPath(); g.arc(G.hunt.t.x * k, G.hunt.t.y * k, 5 * DPR, 0, TAU); g.stroke(); }
+  if (G.hunt && G.hunt.t && !G.hunt.t.dead) { g.strokeStyle = '#f63'; g.lineWidth = 1.5 * DPR; g.beginPath(); g.arc(X(G.hunt.t.x), Y(G.hunt.t.y), 5 * DPR, 0, TAU); g.stroke(); }
   if (G.rescue) dot(G.rescue.x, G.rescue.y, 3, '#5cf');
-  dot(L.x, L.y, 3, '#fff');
-  if (typeof U3 !== 'undefined' && U3.ok === true) {
-    // bakış yönü konisi
-    const yaw = G.yaw === undefined ? (L.ang || 0) : G.yaw, len = (big ? 26 : 13) * DPR, hf = 0.6;
-    g.fillStyle = 'rgba(255,255,255,.28)'; g.beginPath(); g.moveTo(L.x * k, L.y * k); g.arc(L.x * k, L.y * k, len, yaw - hf, yaw + hf); g.closePath(); g.fill();
-  } else { g.strokeStyle = 'rgba(255,255,255,.5)'; g.lineWidth = DPR; g.strokeRect((L.x - VW / 2) * k, (L.y - VH / 2) * k, VW * k, VH * k); }
+  // oyuncu: bakış konisi + yön oku
+  const yaw = G.yaw === undefined ? (L.ang || 0) : G.yaw, mx = X(me.x), my = Y(me.y), len = (big ? 30 : 22) * DPR, hf = 0.55;
+  const cg = g.createRadialGradient(mx, my, 0, mx, my, len); cg.addColorStop(0, 'rgba(255,240,200,.55)'); cg.addColorStop(1, 'rgba(255,240,200,0)');
+  g.fillStyle = cg; g.beginPath(); g.moveTo(mx, my); g.arc(mx, my, len, yaw - hf, yaw + hf); g.closePath(); g.fill();
+  g.save(); g.translate(mx, my); g.rotate(yaw); const a = (big ? 6 : 5) * DPR;
+  g.fillStyle = '#fff'; g.strokeStyle = 'rgba(0,0,0,.7)'; g.lineWidth = 1.2 * DPR; g.beginPath(); g.moveTo(a * 1.6, 0); g.lineTo(-a, -a); g.lineTo(-a * 0.45, 0); g.lineTo(-a, a); g.closePath(); g.fill(); g.stroke(); g.restore();
+  if (!big) { g.fillStyle = 'rgba(255,255,255,.75)'; g.font = `bold ${9 * DPR}px Georgia`; g.textAlign = 'center'; g.fillText('K', S / 2, 10 * DPR); g.strokeStyle = 'rgba(255,255,255,.18)'; g.lineWidth = DPR; g.strokeRect(0.5, 0.5, S - 1, S - 1); }
 }
 
 // ---- keşif sisi

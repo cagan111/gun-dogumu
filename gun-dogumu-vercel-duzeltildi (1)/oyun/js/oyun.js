@@ -8,7 +8,7 @@ function resetState(diff) {
   for (const k of Object.keys(G)) delete G[k];
   Object.assign(G, {
     diff, seed: 0, t: CYCLE * 0.05, day: 1, now: 0, dt: 0,
-    stock: { wood: 30, stone: 10, food: 20, meyve: 14, et: 6, cigEt: 0, bone: 3, hide: 6, herb: 3, poison: 0, crystal: 0, halat: 0, yelkenBezi: 0, gemiParca: 0, mizrak: 1, balta: 1, kazma: 0, sepet: 0, ok: 0, zok: 0, yay: 0, zirh: 0, mesale: 0, eyer: 0, kemikMizrak: 0, yarikTasi: 0, bandaj: 2, ilac: 1 },
+    stock: { wood: 30, stone: 10, food: 20, meyve: 14, et: 6, cigEt: 0, bone: 3, hide: 6, herb: 3, poison: 0, crystal: 0, yatak: 0, halat: 0, yelkenBezi: 0, gemiParca: 0, mizrak: 1, balta: 1, kazma: 0, sepet: 0, ok: 0, zok: 0, yay: 0, zirh: 0, mesale: 0, eyer: 0, kemikMizrak: 0, yarikTasi: 0, bandaj: 2, ilac: 1 },
     fire: { x: CAMP.x, y: CAMP.y, fuel: 85, out: false },
     builds: [], people: [], dinos: [], parts: [], texts: [], msgs: [], proj: [], stains: [], tracks: [], rainDrops: [],
     meal: null, feastNext: false, cave: null, tutIn: false, carcs: [], orders: [], hunt: null, huntMode: false, unclean: 0, lcarry: null, oid: 0, eqT: 0, homeT2: 0,
@@ -38,7 +38,8 @@ function newGame(diff, tutOn) {
   G.cave = makeBuild('magara', CAMP.x, CAMP.y - 230, 0); finishBuild(G.cave, true);
   G.cave.rooms = BUILD.magara.rooms.slice();
   msg('Halkın bir mağarada yaşıyor. Kapısına gidip E ile içeri gir; içeride dolaş, insanlara bakıp E ile emir ver.', '#cfe', 9);
-  assignHomes(); assignEquip();
+  assignHomes(); autoDistribute(); assignEquip();
+  msg('Kimsenin yatağı yok; herkes yerde yatıyor. Zanaatkâra 🛏️ Yatak ürettir ve kişilere ver.', '#cde', 9);
   G.tut = { on: !!tutOn, step: 0 };
   msg('Ateşi canlı tut. Halkını besle. Gece geldiğinde... ışıktan ayrılma.', '#ffd9a0', 8);
   if (!tutOn) msg('Halkını sağdaki panelden gruplara ayır, yöneticiler ata.', '#bbb', 8);
@@ -361,7 +362,7 @@ function itemBlock(id) {
   const best = crafters(it.by).reduce((m, p) => Math.max(m, lvl(p, it.by)), 0);
   if (!best) return `${it.by === 'sifa' ? '🌿 Şifacı' : '🔨 Zanaatkâr'} grubunda kimse yok`;
   if (best < it.lvl) return `${SKILLS[it.by].ad} ${it.lvl}. seviye gerekir (en iyi: ${best})`;
-  if (it.by === 'zanaat' && !G.builds.some(b => b.type === 'atolye' && b.built)) return 'önce bir 🔨 Atölye inşa et';
+  if (it.by === 'zanaat' && !station(it.stn || 'atolye')) { const r = ROOMS[it.stn || 'atolye']; return `önce bir ${r.ic} ${r.ad} kur (yapı ya da oda)`; }
   return '';
 }
 function addOrder(id, n, byId) {
@@ -392,6 +393,7 @@ function newDay() {
   G.day++; G.flags = {}; G.devDone = false; G.leaveDone = false; G.mimic = null; G.tracks = []; G.silent = false;
   let tn = 0; for (const d of G.dinos) if (d.tamed) tn += d.type === 'boynuzlu' ? 3 : d.type === 'uzunboyun' ? 5 : 1;
   const need = 10;
+  { const nb = G.people.filter(q => !(q.own && q.own.yatak)).length; if (nb) { moraleAdd(-Math.min(3, nb * 0.3)); if (G.day % 4 === 2) msg(`🛏️ ${nb} kişi yerde yattı, iyi dinlenemedi. Yatak ürettir ve dağıt.`, '#cba', 5); } }
   const rafs = G.builds.filter(b => b.type === 'raf' && b.built).length;
   if (rafs) addStock('et', rafs * 4);
   if (tn) { const fed = spendFood(Math.ceil(tn * DIFF[G.diff].eat)); if (!fed) msg('Evcil hayvanlar aç kaldı.', '#e9a', 4); }
@@ -648,12 +650,12 @@ function gameOver() {
 //  KAYIT
 // =============================================================
 function serialize() {
-  const pf = ['id', 'name', 'x', 'y', 'leader', 'child', 'age', 'traits', 'story', 'group', 'hp', 'maxhp', 'fear', 'skin', 'hair', 'injury', 'downed', 'tired', 'watched', 'partner', 'parentA', 'parentB', 'stam', 'seat', 'r', 'sk', 'sick', 'wasDowned', 'bedUntil', 'routine', 'alt', 'hunger'];
+  const pf = ['id', 'name', 'x', 'y', 'leader', 'child', 'age', 'traits', 'story', 'group', 'hp', 'maxhp', 'fear', 'skin', 'hair', 'injury', 'downed', 'tired', 'watched', 'partner', 'parentA', 'parentB', 'stam', 'seat', 'r', 'sk', 'sick', 'wasDowned', 'bedUntil', 'routine', 'alt', 'hunger', 'own', 'joinHunt'];
   let ex = ''; for (let i = 0; i < G.explored.length; i++) ex += G.explored[i] ? '1' : '0';
   return JSON.stringify({
     v: 4, wrecks: (G.wrecks || []).map(w => !!w.found), inside: G.inside ? G.builds.indexOf(G.inside.b) : -1, seed: G.seed, diff: G.diff, t: G.t, day: G.day, stock: G.stock, fuel: G.fire.fuel, morale: G.morale, orders: G.orders.map(o => Object.assign({}, o, { worker: 0 })), oid: G.oid, unclean: G.unclean,
     carcs: G.carcs.filter(c => !c.dead).map(c => ({ x: c.x, y: c.y, r: c.r, type: c.type, ang: c.ang, meat: c.meat, bone: c.bone, hide: c.hide, age: c.age, rotten: c.rotten })),
-    managers: G.managers, zone: G.zone, newGroup: G.newGroup, torchFuel: G.torchFuel, nightPlan: G.nightPlan, nightWeather: G.nightWeather, weather: G.weather,
+    managers: G.managers, zone: G.zone, newGroup: G.newGroup, autoEq: !!G.autoEq, torchFuel: G.torchFuel, nightPlan: G.nightPlan, nightWeather: G.nightWeather, weather: G.weather,
     eggs: G.eggs, usedNames: [...G.usedNames], stats: G.stats, idc: G.idc, kills: G.kills, deaths: G.deaths, lost: G.lost,
     devSeenEver: G.devSeenEver, riftFound: G.rift.found, riftHint: G.riftHint, rescueAt: G.rescueAt, dayRainAt: G.dayRainAt,
     flags: G.flags, leaveDone: G.leaveDone, devDone: G.devDone, tut: G.tut.on ? G.tut.step : -1,
@@ -681,6 +683,7 @@ function loadGame(s) {
   Object.assign(G, { t: D.t, day: D.day, morale: D.morale, newGroup: D.newGroup || 'bos', torchFuel: D.torchFuel || 0, nightPlan: D.nightPlan || [], nightWeather: D.nightWeather || 'acik',
     weather: D.weather || { type: 'acik', t: 0 }, eggs: D.eggs || [], stats: Object.assign(G.stats, D.stats || {}), idc: D.idc, kills: D.kills, deaths: D.deaths, lost: D.lost,
     devSeenEver: D.devSeenEver, riftHint: D.riftHint, rescueAt: -1, dayRainAt: D.dayRainAt || -1, flags: D.flags || {}, leaveDone: D.leaveDone, devDone: D.devDone });
+  G.autoEq = !!D.autoEq;
   Object.assign(G.stock, D.stock); G.fire.fuel = D.fuel; G.rift.found = !!D.riftFound;
   (D.wrecks || []).forEach((f, i) => { if (G.wrecks && G.wrecks[i]) G.wrecks[i].found = f; });
   G.usedNames = new Set(D.usedNames); G.orders = D.orders || []; G.oid = D.oid || 0; G.unclean = D.unclean || 0;

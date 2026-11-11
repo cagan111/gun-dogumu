@@ -18,6 +18,7 @@ addEventListener('keydown', e => {
   if (G.sleep) { if (first) wakeUp('Uyandın.'); return; }
   if (e.code === 'KeyE' && first) onActPress();
   if (e.code === 'KeyU' && first) trySleep();
+  if ((e.code === 'KeyB' || e.code === 'KeyQ') && first) toggleMenu();
   if (e.code === 'KeyX' && first) { G.sneakOn = !G.sneakOn; }
   if (e.code === 'KeyT') toggleTorch();
   if (e.code === 'KeyC') toggleCraft();
@@ -26,7 +27,7 @@ addEventListener('keydown', e => {
   if (e.code === 'Tab') unlockPtr();
   if (e.code === 'KeyG') toggleHunt();
   if (e.code === 'KeyI') { if (UI.inB) closeInterior(); else openInterior(G.inside ? G.inside.b : undefined); }
-  if (e.code === 'Escape') { if (UI.char) closeChar(); else if (UI.inB) closeInterior(); else if (G.modal) toggleCraft(false); else if (G.placing) cancelPlace(); else if (G.huntMode) G.huntMode = false; else togglePause(); }
+  if (e.code === 'Escape') { if ($('tools').classList.contains('open')) toggleMenu(false); else if (UI.char) closeChar(); else if (UI.inB) closeInterior(); else if (G.modal) toggleCraft(false); else if (G.placing) cancelPlace(); else if (G.huntMode) G.huntMode = false; else togglePause(); }
   if (e.code === 'KeyP') togglePause();
   const n = parseInt(e.key);
   if (n >= 1 && n <= 9) { const list = BORDER.filter(buildUnlocked); if (list[n - 1]) startPlace(list[n - 1]); }
@@ -98,26 +99,54 @@ if (isTouch) {
 }
 
 // ---- araç çubuğu
+function toggleMenu(force) {
+  if (!playing()) return; const t = $('tools'), open = force !== undefined ? force : !t.classList.contains('open');
+  t.classList.toggle('open', open); $('menuBtn').classList.toggle('on', open); if (open) { unlockPtr(); buildTools(); }
+}
+$('menuBtn').addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); audioInit(); toggleMenu(); });
 $('tools').addEventListener('pointerdown', e => {
   const b = e.target.closest('button'); if (!b) return; e.preventDefault(); audioInit();
+  const x = b.dataset.x;
   if (b.dataset.b) { if (G.placing === b.dataset.b) cancelPlace(); else startPlace(b.dataset.b); }
-  if (b.dataset.x === 'craft') toggleCraft();
-  if (b.dataset.x === 'map') toggleMap();
-  if (b.dataset.x === 'torch') toggleTorch();
-  if (b.dataset.x === 'hunt') toggleHunt();
-  if (b.dataset.x === 'in') openInterior();
-  if (b.dataset.x === 'sleep') trySleep();
+  if (x === 'craft') toggleCraft();
+  if (x === 'map') toggleMap();
+  if (x === 'torch') toggleTorch();
+  if (x === 'hunt') toggleHunt();
+  if (x === 'in') openInterior(G.inside ? G.inside.b : undefined);
+  if (x === 'sleep') trySleep();
+  if (x === 'sneak') { G.sneakOn = !G.sneakOn; msg(G.sneakOn ? 'Eğildin: sessiz ama yavaşsın.' : 'Doğruldun.', '#cde', 2); }
+  if (x === 'people') toggleSide(true);
+  if (x === 'self') openChar(L.id);
+  if (x === 'auto') { G.autoEq = !G.autoEq; msg(G.autoEq ? 'Eşyalar uygun kişilere kendiliğinden dağıtılacak.' : 'Eşyaları artık sen dağıtıyorsun (kişi kartı → Eşyalar).', '#cde', 3); assignEquip(); }
+  if (x === 'gather') { for (const q of G.people) if (!q.leader && !q.child && q.group !== 'takip' && dist(q, L) < 700) { q.prevG = q.group; setGroup(q, 'takip', true); } msg('Yakındaki herkes seni izliyor.', '#cde', 3); G.uiDirty = true; }
+  if (x === 'release') { for (const q of G.people) if (q.group === 'takip') setGroup(q, q.prevG && q.prevG !== 'takip' ? q.prevG : 'bos', true); msg('Herkes işine döndü.', '#cde', 3); G.uiDirty = true; }
+  if (x !== 'close' && x !== 'auto') toggleMenu(false); else if (x === 'close') toggleMenu(false); else buildTools();
 });
+const BCATS = [['Barınak', ['cadir', 'kulube']], ['Üretim alanları', ['atolye', 'oktezgah', 'tabakhane', 'kasaphane', 'raf', 'tarla', 'sifahane']], ['Savunma ve ışık', ['cit', 'duvar', 'tuzak', 'mesale', 'kule']], ['Eve dönüş', ['gemi']]];
 function buildTools() {
-  const bl = bestLvl('insaat');
-  $('tools').innerHTML = `<button data-x="hunt" class="hl ${G.huntMode || G.hunt ? 'on' : ''}">🎯 ${G.hunt ? 'Avı bırak' : 'Av Emri'}<br><small>[G]</small></button>`
-    + `<button data-x="craft" class="hl">⚒️ Üretim<br><small>[C]${G.orders.length ? ' · ' + G.orders.length + ' emir' : ''}</small></button>`
-    + `<button data-x="in" class="hl">🏠 İçeri<br><small>[I]</small></button>`
-    + `<button data-x="sleep" class="hl ${goHome() ? '' : 'no'}">😴 Uyu<br><small>[U]</small></button>`
-    + BORDER.map(k => { const lk = BUILD[k].lvl > bl; return `<button data-b="${k}" class="${G.placing === k ? 'on' : ''} ${lk || !canAfford(BUILD[k].cost) ? 'no' : ''}" title="${BUILD[k].desc}">${BUILD[k].ic} ${BUILD[k].ad}<br><small>${lk ? '🔒 📐' + BUILD[k].lvl : costTxt(BUILD[k].cost)}</small></button>`; }).join('')
-    + ((G.stock.mesale || 0) > 0 ? `<button data-x="torch" class="${G.torchOn ? 'on' : ''}">🔥 Meşale<br><small>[T]</small></button>` : '')
-    + `<button data-x="map">🗺️ Harita<br><small>[M]</small></button>`;
   G.toolsDirty = false;
+  if (!$('tools').classList.contains('open')) return;
+  const bl = bestLvl('insaat');
+  const bb = k => { const B = BUILD[k]; if (!B) return ''; const lk = B.lvl > bl; return `<button data-b="${k}" class="${G.placing === k ? 'on' : ''} ${lk || !canAfford(B.cost) ? 'no' : ''}" title="${B.desc}">${B.ic} ${B.ad}<br><small>${lk ? '🔒 📐' + B.lvl + '. seviye mimar' : costTxt(B.cost)}</small></button>`; };
+  const X = (x, t, sub, cls) => `<button data-x="${x}" class="${cls || ''}">${t}${sub ? `<br><small>${sub}</small>` : ''}</button>`;
+  let h = `<div class="mhead"><b>Eylemler</b><button data-x="close">✕</button></div>`;
+  h += `<div class="cat">Şimdi</div><div class="mrow">`
+    + X('hunt', G.hunt ? '🎯 Avı bırak' : '🎯 Av emri', 'G · hayvana bak', G.hunt || G.huntMode ? 'on' : '')
+    + X('sleep', '😴 Uyu', 'U · gece, barınakta', goHome() ? '' : 'no')
+    + X('sneak', G.sneakOn ? '🧍 Doğrul' : '🦶 Eğil / sessiz yürü', 'X', G.sneakOn ? 'on' : '')
+    + ((G.stock.mesale || 0) > 0 ? X('torch', '🔥 Meşale', 'T', G.torchOn ? 'on' : '') : '')
+    + X('map', '🗺️ Harita', 'M') + `</div>`;
+  h += `<div class="cat">Halk</div><div class="mrow">`
+    + X('people', '👥 Halk paneli', 'H · görev dağıt')
+    + X('gather', '👣 Yakındakiler beni izlesin', '')
+    + X('release', '↩️ İzleyenler işine dönsün', '')
+    + X('self', '🎒 Kendi eşyaların', '')
+    + X('auto', G.autoEq ? '🤖 Eşya dağıtımı: otomatik' : '✋ Eşya dağıtımı: elle', 'değiştir', G.autoEq ? 'on' : '') + `</div>`;
+  h += `<div class="cat">Üretim ve düzen</div><div class="mrow">`
+    + X('craft', '⚒️ Üretim emirleri', 'C' + (G.orders.length ? ' · ' + G.orders.length + ' emir' : ''))
+    + X('in', '🏠 Oda düzeni', 'I · mağara / kulübe') + `</div>`;
+  for (const [ad, ks] of BCATS) h += `<div class="cat">İnşa — ${ad}</div><div class="mrow">${ks.map(bb).join('')}</div>`;
+  $('tools').innerHTML = h;
 }
 function toggleMap() { const b = $('miniBox'); if (b.style.display === 'none') { b.style.display = 'block'; b.classList.remove('big'); } else if (!b.classList.contains('big')) b.classList.add('big'); else { b.classList.remove('big'); if (innerWidth <= 700) b.style.display = 'none'; } drawMini(); }
 $('miniBox').addEventListener('pointerdown', e => {
@@ -225,6 +254,9 @@ $('charM').addEventListener('pointerdown', e => {
   if (c === 'mgr') setManager(p.group, p);
   if (c === 'ord') addOrder(v, 1, p.id);
   if (c === 'rt') { const ord = [null].concat(GORDER.filter(g => g !== 'bos')); p.routine = p.routine || {}; const cur = p.routine[v] || null; p.routine[v] = ord[(ord.indexOf(cur) + 1) % ord.length]; if (!Object.values(p.routine).some(Boolean)) p.routine = null; }
+  if (c === 'give') { if (!giveItem(p, v)) msg('Depoda bundan kalmadı.', '#e99', 2); }
+  if (c === 'take') takeItem(p, v);
+  if (c === 'jh') p.joinHunt = !p.joinHunt;
   if (c === 'alt') { const ks = Object.keys(ALTS); p.alt = ks[(ks.indexOf(p.alt || 'yiyecek') + 1) % ks.length]; }
   if (c === 'prev' || c === 'next') { const L2 = G.people.filter(q => !q.leader); const i = L2.findIndex(q => q.id === p.id); const n = L2[(i + (c === 'next' ? 1 : -1) + L2.length) % L2.length]; if (n) UI.char = n.id; }
   renderChar(); G.uiDirty = true;
@@ -247,13 +279,19 @@ function renderChar() {
     h += `<div class="sk ${cur ? 'cur' : ''}"><span>${SKILLS[s].ic} ${SKILLS[s].ad}</span><b>${l}</b><div class="bar"><i style="width:${Math.round(f * 100)}%;background:#d9a94a"></i></div></div>`;
   }
   h += `</div><div class="cat">Hayatı</div><div><small>${home ? `${BUILD[home.type].ic} Evi: ${BUILD[home.type].ad}${home.owners.length > 1 ? ' (paylaşıyor)' : ''}` : '🏚️ Kalacak yeri yok — ateş başında uyuyor'}${pt ? ` · ❤ ${pt.name}` : ''}${kids.length ? ` · 👶 ${kids.map(k => k.name).join(', ')}` : ''}</small></div>`;
-  h += `<div><small>Kuşandığı: ${eq}</small></div>`;
+  { // eşyalar: kişiye zimmetli; kalanlar depoda
+    let ih = '';
+    for (const k of OWNABLE) { const has = p.own && p.own[k], fr = freeItems(k); if (!has && fr < 1) continue; if (p.child && k !== 'yatak') continue; ih += has ? `<button data-c="take" data-v="${k}" class="on" title="Geri al, depoya koy">${ITEMS[k].ic} ${ITEMS[k].ad} ✓</button>` : `<button data-c="give" data-v="${k}" title="Depodan ver">${ITEMS[k].ic} ${ITEMS[k].ad} <small>(depoda ${fr})</small></button>`; }
+    h += `<div class="cat">Eşyalar — dokun: ver / geri al</div><div class="gsel">${ih || '<small>Depoda verilecek eşya yok. Zanaatkâra ürettir.</small>'}</div>`;
+    if (!(p.own && p.own.yatak)) h += `<div><small>🛏️ Yatağı yok; yerde yatıyor.</small></div>`;
+  }
   if (p.injury || p.sick) h += `<div><small>Sağlık: ${p.injury ? { kanama: 'kanama', kirik: 'kırık bacak', enfeksiyon: 'enfeksiyon (ilaç gerek)' }[p.injury.type] : ''} ${p.sick ? '· hastalık (' + p.sick.d + '. gün)' : ''}${p.bed ? ' · şifahanede, ' + Math.max(0, p.bedUntil - G.day) + ' gün daha' : ''}</small></div>`;
-  if (!p.child) {
+  if (!p.child && !p.leader) {
     h += `<div class="cat">Emir</div><div class="gsel"><button data-c="cmd" data-v="follow" class="${p.group === 'takip' ? 'on' : ''}">👣 Beni izle</button><button data-c="cmd" data-v="free">↩️ İşine dön</button><button data-c="cmd" data-v="carry">🩹 Yaralıyı taşı</button></div>`;
     h += `<div class="cat">Görev</div><div class="gsel">${GORDER.map(g => `<button data-c="grp" data-v="${g}" class="${p.group === g ? 'on' : ''}" title="${GROUPS[g].desc}">${GROUPS[g].ic} ${GROUPS[g].ad}${GROUPS[g].sk ? ' ' + lvl(p, GROUPS[g].sk) : ''}</button>`).join('')}</div>`;
     h += `<button data-c="mgr" class="wide ${G.managers[p.group] === p.id ? 'on' : ''}">★ ${GROUPS[p.group].ad} grubunun yöneticisi yap</button>`;
     h += `<div class="cat">Günlük rutin</div><div class="gsel">${Object.keys(SLOTS).map(s => { const g = p.routine && p.routine[s]; return `<button data-c="rt" data-v="${s}" class="${g ? 'on' : ''}">${SLOTS[s]}: ${g ? GROUPS[g].ic + ' ' + GROUPS[g].ad : '—'}</button>`; }).join('')}</div><small class="hint">Dokundukça sıradaki mesleğe geçer. Rutin varsa o saatte meslek kendiliğinden değişir; akşam herkes evine döner.</small>`;
+    h += `<div class="cat">Av çağrısı</div><div class="gsel"><button data-c="jh" class="${p.joinHunt ? 'on' : ''}">🏹 Av emri verilince ava katıl ${p.joinHunt ? '✓' : ''}</button></div>`;
     h += `<div class="cat">İşi bitince / boşta kalınca</div><div class="gsel"><button data-c="alt">${ALTS[p.alt || 'yiyecek']}</button></div>`;
     if (p.lastMeal !== undefined) h += `<div><small>Son öğün: ${p.lastMeal === 'food' ? '🍲 pişmiş yemek' : p.lastMeal === 'meyve' ? '🫐 meyve' : p.lastMeal === 'et' ? '🍖 çiğ ama temiz et' : p.lastMeal === 'cigEt' ? '🥩 temizlenmemiş et!' : '— aç kaldı'}${p.hunger ? ` · açlık ${p.hunger}` : ''}</small></div>`;
     const by = p.group === 'zanaat' ? 'zanaat' : p.group === 'sifaci' ? 'sifa' : null;

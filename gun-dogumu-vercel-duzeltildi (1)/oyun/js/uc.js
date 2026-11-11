@@ -1254,7 +1254,7 @@ function render3D(dt) {
   U3.eye += (eyeT - U3.eye) * Math.min(1, dt * 7);
   const mvK = U3.vmSway || 0, bobY = Math.sin(U3.bob) * (L.sneak ? 0.6 : 1.0) * mvK, sh = Math.min(G.shake || 0, 20);
   let yaw = G.yaw === undefined ? (L.ang || 0) : G.yaw, pitch = G.pitch || 0, px = L.x, py = L.y;
-  if (G.inside) return renderInterior(dt, t, yaw, pitch, bobY, sh);
+  if (G.inside) return render3DInterior(dt, t, yaw, pitch, bobY, sh);
   if (IN.b) interiorExit();
   if (G.sleep && G.sleep.b) { const b = G.sleep.b; px = b.x; py = b.y + b.r + 16; yaw = Math.PI / 2; pitch = 0.05; }
   const gT = ghE(px, py);
@@ -1411,7 +1411,7 @@ function caveShell(W, H, hz) {
     }
     V.push(row);
   }
-  const pos = [], col = [], cc = new THREE.Color(), base = c3('#5e5148'), wet = c3('#3a3634'), soot = c3('#151210');
+  const pos = [], col = [], cc = new THREE.Color(), base = c3('#4c4038'), wet = c3('#3a3634'), soot = c3('#151210');
   const vcol = q => { cc.copy(base).multiplyScalar(0.55 + q[3] * 0.75 + (q[4] - 0.5) * 0.3); if (q[1] < 20) cc.multiplyScalar(0.75); if (Math.sin(q[0] * 0.09 + q[3] * 9) > 0.86) cc.lerp(wet, 0.5); const hd = Math.hypot(q[0] - cx, q[2] - hz); if (q[1] > 60 && hd < 220) cc.lerp(soot, (1 - hd / 220) * 0.75); return cc; };
   const tri = (a, b, c) => {
     const my = (a[1] + b[1] + c[1]) / 3, mz = (a[2] + b[2] + c[2]) / 3, mx = (a[0] + b[0] + c[0]) / 3;
@@ -1462,9 +1462,9 @@ function inFurniture(gb, f, R, st, X) {
     case 'bed': {
       if (st === 'hut') { gb.box(wood, x, y0 + 5, z, 46, 5, 24); for (const sx of [-1, 1]) for (const sz of [-1, 1]) gb.box('#4a3018', x + sx * 21, y0 + 2.5, z + sz * 10, 3, 5, 3); }
       const yb = y0 + (st === 'hut' ? 8 : 0);
-      gb.sph(fur[Math.floor(R() * 4)], x, yb + 2.4, z, 24, 3.4, 13).sph(fur[Math.floor(R() * 4)], x + 3, yb + 4.2, z + 1, 18, 2.6, 10);
-      gb.add(GEO.cyl, '#c8b490', x - 17, yb + 6, z - 6, 3.2, 12, 3.2, Math.PI / 2, 0, 0);
-      gb.box('#7a5236', x + 6, yb + 6.2, z, 22, 1.2, 15, 0.1);
+      for (let i = 0; i < 5; i++) gb.add(GEO.ico1, fur[(i + Math.floor(R() * 4)) % 4], x - 12 + i * 6 + (R() - 0.5) * 3, yb + 2.5, z + (R() - 0.5) * 5, 9 + R() * 3, 3.6 + R() * 1.6, 9 + R() * 2, 0, R() * 6, 0);
+      gb.add(GEO.ico1, '#d0bea0', x - 17, yb + 5, z, 5, 3, 8, 0, 0.2, 0);
+      gb.add(GEO.ico1, fur[Math.floor(R() * 4)], x + 6, yb + 6, z, 15, 2.2, 11, 0, R(), 0.05);
       if (R() < 0.5) gb.sph('#e4dcc6', x + 26, y0 + 2, z + 8, 2.6, 2, 2.6);
       break;
     }
@@ -1498,11 +1498,15 @@ function inFurniture(gb, f, R, st, X) {
       for (let i = 0; i < (big ? 13 : 9); i++) { const a = i / (big ? 13 : 9) * TAU; gb.dod(i % 2 ? '#5a524a' : '#6a625a', x + Math.cos(a) * r, y0 + 2, z + Math.sin(a) * r, big ? 6.5 : 4.5, big ? 5 : 3.5, big ? 6.5 : 4.5, a * 3); }
       gb.add(GEO.disc, '#120c08', x, y0 + 0.4, z, r - 3, 1, r - 3);
       for (let i = 0; i < 5; i++) { const a = i / 5 * TAU + 0.3; gb.add(GEO.cyl, '#3a2010', x + Math.cos(a) * 2, y0 + 1.5, z + Math.sin(a) * 2, big ? 2.4 : 1.7, big ? 26 : 16, big ? 2.4 : 1.7, 0, -a, -Math.PI / 2 + 0.55); }
-      flame(x, y0 + 2, z, big ? 24 : 14, { col: 0xff8a38, int: big ? 2.6 : 1.8, dist: big ? 520 : 300, pri: big ? 0 : 2, fl: 1 });
+      flame(x, y0 + 2, z, big ? 24 : 14, { col: 0xff8a38, int: big ? 2.8 : 1.9, dist: big ? 440 : 260, pri: big ? 0 : 2, fl: 1 });
       X.embers.push([x, y0, z, r]);
-      if (f.t === 'mutfak' || big) {   // üç ayak + çömlek
-        for (let i = 0; i < 3; i++) { const a = i / 3 * TAU; gb.add(GEO.cyl, '#3a2a1a', x + Math.cos(a) * (r - 4), y0, z + Math.sin(a) * (r - 4), 1, 40, 1, Math.sin(a) * 0.32, 0, -Math.cos(a) * 0.32); }
-        gb.cyl('#2a2018', x, y0 + 34, z, 0.4, 6).sph('#3a3028', x, y0 + 26, z, 8, 7, 8).cyl('#2a2420', x, y0 + 31, z, 6, 2);
+      if (f.t === 'mutfak' && !big) {   // üç ayak + çömlek
+        for (let i = 0; i < 3; i++) { const a = i / 3 * TAU; gb.add(GEO.cyl, '#3a2a1a', x + Math.cos(a) * (r + 2), y0, z + Math.sin(a) * (r + 2), 1, 46, 1, Math.sin(a) * 0.36, 0, -Math.cos(a) * 0.36); }
+        gb.cyl('#2a2018', x, y0 + 36, z, 0.4, 7).sph('#4a3a30', x, y0 + 30, z, 6, 5, 6).cyl('#3a2c22', x, y0 + 34, z, 4.6, 1.6);
+      }
+      if (big) {   // şiş: iki çatal ve kızaran et
+        for (const sx of [-1, 1]) { gb.add(GEO.cyl, '#4a3018', x + sx * (r + 3), y0, z, 1.3, 30, 1.3, 0, 0, sx * 0.08); gb.add(GEO.cyl, '#4a3018', x + sx * (r + 3), y0 + 28, z, 0.9, 6, 0.9, 0, 0, sx * 0.7); }
+        gb.add(GEO.cyl, '#5a4028', x - r - 8, y0 + 30, z, 0.8, 2 * r + 16, 0.8, 0, 0, -Math.PI / 2).sph('#7a2a16', x, y0 + 30, z, 9, 5.5, 5.5).sph('#5a1e10', x + 6, y0 + 31, z + 1, 4, 4, 4);
       }
       if (big) { for (const [a, l] of [[0.5, 46], [2.6, 40], [4.2, 44]]) gb.add(GEO.cyl, '#5a3c22', x + Math.cos(a) * 48, y0 + 4, z + Math.sin(a) * 48, 4, l, 4, 0, -a + Math.PI / 2, Math.PI / 2); for (let i = 0; i < 3; i++) { const a = 1.2 + i * 1.6; gb.sph(fur[i], x + Math.cos(a) * 62, y0 + 1.6, z + Math.sin(a) * 62, 13, 2, 9); } }
       break;
@@ -1540,7 +1544,7 @@ function inFurniture(gb, f, R, st, X) {
     case 'torch': {
       const lean = st === 'cave' ? 0.18 : 0;
       gb.add(GEO.cyl, '#4a3018', x, y0, z, 1.6, 54, 1.6, lean, 0, 0).dod('#5a524a', x, y0 + 2, z, 5, 3, 5).add(GEO.cyl, '#2a1a0c', x, y0 + 52 * Math.cos(lean), z + 52 * Math.sin(lean), 2.6, 5, 2.6, lean, 0, 0);
-      flame(x, y0 + 57 * Math.cos(lean), z + 57 * Math.sin(lean), 7, { col: 0xff9a48, int: 1.5, dist: 280, pri: 1, fl: 1 });
+      flame(x, y0 + 57 * Math.cos(lean), z + 57 * Math.sin(lean), 7, { col: 0xff9a48, int: 1.6, dist: 230, pri: 1, fl: 1 });
       break;
     }
   }
@@ -1686,7 +1690,7 @@ function inBuild(b) {
   IN.mouthGlow = sprite(TEX.glow, 0xffffff, true, false); IN.mouthGlow.position.set(door.x, 44, st === 'tent' ? H / 2 + 180 : door.y + (st === 'cave' ? 40 : 14)); IN.mouthGlow.scale.set(260, 200, 1); root.add(IN.mouthGlow);
   // gün ışığı huzmeleri (mağara ağzından içeri)
   IN.shafts = [];
-  if (st !== 'tent') for (let i = 0; i < 3; i++) { const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: TEX.shaft, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: false, color: 0xfff0d8 }));
+  if (false) for (let i = 0; i < 3; i++) { const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: TEX.shaft, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: false, color: 0xfff0d8 }));
     m.scale.set(st === 'cave' ? 46 : 30, st === 'cave' ? 230 : 120, 1); m.position.set(door.x - 26 + i * 26, 36, (st === 'cave' ? door.y - 50 : door.y - 30) + i * 6); m.rotation.set(-1.15, (i - 1) * 0.22, 0); root.add(m); IN.shafts.push(m); }
   X.lights.push({ x: door.x, y: 58, z: st === 'tent' ? H / 2 + 150 : door.y + (st === 'cave' ? 30 : 4), col: 0xffffff, int: 0, dist: st === 'cave' ? 420 : 300, pri: 1.5, door: 1 });
   X.lights.sort((a, c) => a.pri - c.pri); IN.lights = X.lights.slice(0, 6);
@@ -1706,7 +1710,7 @@ function interiorExit() {
   if (U3.cam.parent !== U3.scene) U3.scene.add(U3.cam);
   U3.gY = undefined;
 }
-function renderInterior(dt, t, yaw, pitch, bobY, sh) {
+function render3DInterior(dt, t, yaw, pitch, bobY, sh) {
   const I = G.inside, b = I.b, cam = U3.cam;
   const key = b.type + '|' + (b.rooms || []).join() + '|' + Math.round(b.x) + ',' + Math.round(b.y);
   if (IN.b !== b || IN.key !== key) { if (IN.root) { IN.scene.remove(IN.root); inDispose(); } inBuild(b); IN.key = key; }
@@ -1726,12 +1730,12 @@ function renderInterior(dt, t, yaw, pitch, bobY, sh) {
   for (const m of IN.shafts) m.material.opacity = 0.05 + day * 0.13 + Math.sin(t * 0.7 + m.position.x) * 0.02 * day;
   if (IN.tentMat) IN.tentMat.emissive.setRGB(0.3 * day, 0.2 * day, 0.1 * day);
   IN.scene.fog.color.setRGB(0.04 + 0.04 * day, 0.03 + 0.03 * day, 0.025 + 0.03 * day);
-  IN.hemi.intensity = 0.16 + day * 0.14;
+  IN.hemi.intensity = 0.06 + day * 0.07;
   // ışıklar: ocak ve meşaleler titrer
   for (let i = 0; i < 6; i++) {
     const l = IN.lights[i], pl = IN.pl[i];
     if (!l) { pl.intensity = 0; continue; }
-    if (l.door) { pl.color.copy(_col); pl.intensity = 0.35 + day * 1.5; }
+    if (l.door) { pl.color.copy(_col); pl.intensity = 0.25 + day * 1.4; }
     else { pl.color.setHex(l.col); const f = l.fl ? 0.86 + Math.sin(t * 9.3 + i * 2) * 0.07 + Math.sin(t * 23.1 + i) * 0.05 + Math.sin(t * 3.7 + i * 5) * 0.05 : 1; pl.intensity = l.int * f; }
     pl.distance = l.dist; pl.position.set(l.x + (l.fl ? Math.sin(t * 7 + i) * 1.5 : 0), l.y + (l.fl ? Math.sin(t * 11 + i) * 1.2 : 0), l.z);
   }
