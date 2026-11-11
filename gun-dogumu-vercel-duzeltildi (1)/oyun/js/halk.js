@@ -971,8 +971,14 @@ function workOrder(p, dt, by, stn) {
   if (!o.paid) { pay(it.cost); o.paid = true; }
   o.prog += dt * skillMul(lvl(p, by)) * grpMul(p.group) * (abilOn(p.group) ? 2 : 1) * (tr(p, 'caliskan') ? 1.3 : 1) * (p.sick ? 0.5 : 1);
   if (Math.random() < dt * 2.5 && L && dist(p, L) < 450) SFX.hammer(0.25);
+  // aşama aşama: çoklu eşyalar (ok ×10) tek tek, her biri üç adımda yapılır
+  { const q = it.qty || 1, per = it.work / q, done = Math.min(q, Math.floor(o.prog / per)), f = (o.prog - done * per) / per, sts = stagesOf(o.item), si = Math.min(sts.length - 1, Math.floor(f * sts.length));
+    const key = done * 10 + si;
+    if (o.stageKey !== key) { o.stageKey = key; o.stage = si; o.unit = done; o.stageAd = sts[si] + (q > 1 ? ` (${Math.min(q, done + 1)}/${q})` : ''); if (L && dist(p, L) < 400 && !p.insideB) ftext(p.x, p.y - 44, o.stageAd, '#e8d4b0'); G.craftDirty = true; }
+    if (q > 1 && done > (o.made || 0) && done < q) { addStock(o.item, done - (o.made || 0), stn.x, stn.y); o.made = done; G.uiDirty = true; }
+  }
   if (o.prog >= it.work) {
-    addStock(o.item, it.qty || 1, stn.x, stn.y);
+    addStock(o.item, (it.qty || 1) - (o.made || 0), stn.x, stn.y); o.made = 0; o.stageKey = -1; o.stage = 0; o.stageAd = '';
     o.prog = 0; o.paid = false; o.trips = undefined; o.left--; o.worker = 0;
     addXP(p, by, it.work * 0.7);
     if (o.item === 'yarikTasi') { msg('🌀 YARIK TAŞI HAZIR! Yarığa götür ve E ile etkinleştir.', '#9cf', 8); SFX.bell(); }

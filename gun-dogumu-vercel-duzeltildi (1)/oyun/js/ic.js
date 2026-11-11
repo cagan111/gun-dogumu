@@ -88,7 +88,7 @@ function inInteract() {
   for (const f of inFurn(b)) {
     if (f.k === 'door') test(f.x, f.y, { kind: 'exit', label: 'Dışarı çık' }, 80);
     else if (f.k === 'bed' || f.k === 'mat') test(f.x, f.y, { kind: 'sleep', label: goHome() ? 'Uyu' : 'Yatak (gece uyuyabilirsin)' }, 70);
-    else if (f.k === 'bench') test(f.x, f.y, { kind: 'craft', label: 'Üretim masası' }, 80);
+    else if (f.k === 'bench') { const od = G.orders.find(o => o.worker && o.stageAd && !(o.trips > 0)); test(f.x, f.y, { kind: 'craft', label: od ? `Üretim masası — ${ITEMS[od.item].ad}: ${od.stageAd}` : 'Üretim masası' }, 80); }
     else if (f.k === 'crate') test(f.x, f.y, { kind: 'store', label: 'Depo — oda türünü değiştir (I)' }, 60);
   }
   return best;

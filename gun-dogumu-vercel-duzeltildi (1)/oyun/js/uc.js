@@ -252,7 +252,7 @@ function init3D() {
   // dinamik havuzlar
   const dyn = U3.dyn = new THREE.Group(); sc.add(dyn);
   U3.entShadow = mkInst(GEO.disc, MAT.shadow, 160); dyn.add(U3.entShadow);
-  U3.stainI = mkInst(GEO.disc, MAT.blood, 40); dyn.add(U3.stainI);
+  U3.stainI = mkInst(GEO.disc, MAT.blood, 240); dyn.add(U3.stainI);
   U3.trackI = mkInst(GEO.disc, MAT.track, 60); dyn.add(U3.trackI);
   U3.arrowI = mkInst(GEO.cyl, new THREE.MeshLambertMaterial({ color: 0x6a4a26, emissive: 0x1a1208 }), 24); dyn.add(U3.arrowI);
   U3.spitI = mkInst(GEO.ico, new THREE.MeshBasicMaterial({ color: 0xb8e04a }), 24); dyn.add(U3.spitI);
@@ -262,6 +262,8 @@ function init3D() {
     for (let i = 0; i < n; i++) U3.flySeed.push([R() * 700 - 350, 6 + R() * 50, R() * 700 - 350, R() * 9]);
     g.setAttribute('position', new THREE.BufferAttribute(p, 3));
     U3.flies = new THREE.Points(g, new THREE.PointsMaterial({ color: 0xd2ff78, size: 2.4, sizeAttenuation: true, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, fog: false })); U3.flies.frustumCulled = false; dyn.add(U3.flies); }
+  { const n = 400, g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n * 3), 3));
+    U3.bloodP = new THREE.Points(g, new THREE.PointsMaterial({ map: TEX.soft, color: 0x6a0606, size: 3.4, transparent: true, depthWrite: false, alphaTest: 0.05 })); U3.bloodP.frustumCulled = false; U3.bloodN = n; dyn.add(U3.bloodP); }
   U3.eyes = []; for (let i = 0; i < 40; i++) { const s = sprite(TEX.glow, 0xffffff, true, false); s.visible = false; dyn.add(s); U3.eyes.push(s); }
   U3.smoke = []; for (let i = 0; i < 6; i++) { const s = sprite(TEX.soft, 0x8a8782, false, true); s.visible = false; dyn.add(s); U3.smoke.push(s); }
   U3.ghost = new THREE.Group(); U3.ghostMat = new THREE.MeshBasicMaterial({ color: 0x77cc66, transparent: true, opacity: 0.3, depthWrite: false, side: THREE.DoubleSide });
@@ -322,16 +324,16 @@ function buildViewModel() {
   U3.torchGlow = sprite(TEX.glow, 0xff9a40, true, false); U3.torchGlow.material.depthTest = false; U3.torchGlow.renderOrder = 999; U3.torchGlow.position.set(0, 9, 0); U3.torchGlow.scale.set(14, 14, 1); tc.add(U3.torchGlow);
   // yay (sol el) + kiriş + ok (sağ el kirişi çeker)
   const bw = U3.bow = new THREE.Group(); vm.add(bw); bw.visible = false;
-  const limb = new THREE.TorusGeometry(15, 0.42, 4, 16, Math.PI * 0.62); limb.rotateZ(Math.PI / 2 - Math.PI * 0.31); limb.translate(-12.2, 0, 0);
+  const limb = new THREE.TorusGeometry(15, 0.42, 4, 16, Math.PI * 0.62); limb.rotateZ(-Math.PI * 0.31); limb.translate(-12.2, 0, 0); limb.scale(-1, 1, 1);
   part(limb, wood, bw, 0, 0, 0, 1, 1, 1);
-  part(GEO.cyl, wrap, bw, 2.9, -2, 0, 0.75, 4, 0.75);
-  hand(bw, -1); bw.children.slice(-7).forEach(m => { m.position.x += 2.9; m.position.y += 0; });
+  part(GEO.cyl, wrap, bw, -2.8, -2, 0, 0.75, 4, 0.75);
+  hand(bw, -1); bw.children.slice(-7).forEach(m => { m.position.x -= 2.8; m.position.y += 1.5; });
   const s1 = U3.bowS1 = part(GEO.cyl, str, bw, 0, 0, 0, 0.12, 1, 0.12), s2 = U3.bowS2 = part(GEO.cyl, str, bw, 0, 0, 0, 0.12, 1, 0.12);
   const ar = U3.arrowVM = new THREE.Group(); bw.add(ar);
   part(GEO.cyl, wood, ar, 0, 0, 0, 0.22, 26, 0.22, 0, 0, Math.PI / 2);
   part(GEO.cone, stone, ar, -26, 0, 0, 0.6, 3.2, 0.3, 0, 0, Math.PI / 2);
   part(GEO.box, M(0xc8483a, 0x100404), ar, -1.5, 0.5, 0, 4, 0.9, 0.08); part(GEO.box, M(0xe8e0d0, 0x101010), ar, -1.5, -0.5, 0, 4, 0.9, 0.08);
-  const rh = U3.bowHand = new THREE.Group(); bw.add(rh); hand(rh, 1);
+  const rh = U3.bowHand = new THREE.Group(); bw.add(rh); hand(rh, 1); rh.scale.setScalar(0.8);
   U3.vmLag = { y: 0, p: 0, py: G.yaw || 0, pp: G.pitch || 0 }; U3.bowK = 0; U3.bowShow = 0; U3.lastCd = 0;
 }
 function updViewModel(dt, t) {
@@ -363,12 +365,12 @@ function updViewModel(dt, t) {
   bw.visible = bv > 0.02;
   if (bw.visible) {
     const bk = U3.bowK, vib = shot || (U3.bowK < 0.05 && cd > 0.4) ? Math.sin(t * 60) * Math.max(0, cd - 0.4) * 1.5 : 0;
-    bw.position.set(-2.2 * narrow + bx * 0.6, -4.2 - by * 0.6 - (1 - bv) * 14, -17 + bk * 1.2); bw.rotation.set(0, 0.06, 0.22);
-    const top = new THREE.Vector3(-12.2 + 15 * Math.cos(Math.PI * 0.31), 15 * Math.sin(Math.PI * 0.31), 0), bot = top.clone().setY(-top.y), nock = new THREE.Vector3(top.x + 0.6 + bk * 9 + vib, 0, 0);
+    bw.position.set(-3.2 * narrow + bx * 0.6, -3.6 - by * 0.6 - (1 - bv) * 14, -15 + bk * 1.0); bw.rotation.set(-0.32, -Math.PI / 2 + 0.08, 0, 'YXZ'); bw.scale.setScalar(0.62);
+    const top = new THREE.Vector3(12.2 - 15 * Math.cos(Math.PI * 0.31), 15 * Math.sin(Math.PI * 0.31), 0), bot = top.clone().setY(-top.y), nock = new THREE.Vector3(top.x + 0.6 + bk * 12 + vib, 0, 0);
     const seg = (m, a, b) => { m.position.copy(a).add(b).multiplyScalar(0.5); m.position.y -= 0; const d = b.clone().sub(a); m.scale.y = d.length(); m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize()); m.position.addScaledVector(d, -m.scale.y * 0.5); };
     seg(U3.bowS1, bot, nock); seg(U3.bowS2, nock, top);
-    U3.arrowVM.visible = cd < 0.35; U3.arrowVM.position.set(nock.x, 0.3, 0.3);
-    U3.bowHand.position.set(nock.x + 1.2, -2.5, 0.8); U3.bowHand.rotation.set(0, 0, Math.PI / 2 + 0.2);
+    U3.arrowVM.visible = cd < 0.35; U3.arrowVM.position.set(nock.x, 0.3, 0.6);
+    U3.bowHand.position.set(nock.x + 4.5, 0, 1.2); U3.bowHand.rotation.set(0, 0, Math.PI / 2);
   }
   const tc = U3.torch;
   tc.visible = !!G.torchOn && bv < 0.5;
@@ -1056,6 +1058,25 @@ function dropEnt(e) {
 function mimicView(d, v) {
   return Object.assign(v || {}, { x: d.x, y: d.y, ang: d.ang + (d.tilt || 0) * 0.15, anim: d.anim, moving: d.moving, skin: d.disguise.skin, hair: d.disguise.hair, group: d.disguise.group, name: d.disguise.name, hurtT: d.hurt, id: d.id, hp: 1, maxhp: 1, carry: 0, bag: {}, eq: {}, swing: 0, work: 0 });
 }
+// ---- taşınan yük: omuzda kütük, kucakta taş, sırtta sepet, elde et, diğerleri bohça
+const HAUL = {};
+function haulGeo(k) {
+  if (HAUL[k]) return HAUL[k];
+  const gb = new GB();
+  if (k === 'wood') { gb.add(GEO.cyl, '#6a4a2a', 4, 33, 4.5, 2.6, 34, 2.6, 0, 0, Math.PI / 2).add(GEO.disc, '#b08a5a', 21.1, 33, 4.5, 2.4, 1, 2.4, 0, 0, Math.PI / 2); gb.add(GEO.cyl, '#4a3018', 10, 33, 4.5, 0.6, 5, 0.6, 0.6, 0, 0); }
+  else if (k === 'stone') gb.dod('#8a857c', 6.5, 19, 0, 5.2, 4.4, 5.6, 0.7);
+  else if (k === 'meyve' || k === 'herb' || k === 'poison') { gb.add(GEO.cyl, '#a08050', -5.2, 18, 0, 4.4, 9, 4.4).add(GEO.torus, '#7a5a30', -5.2, 21, 0, 4.6, 1.2, 4.6); const c = k === 'meyve' ? '#b3243a' : k === 'herb' ? '#4c8a3a' : '#7a3aa0'; for (let i = 0; i < 4; i++) gb.sph(c, -5.2 + Math.cos(i * 1.6) * 2.2, 27.5, Math.sin(i * 1.6) * 2.2, 1.8); }
+  else if (k === 'et' || k === 'cigEt') gb.sph(k === 'et' ? '#8a3a1e' : '#a02a1e', 6, 18, 2, 5.5, 2.6, 4).box('#e4dcc6', 8, 18, 2, 9, 1.2, 1.2);
+  else gb.sph('#8a7050', -5, 24, 0, 4.6, 5.4, 4.6).box('#5a3e22', -5, 24, 0, 1, 11, 9.6);
+  return (HAUL[k] = gb.mesh().geometry);
+}
+function haulProp(e, p) {
+  const k = p.haul || null;
+  if (e.hk === k) return;
+  e.hk = k;
+  if (e.hm) { e.g.remove(e.hm); e.hm = null; }
+  if (k) { e.hm = new THREE.Mesh(haulGeo(k), MAT.v); e.g.add(e.hm); }
+}
 function syncEnts(t, dk) {
   const M = U3.ents, f = U3.frame, sh = U3.entShadow; sh.count = 0;
   const shA = 1 - dk * 0.8;
@@ -1078,6 +1099,7 @@ function syncEnts(t, dk) {
     e.g.position.set(p.x, y0, p.y); e.g.rotation.y = -p.ang;
     if (p === guard && !p.torch) { const v = e.gv || (e.gv = {}); for (const k in v) delete v[k]; Object.assign(v, p); v.torch = true; M3.updPerson(e.g, v, t); }
     else M3.updPerson(e.g, p, t);
+    haulProp(e, p);
     if (!tw) instAdd(sh, p.x, y0 + 0.5, p.y, p.child ? 7 : 10, 1, p.child ? 7 : 10, 0);
     if (p.group === 'balik' && p.work && !p.moving && nf < 24) {   // olta: elden uca kamış, uçtan suya ip
       const c = Math.cos(p.ang), sn = Math.sin(p.ang), hx = p.x + c * 6 - sn * 4, hz = p.y + sn * 6 + c * 4, tx = p.x + c * 44, tz = p.y + sn * 44, ty = y0 + 40 + Math.sin(t * 1.3 + p.id) * 1.5;
@@ -1151,7 +1173,14 @@ function syncSmall(t, dk) {
   for (const q of G.eproj) instAdd(S, q.x, ghE(q.x, q.y) + 18, q.y, 3.4, 3.4, 3.4, t * 9);
   instDone(S);
   const P = U3.parts, pa = P.geometry.attributes.position, ca = P.geometry.attributes.color; let n = 0;
+  const BP = U3.bloodP.geometry.attributes.position, dt = Math.min(0.05, U3.dt || 0.016); let nb = 0;
   for (const q of G.parts) {
+    if (q.blood) {   // kan: hayvanın gövde yüksekliğinden yerçekimiyle yay çizerek düşen damlalar
+      if (nb >= U3.bloodN) continue;
+      if (q._z === undefined) { let r = 14; for (const d of G.dinos) if (Math.abs(d.x - q.x) < d.r + 30 && Math.abs(d.y - q.y) < d.r + 30) { r = d.r; break; } q._g = ghE(q.x, q.y); q._z = r * (q.drip ? 0.8 : 1.0); q._vz = q.drip ? 0 : 40 + Math.random() * 90; }
+      if (q._z > 0) { q._vz -= 520 * dt; q._z = Math.max(0, q._z + q._vz * dt); }
+      BP.setXYZ(nb++, q.x, q._g + q._z + 0.6, q.y); continue;
+    }
     if (n >= U3.partN) break;
     if (q._y0 === undefined) { q._y0 = q.y; q._up = q.vy < -24 && Math.abs(q.vx) < 46; q._h = 6 + Math.random() * 16; q._g = ghE(q.x, q.y); }
     const c = c3(q.col), a = clamp(q.life * 1.5, 0, 1);
@@ -1159,6 +1188,7 @@ function syncSmall(t, dk) {
     ca.setXYZ(n, c.r * a, c.g * a, c.b * a); n++;
   }
   P.geometry.setDrawRange(0, n); pa.needsUpdate = true; ca.needsUpdate = true;
+  U3.bloodP.geometry.setDrawRange(0, nb); BP.needsUpdate = true;
   const cx = L.x, cy = L.y;
   const ST = U3.stainI; ST.count = 0;
   for (const s of G.stains) { if (Math.abs(s.x - cx) > 900 || Math.abs(s.y - cy) > 900) continue; if (s._g === undefined) s._g = gh(s.x, s.y); instAdd(ST, s.x, s._g + 0.5 + (ST.count % 5) * 0.03, s.y, s.r, 1, s.r * 0.8, s.x); }
@@ -1323,7 +1353,7 @@ function render3D(dt) {
   if (!L || !G.trees) return true;
   resize3D();
   const t = G.now, cam = U3.cam; U3.frame++;
-  U3.uTime.value = t;
+  U3.uTime.value = t; U3.dt = dt;
   // yeni oyun / yükleme: dünya dizileri değişti
   if (U3.worldKey !== G.trees || U3.worldSeed !== G.seed || U3.worldFire !== G.fire) { U3.worldKey = G.trees; U3.worldSeed = G.seed; U3.worldFire = G.fire; buildWorld(); }
   // ---- kamera (göz yüksekliği: arazi + duruş)
@@ -1743,8 +1773,11 @@ function inBuild(b) {
       gb.cyl('#5a3c20', px, 0, pz, 1.6, 54); gb.add(GEO.cyl, '#4a3018', px, 52, pz, 1.5, Math.hypot(hz, 124) + 8, 1.5, Math.atan2(hz, 124), Math.atan2(dx, dz), 0); }
     gb.add(GEO.disc, '#4a3a2a', cx, 0.3, cz, rw, 1, rw);
     for (let i = 0; i < 4; i++) { const a = i / 4 * TAU + 0.8; gb.sph(['#6a4a30', '#8a6a48', '#5a4232', '#a08060'][i], cx + Math.cos(a) * 95, 2.2, cz + Math.sin(a) * 75, 26, 2.6, 15); gb.add(GEO.cyl, '#c8b490', cx + Math.cos(a) * 118, 5, cz + Math.sin(a) * 92, 3, 12, 3, Math.PI / 2, a, 0); }
-    inFurniture(gb, { k: 'hearth', x: cx, y: cz - 10, t: 'mutfak' }, R, 'tent', X);
-    for (let i = 0; i < 3; i++) inFurniture(gb, { k: 'crate', x: cx - 90 + i * 36, y: 24, ang: 0 }, R, 'tent', X);
+    if (!furn.some(f => f.k === 'hearth')) {   // ocak yoksa direğe asılı yağ kandili
+      gb.cyl('#2a2018', cx, 100, cz, 0.3, 70).sph('#5a4a3a', cx, 96, cz, 3.2, 2.4, 3.2);
+      X.flames.push([cx, 98, cz, 3.2]); X.lights.push({ x: cx, y: 92, z: cz, col: 0xffa860, int: 1.5, dist: 320, pri: 0, fl: 1 });
+    }
+    for (let i = 0; i < 3; i++) inFurniture(gb, { k: 'crate', x: cx - 70 + i * 34, y: 8, ang: 0 }, R, 'tent', X);
   }
   for (const f of furn) inFurniture(gb, f, R, st, X);
   if (st !== 'tent') inDividers(gb, b, D, st, R, X, ceil);

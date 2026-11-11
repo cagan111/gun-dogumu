@@ -174,6 +174,17 @@ const ITEMS = {
   bandaj:      { ad: 'Sargı',          ic: '🩹', by: 'sifa',   lvl: 1, cost: { hide: 1, herb: 1 },   work: 6,  qty: 2, desc: 'Kanamayı anında durdurur, can verir' },
   ilac:        { ad: 'İlaç',           ic: '💊', by: 'sifa',   lvl: 2, cost: { herb: 3 },            work: 10, desc: 'Enfeksiyon ve salgına iyi gelir' }
 };
+// üretim aşamaları: her eşya tezgâhta adım adım yapılır
+const STAGES = {
+  balta: ['Sap yontuluyor', 'Taş yontuluyor', 'Baş sapa bağlanıyor'], kazma: ['Sap yontuluyor', 'Uç sivriltiliyor', 'Uç sapa bağlanıyor'],
+  mizrak: ['Sap düzeltiliyor', 'Taş uç yontuluyor', 'Uç bağlanıyor'], kemikMizrak: ['Sap düzeltiliyor', 'Kemik bileniyor', 'Uç bağlanıyor'],
+  sepet: ['Dallar ayıklanıyor', 'Taban örülüyor', 'Kenar örülüyor'], ok: ['Sap yontuluyor', 'Uç takılıyor', 'Tüy bağlanıyor'], zok: ['Sap yontuluyor', 'Uç zehre batırılıyor', 'Tüy bağlanıyor'],
+  yay: ['Dal seçilip yontuluyor', 'Ateşte eğiliyor', 'Kiriş geriliyor'], zirh: ['Deri kesiliyor', 'Kemik plakalar deliniyor', 'Dikiliyor'],
+  eyer: ['Deri kesiliyor', 'İskelet bağlanıyor', 'Kayışlar dikiliyor'], mesale: ['Sopa hazırlanıyor', 'Bez sarılıyor', 'Yağa batırılıyor'],
+  yatak: ['Çerçeve bağlanıyor', 'Ot dolduruluyor', 'Post seriliyor'], halat: ['Lifler ayrılıyor', 'Bükülüyor', 'Örülüyor'], yelkenBezi: ['Deriler kazınıyor', 'Parçalar kesiliyor', 'Dikiliyor'],
+  bandaj: ['Otlar eziliyor', 'Bez kesiliyor', 'Sarılıyor'], ilac: ['Otlar ayıklanıyor', 'Havanda dövülüyor', 'Kaynatılıyor'],
+};
+const stagesOf = k => STAGES[k] || ['Hazırlanıyor', 'İşleniyor', 'Bitiriliyor'];
 const IORDER = ['balta', 'kazma', 'mizrak', 'sepet', 'ok', 'mesale', 'yay', 'zirh', 'zok', 'eyer', 'kemikMizrak', 'yatak', 'halat', 'yelkenBezi', 'bandaj', 'ilac'];
 
 const RES = { wood: '🪵', stone: '🪨', food: '🍲', meyve: '🫐', et: '🍖', cigEt: '🥩', bone: '🦴', hide: '🟫', herb: '🌿', poison: '🧪', crystal: '💎' };

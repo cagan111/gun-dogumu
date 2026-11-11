@@ -331,7 +331,7 @@ function renderCraft() {
     h += `<div class="cat">Emirler</div>`;
     for (const o of G.orders) {
       const it = ITEMS[o.item], w = o.worker && G.people.find(p => p.id === o.worker), who = o.by && G.people.find(p => p.id === o.by);
-      const wait = !w ? (!o.paid && !canAfford(it.cost) ? 'malzeme bekliyor' : itemBlock(o.item) || 'usta bekliyor') : `${w.name} çalışıyor`;
+      const wait = !w ? (!o.paid && !canAfford(it.cost) ? 'malzeme bekliyor' : itemBlock(o.item) || 'usta bekliyor') : `${w.name}: ${o.trips > 0 ? 'malzeme getiriyor' : (o.stageAd || 'çalışıyor')}`;
       h += `<div class="card"><div>${it.ic} <b>${it.ad}</b> ×${o.left >= 999 ? '∞' : o.left}${who ? ' · <small>' + who.name + '</small>' : ''}<div class="bar" style="margin-top:4px"><i style="width:${Math.round(o.prog / it.work * 100)}%;background:#d9a94a"></i></div><small>${wait}</small></div><button data-x2="${o.id}">✕</button></div>`;
     }
   }
