@@ -83,6 +83,63 @@ function initGeo() {
     GEO.frond = new THREE.BufferGeometry(); GEO.frond.setAttribute('position', new THREE.Float32BufferAttribute(p, 3)); GEO.frond.computeVertexNormals(); }
 }
 
+// Daha ayrıntılı ağaç silueti; simülasyon/çarpışma geometrisine dokunmaz.
+function initTreeArt() {
+  GEO.treeTrunk = new THREE.CylinderGeometry(0.55, 1, 1, 12, 5);
+  const tp = GEO.treeTrunk.attributes.position;
+  for (let i = 0; i < tp.count; i++) {
+    const x = tp.getX(i), y = tp.getY(i), z = tp.getZ(i), a = Math.atan2(z, x);
+    const k = 1 + 0.045 * Math.cos(a * 6) + 0.018 * Math.sin(y * 17 + a * 3);
+    tp.setXYZ(i, x * k, y + 0.5, z * k);
+  }
+  GEO.treeTrunk.computeVertexNormals();
+  GEO.treeCrown = new THREE.ConeGeometry(1, 1, 14, 9);
+  const cp = GEO.treeCrown.attributes.position;
+  for (let i = 0; i < cp.count; i++) {
+    const x = cp.getX(i), z = cp.getZ(i), y = cp.getY(i) + 0.5, a = Math.atan2(z, x);
+    const k = 1 + 0.11 * Math.cos(a * 7 + y * 2) + 0.07 * Math.sin(y * 38 + a * 2);
+    cp.setXYZ(i, x * k, y, z * k);
+  }
+  GEO.treeCrown.computeVertexNormals();
+  GEO.treeLeaf = new THREE.IcosahedronGeometry(1, 2);
+  const lp = GEO.treeLeaf.attributes.position;
+  for (let i = 0; i < lp.count; i++) {
+    const x = lp.getX(i), y = lp.getY(i), z = lp.getZ(i);
+    const k = 1 + 0.075 * Math.sin(x * 9 + z * 3) * Math.cos(y * 7 - z * 4);
+    lp.setXYZ(i, x * k, y * k, z * k);
+  }
+  GEO.treeLeaf.computeVertexNormals();
+}
+function treeWindMaterial(base, kind) {
+  const m = base.clone();
+  if (!U3.artWind) U3.artWind = { value: new THREE.Vector3(1, 0, 0.25) };
+  m.onBeforeCompile = sh => {
+    sh.uniforms.uTreeTime = U3.uTime; sh.uniforms.uTreeWind = U3.artWind;
+    sh.vertexShader = 'uniform float uTreeTime;\nuniform vec3 uTreeWind;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
+      #ifdef USE_INSTANCING
+      {
+        vec3 ip = instanceMatrix[3].xyz;
+        float w = ${kind === 2 ? 'clamp(abs(position.x), 0.0, 1.0)' : kind === 1 ? 'smoothstep(-0.6, 0.9, position.y)' : 'smoothstep(0.0, 1.0, position.y)'};
+        float phase = uTreeTime * 1.2 - dot(ip.xz, uTreeWind.xy) * 0.008;
+        float gust = sin(phase) * 0.65 + sin(phase * 1.73 + ip.x * 0.03) * 0.35;
+        float height = length(instanceMatrix[1].xyz);
+        vec3 bend = vec3(uTreeWind.x, 0.0, uTreeWind.y) * (height * 0.018 * uTreeWind.z * gust * w * w);
+        transformed.x += dot(bend, instanceMatrix[0].xyz) / max(dot(instanceMatrix[0].xyz, instanceMatrix[0].xyz), 0.0001);
+        transformed.z += dot(bend, instanceMatrix[2].xyz) / max(dot(instanceMatrix[2].xyz, instanceMatrix[2].xyz), 0.0001);
+      }
+      #endif`);
+  };
+  m.customProgramCacheKey = () => 'son-ates-tree-wind-v1-' + kind;
+  return m;
+}
+function updateTreeWind() {
+  if (!U3.artWind) return;
+  const w = G.wind, a = w && Number.isFinite(w.a) ? w.a : 0;
+  const s = w && Number.isFinite(w.s) ? clamp(w.s, 0, 1) : 0.25;
+  const storm = G.weather && G.weather.type === 'firtina' ? 1.45 : 1;
+  U3.artWind.value.set(Math.cos(a), Math.sin(a), s * storm);
+}
+
 // ---- geometri birleştirici: tek ağ, köşe renkli
 class GB {
   constructor() { this.p = []; this.c = []; }
@@ -137,6 +194,9 @@ function initMat() {
   MAT.ghost = L_({ vertexColors: true, flatShading: true, transparent: true, opacity: 0.42, depthWrite: false, emissive: 0x2a3a48 });
   MAT.inst = L_({ flatShading: true });
   MAT.instD = L_({ flatShading: true, side: THREE.DoubleSide });
+  MAT.treeCone = treeWindMaterial(MAT.inst, 0);
+  MAT.treeLeaf = treeWindMaterial(MAT.inst, 1);
+  MAT.treeFrond = treeWindMaterial(MAT.instD, 2);
   MAT.crystal = L_({ flatShading: true, emissive: 0x2a6f9a });
   MAT.rock = triPatch(L_({ flatShading: true }), 0.031, 0.5);
   MAT.rockV = triPatch(L_({ vertexColors: true, flatShading: true }), 0.045, 0.45);
@@ -231,7 +291,7 @@ function init3D() {
   } catch (e) { console.warn('WebGL açılamadı, 2B çizime dönülüyor:', e); U3.ok = false; return false; }
   const r = U3.r;
   r.setClearColor(0x000000, 1);
-  initGeo(); initMat();
+  initGeo(); initTreeArt(); initMat();
   const sc = U3.scene = new THREE.Scene();
   sc.fog = new THREE.Fog(0x9fbcd0, 400, 2300);
   U3.cam = new THREE.PerspectiveCamera(75, 1, 1.5, VIEW_FAR); U3.cam.rotation.order = 'YXZ'; sc.add(U3.cam);
@@ -531,8 +591,8 @@ function initTerrainMat() {
   U3.fogCap = { value: 0.86 }; U3.fogLift = { value: 0.3 };
   m.onBeforeCompile = sh => {
     Object.assign(sh.uniforms, { tGround: { value: TEX.ground }, tNoise: { value: TEX.noise }, uTime: U3.uTime, uFogCap: U3.fogCap, uFogLift: U3.fogLift });
-    sh.vertexShader = 'attribute float aG;\nvarying float vG;\nvarying vec3 vWP;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\nvG = aG; vWP = (modelMatrix * vec4(transformed, 1.0)).xyz;');
-    sh.fragmentShader = 'varying float vG;\nvarying vec3 vWP;\nuniform sampler2D tGround;\nuniform sampler2D tNoise;\nuniform float uTime;\nuniform float uFogCap;\nuniform float uFogLift;\n' + sh.fragmentShader
+    sh.vertexShader = 'attribute float aG;\nvarying float vG;\nvarying float vSlope;\nvarying vec3 vWP;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\nvG = aG; vSlope = clamp(1.0 - abs(normal.y), 0.0, 1.0); vWP = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+    sh.fragmentShader = 'varying float vG;\nvarying float vSlope;\nvarying vec3 vWP;\nuniform sampler2D tGround;\nuniform sampler2D tNoise;\nuniform float uTime;\nuniform float uFogCap;\nuniform float uFogLift;\n' + sh.fragmentShader
       .replace('#include <color_fragment>', `#include <color_fragment>
         float g1 = texture2D(tGround, vWP.xz / 150.0).r;
         float g2 = texture2D(tNoise, vWP.xz / 64.0).r;
@@ -541,6 +601,10 @@ function initTerrainMat() {
         float gk = clamp(vG, 0.0, 1.0), sk = clamp(-vG, 0.0, 1.0);
         float det = mix(mix(1.0 + (g2 - 0.69) * 0.95 + (g4 - 0.69) * 0.35, 1.02 + (g4 - 0.69) * 0.22 + (g3 - 0.69) * 0.2, sk), 0.5 + g1 * 0.62, gk);
         diffuseColor.rgb *= det * (1.0 + (g3 - 0.69) * 1.1);
+        float cliff = smoothstep(0.12, 0.45, vSlope) * (1.0 - sk);
+        float strata = 0.5 + 0.5 * sin(vWP.y * 0.13 + g2 * 3.0 + g3 * 5.0);
+        vec3 rock = mix(vec3(0.30, 0.285, 0.25), vec3(0.49, 0.46, 0.39), smoothstep(0.25, 0.75, strata));
+        diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * 0.55 + rock * 0.45, cliff);
         float wl = 0.25 * sin(uTime * 0.9 + (vWP.x + vWP.z * 0.6) * 0.012);
         float shr = 1.0 - smoothstep(0.0, 0.45, abs(vWP.y - wl));
         float fw = 0.5 + 0.5 * sin(uTime * 1.3 + (vWP.x * 0.7 + vWP.z) * 0.05 + g2 * 9.0);
@@ -665,8 +729,8 @@ function buildWorld() {
   // örnekli ağlar
   const I = U3.inst = {};
   const nT = G.trees.length + G.deco.length;
-  I.trunk = mkInst(GEO.trunk, MAT.inst, nT * 4 + 8); I.cone = mkInst(GEO.cone, MAT.inst, G.trees.length * 3 + 8); I.blob = mkInst(GEO.ico1, MAT.inst, G.trees.length * 3 + 8);
-  I.moss = mkInst(GEO.cone4, MAT.instD, G.trees.length * 3 + 8); I.frond = mkInst(GEO.frond, MAT.instD, G.trees.length * 2 + 8);
+  I.trunk = mkInst(GEO.treeTrunk, MAT.inst, nT * 5 + 8); I.cone = mkInst(GEO.treeCrown, MAT.treeCone, G.trees.length * 3 + 8); I.blob = mkInst(GEO.treeLeaf, MAT.treeLeaf, G.trees.length * 3 + 8);
+  I.moss = mkInst(GEO.cone4, MAT.instD, G.trees.length * 3 + 8); I.frond = mkInst(GEO.frond, MAT.treeFrond, G.trees.length * 9 + 8);
   I.tshadow = mkInst(GEO.disc, MAT.tshadow, G.trees.length + G.rocks.length + 8); I.tshadow.renderOrder = 1;
   I.rock = mkInst(GEO.dod, MAT.rock, G.rocks.length * 2 + G.deco.length + 8);
   I.bush = mkInst(GEO.ico, MAT.inst, G.bushes.length * 2 + (G.herbs.length + G.poisons.length) + 8);
@@ -1465,7 +1529,7 @@ function render3D(dt) {
   if (!L || !G.trees) return true;
   resize3D();
   const t = G.now, cam = U3.cam; U3.frame++;
-  U3.uTime.value = t; U3.dt = dt;
+  U3.uTime.value = t; U3.dt = dt; updateTreeWind();
   // yeni oyun / yükleme: dünya dizileri değişti
   if (U3.worldKey !== G.trees || U3.worldSeed !== G.seed || U3.worldFire !== G.fire) { U3.worldKey = G.trees; U3.worldSeed = G.seed; U3.worldFire = G.fire; buildWorld(); }
   // ---- kamera (göz yüksekliği: arazi + duruş)

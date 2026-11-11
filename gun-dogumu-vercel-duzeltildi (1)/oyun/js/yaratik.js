@@ -111,7 +111,7 @@ function hurt(t, dmg, src, poison, isProj) {
         if (t.ko > 0) t.hp = 0;
         else { t.angry = 18; t.tgt = src; if (!t.koDone && t.hp > 0 && t.hp < t.maxhp * 0.3) { t.ko = 30; t.koDone = true; t.angry = 0; msg('Boynuzlu bayıldı! [E] basılı tut: 15🍖 ile evcilleştir — ya da vur ve et al.', '#fe9', 6); } }
       } else if (t.type === 'uzunboyun') { t.angry = 15; t.tgt = src; }
-      else if (t.type === 'ordek') alarmHerd(t, src || L);
+      else if (t.type === 'ordek' || t.type === 'bozkirat') alarmHerd(t, src || L);
       else if (t.type === 'gurleyen' || t.type === 'zirhli') { t.angry = 12; t.tgt = src || L; }
       else if (t.type === 'kanatli') { t.st = 'fly'; t.home = { x: clamp(t.x + rand(-900, 900), 200, WORLD - 200), y: clamp(t.y + rand(-900, 900), 200, WORLD - 200) }; }
       else if (src && !t.leave && src.kind !== 'build') { t.tgt = src; t.engaged = true; }
@@ -247,6 +247,7 @@ function updDino(d, dt, prey, zones) {
     if (d.hp <= 0) { killDino(d, L); return; }
   }
   if (d.mounted) return;
+  if (d.type === 'bozkirat') return updBozkirat(d, dt);
   if (d.type === 'boynuzlu') return updHerb(d, dt);
   if (d.type === 'uzunboyun') return updLong(d, dt);
   if (d.type === 'kanatli') return updFlyer(d, dt);
@@ -565,7 +566,7 @@ function fleeStep(d, dt, mul) {
   return true;
 }
 // ---- av hayvanının kulakları ve gözleri
-const PREY_HEAR = { ordek: 420, gurleyen: 450, boynuzlu: 420, zirhli: 400, uzunboyun: 520 };
+const PREY_HEAR = { bozkirat: 580, ordek: 420, gurleyen: 450, boynuzlu: 420, zirhli: 400, uzunboyun: 520 };
 function preyNotices(d, p, dd) {
   const hear = PREY_HEAR[d.type] || 440;
   if (dd < hear * noiseOf(p)) return true;
@@ -738,6 +739,91 @@ function takeEgg(n) {
 }
 
 // ---- doğurma
+// Yuvalar dünya tohumundan yeniden üretildiği için ayrıca kaydedilmez.
+function denHash(type, x, y) {
+  let h = ((G.seed || 1) ^ (x * 374761393) ^ (y * 668265263) ^
+    (type.length * 2246822519)) | 0;
+  for (let i = 0; i < type.length; i++) h = Math.imul(h ^ type.charCodeAt(i), 1597334677);
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967295;
+}
+
+function makeDen(type, biome, minH, r) {
+  let best = null, bestScore = -1;
+  for (let y = 240; y < WORLD - 240; y += 240) {
+    for (let x = 240; x < WORLD - 240; x += 240) {
+      if (Math.hypot(x - G.fire.x, y - G.fire.y) < 1900) continue;
+      if (biomeFast(x, y) !== biome || isSea(x, y) || groundH(x, y) < minH) continue;
+      if (G.lakes.some(l => Math.hypot(l.x - x, l.y - y) < l.r + 90)) continue;
+      const score = denHash(type, x, y) + wildness(x, y) * 0.45;
+      if (score > bestScore) {
+        bestScore = score;
+        best = { type, x, y, r, biome, prey: 0, predators: 0 };
+      }
+    }
+  }
+  return best;
+}
+
+function initDens() {
+  if (G.dens && G.densFire === G.fire) return;
+  G.dens = []; G.densFire = G.fire;
+  const defs = [
+    ['geceavcisi', 1, 250, 1050],
+    ['yirtici', 0, 18, 1050],
+    ['kesici', 3, 1, 1250]
+  ];
+  for (const q of defs) {
+    const den = makeDen(q[0], q[1], q[2], q[3]);
+    if (den) G.dens.push(den);
+  }
+
+  let pool = null, poolScore = -1;
+  for (const p of G.pools) {
+    if (Math.hypot(p.x - G.fire.x, p.y - G.fire.y) < 1900) continue;
+    if (biomeFast(p.x, p.y) !== 2) continue;
+    const score = denHash('batakci', p.x | 0, p.y | 0);
+    if (score > poolScore) { poolScore = score; pool = p; }
+  }
+  if (pool) {
+    G.dens.push({
+      type: 'batakci', x: pool.x, y: pool.y,
+      r: Math.max(850, pool.r + 500), biome: 2,
+      prey: 0, predators: 0, pool
+    });
+  }
+}
+
+function denBalance(den) {
+  let prey = 0, predators = 0;
+  for (const d of G.dinos) {
+    if (d.dead || d.tamed || d.leave || d.watcher || d.campI !== undefined) continue;
+    if (DINO[d.type].herb && Math.hypot(d.x - den.x, d.y - den.y) < 1550) prey++;
+    if (d.type === den.type && Math.hypot(d.x - den.x, d.y - den.y) < 1900) predators++;
+  }
+  den.prey = prey;
+  den.predators = predators;
+  den.roam = prey < 2 ? den.r * 1.55 : prey < 4 ? den.r * 1.25 : den.r;
+  return den;
+}
+
+function denFor(type) {
+  initDens();
+  let best = null, bd = Infinity;
+  for (const den of G.dens) {
+    if (den.type !== type) continue;
+    denBalance(den);
+    const dd = L ? Math.hypot(den.x - L.x, den.y - L.y) : 0;
+    if (dd < bd) { bd = dd; best = den; }
+  }
+  return best;
+}
+
+function bindDen(d, den) {
+  d.den = den;
+  d.terr = den ? { x: den.x, y: den.y, r: den.roam || den.r } : null;
+}
+
 function spawnPos(minR = 850, maxR = 1150, around) {
   const c = around || L;
   for (let k = 0; k < 30; k++) {
@@ -773,8 +859,69 @@ function ambush(v, n, type, text) {
   SFX.screech(L ? clamp(1 - dist(v, L) / 1000, 0.2, 1) : 0.4, panOf(v.x));
   return out;
 }
-// bölgesel doğurma: yeri (biyom + vahşilik) uygunsa sürüyü orada kurar, d.terr = yaşam alanı
+// Yuva kaynaklı normal doğumlar: yerel kapasite ve bütün haritadaki tür sınırı.
+function denSpawnRoom(type, n, den) {
+  if (!den || den.prey < 2 || !Number.isFinite(n) || n < 1) return 0;
+  const night = isNight(), sm = DIFF[G.diff].spawn;
+  let limit;
+  if (type === 'yirtici') limit = (night ? 4 : 3) * sm;
+  else if (type === 'geceavcisi') {
+    if (!night || G.day < 2) return 0;
+    limit = Math.min(2 + G.day / 4, 5) * sm;
+  } else if (type === 'kesici') {
+    if (G.day < 3) return 0;
+    limit = 1;
+  } else return 0;
+  let total = 0;
+  for (const d of G.dinos) {
+    if (d.type === type && !d.dead && !d.tamed && !d.leave &&
+        !d.watcher && d.campI === undefined) total++;
+  }
+  const local = Math.max(1, Math.floor(den.prey / 3)) - den.predators;
+  return Math.max(0, Math.min(Math.floor(n), local, Math.ceil(limit) - total));
+}
+// Merkez doğru biyomda; beden çevresinden beş örnek karada kalsın.
+function denSpotOK(type, p, den) {
+  if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) return false;
+  const radius = DINO[type].r || 0;
+  if (p.x < 80 + radius || p.y < 80 + radius ||
+      p.x > WORLD - 80 - radius || p.y > WORLD - 80 - radius) return false;
+  if (Math.hypot(p.x - G.fire.x, p.y - G.fire.y) < 1900 + radius) return false;
+  if (biomeFast(p.x, p.y) !== den.biome) return false;
+  const minH = type === 'geceavcisi' ? 250 : type === 'yirtici' ? 18 : 1;
+  if (groundH(p.x, p.y) < minH) return false;
+  if (G.lakes.some(l => Math.hypot(l.x - p.x, l.y - p.y) < l.r + radius + 40)) return false;
+  for (const v of [[0, 0], [radius, 0], [-radius, 0], [0, radius], [0, -radius]]) {
+    if (isSea(p.x + v[0], p.y + v[1]) || groundH(p.x + v[0], p.y + v[1]) < 0.6) return false;
+  }
+  return true;
+}
+// spawnPack'ın ±60 saçılması yerine her bireyi son konumunda doğrula.
+function spawnDenPack(type, n, den, minW) {
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    for (let k = 0; k < 12; k++) {
+      const a = rand(0, TAU), rr = rand(35, 120);
+      const p = { x: den.x + Math.cos(a) * rr, y: den.y + Math.sin(a) * rr };
+      if (!denSpotOK(type, p, den) || wildness(p.x, p.y) < minW) continue;
+      const d = mkDino(type, p.x, p.y), blocked = pushOut(d, true);
+      if (blocked || !denSpotOK(type, d, den) || wildness(d.x, d.y) < minW) continue;
+      d.wx = d.x; d.wy = d.y; d.herdL = out[0] || d;
+      bindDen(d, den); G.dinos.push(d); out.push(d);
+      break;
+    }
+  }
+  den.predators += out.length;
+  return out;
+}
+// Bölgesel doğurma imzası korunur; senaryolu spawnPack/pusu akışları değişmez.
 function spawnTerr(type, n, bs, minW, r = 1100, minR = 800, maxR = 1250) {
+  if (type === 'yirtici' || type === 'geceavcisi' || type === 'kesici') {
+    const den = denFor(type);
+    if (!den || (L && Math.hypot(den.x - L.x, den.y - L.y) > 2100)) return [];
+    const cap = denSpawnRoom(type, n, den);
+    return cap > 0 ? spawnDenPack(type, cap, den, minW) : [];
+  }
   for (let k = 0; k < 10; k++) {
     const p = spawnPos(minR, maxR); if (!p) continue;
     if (bs && !bs.includes(biomeFast(p.x, p.y))) continue;
@@ -796,9 +943,23 @@ function spawnHerd(type, n, bs, minR = 700, maxR = 1250) {
   return [];
 }
 function spawner() {
+  initDens();
+  for (const den of G.dens) denBalance(den);
+  for (const d of G.dinos) {
+    if (!d.den || d.dead || d.tamed) continue;
+    denBalance(d.den);
+    if (!d.terr) d.terr = { x: d.den.x, y: d.den.y, r: d.den.roam };
+    else {
+      d.terr.x = d.den.x;
+      d.terr.y = d.den.y;
+      d.terr.r = d.den.roam;
+    }
+  }
+
   const cnt = {}; for (const d of G.dinos) if (!d.tamed && (!d.leave || DINO[d.type].herb) && d.campI === undefined && !d.watcher) cnt[d.type] = (cnt[d.type] || 0) + 1;
   const c = k => cnt[k] || 0;
   const day = G.day, n = isNight(), sm = DIFF[G.diff].spawn, R = Math.random;
+  if (!n && c('bozkirat') < 6 && R() < 0.025) spawnBozkirat(ri(2, 3));
   // ---- av hayvanları: yaygın, sürü halinde; ovada daha çok
   if (c('ordek') < 12 && R() < 0.12) spawnHerd('ordek', ri(4, 7), R() < 0.7 ? [4, 0] : [0, 4]);
   if (c('gurleyen') < 7 && R() < 0.05) spawnHerd('gurleyen', ri(3, 5), R() < 0.6 ? [4, 0, 1] : [0, 1]);
@@ -806,19 +967,42 @@ function spawner() {
   if (c('zirhli') < 3 && R() < 0.03) spawnHerd('zirhli', ri(1, 2), [4, 0]);
   if (c('uzunboyun') < 1 && R() < 0.006) spawnHerd('uzunboyun', 1, [4], 900, 1400);
   if (!n && c('kanatli') < 3 && R() < 0.15) { const pos = spawnPosBiome([1, 5], 500, 1100); if (pos) spawnFlyer(pos); }
-  // ---- yırtıcılar: az, uzak bölgelerinde (sık orman, dağ, bataklık, sis); kamp çevresi boş
+  // ---- yırtıcılar: yerel av kapasitesi yoksa çoğalmaz; az avda daha geniş dolaşır
   if (c('kucuk') < (n ? 3 : 2) && R() < 0.04) spawnTerr('kucuk', ri(2, 3), null, 0.35, 900);
-  if (c('yirtici') < (n ? 4 : 3) * sm && R() < (n ? 0.035 : 0.025)) spawnTerr('yirtici', ri(1, 3), [0, 1, 2, 3], 0.55);
-  if (n && day >= 2 && c('geceavcisi') < Math.min(2 + day / 4, 5) * sm && R() < 0.03) spawnTerr('geceavcisi', ri(2, 3), [0, 2, 3], 0.6);
+
+  const yd = denFor('yirtici');
+  if (yd && yd.prey >= 2 && yd.predators < Math.min((n ? 4 : 3) * sm, Math.max(1, Math.floor(yd.prey / 3))) &&
+      R() < (n ? 0.035 : 0.025)) {
+    spawnTerr('yirtici', ri(1, 3), [0], 0.55);
+  }
+
+  const gd = denFor('geceavcisi');
+  if (n && day >= 2 && gd && gd.prey >= 2 &&
+      gd.predators < Math.min(Math.min(2 + day / 4, 5) * sm, Math.max(1, Math.floor(gd.prey / 3))) &&
+      R() < 0.03) {
+    spawnTerr('geceavcisi', ri(1, 2), [1], 0.6);
+  }
+
   if (c('tukurgec') < (day >= 6 ? 2 : 1) && R() < 0.005 * sm) spawnTerr('tukurgec', 1, [0, 2], 0.8, 700);
-  if (day >= 3 && c('kesici') < 1 && R() < (n ? 0.008 : 0.003) * sm) for (const d of spawnTerr('kesici', 1, [0, 3], 0.75, 1300)) d.silent = true;
+
+  const kd = denFor('kesici');
+  if (day >= 3 && kd && kd.prey >= 3 && kd.predators < 1 &&
+      R() < (n ? 0.008 : 0.003) * sm) {
+    for (const d of spawnTerr('kesici', 1, [3], 0.75, 1300)) d.silent = true;
+  }
+
   if (day >= 4 && c('yelken') < 1 && R() < 0.0015 * sm) {
     const W = G.pools.concat(G.lakes).filter(w => { const d = Math.hypot(w.x - L.x, w.y - L.y); return d > 700 && d < 1500 && wildness(w.x, w.y) > 0.5; });
     if (W.length) { const w = pick(W), a = rand(0, TAU), d = mkDino('yelken', w.x + Math.cos(a) * (w.r + 40), w.y + Math.sin(a) * (w.r + 40)); d.home = { x: w.x, y: w.y }; pushOut(d, true); G.dinos.push(d); }
   }
-  if (c('batakci') < 5 && R() < 0.3) {
-    const pools = G.pools.filter(pl => !pl.croc && Math.hypot(pl.x - L.x, pl.y - L.y) < 1300 && Math.hypot(pl.x - L.x, pl.y - L.y) > 450);
-    if (pools.length) { const pl = pick(pools), d = mkDino('batakci', pl.x, pl.y); d.home = pl; pl.croc = d; d.hidden = true; d.st = 'hide'; G.dinos.push(d); }
+
+  const bd = denFor('batakci');
+  if (bd && bd.pool && !bd.pool.croc && bd.prey >= 2 &&
+      (!L || Math.hypot(bd.x - L.x, bd.y - L.y) < 1500) &&
+      c('batakci') < 5 && R() < 0.3) {
+    const pl = bd.pool, d = mkDino('batakci', pl.x, pl.y);
+    d.home = pl; pl.croc = d; d.hidden = true; d.st = 'hide';
+    bindDen(d, bd); G.dinos.push(d);
   }
   // nadir gündüz pususu: yalnızca vahşi topraklarda dolaşan birine
   if (!n && day >= 3 && R() < 0.004 * sm) {
@@ -996,6 +1180,50 @@ function alarmHerd(d, thr) {
   }
   if (any) SFX.honk(volOf(d, 900) + 0.03, panOf(d.x));
 }
+// Bozkır Atı: barışçıl, ürkek çayır otoburu; binme/evcilleştirme bu pakette yok.
+function updBozkirat(d, dt) {
+  const def = DINO.bozkirat;
+  d.angry = 0; // savunma için zırhlı kuyruğu saldırısına düşmesin
+  if (fleeStep(d, dt, 1.6) || preyAware(d, dt)) return;
+  if (dist(d, G.fire) < 500) {
+    const a = angTo(G.fire, d);
+    steer(d, d.x + Math.cos(a) * 160, d.y + Math.sin(a) * 160, def.spd * 0.75, dt, true);
+    d.anim += dt * 6; return;
+  }
+  const lead = d.herdL;
+  if (lead && lead !== d && !lead.dead && dist(d, lead) > 110) {
+    steer(d, lead.x + Math.cos(d.id) * 45, lead.y + Math.sin(d.id) * 45, def.spd * 0.55, dt, true);
+    d.anim += dt * 4; return;
+  }
+  wanderSlow(d, dt, def.spd * 0.3);
+}
+function spawnBozkirat(n) {
+  const out = [], cap = 6;
+  const count = G.dinos.filter(d => !d.dead && d.type === 'bozkirat').length;
+  n = Math.min(Math.max(0, Math.floor(n) || 0), cap - count);
+  if (!(n > 0)) return out;
+  const center = spawnPosBiome([4], 750, 1250);
+  if (!center) return out;
+  function valid(x, y) {
+    if (!Number.isFinite(x) || !Number.isFinite(y) || x < 35 || y < 35 || x > WORLD - 35 || y > WORLD - 35) return false;
+    if (biomeFast(x, y) !== 4 || isSea(x, y) || groundH(x, y) < 0.8 || Math.hypot(x - G.fire.x, y - G.fire.y) < 650) return false;
+    if ([...G.pools, ...G.lakes].some(w => Math.hypot(x - w.x, y - w.y) < w.r + DINO.bozkirat.r + 8)) return false;
+    const h = groundH(x, y);
+    return [[20, 0], [-20, 0], [0, 20], [0, -20]].every(v => Math.abs(groundH(x + v[0], y + v[1]) - h) < 6);
+  }
+  for (let k = 0; k < 18 && out.length < n; k++) {
+    const x = center.x + rand(-70, 70), y = center.y + rand(-70, 70);
+    if (!valid(x, y)) continue;
+    const d = mkDino('bozkirat', x, y); pushOut(d, true);
+    if (!valid(d.x, d.y)) continue;
+    if (gQuery(d.x, d.y, d.r + 4).some(o => !o.dead && Math.hypot(d.x - o.x, d.y - o.y) < d.r + o.r)) continue;
+    if (G.dinos.some(o => !o.dead && Math.hypot(d.x - o.x, d.y - o.y) < d.r + o.r + 4)) continue;
+    d.terr = { x: center.x, y: center.y, r: 550 };
+    d.herdL = out[0] || d; G.dinos.push(d); out.push(d);
+  }
+  return out;
+}
+
 function updGrazer(d, dt) {
   const def = DINO[d.type];
   d.swing = Math.max(0, (d.swing || 0) - dt);

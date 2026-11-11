@@ -115,6 +115,7 @@ const ABIL = {
 // ---- yaratıklar
 // kind: pred (yırtıcı), herb (otobur), human
 const DINO = {
+  bozkirat:   { ad: 'Bozkır Atı', r: 19, hp: 65, spd: 185, dmg: 0, cd: 1.2, col: '#8b7052', eye: '#806137', drop: { meat: 18, bone: 2, hide: 3 }, herb: true },
   kucuk:      { ad: 'Sürüngeç',    r: 9,  hp: 16,  spd: 175, dmg: 4,  cd: 0.7, col: '#6b7d3a', eye: '#b6ff5a', drop: { meat: 4 },                     sense: 380, nsense: 560,  pred: true },
   geceavcisi: { ad: 'Gece Avcısı', r: 12, hp: 30,  spd: 205, dmg: 8,  cd: 0.8, col: '#3a3f4a', eye: '#7cff9a', drop: { meat: 5, bone: 1 },             sense: 300, nsense: 900,  pred: true, night: true },
   tukurgec:   { ad: 'Tükürgeç',    r: 13, hp: 28,  spd: 160, dmg: 7,  cd: 0.9, col: '#5a6a4a', eye: '#ff9a3a', drop: { meat: 6, bone: 1, poison: 2 },  sense: 420, nsense: 600,  pred: true },
