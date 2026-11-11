@@ -107,7 +107,8 @@ button{font-family:Georgia,serif;color:var(--ink);cursor:pointer}
 #inBox .nav{position:absolute;top:50%;transform:translateY(-50%);font-size:16px;padding:6px 10px;opacity:.85}
 #inBox .nav.l{left:4px}#inBox .nav.r{right:4px}
 #charM{z-index:6}
-#charBox{background:#15110c;border:1px solid #6a5030;border-radius:12px;width:min(520px,94vw);max-height:88vh;display:flex;flex-direction:column;font-size:13px}
+#charBox{background:#15110c;border:1px solid #6a5030;border-radius:12px;width:min(520px,94vw);max-height:86vh;max-height:86dvh;display:flex;flex-direction:column;font-size:13px}
+#charBox .cl{overflow-y:auto;-webkit-overflow-scrolling:touch;touch-action:pan-y;overscroll-behavior:contain;min-height:0;flex:1;padding-bottom:28px}
 #charBox button,.ctabs button,.obtns button{background:#2b2419;border:1px solid #5a4a30;border-radius:6px;padding:4px 9px;font-size:12px}
 #charBox button.on,.ctabs button.on{border-color:var(--fire);background:#4a2a10}
 #charBox button.no{opacity:.45}

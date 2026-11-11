@@ -82,7 +82,8 @@ const ranged = p => !!(p.eq && p.eq.yay) && arrows() > 0;
 const nearSifahane = p => G.builds.some(b => b.built && !b.dead && (b.type === 'sifahane' || roomCount(b, 'sifa') > 0) && Math.hypot(b.x - p.x, b.y - p.y) < b.r + 140);
 
 function pSpeed(p) {
-  let s = p.leader ? 150 : 105;
+  let s = p.leader ? 120 : 84;
+  if (p.carry > 0 && !p.leader) s *= 0.82;   // yük taşıyan ağır yürür
   if (typeof terrainMul === 'function') s *= terrainMul(p.x, p.y);
   if (p.sneak) s *= 0.5;
   if (tr(p, 'cevik')) s *= 1.25;
@@ -515,6 +516,17 @@ function updPerson(p, dt, LS) {
   if (p.carriedBy) { if (!G.people.some(c => c.id === p.carriedBy && c.carrying === p) && !(G.lcarry === p)) p.carriedBy = 0; else return; }
   const night = isNight();
   updFear(p, dt, LS, night);
+  // yaralı çalışmaz: kırığı olan yerinde bekler (taşınır), diğerleri mağaraya/ateşe çekilip dinlenir; şifacı yanına gelir
+  if (!p.carrying && (p.injury || p.hp < p.maxhp * 0.4) && !(p.fear > 60)) {
+    p.work = 0; p.sneak = false; if (p.tgt && p.tgt.claim === p) p.tgt.claim = null; p.tgt = null; p.carryOrder = 0;
+    if (!members('sifaci').length && !G.flags.noHealer) { G.flags.noHealer = 1; msg(`🩹 ${p.name} yaralı ve çalışamıyor. Şifacın yok: birini 🌿 Şifacı yap ya da yanına gidip kendin sar.`, '#f99', 6); }
+    const broken = p.injury && p.injury.type === 'kirik';
+    if (broken || p.wasDowned) { p.moving = false; p.stageAd = 'Yaralı — taşınmayı bekliyor'; return; }
+    if (p.bedRes) { const bp = bedPos(p.bedRes.s, p.bedRes.i); if (Math.hypot(p.x - bp.x, p.y - bp.y) > 30 && dist(p, p.bedRes.s) > p.bedRes.s.r + 20) { steer(p, bp.x, bp.y + 20, pSpeed(p) * 0.6, dt, false); p.anim += dt * 6; } else putInBed(p); p.stageAd = 'Yaralı — şifa yerine gidiyor'; return; }
+    const rp = depotOf(p); p.stageAd = 'Yaralı — dinleniyor';
+    if (Math.hypot(p.x - rp.x, p.y - rp.y) > 40) { steer(p, rp.x + Math.cos(p.seat) * 20, rp.y + 10, pSpeed(p) * 0.6, dt, false); p.anim += dt * 6; } else { p.moving = false; p.hp = Math.min(p.maxhp, p.hp + 0.6 * dt); }
+    return;
+  }
   if (p.lastHurt > 6 && !(p.injury && p.injury.type === 'enfeksiyon')) {
     let h = 0;
     if (dist(p, G.fire) < fireR() + 20) h = 0.8;

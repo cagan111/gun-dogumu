@@ -78,6 +78,9 @@ function inMove(mx, my, spd, dt) {
   const I = G.inside, D = inDims(I.b); let x = I.x + mx * spd * dt, y = I.y + my * spd * dt;
   x = clamp(x, 14, D.w - 14); y = clamp(y, 14, D.h - 10);
   for (const f of inFurn(I.b)) { if (f.k === 'door' || f.k === 'paint' || f.k === 'torch' || f.k === 'mat') continue; const r = f.k === 'table' ? 30 : f.k === 'hearth' ? 22 : 18, dx = x - f.x, dy = y - f.y, d = Math.hypot(dx, dy); if (d < r && d > 0.01) { x = f.x + dx / d * r; y = f.y + dy / d * r; } }
+  // duvar, sütun ve kaya bölmeleri (çizici tanımlar): içinden geçilmez
+  if (typeof inSolids === 'function') for (const o of inSolids(I.b)) { const dx = x - o.x, dy = y - o.y, d = Math.hypot(dx, dy), r = o.r + 9; if (d < r && d > 0.01) { x = o.x + dx / d * r; y = o.y + dy / d * r; } }
+  if (typeof inWall === 'function') { const q = inWall(I.b, x, y); if (q) { x = q.x; y = q.y; } }
   I.x = x; I.y = y;
 }
 function inInteract() {

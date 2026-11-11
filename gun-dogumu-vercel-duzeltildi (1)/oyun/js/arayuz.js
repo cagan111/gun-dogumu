@@ -303,7 +303,7 @@ function renderChar() {
       if (mine.length) h += `<div><small>Sırası: ${mine.map(o => `${ITEMS[o.item].ic}×${o.left >= 999 ? '∞' : o.left}`).join(' ')}</small></div>`;
     }
   }
-  $('charBox').innerHTML = h + '</div>';
+  { const box = $('charBox'), old = box.querySelector('.cl'), st = old && UI.charShown === p.id ? old.scrollTop : 0; box.innerHTML = h + '</div>'; const nw = box.querySelector('.cl'); if (nw) nw.scrollTop = st; UI.charShown = p.id; }
 }
 
 // ---- üretim menüsü
@@ -565,11 +565,12 @@ function showVictory(saved, left) {
 }
 
 // ---- döngü
+const TEMPO = 0.78;   // oyunun genel hızı: daha ağır, daha yavaş bir hava
 let lastT = performance.now();
 function loop(now) {
   const dt = Math.min(0.05, (now - lastT) / 1000); lastT = now;
   if (G.started && L) {
-    if (!G.paused && !G.over && !G.modal) { if (G.sleep) { for (let i = 0; i < 10 && G.sleep; i++) update(0.05); } else update(dt); }
+    if (!G.paused && !G.over && !G.modal) { if (G.sleep) { for (let i = 0; i < 10 && G.sleep; i++) update(0.05); } else update(dt * TEMPO); }
     $('sleepV').style.display = G.sleep ? 'flex' : 'none';
     if (L) { render(); hudTick(dt); }
   }
