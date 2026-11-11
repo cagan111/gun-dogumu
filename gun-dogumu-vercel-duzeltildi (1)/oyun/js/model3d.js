@@ -166,8 +166,8 @@ const M3 = (function () {
       pb.wedge(-0.12 * L, 0.45 * L, 0, 0.72 * h, 0, 0.62 * h, w * 0.9, w * 0.95, c.col);
       pb.wedge(0.45 * L, L, 0, 0.55 * h, 0.06 * h, 0.22 * h, w * 0.85, w * 0.45, c.col);
       pb.wedge(0.88 * L, 1.05 * L, 0.0, 0.26 * h, -0.06 * h, 0.08 * h, w * 0.4, w * 0.25, '#4a4034');
-      pb.ball(0.14 * L, 0.86 * h, 0, 0.42 * L, 0.6 * h, w * 1.05, '#e4d8c0');
-      pb.ball(0.2 * L, 1.1 * h, 0, 0.28 * L, 0.42 * h, w * 0.75, '#efe6d2');
+      pb.ball(0.14 * L, 0.86 * h, 0, 0.42 * L, 0.6 * h, w * 1.05, mix(c.col, '#e4d8c0', 0.55));
+      pb.ball(0.2 * L, 1.1 * h, 0, 0.28 * L, 0.42 * h, w * 0.75, mix(c.col, '#efe6d2', 0.7));
       for (let i = 0; i < 7; i++) { const a = PI * 0.5 + (i / 6 - 0.5) * PI * 1.3, x = 0.1 * L + Math.cos(a) * 0.1 * L - 0.34 * L * Math.abs(Math.sin(a)) * 0 - 0.3 * L * (1 - Math.abs(i - 3) / 4), z = Math.cos((i / 6) * PI) * w * 1.15; pb.cone([x, 0.6 * h, z], [x - 0.14 * L, 0.78 * h, z * 1.35], 0.07 * L, '#5a4a3a'); }
       for (const s of [-1, 1]) { pb.ball(0.5 * L, 0.42 * h, s * w * 0.86, 0.05 * L, 0.05 * L, 0.03 * L, '#0c0a08', { d: 0 }); pb.cone([0.72 * L, 0.36 * h, s * w * 0.5], [0.78 * L, 0.52 * h, s * w * 0.6], 0.04 * L, '#5a4a3a'); }
       return;
@@ -765,7 +765,7 @@ const M3 = (function () {
     o.torso.position.y = 27 + (mv ? Math.abs(Math.cos(ph)) * 0.8 : Math.sin(t * 1.3) * 0.3) - 1.0;
     o.torso.rotation.z = -0.3 - at * 0.25 + Math.sin(t * 0.9 + id) * 0.03; o.torso.rotation.x = Math.sin(t * 0.6 + id) * 0.05 + jit * 0.06;
     o.head.rotation.z = 0.15 + at * 0.2 + jit * 0.12; o.head.rotation.x = Math.sin(t * 1.7 + id) * 0.18 + jit * 0.3; o.head.rotation.y = Math.sin(t * 0.8 + id) * 0.25;
-    const open = 0.2 + 0.14 * Math.sin(t * 12) + at * 0.75 + 0.1 * Math.sin(t * 2.1);
+    const open = 0.32 + 0.12 * Math.sin(t * 12) + at * 0.7 + 0.1 * Math.sin(t * 2.1);
     o.half[0].rotation.x = -open; o.half[1].rotation.x = open;
     for (let i = 0; i < 2; i++) {
       const L = o.legs[i], sg = i ? -1 : 1, a = mv * s * sg * 0.55 + 0.22;
