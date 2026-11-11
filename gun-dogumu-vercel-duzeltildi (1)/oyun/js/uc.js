@@ -395,7 +395,7 @@ const BIOME_GR = [1, 0.25, 0.8, 0.7, 1, 0, 0, 1];
 const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
 let TC = null;
 function terColor(x, z, h, ny, out) {
-  if (!TC) TC = { b: BIOME_COL.map(c => new THREE.Color(c)), rock: new THREE.Color('#6b655c'), rock2: new THREE.Color('#57524b'), snow: new THREE.Color('#e9eef3'), sand: new THREE.Color('#e6d3a2'), wet: new THREE.Color('#a8946a'), deep: new THREE.Color('#1f4250'), dirt: new THREE.Color('#6e5638'), litter: new THREE.Color('#5a4a2c'), t: new THREE.Color() };
+  if (!TC) TC = { b: BIOME_COL.map(c => new THREE.Color(c)), rock: new THREE.Color('#6b655c'), rock2: new THREE.Color('#57524b'), snow: new THREE.Color('#e9eef3'), sand: new THREE.Color('#e6d3a2'), wet: new THREE.Color('#a8946a'), deep: new THREE.Color('#1f4250'), dirt: new THREE.Color('#6e5638'), litter: new THREE.Color('#5a4a2c'), au1: new THREE.Color('#8a6a2c'), au2: new THREE.Color('#7a4a24'), straw: new THREE.Color('#7e7452'), fresh: new THREE.Color('#5c9a30'), t: new THREE.Color() };
   let r = 0, g = 0, b = 0, gr = 0;
   for (let k = 0; k < 4; k++) { const bi = bioAt(x + (k & 1 ? 55 : -55), z + (k & 2 ? 55 : -55)), c = TC.b[bi]; r += c.r; g += c.g; b += c.b; gr += BIOME_GR[bi]; }
   out.setRGB(r / 4, g / 4, b / 4); gr /= 4;
@@ -407,11 +407,58 @@ function terColor(x, z, h, ny, out) {
   if (rk > 0) { TC.t.copy(n2 > 0.5 ? TC.rock : TC.rock2).multiplyScalar(0.85 + n1 * 0.3); out.lerp(TC.t, rk); gr *= 1 - rk; }
   const sn = smooth(430, 500, h + (n1 - 0.5) * 140 + (n2 - 0.5) * 40) * (1 - smooth(0.5, 0.75, slope));
   if (sn > 0) { out.lerp(TC.snow, sn); gr *= 1 - sn; }
+  { const S = U3.sl;                                                                 // mevsim: bitki örtüsü rengi
+    if (S && gr > 0.05) { const k = Math.min(1, gr * 1.3);
+      if (S.au > 0.01) out.lerp(n1 > 0.5 ? TC.au1 : TC.au2, S.au * 0.5 * k);
+      if (S.wi > 0.01) out.lerp(TC.straw, S.wi * 0.5 * k);
+      if (S.sp > 0.01) out.lerp(TC.fresh, S.sp * 0.22 * k); }
+    const sc = snowCover(x, z, h, n2) * (1 - smooth(0.5, 0.75, slope));                // kar örtüsü (derinlik alanından, yamalı)
+    if (sc > 0) { out.lerp(TC.snow, sc * 0.95); gr *= 1 - sc; } }
   TC.sk = 0; { const bs = bioAt(x, z) === 5 ? 1 : 0, s = Math.max(h < 8 ? smooth(8, 1.2, h + (n2 - 0.5) * 3) : 0, bs * (1 - rk)); if (s > 0) { out.lerp(TC.sand, s * 0.92); gr *= 1 - s; TC.sk = s; } }
   if (h < SEA_Y + 0.6) { out.lerp(TC.wet, smooth(SEA_Y + 0.6, -3, h)); out.lerp(TC.deep, smooth(-2, -45, h)); gr = 0; }
   const dc = Math.hypot(x - CAMP.x, z - CAMP.y); if (dc < 320) { out.lerp(TC.dirt, smooth(320, 60, dc) * (0.75 + n2 * 0.2)); gr *= 0.4 + 0.6 * smooth(60, 320, dc); }
   if (G.lakes) for (const l of G.lakes) { const dl = Math.hypot(x - l.x, z - l.y); if (dl < l.r + 70) { const s = smooth(l.r + 70, l.r, dl) * 0.75; out.lerp(TC.wet, s); gr *= 1 - s; } }
   return gr;
+}
+// kar örtüsü 0..1: dunya.js derinlik bantlarından (U3.sl.snow, yeniden boyama anındaki kopya); az karda yamalı
+function snowCover(x, z, h, n) {
+  const S = U3.sl; if (!S || h < 1) return 0;
+  const B = S.snow, f = clamp(h / 100, 0, B.length - 1), i = Math.min(B.length - 2, f | 0), u = f - i;
+  let d = B[i] + (B[i + 1] - B[i]) * u; if (d < 0.01) return 0;
+  const b = bioAt(x, z); d *= b === 5 ? 0.55 : b === 2 ? 0.75 : b === 6 ? 0 : 1;
+  if (n === undefined) n = vnoise3(x * 0.017, z * 0.017, 8.1);
+  const th = 0.04 + n * 0.32; return smooth(th, th + 0.22, d);
+}
+// mevsim/kar değişince görünen parçaları yeniden boya: kare başına birkaç parça, en yakından başlayarak
+function terColorsOf(x0, z0, size, geo) {
+  const N = TER.N, V = (N + 1) * (N + 1), pos = geo.attributes.position.array, nor = geo.attributes.normal.array, col = geo.attributes.color.array, grs = geo.attributes.aG.array;
+  for (let v = 0; v < V; v++) {
+    const gx = x0 + pos[v * 3], gz = z0 + pos[v * 3 + 2], g = terColor(gx, gz, pos[v * 3 + 1], nor[v * 3 + 1], _col), n = 0.92 + hash2(gx, gz) * 0.16;
+    col[v * 3] = _col.r * n; col[v * 3 + 1] = _col.g * n; col[v * 3 + 2] = _col.b * n; grs[v] = g > 0.02 ? g : -TC.sk;
+  }
+  const ed = [[0, 1], [N * (N + 1), 1], [0, N + 1], [N, N + 1]];
+  ed.forEach(([s, st], q) => { for (let k = 0; k <= N; k++) { const a = s + k * st, b = V + q * (N + 1) + k; col[b * 3] = col[a * 3]; col[b * 3 + 1] = col[a * 3 + 1]; col[b * 3 + 2] = col[a * 3 + 2]; grs[b] = grs[a]; } });
+  geo.attributes.color.needsUpdate = true; geo.attributes.aG.needsUpdate = true;
+}
+function seasonSync(dt, cx, cz) {
+  U3.slT = (U3.slT || 0) - dt;
+  if (!U3.sl || U3.slT <= 0) {
+    U3.slT = 0.5;
+    const n = seasonLook(), o = U3.sl;
+    let ch = !o, chI = !o;
+    if (o) { const dS = Math.max(Math.abs(n.sp - o.sp), Math.abs(n.au - o.au), Math.abs(n.wi - o.wi)); let dN = 0; for (let i = 0; i < n.snow.length; i++) dN = Math.max(dN, Math.abs(n.snow[i] - o.snow[i])); ch = dS > 0.04 || dN > 0.03; }
+    if (ch) { U3.sl = n; TER.gen = (TER.gen || 0) + 1; GR.gen = (GR.gen || 0) + 1; U3.instX = 1e9; }
+  }
+  // en fazla 3 parça / ~3 ms; o karede yeni parça kurulduysa yalnız 1 (yeni parçalar asla bekletilmez)
+  const t0 = performance.now(), lim = TER.builtLast ? 1 : 3; let done = 0;
+  while (done < lim && performance.now() - t0 < 3) {
+    let best = null, bd = 1e18;
+    for (const k of TER.want || []) { const nd = TER.nodes.get(k); if (!nd || nd.gen === TER.gen || !nd.m.visible) continue; const x0 = nd.x0 + nd.s / 2 - cx, z0 = nd.z0 + nd.s / 2 - cz, d = x0 * x0 + z0 * z0; if (d < bd) { bd = d; best = nd; } }
+    if (!best) break;
+    terColorsOf(best.x0, best.z0, best.s, best.m.geometry); best.gen = TER.gen; done++;
+  }
+  U3.recolN = done;
+  grassReseason(2);
 }
 function terIndex() {
   if (TER.idx) return TER.idx;
@@ -446,7 +493,7 @@ function terBuild(key) {
   geo.boundingSphere = new THREE.Sphere(new THREE.Vector3(size / 2, (ymin + ymax) / 2, size / 2), Math.hypot(size * 0.71, (ymax - ymin) / 2 + sk));
   const m = new THREE.Mesh(geo, MAT.terrain); m.position.set(x0, 0, z0); m.matrixAutoUpdate = false; m.updateMatrix(); m.visible = false;
   TER.group.add(m);
-  return { m, used: 0 };
+  return { m, used: 0, gen: TER.gen || 0, x0, z0, s: size };
 }
 function terWant(cx, cz) {
   const out = [], R = TER.ROOT, o = WORLD / 2 - R / 2, M = 2600;
@@ -467,6 +514,7 @@ function terUpdate(cx, cz, budget) {
     if (!n) { if (built >= budget) { ready = false; continue; } n = terBuild(k); TER.nodes.set(k, n); built++; }
     n.used = U3.frame;
   }
+  TER.builtLast = built;
   if (ready && TER.shown !== TER.wantSet) {
     TER.shown = TER.wantSet;
     for (const [k, n] of TER.nodes) n.m.visible = TER.shown.has(k);
