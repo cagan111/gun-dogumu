@@ -74,6 +74,8 @@ const nearSifahane = p => G.builds.some(b => b.built && !b.dead && (b.type === '
 
 function pSpeed(p) {
   let s = p.leader ? 150 : 105;
+  if (typeof terrainMul === 'function') s *= terrainMul(p.x, p.y);
+  if (p.sneak) s *= 0.5;
   if (tr(p, 'cevik')) s *= 1.25;
   if (tr(p, 'yasli')) s *= 0.85;
   if (p.tired) s *= 0.8;
@@ -474,7 +476,7 @@ function updFear(p, dt, LS, night) {
 // ---- ana kişi güncellemesi
 const HOME_GROUPS = ['odun', 'tas', 'yiyecek', 'kasap', 'asci', 'ciftci', 'sifaci', 'zanaat', 'mimar', 'kasif', 'bos', 'avci'];
 function updPerson(p, dt, LS) {
-  p.insideB = null;
+  p.insideB = null; if (p.group !== 'avci') p.sneak = false;
   if (p.grabbed) return;
   p.atkCd -= dt; p.hurtT = Math.max(0, p.hurtT - dt); p.lastHurt += dt; p.swing = Math.max(0, p.swing - dt);
   if (p.work > 0 && p.moving) p.work = 0;
@@ -814,6 +816,7 @@ function updHunter(p, dt, thr) {
   if (p.hp < p.maxhp * 0.35) { steer(p, G.fire.x, G.fire.y, pSpeed(p) * 1.3, dt, false); p.anim += dt * 12; return; }
   const t = huntTarget(p);
   if (!t) {
+    p.sneak = false;
     if (goHome()) return homeBehavior(p, dt);
     if (thr) return rangedOrMelee(p, thr, dt);
     if (haulJob(p, dt)) return;
@@ -822,6 +825,7 @@ function updHunter(p, dt, thr) {
   }
   const hs = members('avci'), idx = Math.max(0, hs.indexOf(p)), n = Math.max(1, hs.length);
   const dd = dist(p, t);
+  p.sneak = !DINO[t.type].pred && !t.fleeing && !(t.angry > 0) && dd < 520 && dd > 150;   // ava sessizce yaklaş
   const charging = (t.tgt === p) && angDiff(t.ang, angTo(t, p)) < 0.9 && (t.angry > 0 || !!DINO[t.type].pred);
   if (ranged(p)) {
     const want = 170 + t.r, a = angTo(t, p) + (idx - (n - 1) / 2) * 0.4;

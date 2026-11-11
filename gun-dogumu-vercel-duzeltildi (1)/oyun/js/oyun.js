@@ -8,7 +8,7 @@ function resetState(diff) {
   for (const k of Object.keys(G)) delete G[k];
   Object.assign(G, {
     diff, seed: 0, t: CYCLE * 0.05, day: 1, now: 0, dt: 0,
-    stock: { wood: 30, stone: 10, food: 20, meyve: 14, et: 6, cigEt: 0, bone: 3, hide: 6, herb: 3, poison: 0, crystal: 0, mizrak: 1, balta: 1, kazma: 0, sepet: 0, ok: 0, zok: 0, yay: 0, zirh: 0, mesale: 0, eyer: 0, kemikMizrak: 0, yarikTasi: 0, bandaj: 2, ilac: 1 },
+    stock: { wood: 30, stone: 10, food: 20, meyve: 14, et: 6, cigEt: 0, bone: 3, hide: 6, herb: 3, poison: 0, crystal: 0, halat: 0, yelkenBezi: 0, gemiParca: 0, mizrak: 1, balta: 1, kazma: 0, sepet: 0, ok: 0, zok: 0, yay: 0, zirh: 0, mesale: 0, eyer: 0, kemikMizrak: 0, yarikTasi: 0, bandaj: 2, ilac: 1 },
     fire: { x: CAMP.x, y: CAMP.y, fuel: 85, out: false },
     builds: [], people: [], dinos: [], parts: [], texts: [], msgs: [], proj: [], stains: [], tracks: [], rainDrops: [],
     meal: null, feastNext: false, cave: null, tutIn: false, carcs: [], orders: [], hunt: null, huntMode: false, unclean: 0, lcarry: null, oid: 0, eqT: 0, homeT2: 0,
@@ -29,15 +29,15 @@ function newGame(diff, tutOn) {
   G.seed = Math.floor(Math.random() * 1e9);
   genWorld(G.seed);
   L = mkPerson(CAMP.x, CAMP.y + 70, 'Sen', true); G.people.push(L);
-  ['odun', 'avci', 'kasap', 'asci', 'yiyecek', 'mimar', 'muhafiz'].forEach((g, i) => {
-    const a = i / 7 * TAU + 0.5, p = mkPerson(CAMP.x + Math.cos(a) * 80, CAMP.y + Math.sin(a) * 80, freshName(), false);
+  ['odun', 'avci', 'kasap', 'asci', 'yiyecek', 'mimar', 'muhafiz', 'zanaat'].forEach((g, i) => {
+    const a = i / 8 * TAU + 0.5, p = mkPerson(CAMP.x + Math.cos(a) * 80, CAMP.y + Math.sin(a) * 80, freshName(), false);
     p.group = g; G.people.push(p);
     if (g === 'mimar' && lvl(p, 'insaat') < 2) p.sk.insaat = XPL[1] + 1;
     if (g === 'asci' && lvl(p, 'asci') < 2) p.sk.asci = XPL[1] + 1;
   });
   G.cave = makeBuild('magara', CAMP.x, CAMP.y - 230, 0); finishBuild(G.cave, true);
   G.cave.rooms = BUILD.magara.rooms.slice();
-  msg('Halkın şimdilik bir mağarada yaşıyor. İçini görmek için I tuşu ya da alttaki 🏠 İçeri.', '#cfe', 8);
+  msg('Halkın bir mağarada yaşıyor. Kapısına gidip E ile içeri gir; içeride dolaş, insanlara bakıp E ile emir ver.', '#cfe', 9);
   assignHomes(); assignEquip();
   G.tut = { on: !!tutOn, step: 0 };
   msg('Ateşi canlı tut. Halkını besle. Gece geldiğinde... ışıktan ayrılma.', '#ffd9a0', 8);
@@ -65,7 +65,16 @@ function updLeader(dt) {
   if (touch.jx || touch.jy) { mx = touch.jx; my = touch.jy; }
   { const fx = Math.cos(G.yaw), fy = Math.sin(G.yaw), f = -my, r = mx; mx = fx * f - fy * r; my = fy * f + fx * r; }
   const m = Math.hypot(mx, my);
-  p.sprinting = (keys.ShiftLeft || keys.ShiftRight || touch.run) && m > 0.1 && p.stam > 1;
+  p.sneak = !!(keys.ControlLeft || keys.ControlRight || G.sneakOn) && !G.mount;
+  if (G.inside) {
+    const b = G.inside.b; if (!b || b.dead) { exitBuilding(); return; }
+    p.moving = m > 0.1; p.sprinting = false; p.stam = clamp(p.stam + 16 * dt, 0, 100);
+    if (p.moving) { inMove(mx / m, my / m, 110 * Math.min(1, m) * (p.sneak ? 0.5 : 1), dt); p.anim += dt * 9; }
+    p.x = b.x; p.y = b.y; p.insideB = b; p.ang = G.yaw; p.atkCd -= dt; p.swing = Math.max(0, p.swing - dt);
+    G.interact = findInteract(); G.lookP = G.interact && G.interact.kind === 'person' ? G.interact.o : null; G.actT = 0; G.actProg = 0;
+    return;
+  }
+  p.sprinting = !p.sneak && (keys.ShiftLeft || keys.ShiftRight || touch.run) && m > 0.1 && p.stam > 1;
   p.stam = clamp(p.stam + (p.sprinting ? -28 : 16) * dt, 0, 100);
   const mouseAim = !isTouch;
   if (G.mount) {
@@ -129,9 +138,9 @@ function updLeader(dt) {
   G.interact = findInteract();
   const act = keys.KeyE || touch.act;
   const it = G.interact;
-  if (act && it && it.kind !== 'mount' && it.kind !== 'info' && it.kind !== 'carry' && it.kind !== 'drop') {
+  if (act && it && it.kind !== 'mount' && it.kind !== 'info' && it.kind !== 'carry' && it.kind !== 'drop' && it.kind !== 'person' && it.kind !== 'ship') {
     G.actT += dt;
-    const rate = { fire: 0.18, tame: 2.0, tameLong: 2.0, tameFly: 1.5, rescue: 0.6, free: 1.2, revive: 1.5, treat: 1.5, egg: 1.0, rift: 1.5, carc: 0.35, build: 0.25 }[it.kind] || 0.4;
+    const rate = { fire: 0.18, tame: 2.0, tameLong: 2.0, tameFly: 1.5, rescue: 0.6, free: 1.2, revive: 1.5, treat: 1.5, egg: 1.0, rift: 1.5, carc: 0.35, build: 0.25, wreck: 2.5 }[it.kind] || 0.4;
     G.actProg = clamp(G.actT / rate, 0, 1);
     if (G.actT >= rate) { G.actT = 0; doInteract(it); }
     if (it.kind !== 'fire' && it.o) p.ang = angTo(p, it.o);
@@ -167,12 +176,19 @@ function onActPress() {
   if (G.lcarry) { const q = G.lcarry; G.lcarry = null; q.carriedBy = 0; msg(`${acc(q.name)} yere bıraktın.`, '#ccc', 2); return true; }
   const it = findInteract();
   if (it && it.kind === 'mount') { mount(it.o); return true; }
-  if (it && it.kind === 'info') { openInterior(it.o); return true; }
+  if (it && it.kind === 'info') { if (enterable(it.o)) enterBuilding(it.o); else openInterior(it.o); return true; }
+  if (it && it.kind === 'person') { openChar(it.o.id); return true; }
+  if (it && it.kind === 'exit') { exitBuilding(); return true; }
+  if (it && it.kind === 'sleep') { trySleep(); return true; }
+  if (it && it.kind === 'craft') { toggleCraft(true); return true; }
+  if (it && it.kind === 'store') { openInterior(G.inside.b); return true; }
+  if (it && it.kind === 'ship') { setSail(it.o); return true; }
   if (it && it.kind === 'carry') { G.lcarry = it.o; it.o.carriedBy = -1; if (it.o.inHut) leaveHut(it.o); msg(`${acc(it.o.name)} sırtladın. ${it.o.bedRes ? 'Şifahaneye götür.' : 'Boş yatak yok!'}`, '#9fd', 3); return true; }
   return false;
 }
 function findInteract() {
   const p = L; let best = null, bd = 1e9;
+  if (G.inside) { const q = inInteract(); return q ? { o: q.p || G.inside.b, kind: q.kind, label: q.label } : null; }
   const consider = (o, kind, d, label) => { if (d < bd) { bd = d; best = { o, kind, label }; } };
   if (G.mount) return { o: G.mount, kind: 'mount', label: 'İn' };
   if ((G.stock.eyer || 0) > 0) for (const d of G.dinos) if (d.tamed && d.type === 'boynuzlu') { const dd = dist(d, p) - d.r; if (dd < 30) consider(d, 'mount', dd - 50, 'Bin (Boynuzlu)'); }
@@ -192,9 +208,11 @@ function findInteract() {
   }
   if (!G.carryEgg) for (const n of G.nests) if (n.eggs > 0) { const dd = dist(n, p) - n.r; if (dd < 30) consider(n, 'egg', dd - 10, 'Yumurta çal (anneler gelir!)'); }
   for (const c of G.carcs) { if (c.dead) continue; const dd = dist(c, p) - c.r; if (dd < 20) consider(c, 'carc', dd + 5, c.meat > 0 ? `Leşten çiğ et kes (${c.meat}) — et ustasına götürülmeli` : 'Leşten deri/kemik al'); }
-  for (const b of G.builds) if (b.built && (isRoomy(b) || BUILD[b.type].rooms || ['sifahane', 'kasaphane', 'atolye'].includes(b.type))) { const dd = dist(b, p) - b.r; if (dd < 30) consider(b, 'info', dd + 15, `${BUILD[b.type].ic} ${BUILD[b.type].ad} — içini gör [I]`); }
+  for (const b of G.builds) if (b.built && (isRoomy(b) || b.type === 'cadir' || BUILD[b.type].rooms || ['sifahane', 'kasaphane', 'atolye'].includes(b.type))) { const dd = dist(b, p) - b.r; if (dd < 30) consider(b, 'info', dd + 15, enterable(b) ? `${BUILD[b.type].ic} ${BUILD[b.type].ad} — içeri gir` : `${BUILD[b.type].ic} ${BUILD[b.type].ad} — içini gör [I]`); }
   for (const b of G.builds) if (!b.built) { const dd = dist(b, p) - b.r; if (dd < 24) consider(b, 'build', dd, `${BUILD[b.type].ad} inşasına yardım et (${Math.floor(b.prog / b.need * 100)}%)`); }
-  { const dd = dist(G.rift, p) - G.rift.r; if (dd < 70 && !G.finale) consider(G.rift, 'rift', dd - 10, (G.stock.yarikTasi || 0) > 0 ? 'Yarık Taşı’nı yerleştir — son savaş başlar!' : 'Zaman yarığı. Açmak için Yarık Taşı gerekli.'); }
+  for (const w of G.wrecks || []) if (!w.found) { const dd = dist(w, p) - w.r; if (dd < 40) consider(w, 'wreck', dd - 30, 'Enkazı ara — basılı tut'); }
+  for (const b of G.builds) if (b.type === 'gemi' && b.built) { const dd = dist(b, p) - b.r; if (dd < 60) consider(b, 'ship', dd - 60, 'Yelken aç — eve dönüş'); }
+  if (0) { const dd = dist(G.rift, p) - G.rift.r; if (dd < 70 && !G.finale) consider(G.rift, 'rift', dd - 10, (G.stock.yarikTasi || 0) > 0 ? 'Yarık Taşı’nı yerleştir — son savaş başlar!' : 'Zaman yarığı. Açmak için Yarık Taşı gerekli.'); }
   if (G.rescue) { const dd = dist(G.rescue, p); if (dd < 55) consider(G.rescue, 'rescue', dd - 40, `${acc(G.rescue.name)} kurtar`); }
   for (const c of G.ccamps) c.captives.forEach((cp, k) => { const x = c.x - 30 + k * 24, y = c.y + 34, dd = Math.hypot(x - p.x, y - p.y); if (dd < 45) consider({ x, y, c, k }, 'free', dd - 40, `${gen(cp.p.name)} iplerini çöz`); });
   { const dd = dist(G.fire, p) - 30; if (dd < 50) consider(G.fire, 'fire', dd, G.stock.wood > 0 ? 'Ateşe odun at' : 'Odun yok!'); }
@@ -206,6 +224,13 @@ function findInteract() {
     if (o.kind === 'tree' && !o.stump) consider(o, 'gather', dd, 'Odun kes');
     if (o.kind === 'rock') consider(o, 'gather', dd, 'Taş kır');
     if (o.kind === 'crystal') consider(o, 'gather', dd, 'Kristal çıkar');
+  }
+  // nişangâhtaki kişi: doğrudan emir
+  G.lookP = null;
+  if (!(best && ['revive', 'carry', 'treat', 'mount', 'rescue', 'free'].includes(best.kind))) {
+    let bp = null, ba = 0.2;
+    for (const q of G.people) { if (q === p || q.inHut || q.insideB || q.grabbed || q.dead || q.bed) continue; const dd = dist(q, p); if (dd > 190 || dd < 1) continue; const a = angDiff(angTo(p, q), G.yaw) - Math.atan2(9, dd); if (a < ba) { ba = a; bp = q; } }
+    if (bp) { G.lookP = bp; best = { o: bp, kind: 'person', label: `${bp.name} (${GROUPS[bp.group] ? GROUPS[bp.group].ad : ''}) — emir ver` }; }
   }
   return best;
 }
@@ -237,6 +262,7 @@ function doInteract(it) {
   } else if (it.kind === 'revive' || it.kind === 'treat') treat(o, L);
   else if (it.kind === 'egg') takeEgg(o);
   else if (it.kind === 'free') { if (o.c.captives[o.k]) freeCaptive(o.c, o.k); }
+  else if (it.kind === 'wreck') { const w = it.o; w.found = true; addStock('gemiParca', 1, w.x, w.y); const nm = ['pusula ve haritalar', 'dümen', 'sağlam omurga kirişleri'][(w.i || 0) % 3]; msg(`⚓ Enkazdan ${nm} çıkardın. Gemi parçası: ${G.stock.gemiParca}/3`, '#9cf', 7); SFX.bell && SFX.bell(); moraleAdd(8); }
   else if (it.kind === 'rift') { if ((G.stock.yarikTasi || 0) > 0) startFinale(); else msg('Yarık Taşı gerekli: 6. seviye bir zanaatkâr, 25💎 40🪨 40🪵 ve en az 30 kişilik halk.', '#9cf', 6); }
   else if (it.kind === 'rescue') {
     const r = G.rescue; G.rescue = null;
@@ -265,8 +291,17 @@ function placePos() {
   const d = clamp(pt < -0.08 ? 30 / Math.tan(-pt) : 260, 50, 260) + r * 0.5;
   return { x: L.x + Math.cos(G.yaw) * d, y: L.y + Math.sin(G.yaw) * d };
 }
+function shipBlock(p) {
+  if (G.day < 200) return `Gemi için en az 200 gün hayatta kalmalısın (şimdi ${G.day}. gün).`;
+  if (G.people.length < 15) return 'Gemiyi yürütmek için en az 15 kişi gerek.';
+  if (G.builds.some(b => b.type === 'gemi')) return 'Zaten bir gemi var.';
+  if (p) { let near = false; for (let a = 0; a < TAU; a += 0.4) if (isSea(p.x + Math.cos(a) * 240, p.y + Math.sin(a) * 240)) near = true; if (!near || isSea(p.x, p.y)) return 'Gemi kıyıda, denizin hemen yanında kurulmalı.'; }
+  return '';
+}
 function placeOk(t, p) {
   const r = BUILD[t].r;
+  if (t === 'gemi' && shipBlock(p)) return false;
+  if (typeof isSea === 'function' && isSea(p.x, p.y)) return false;
   if (p.x < 60 || p.y < 60 || p.x > WORLD - 60 || p.y > WORLD - 60) return false;
   if (Math.hypot(p.x - G.fire.x, p.y - G.fire.y) < 50 + r) return false;
   for (const o of gQuery(p.x, p.y, r + 10)) { if (o.dead) continue; const wall = o.kind === 'build' && (o.type === 'cit' || o.type === 'duvar') && (t === 'cit' || t === 'duvar'); if (Math.hypot(o.x - p.x, o.y - p.y) < o.r + r - (wall ? 14 : 0)) return false; }
@@ -293,7 +328,7 @@ function finishBuild(b, quiet) {
 function tryPlace() {
   const t = G.placing; if (!t) return;
   const p = placePos();
-  if (!placeOk(t, p)) { msg('Buraya inşa edilemez.', '#e99', 2); return; }
+  if (!placeOk(t, p)) { msg((t === 'gemi' && shipBlock(p)) || 'Buraya inşa edilemez.', '#e99', 3); return; }
   if (!canAfford(BUILD[t].cost)) { msg('Malzeme bitti.', '#e99', 2); cancelPlace(); return; }
   pay(BUILD[t].cost); makeBuild(t, p.x, p.y, L.ang); SFX.build();
   if (!members('mimar').length && !G.flags.noMimar) { G.flags.noMimar = 1; msg('Plan hazır. İnşa etmesi için 📐 Mimar ata (boştakiler de yardım eder, sen de E ile yardım edebilirsin).', '#cde', 5); }
@@ -365,8 +400,8 @@ function newDay() {
   // yeni gelenler
   assignHomes();
   let free = emptyTents();
-  if (G.people.length > 0 && free > 0 && foodTotal() >= need) {
-    let n = 1 + (Math.random() < 0.5 ? 1 : 0) + (G.morale > 65 ? 1 : 0) + (G.day > 4 && Math.random() < 0.4 ? 1 : 0);
+  if (G.people.length > 0 && free > 0 && foodTotal() >= need && G.day > 3 && Math.random() < (G.morale > 65 ? 0.07 : 0.04)) {
+    let n = Math.random() < 0.3 ? 2 : 1;
     let came = 0;
     while (n > 0 && free > 0) {
       const couple = n >= 2 && Math.random() < 0.3;
@@ -412,9 +447,9 @@ function makeTracks() {
 function planNight() {
   const d = G.day, ev = [];
   const W = Math.random(); G.nightWeather = W < 0.65 ? 'acik' : W < 0.77 ? 'yagmur' : W < 0.87 ? 'firtina' : 'sis';
-  if (d <= 1) { G.nightPlan = ev; return; }
-  let n = Math.random() < 0.45 ? 0 : (Math.random() < 0.75 || d < 4 ? 1 : 2);
-  if (d === 3 && Math.random() < 0.25) { ev.push({ k: 'dev', at: rand(0.6, 0.8) }); n = Math.max(0, n - 1); }
+  if (d <= 2) { G.nightPlan = ev; return; }
+  // çoğu gece sakin geçer; olaylar nadir ama ani
+  let n = Math.random() < (d < 10 ? 0.8 : d < 40 ? 0.72 : 0.65) ? 0 : (d > 30 && Math.random() < 0.15 ? 2 : 1);
   const pool = [['yapi', d >= 3 && unprotectedHomes().length ? 10 : 0], ['taklitci', d >= 4 ? 8 : 0], ['pusu', 30], ['dev', d >= 4 ? 5 : 0], ['yamyam', d >= 3 && G.ccamps.some(c => c.alive) ? 18 : 0], ['sessiz', 14], ['kayip', d >= 3 ? 8 : 0], ['taklit', 10], ['suru', d >= 4 ? 9 : 0]];
   for (let i = 0; i < n; i++) {
     const avail = pool.filter(([k, w]) => w > 0 && !ev.some(e => e.k === k)), tot = avail.reduce((a, b) => a + b[1], 0);
@@ -594,7 +629,7 @@ function updFinale(dt) {
 function victory() {
   G.over = true; G.won = true; unlock('kurtulus');
   const saved = G.people.filter(p => dist(p, G.rift) < 520), left = G.people.length - saved.length;
-  store.del('sonAtesKayit'); store.del('sonAtesSafak');
+  store.del('sonAtesKayit4'); store.del('sonAtesSafak4');
   SFX.win();
   showVictory(saved, left);
 }
@@ -602,7 +637,7 @@ function gameOver() {
   if (G.over) return;
   G.over = true;
   if (G.day > +(store.get('sonAtesRekor') || 0)) store.set('sonAtesRekor', G.day);
-  if (G.diff !== 'kolay') store.del('sonAtesKayit');
+  if (G.diff !== 'kolay') store.del('sonAtesKayit4');
   setTimeout(showGameOver, 2500);
 }
 
@@ -613,7 +648,7 @@ function serialize() {
   const pf = ['id', 'name', 'x', 'y', 'leader', 'child', 'age', 'traits', 'story', 'group', 'hp', 'maxhp', 'fear', 'skin', 'hair', 'injury', 'downed', 'tired', 'watched', 'partner', 'parentA', 'parentB', 'stam', 'seat', 'r', 'sk', 'sick', 'wasDowned', 'bedUntil', 'routine', 'alt', 'hunger'];
   let ex = ''; for (let i = 0; i < G.explored.length; i++) ex += G.explored[i] ? '1' : '0';
   return JSON.stringify({
-    v: 3, seed: G.seed, diff: G.diff, t: G.t, day: G.day, stock: G.stock, fuel: G.fire.fuel, morale: G.morale, orders: G.orders.map(o => Object.assign({}, o, { worker: 0 })), oid: G.oid, unclean: G.unclean,
+    v: 4, wrecks: (G.wrecks || []).map(w => !!w.found), inside: G.inside ? G.builds.indexOf(G.inside.b) : -1, seed: G.seed, diff: G.diff, t: G.t, day: G.day, stock: G.stock, fuel: G.fire.fuel, morale: G.morale, orders: G.orders.map(o => Object.assign({}, o, { worker: 0 })), oid: G.oid, unclean: G.unclean,
     carcs: G.carcs.filter(c => !c.dead).map(c => ({ x: c.x, y: c.y, r: c.r, type: c.type, ang: c.ang, meat: c.meat, bone: c.bone, hide: c.hide, age: c.age, rotten: c.rotten })),
     managers: G.managers, zone: G.zone, newGroup: G.newGroup, torchFuel: G.torchFuel, nightPlan: G.nightPlan, nightWeather: G.nightWeather, weather: G.weather,
     eggs: G.eggs, usedNames: [...G.usedNames], stats: G.stats, idc: G.idc, kills: G.kills, deaths: G.deaths, lost: G.lost,
@@ -632,8 +667,8 @@ function saveGame(kind) {
   if (!G.started || G.over || G.diff === 'kabus' || G.finale || !L) return;
   try {
     const s = serialize();
-    store.set('sonAtesKayit', s);
-    if (kind === 'dawn' && G.diff === 'kolay') store.set('sonAtesSafak', s);
+    store.set('sonAtesKayit4', s);
+    if (kind === 'dawn' && G.diff === 'kolay') store.set('sonAtesSafak4', s);
   } catch (e) { }
 }
 function loadGame(s) {
@@ -644,6 +679,7 @@ function loadGame(s) {
     weather: D.weather || { type: 'acik', t: 0 }, eggs: D.eggs || [], stats: Object.assign(G.stats, D.stats || {}), idc: D.idc, kills: D.kills, deaths: D.deaths, lost: D.lost,
     devSeenEver: D.devSeenEver, riftHint: D.riftHint, rescueAt: -1, dayRainAt: D.dayRainAt || -1, flags: D.flags || {}, leaveDone: D.leaveDone, devDone: D.devDone });
   Object.assign(G.stock, D.stock); G.fire.fuel = D.fuel; G.rift.found = !!D.riftFound;
+  (D.wrecks || []).forEach((f, i) => { if (G.wrecks && G.wrecks[i]) G.wrecks[i].found = f; });
   G.usedNames = new Set(D.usedNames); G.orders = D.orders || []; G.oid = D.oid || 0; G.unclean = D.unclean || 0;
   G.carcs = (D.carcs || []).map(c => Object.assign({ carc: true }, c));
   for (const g of GORDER) { G.managers[g] = (D.managers || {})[g] || null; G.zone[g] = (D.zone || {})[g] || null; }
@@ -705,7 +741,7 @@ function markExplored(x, y, r, who) {
     if (i < 0 || j < 0 || i >= MAPN || j >= MAPN) continue;
     if (Math.hypot((i + 0.5) * MAPC - x, (j + 0.5) * MAPC - y) < r) G.explored[j * MAPN + i] = 1;
   }
-  if (!G.rift.found && Math.hypot(x - G.rift.x, y - G.rift.y) < r + 150) { G.rift.found = true; msg(by + 'Mavi bir ışık... ZAMAN YARIĞI! Buradan eve dönebiliriz. (Zanaat: Yarık Taşı)', '#9cf', 8); SFX.bell(); }
+  if (!G.rift.found && Math.hypot(x - G.rift.x, y - G.rift.y) < r + 150) { G.rift.found = true; msg(by + 'Mavi bir ışık... Tuhaf bir yarık. Kimse ne olduğunu bilmiyor.', '#9cf', 8); SFX.bell(); }
   for (const c of G.ccamps || []) if (!c.found && Math.hypot(x - c.x, y - c.y) < r + 60) { c.found = true; if (c.alive) { msg(by + 'Kafatasları... totemler... bir YAMYAM KAMPI! Haritaya ☠ işaretlendi.', '#f86', 8); SFX.sting(); } }
   for (const n of G.nests) if (!n.found && Math.hypot(x - n.x, y - n.y) < r) n.found = true;
 }
@@ -719,7 +755,7 @@ const TUT = [
   { t: 'Üretim menüsünü aç (C) ve zanaatkârlara bir emir ver: balta, kazma, ok...', done: () => G.orders.length > 0 || IORDER.some(k => k !== 'mizrak' && k !== 'balta' && k !== 'bandaj' && k !== 'ilac' && G.stock[k] > 0) },
   { t: 'Kâşif grubuna birini ekle (🧭), sonra haritada (M) bilinmeyen bir yere dokun.', done: () => !!G.zone.kasif },
   { t: 'I ile mağaranın içine bak: odalara görev ver, içeriden birine dokunup karakter kartını aç.', done: () => !!G.tutIn },
-  { t: 'Halkın büyümesi için yer gerekir: ⛺ çadır (1 hane), 🛖 kulübe ya da yeni bir yatakhane odası (2 hane). Yarık için 30 kişi lazım.', done: () => freeHomes() > 0 || G.builds.some(b => b.type === 'kulube' || b.type === 'cadir') },
+  { t: 'Halkın büyümesi için yer gerekir: ⛺ çadır (1 hane), 🛖 kulübe ya da yeni bir yatakhane odası (2 hane). Yeni insanlar çok nadir gelir; her canın kıymeti var.', done: () => freeHomes() > 0 || G.builds.some(b => b.type === 'kulube' || b.type === 'cadir') },
   { t: 'Gece geliyor. Ateşi doldur, halkını ışıkta tut. İyi şanslar.', done: () => isNight() }
 ];
 function updTut() {
@@ -847,9 +883,9 @@ function trySleep() {
   if (G.sleep) { wakeUp('Uyandın.'); return; }
   if (!goHome()) { msg('Henüz uyku vakti değil. Karanlık çökünce uyuyabilirsin.', '#ccc', 3); return; }
   if (G.mount) { msg('Önce bineğinden in.', '#ccc', 2); return; }
-  const b = sleepSpot();
+  const b = G.inside ? G.inside.b : sleepSpot();
   if (!b) { msg('Uyumak için mağaranın ya da bir barınağın yanına git.', '#ccc', 3); return; }
-  if (G.dinos.some(d => threatNear(d, L.x, L.y))) { msg('Yakında bir şey var. Şimdi uyuyamazsın.', '#e99', 3); return; }
+  if (!G.inside && G.dinos.some(d => threatNear(d, L.x, L.y))) { msg('Yakında bir şey var. Şimdi uyuyamazsın.', '#e99', 3); return; }
   G.sleep = { b, sig: harmSig(), t: 0, day: G.day };
   if (G.placing) cancelPlace(); G.huntMode = false;
   const g = doorGuard();
@@ -858,7 +894,8 @@ function trySleep() {
 function wakeUp(why, alarm) {
   if (!G.sleep) return;
   const b = G.sleep.b; G.sleep = null; L.insideB = null;
-  if (b && !b.dead) { const q = stnPos(b); L.x = q.x; L.y = q.y + 14; G.yaw = Math.PI / 2; G.pitch = 0; }
+  if (G.inside && G.inside.b === b && b && !b.dead) { L.insideB = b; }
+  else if (b && !b.dead) { G.inside = null; const q = stnPos(b); L.x = q.x; L.y = q.y + 14; G.yaw = Math.PI / 2; G.pitch = 0; }
   if (alarm) { G.scare = Math.max(G.scare, 0.5); SFX.alarm ? SFX.alarm() : SFX.thump(0.8); }
   if (why) msg(why, alarm ? '#f88' : '#ffd27a', 4);
 }
@@ -878,4 +915,13 @@ function sleepTick(dt) {
   const h = harmSig();
   if (h.n > s.sig.n || h.h < s.sig.h - 4 || h.hp < s.sig.hp - 1 || G.over) { wakeUp(G.sleepWhy = '❗ Çığlıklarla uyandın!', true); return; }
   s.sig.h = Math.max(s.sig.h, h.h); s.sig.hp = Math.max(s.sig.hp, h.hp);
+}
+
+// ---- gemi: eve dönüş
+function setSail(b) {
+  if (foodTotal() < 100) { msg('Yolculuk için en az 100 yiyecek gerek.', '#e99', 4); return; }
+  const saved = G.people.filter(p => !p.dead && !p.grabbed && dist(p, b) < 900), left = G.people.length - saved.length;
+  if (saved.length < Math.min(G.people.length, 8)) { msg('Halkın çoğu uzakta. Herkesi kıyıya topla (Takip grubu), sonra yelken aç.', '#e99', 5); return; }
+  G.over = true; G.won = true; try { localStorage.removeItem('sonAtesKayit4'); } catch (e) {}
+  showVictory(saved, left);
 }

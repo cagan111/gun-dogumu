@@ -145,6 +145,141 @@ function updFX(dt, cx, cy) {
 //  ANA ÇİZİM
 // =============================================================
 function render() {
+  G.camX = L.x - VW / 2; G.camY = L.y - VH / 2;
+  if (!G.vis) G.vis = visionSources();
+  sunUpdate();
+  let ok3 = false;
+  try { ok3 = typeof render3D === 'function' && render3D(G.dt || 0.016); }
+  catch (e) { if (!render.err) { render.err = true; console.error('3B çizim hatası:', e); } ok3 = U3.ok === true; }
+  if (!ok3) { render2D(); return; }
+  drawOverlay3D();
+}
+// ---- 3B görünümün üstündeki 2B kaplama (şeffaf #c tuvali)
+function drawOverlay3D() {
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+  ctx.clearRect(0, 0, VW, VH);
+  const dk = darkness(), LS = U3.LS && U3.LS.length ? U3.LS : lights();
+  if (SUN.grade) { ctx.fillStyle = SUN.grade; ctx.fillRect(0, 0, VW, VH); }
+  if (G.weather.type === 'yagmur' || G.weather.type === 'firtina') {
+    const st = G.weather.type === 'firtina';
+    ctx.strokeStyle = 'rgba(170,190,220,.35)'; ctx.lineWidth = 1; ctx.beginPath();
+    const n = st ? 220 : 130, sl = st ? 9 : 3;
+    for (let i = 0; i < n; i++) { const x = (i * 137.5 + G.now * 60) % VW, y = (i * 91.3 + G.now * 900) % VH, l = 14 + (i % 5) * 4; ctx.moveTo(x, y); ctx.lineTo(x - sl, y + l); }
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(190,210,240,.2)'; for (let i = 0; i < 24; i++) { const x = (i * 211.7 + G.now * 37) % VW, y = VH * 0.62 + (i * 133.1 + G.now * 53) % (VH * 0.38); ell(x, y, 3, 1.2); }
+  }
+  if (G.flash > 0) { ctx.fillStyle = `rgba(220,230,255,${Math.min(0.85, G.flash * 1.5)})`; ctx.fillRect(0, 0, VW, VH); }
+  // dünyaya bağlı yazılar
+  ctx.textAlign = 'center';
+  ctx.font = 'bold 13px Georgia';
+  for (const t of G.texts) { const s = w2s(t.x, t.y, 30 + (1.3 - t.life) * 14); if (!s || !s.on || s.z > 900) continue; ctx.globalAlpha = clamp(t.life, 0, 1); ctx.fillStyle = '#000'; ctx.fillText(t.t, s.x + 1, s.y + 1); ctx.fillStyle = t.col; ctx.fillText(t.t, s.x, s.y); }
+  ctx.globalAlpha = 1;
+  drawLabels3D(LS, dk);
+  edgeMarker(G.fire.x, G.fire.y, '🔥', dist(L, G.fire) > 450 || G.carryEgg);
+  if (G.rescue) edgeMarker(G.rescue.x, G.rescue.y, '🆘', true);
+  if (G.rift.found || (G.riftHint && isNight())) edgeMarker(G.rift.x, G.rift.y, '🌀', true);
+  if (G.hunt && G.hunt.t && !G.hunt.t.dead) edgeMarker(G.hunt.t.x, G.hunt.t.y, '🎯', true);
+  for (const p of G.people) if ((p.grabbed && p.grabT > 0 && dist(p, L) < 1100) || p.desert > 0 || p.downed > 0) edgeMarker(p.x, p.y, p.downed > 0 ? '🩸' : '❗', true);
+  for (const c of G.ccamps) if (c.captives.length) edgeMarker(c.x, c.y, '⛓️', true);
+  // karartma, tehlike, hasar
+  const fearV = Math.max(G.danger * 0.8, dk * 0.5);
+  const vg = ctx.createRadialGradient(VW / 2, VH / 2, Math.min(VW, VH) * (0.42 - fearV * 0.15), VW / 2, VH / 2, Math.max(VW, VH) * 0.75);
+  vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, `rgba(${Math.round(40 * G.danger)},0,0,${0.36 + fearV * 0.4})`);
+  ctx.fillStyle = vg; ctx.fillRect(0, 0, VW, VH);
+  if (G.red > 0) { ctx.fillStyle = `rgba(160,0,0,${G.red * 0.4})`; ctx.fillRect(0, 0, VW, VH); }
+  if (G.scare > 0) { ctx.fillStyle = G.scare > 0.35 ? `rgba(255,255,255,${(G.scare - 0.35) * 5})` : `rgba(120,0,0,${G.scare * 0.6})`; ctx.fillRect(0, 0, VW, VH); }
+  if (L.hp < 35) { ctx.fillStyle = `rgba(120,0,0,${(0.15 + Math.sin(G.now * 6) * 0.08) * (1 - L.hp / 35)})`; ctx.fillRect(0, 0, VW, VH); }
+  if (G.finale) { ctx.fillStyle = `rgba(40,80,200,${0.08 + Math.sin(G.now * 3) * 0.04})`; ctx.fillRect(0, 0, VW, VH); }
+  // nişangâh + eylem halkası + lider durum simgeleri
+  if (!G.sleep && L.hp > 0) {
+    const cx = VW / 2, cy = VH / 2;
+    ctx.fillStyle = 'rgba(0,0,0,.45)'; circle(cx, cy, 3); ctx.fillStyle = 'rgba(255,240,210,.85)'; circle(cx, cy, 1.7);
+    if (G.actProg > 0 && G.interact) { ctx.strokeStyle = 'rgba(0,0,0,.4)'; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(cx, cy, 18, 0, TAU); ctx.stroke(); ctx.strokeStyle = '#ffd890'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(cx, cy, 18, -Math.PI / 2, -Math.PI / 2 + TAU * G.actProg); ctx.stroke(); }
+    let ic = (L.injury ? (L.injury.type === 'kanama' ? '🩸' : L.injury.type === 'kirik' ? '🦴' : '🤢') : '') + (L.sick ? '🤒' : '') + (G.carryEgg ? '🥚' : '');
+    if (ic) { ctx.font = '16px serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#fff'; ctx.fillText(ic, cx, cy + 40); }
+  }
+}
+function drawLabels3D(LS, dk) {
+  ctx.textAlign = 'center';
+  const label = (s, text, col, ic) => {
+    const k = clamp(260 / Math.max(120, s.z), 0.75, 1.35), fs = Math.round(11 * k);
+    ctx.globalAlpha = clamp((520 - s.z) / 140, 0, 1);
+    if (text) { ctx.font = fs + 'px Georgia'; ctx.fillStyle = 'rgba(0,0,0,.7)'; ctx.fillText(text, s.x + 1, s.y + 1); ctx.fillStyle = col; ctx.fillText(text, s.x, s.y); }
+    if (ic) { ctx.font = Math.round(13 * k) + 'px serif'; ctx.fillStyle = '#fff'; ctx.fillText(ic, s.x, s.y - fs - 3); }
+    ctx.globalAlpha = 1;
+  };
+  for (const p of G.people) {
+    if (p.inHut || p.leader || p.insideB) continue;
+    if (Math.abs(p.x - L.x) > 520 || Math.abs(p.y - L.y) > 520) continue;
+    if (lightLevel(p.x, p.y, LS) < 0.3 && !(p.downed > 0)) continue;
+    const lying = p.downed > 0 || p.bed || p.carriedBy;
+    const s = w2s(p.x, p.y, lying ? 16 : p.child ? 31 : 42); if (!s || !s.on || s.z > 520) continue;
+    const isM = !p.child && GORDER.some(g => G.managers[g] === p.id);
+    let ic = '';
+    if (p.downed > 0) ic = '🩸' + Math.ceil(p.downed);
+    else { if (p.injury) ic += p.injury.type === 'kanama' ? '🩸' : p.injury.type === 'kirik' ? '🦴' : '🤢'; if (p.sick) ic += '🤒'; if (p.tired) ic += '😴'; if (p.fear >= 80) ic += '❗'; }
+    label(s, (isM ? '★ ' : '') + p.name, p.fear >= 80 ? '#f99' : isM ? '#ffd27a' : '#eadcc0', ic);
+    if ((p.hp < p.maxhp * 0.75 || p.hurtT > 0) && s.z < 380) hpBar(s.x, s.y + 4, p.hp / p.maxhp, 26);
+  }
+  for (const d of G.dinos) {
+    if (d.hidden || d.dead || Math.abs(d.x - L.x) > 700 || Math.abs(d.y - L.y) > 700) continue;
+    if (!(d.tamed || visible(d.x, d.y, d.r))) continue;
+    const mim = d.type === 'taklitci' && !d.revealed;
+    if (mim) { if (lightLevel(d.x, d.y, LS) < 0.3) continue; const s = w2s(d.x, d.y, 42); if (s && s.on && s.z < 520) label(s, d.disguise.name, '#eadcc0', ''); continue; }
+    const hurt = d.hp < d.maxhp, human = d.type === 'yamyam';
+    if (!hurt && !d.tamed) continue;
+    if (dk > 0.5 && lightLevel(d.x, d.y, LS) < 0.2 && !d.tamed) continue;
+    const s = w2s(d.x, d.y, (human ? 44 : d.r * 2.1 + 8) + (d.fly ? (d.alt || 0) * 85 : 0)); if (!s || !s.on || s.z > 650) continue;
+    if (hurt) hpBar(s.x, s.y, d.hp / d.maxhp, clamp(d.r * 1.4, 26, 70));
+    if (d.tamed) { ctx.fillStyle = '#9cf'; ctx.font = '12px Georgia'; ctx.fillText('♥', s.x, s.y - 5); }
+  }
+  for (const b of G.builds) {
+    if (b.dead || Math.abs(b.x - L.x) > 480 || Math.abs(b.y - L.y) > 480) continue;
+    const T = b.type, flat = BUILD[T].flat;
+    const top = T === 'magara' ? 60 : T === 'kulube' ? 66 : T === 'kule' ? 122 : flat ? 22 : T === 'cit' || T === 'duvar' ? 42 : 50;
+    const s = w2s(b.x, T === 'magara' ? b.y + b.r * 0.95 : b.y, top); if (!s || !s.on || s.z > 480) continue;
+    if (!b.built) { hpBar(s.x, s.y, b.prog / b.need, 34); continue; }
+    if (b.hp < b.maxhp && !flat) hpBar(s.x, s.y, b.hp / b.maxhp, 30);
+    ctx.globalAlpha = clamp((480 - s.z) / 120, 0, 1); ctx.fillStyle = '#e8d8b8';
+    const n = (b.occ || []).length;
+    if (T === 'magara' && n) { ctx.font = '12px Georgia'; ctx.fillText(`💤 ${n}`, s.x, s.y - 4); }
+    else if (T === 'kulube') { ctx.font = '12px serif'; ctx.fillText((b.rooms || []).map(r => ROOMS[r].ic).join(' ') + (n ? ' 💤' : ''), s.x, s.y - 6); }
+    else if (T === 'cadir') { if (n) { ctx.font = '11px serif'; ctx.fillText('💤', s.x, s.y - 6); } else if (!b.owners.length) { ctx.font = '10px Georgia'; ctx.fillStyle = 'rgba(255,240,200,.75)'; ctx.fillText('boş', s.x, s.y - 6); } }
+    else if (T === 'tarla' && b.planted && b.g >= 1) { ctx.font = '14px serif'; ctx.fillText('🌾', s.x, s.y); }
+    ctx.globalAlpha = 1;
+  }
+  for (const c of G.ccamps) if (c.alive && c.totem < 250) { const s = w2s(c.x, c.y, 76); if (s && s.on && s.z < 600) hpBar(s.x, s.y, c.totem / 250, 34); }
+  if (G.finale) { const s = w2s(G.rift.x, G.rift.y, 130); if (s && s.on) { ctx.fillStyle = '#cfe4ff'; ctx.font = 'bold 22px Georgia'; ctx.fillText(Math.ceil(G.finale.t), s.x, s.y); } }
+}
+// pusula tarzı işaret: hedef görüşteyse üstünde, değilse ekran kenarında ok
+function edgeMarker(wx, wy, ic, show) {
+  if (!show) return;
+  if (!U3.cam || U3.ok !== true) return edgeMarker2D(wx, wy, ic, show);
+  const quiet = ic === '🔥' || ic === '🌀' || ic === '🎯';
+  const d = Math.hypot(wx - L.x, wy - L.y), s = w2s(wx, wy, quiet ? 70 : 52), m = 34;
+  ctx.textAlign = 'center';
+  if (s && s.z > 1 && s.x > m && s.x < VW - m && s.y > m && s.y < VH - m) {
+    if (quiet && d < 320) return;
+    ctx.font = (quiet ? 15 : 18) + 'px serif'; ctx.globalAlpha = quiet ? 0.85 : 1; ctx.fillStyle = '#fff'; ctx.fillText(ic, s.x, s.y);
+    if (d > 150) { const tx = Math.round(d / 10) + ' m'; ctx.font = '10px Georgia'; ctx.fillStyle = 'rgba(0,0,0,.7)'; ctx.fillText(tx, s.x + 1, s.y + 14); ctx.fillStyle = '#eadcc0'; ctx.fillText(tx, s.x, s.y + 13); }
+    ctx.globalAlpha = 1; return;
+  }
+  const yaw = G.yaw === undefined ? (L.ang || 0) : G.yaw;
+  let rel = Math.atan2(wy - L.y, wx - L.x) - yaw; rel = Math.atan2(Math.sin(rel), Math.cos(rel));
+  const side = rel >= 0 ? 1 : -1, back = clamp((Math.abs(rel) - 0.6) / (Math.PI - 0.6), 0, 1);
+  const tx = side > 0 ? VW - m : m;
+  let ty = VH * 0.42 + back * VH * 0.2;
+  if (s && s.z > 1) ty = clamp(s.y, m + 60, VH - m - 120);
+  ty = clamp(ty, m + 60, Math.max(m + 61, VH - m - 120));
+  ctx.save(); ctx.translate(tx, ty); ctx.rotate(side > 0 ? back * 0.9 : Math.PI - back * 0.9);
+  ctx.fillStyle = ic === '🌀' ? 'rgba(120,170,255,.8)' : ic === '🎯' ? 'rgba(255,90,60,.85)' : 'rgba(255,200,120,.75)';
+  ctx.beginPath(); ctx.moveTo(18, 0); ctx.lineTo(5, -7); ctx.lineTo(5, 7); ctx.fill(); ctx.restore();
+  ctx.font = '16px serif'; ctx.fillStyle = '#fff'; ctx.fillText(ic, tx - side * 12, ty + 5);
+  ctx.font = '9px Georgia'; ctx.fillStyle = 'rgba(234,220,192,.85)'; ctx.fillText(Math.round(d / 10) + ' m', tx - side * 12, ty + 18);
+}
+// ---- eski kuşbakışı çizim: WebGL yoksa yedek
+function render2D() {
   const sx = (Math.random() - 0.5) * G.shake, sy = (Math.random() - 0.5) * G.shake;
   G.camX = L.x - VW / 2 + sx; G.camY = L.y - VH / 2 + sy;
   const cx = G.camX, cy = G.camY;
@@ -314,7 +449,7 @@ function drawLabels(LS, cx, cy) {
   if (L.injury || L.sick) { ctx.font = '13px serif'; ctx.fillText((L.injury ? (L.injury.type === 'kanama' ? '🩸' : L.injury.type === 'kirik' ? '🦴' : '🤢') : '') + (L.sick ? '🤒' : ''), L.x - cx, L.y - cy - 26); }
   if (G.carryEgg) { ctx.font = '14px serif'; ctx.fillText('🥚', L.x - cx + 14, L.y - cy - 14); }
 }
-function edgeMarker(wx, wy, ic, show) {
+function edgeMarker2D(wx, wy, ic, show) {
   if (!show) return;
   const x = wx - G.camX, y = wy - G.camY;
   if (x > 20 && y > 20 && x < VW - 20 && y < VH - 20) { if (ic !== '🔥' && ic !== '🌀' && ic !== '🎯') { ctx.font = '18px serif'; ctx.textAlign = 'center'; ctx.fillText(ic, x, y - 30); } return; }
@@ -857,7 +992,11 @@ function drawMini() {
   if (G.hunt && G.hunt.t && !G.hunt.t.dead) { g.strokeStyle = '#f63'; g.lineWidth = 1.5 * DPR; g.beginPath(); g.arc(G.hunt.t.x * k, G.hunt.t.y * k, 5 * DPR, 0, TAU); g.stroke(); }
   if (G.rescue) dot(G.rescue.x, G.rescue.y, 3, '#5cf');
   dot(L.x, L.y, 3, '#fff');
-  g.strokeStyle = 'rgba(255,255,255,.5)'; g.lineWidth = DPR; g.strokeRect((L.x - VW / 2) * k, (L.y - VH / 2) * k, VW * k, VH * k);
+  if (typeof U3 !== 'undefined' && U3.ok === true) {
+    // bakış yönü konisi
+    const yaw = G.yaw === undefined ? (L.ang || 0) : G.yaw, len = (big ? 26 : 13) * DPR, hf = 0.6;
+    g.fillStyle = 'rgba(255,255,255,.28)'; g.beginPath(); g.moveTo(L.x * k, L.y * k); g.arc(L.x * k, L.y * k, len, yaw - hf, yaw + hf); g.closePath(); g.fill();
+  } else { g.strokeStyle = 'rgba(255,255,255,.5)'; g.lineWidth = DPR; g.strokeRect((L.x - VW / 2) * k, (L.y - VH / 2) * k, VW * k, VH * k); }
 }
 
 // ---- keşif sisi

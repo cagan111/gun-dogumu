@@ -18,13 +18,14 @@ addEventListener('keydown', e => {
   if (G.sleep) { if (first) wakeUp('Uyandın.'); return; }
   if (e.code === 'KeyE' && first) onActPress();
   if (e.code === 'KeyU' && first) trySleep();
+  if (e.code === 'KeyX' && first) { G.sneakOn = !G.sneakOn; }
   if (e.code === 'KeyT') toggleTorch();
   if (e.code === 'KeyC') toggleCraft();
   if (e.code === 'KeyM') toggleMap();
   if (e.code === 'KeyH') { toggleSide(); unlockPtr(); }
   if (e.code === 'Tab') unlockPtr();
   if (e.code === 'KeyG') toggleHunt();
-  if (e.code === 'KeyI') { if (UI.inB) closeInterior(); else openInterior(); }
+  if (e.code === 'KeyI') { if (UI.inB) closeInterior(); else openInterior(G.inside ? G.inside.b : undefined); }
   if (e.code === 'Escape') { if (UI.char) closeChar(); else if (UI.inB) closeInterior(); else if (G.modal) toggleCraft(false); else if (G.placing) cancelPlace(); else if (G.huntMode) G.huntMode = false; else togglePause(); }
   if (e.code === 'KeyP') togglePause();
   const n = parseInt(e.key);
@@ -93,6 +94,7 @@ if (isTouch) {
   hold('tAtk', 'atk'); hold('tAct', 'act'); hold('tRun', 'run'); hold('tShoot', 'shoot');
   $('tTorch').addEventListener('pointerdown', e => { e.preventDefault(); toggleTorch(); });
   $('tMap').addEventListener('pointerdown', e => { e.preventDefault(); toggleMap(); });
+  $('tSneak').addEventListener('pointerdown', e => { e.preventDefault(); G.sneakOn = !G.sneakOn; $('tSneak').classList.toggle('act', !!G.sneakOn); });
 }
 
 // ---- araç çubuğu
@@ -218,6 +220,7 @@ $('charM').addEventListener('pointerdown', e => {
   const c = b.dataset.c, v = b.dataset.v;
   if (c === 'close') return closeChar();
   if (c === 'grp') setGroup(p, v);
+  if (c === 'cmd') { if (v === 'follow') { if (p.group !== 'takip') p.prevG = p.group; setGroup(p, 'takip'); msg(`${p.name} seni izliyor.`, '#cde', 2); } else { setGroup(p, p.prevG && p.prevG !== 'takip' ? p.prevG : 'bos'); msg(`${p.name} işine döndü.`, '#cde', 2); } closeChar(); return; }
   if (c === 'mgr') setManager(p.group, p);
   if (c === 'ord') addOrder(v, 1, p.id);
   if (c === 'rt') { const ord = [null].concat(GORDER.filter(g => g !== 'bos')); p.routine = p.routine || {}; const cur = p.routine[v] || null; p.routine[v] = ord[(ord.indexOf(cur) + 1) % ord.length]; if (!Object.values(p.routine).some(Boolean)) p.routine = null; }
@@ -246,6 +249,7 @@ function renderChar() {
   h += `<div><small>Kuşandığı: ${eq}</small></div>`;
   if (p.injury || p.sick) h += `<div><small>Sağlık: ${p.injury ? { kanama: 'kanama', kirik: 'kırık bacak', enfeksiyon: 'enfeksiyon (ilaç gerek)' }[p.injury.type] : ''} ${p.sick ? '· hastalık (' + p.sick.d + '. gün)' : ''}${p.bed ? ' · şifahanede, ' + Math.max(0, p.bedUntil - G.day) + ' gün daha' : ''}</small></div>`;
   if (!p.child) {
+    h += `<div class="cat">Emir</div><div class="gsel"><button data-c="cmd" data-v="follow" class="${p.group === 'takip' ? 'on' : ''}">👣 Beni izle</button><button data-c="cmd" data-v="free">↩️ İşine dön</button></div>`;
     h += `<div class="cat">Görev</div><div class="gsel">${GORDER.map(g => `<button data-c="grp" data-v="${g}" class="${p.group === g ? 'on' : ''}" title="${GROUPS[g].desc}">${GROUPS[g].ic} ${GROUPS[g].ad}${GROUPS[g].sk ? ' ' + lvl(p, GROUPS[g].sk) : ''}</button>`).join('')}</div>`;
     h += `<button data-c="mgr" class="wide ${G.managers[p.group] === p.id ? 'on' : ''}">★ ${GROUPS[p.group].ad} grubunun yöneticisi yap</button>`;
     h += `<div class="cat">Günlük rutin</div><div class="gsel">${Object.keys(SLOTS).map(s => { const g = p.routine && p.routine[s]; return `<button data-c="rt" data-v="${s}" class="${g ? 'on' : ''}">${SLOTS[s]}: ${g ? GROUPS[g].ic + ' ' + GROUPS[g].ad : '—'}</button>`; }).join('')}</div><small class="hint">Dokundukça sıradaki mesleğe geçer. Rutin varsa o saatte meslek kendiliğinden değişir; akşam herkes evine döner.</small>`;
@@ -459,14 +463,14 @@ function hudTick(dt) {
 }
 
 // ---- ekranlar
-function saveInfo() { const s = store.get('sonAtesKayit'); if (!s) return null; try { const d = JSON.parse(s); if (d.v !== 3) return null; return { day: d.day, diff: d.diff, s }; } catch (e) { return null; } }
+function saveInfo() { const s = store.get('sonAtesKayit4'); if (!s) return null; try { const d = JSON.parse(s); if (d.v !== 3) return null; return { day: d.day, diff: d.diff, s }; } catch (e) { return null; } }
 function startScreen() {
   G.started = false; $('hud').style.display = 'none';
   const sv = saveInfo(), tutDone = store.get('sonAtesTutDone');
   const achList = Object.entries(ACH).map(([k, a]) => `<div class="${ACHSET.has(k) ? 'got' : ''}">${ACHSET.has(k) ? '🏆' : '🔒'} <b>${a.ad}</b> — ${a.desc}</div>`).join('');
   const best = +(store.get('sonAtesRekor') || 0);
   $('screenBox').innerHTML = `<h1>SON ATEŞ</h1>
-  <p class="story">Bir fırtına. Kör edici bir ışık. Uyandığınızda gökyüzünde tanımadığınız kanatlar,<br>ormanda tanımadığınız sesler vardı. Sekiz kişisiniz. Bir mağaranız, bir ateşiniz var.<br>Uzaklarda bir yerde, sizi buraya getiren yarık hâlâ parlıyor.<br><b>Ve gece yaklaşıyor.</b></p>
+  <p class="story">Bir fırtına. Kör edici bir ışık. Uyandığınızda gökyüzünde tanımadığınız kanatlar,<br>ormanda tanımadığınız sesler vardı. Dokuz kişisiniz. Bir mağaranız, bir ateşiniz var.<br>Geminiz kayalıklarda parçalandı; enkazı adanın kıyılarına dağıldı.<br><b>Ve gece yaklaşıyor.</b></p>
   ${sv ? `<button id="cont" class="big">DEVAM ET <small>(${sv.day}. gün · ${DIFF[sv.diff] ? DIFF[sv.diff].ad : ''})</small></button><br>` : ''}
   <div class="diffs">${Object.entries(DIFF).map(([k, d]) => `<button data-d="${k}" class="${UI.diff === k ? 'on' : ''}">${d.ad}</button>`).join('')}</div>
   <p class="ddesc" id="ddesc">${DIFF[UI.diff].desc}</p>
@@ -481,13 +485,13 @@ function startScreen() {
   <b>Barınma</b>: her tek kişi ya da çift bir yerde yaşar (çadır = 1 hane, yatakhane odası = 2 hane). Yer yoksa yeni insanlar gelmez. Çitsiz evler nadiren saldırıya uğrar.<br>
   <b>Sağlık</b>: yaralılar şifahaneye taşınır, günlerce tedavi görür. Salgınlar nadiren öldürür ama yayılır.<br>
   <b>Bilinmezlik</b>: sadece halkının gördüğünü görürsün. Geceler çoğu zaman sessizdir... ama her zaman değil. Yüzü tanıdık gelen her şeye güvenme.<br>
-  <b>Hedef</b>: yarığı bul, halkını 30 kişiye çıkar, 6. seviye bir zanaatkâra Yarık Taşı yaptır ve son savaşı kazan.</div></details>
+  <b>Hedef</b>: adada en az 200 gün hayatta kal, kıyılardaki 3 gemi enkazını bul, halat ve yelken bezi ürettir, usta bir mimarla kıyıya ⛵ Gemi kur ve halkınla eve dön.</div></details>
   <details><summary>Başarımlar (${ACHSET.size}/${Object.keys(ACH).length})</summary><div class="achs">${achList}</div></details>
   <p style="font-size:12px;color:#776">🎧 Kulaklıkla oyna.</p>`;
   $('screen').style.display = 'flex';
   for (const b of document.querySelectorAll('.diffs button')) b.onclick = () => { UI.diff = b.dataset.d; for (const x of document.querySelectorAll('.diffs button')) x.classList.toggle('on', x === b); $('ddesc').textContent = DIFF[UI.diff].desc; };
   $('go').onclick = () => { audioInit(); newGame(UI.diff, $('tutChk').checked); };
-  if (sv) $('cont').onclick = () => { audioInit(); try { loadGame(sv.s); } catch (e) { console.error(e); store.del('sonAtesKayit'); startScreen(); } };
+  if (sv) $('cont').onclick = () => { audioInit(); try { loadGame(sv.s); } catch (e) { console.error(e); store.del('sonAtesKayit4'); startScreen(); } };
 }
 function onGameStart() {
   $('screen').style.display = 'none'; $('hud').style.display = 'block'; $('pause').style.display = 'none';
@@ -498,7 +502,7 @@ function onGameStart() {
   buildTools(); renderSide(); updateHUD();
 }
 function showGameOver() {
-  const dawn = G.diff === 'kolay' && store.get('sonAtesSafak');
+  const dawn = G.diff === 'kolay' && store.get('sonAtesSafak4');
   $('screenBox').innerHTML = `<h1 style="color:#c33;text-shadow:0 0 30px #600">KARANLIK</h1>
   <p class="story">Ateşin son közü de söndü. Ormanın sesleri, sanki hiçbir şey olmamış gibi devam etti.</p>
   <p><b>${G.day}</b> gün hayatta kaldınız · <b>${G.kills}</b> yaratık · <b>${G.stats.hunts || 0}</b> av · <b>${G.deaths}</b> ölü · <b>${G.lost}</b> kayıp</p>
@@ -512,8 +516,8 @@ function showGameOver() {
 }
 function showVictory(saved, left) {
   $('screenBox').innerHTML = `<h1 style="color:#9cf;text-shadow:0 0 30px #36f">EVE DÖNÜŞ</h1>
-  <p class="story">Yarık bir nefes gibi açıldı ve kapandı. Arkada, ormanın içinde, bir ateş hâlâ yanıyordu.</p>
-  <p><b>${saved.length}</b> kişi yarıktan geçti: ${saved.map(p => p.name).join(', ')}.</p>
+  <p class="story">Yelkenler rüzgârla doldu. Arkada, ormanın içinde, bir ateş hâlâ yanıyordu.</p>
+  <p><b>${saved.length}</b> kişi gemiye bindi: ${saved.map(p => p.name).join(', ')}.</p>
   ${left ? `<p class="story">${left} kişi geride, kampta kaldı. Onlar bu dünyanın ilk köyünü kuracak.</p>` : ''}
   <p><b>${G.day}</b> gün · <b>${G.kills}</b> yaratık · <b>${G.deaths}</b> kayıp · ${DIFF[G.diff].ad}</p>
   <button id="menu" class="big">ANA MENÜ</button>`;

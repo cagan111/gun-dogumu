@@ -242,3 +242,7 @@ function updWeather(dt) {
   }
   G.flash = Math.max(0, (G.flash || 0) - dt);
 }
+
+// ---- arazi yüksekliği ve deniz (yer tutucu; dünya üreticisi doldurur)
+function groundH(x, y) { return 0; }
+function isSea(x, y) { return false; }
