@@ -142,7 +142,7 @@ function initMat() {
   MAT.rockV = triPatch(L_({ vertexColors: true, flatShading: true }), 0.045, 0.45);
   MAT.ground = L_({ map: TEX.ground, vertexColors: true });
   MAT.water = L_({ color: 0x2a6a88, emissive: 0x06141c, transparent: true, opacity: 0.9 });
-  MAT.ice = L_({ color: 0xb8d4e2, emissive: 0x0c1a22 });
+  MAT.ice = L_({ color: 0x80a4bc, emissive: 0x060e14 });
   MAT.sand = L_({ color: 0x968258 });
   MAT.swamp = L_({ color: 0x2f3a22, emissive: 0x040603 });
   // yumuşak leke gölge: merkezde koyu, kenara doğru sönen radyal geçiş (alphaMap = G kanalı)
@@ -1488,7 +1488,7 @@ function render3D(dt) {
   if (!U3.sl) U3.sl = seasonLook();
   terUpdate(cam.position.x, cam.position.z, U3.frame < 3 ? 1e9 : 8);
   seasonSync(dt, cam.position.x, cam.position.z);
-  if (U3.lakeM) { const sk = Math.min(1, ((U3.sl && U3.sl.snow[0]) || 0) * 1.4); MAT.ice.color.setRGB(0.72 + 0.2 * sk, 0.83 + 0.12 * sk, 0.89 + 0.08 * sk); for (const [l, m] of U3.lakeM) { const mt = l.frozen ? MAT.ice : MAT.water; if (m.material !== mt) m.material = mt; } }
+  if (U3.lakeM) { const sk = Math.min(1, ((U3.sl && U3.sl.snow[0]) || 0) * 1.4); MAT.ice.color.setRGB(0.5 + 0.25 * sk, 0.64 + 0.18 * sk, 0.74 + 0.12 * sk); for (const [l, m] of U3.lakeM) { const mt = l.frozen ? MAT.ice : MAT.water; if (m.material !== mt) m.material = mt; } }
   U3.sea.position.set(Math.round(cam.position.x / 500) * 500, SEA_Y, Math.round(cam.position.z / 500) * 500);
   { const nb = G.builds.reduce((a, b) => a + (b.dead ? 0 : 1), 0); if (nb !== U3.grassN) { U3.grassN = nb; GR.slots.clear(); GR.free = []; for (let i = 0; i < (2 * GR.R + 1) ** 2; i++) GR.free.push(i); GR.cx = 1e9; } }
   grassUpdate(cam.position.x, cam.position.z, U3.frame < 3 ? 1e9 : 10);
