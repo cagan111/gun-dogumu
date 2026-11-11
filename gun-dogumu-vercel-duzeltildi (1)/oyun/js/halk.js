@@ -1235,9 +1235,9 @@ function kbStep(p, dt) {
 
 // ---- balıkçı: en yakın suyun kıyısında balık tutar, balığı depoya taşır
 function fishSpot(p) {
-  if (p.fspot && p.fspotT > G.now) return p.fspot;
+  if (p.fspot && p.fspotT > G.now && !(p.fspot.lake && p.fspot.lake.frozen)) return p.fspot;
   let best = null, bd = 1e9;
-  for (const l of G.lakes) { const d = dist(l, G.fire) * 0.6 + dist(l, p); if (dist(l, G.fire) < 3200 && d < bd) { bd = d; const a = angTo(l, p) + ((p.id * 0.7) % 1 - 0.5); best = { x: l.x + Math.cos(a) * (l.r + 10), y: l.y + Math.sin(a) * (l.r + 10), fx: l.x, fy: l.y }; } }
+  for (const l of G.lakes) { if (l.frozen) continue; const d = dist(l, G.fire) * 0.6 + dist(l, p); if (dist(l, G.fire) < 3200 && d < bd) { bd = d; const a = angTo(l, p) + ((p.id * 0.7) % 1 - 0.5); best = { x: l.x + Math.cos(a) * (l.r + 10), y: l.y + Math.sin(a) * (l.r + 10), fx: l.x, fy: l.y, lake: l }; } }
   if (!best && G.harbor && dist(G.harbor, G.fire) < 7000) best = { x: G.harbor.x, y: G.harbor.y, fx: G.harbor.x + Math.cos(G.harbor.a || 0) * 80, fy: G.harbor.y + Math.sin(G.harbor.a || 0) * 80 };
   p.fspot = best; p.fspotT = G.now + 60; return best;
 }
@@ -1250,6 +1250,7 @@ function updFisher(p, dt) {
     p.anim += dt * 9; return;
   }
   const sp = fishSpot(p);
+  if (!sp && G.lakes.some(l => l.frozen && dist(l, G.fire) < 3200)) { if (!G.flags.lakeIce) { G.flags.lakeIce = 1; msg('🧊 Göl donmuş — balıkçılar balık tutamıyor, başka işe yardım ediyor.', '#cfe8ff', 5); } return updIdle(p, dt, true); }
   if (!sp) { if (!G.flags.noWater) { G.flags.noWater = 1; msg('Yakında balık tutulacak su yok. Balıkçılar boşta.', '#e99', 4); } return updIdle(p, dt, true); }
   if (Math.hypot(p.x - sp.x, p.y - sp.y) > 14) { steer(p, sp.x, sp.y, pSpeed(p), dt, false); p.anim += dt * 9; return; }
   p.moving = false; p.ang = Math.atan2(sp.fy - p.y, sp.fx - p.x); p.work = 1;

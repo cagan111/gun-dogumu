@@ -369,13 +369,14 @@ function darkness() {
   const w = G.weather && G.weather.type;
   if (w === 'yagmur' || w === 'firtina') d = Math.max(d, 0.28);
   if (w === 'sis') d = Math.max(d, 0.2);
+  if (w === 'kar') d = Math.max(d, G.weather.heavy ? 0.24 : 0.14);
   if (G.finale) d = Math.max(d, 0.6);
   if (G.flash > 0) d *= 0.15;
   return d;
 }
 const isNight = () => baseDark() > 0.55;
 const goHome = () => { const p = phase(); return p > 0.46 && p < 0.93; };
-const lightMul = () => G.weather && G.weather.type === 'sis' ? 0.65 : G.weather && G.weather.type === 'firtina' ? 0.85 : 1;
+const lightMul = () => G.weather && G.weather.type === 'sis' ? 0.65 : G.weather && (G.weather.type === 'firtina' || (G.weather.type === 'kar' && G.weather.heavy)) ? 0.85 : 1;
 function fireR() { return G.fire.fuel <= 0 ? 0 : (90 + G.fire.fuel * 2.6) * lightMul(); }
 function lights() {
   const lm = lightMul(), out = [];
@@ -429,8 +430,13 @@ function lightLevel(x, y, LS) {
 //  HAVA
 // =============================================================
 function setWeather(type, t) {
-  const old = G.weather.type; G.weather = { type, t };
+  // yağış türü sıcaklığa göre: soğukta yağmur/fırtına kara döner (fırtına → yoğun kar)
+  let heavy = 0;
+  if ((type === 'yagmur' || type === 'firtina') && tempAt(G.fire.x, G.fire.y, type) < 0.5) { heavy = type === 'firtina' ? 1 : 0; type = 'kar'; }
+  if (type === 'kar' && t === undefined) t = 0;
+  const old = G.weather.type; G.weather = heavy ? { type, t, heavy } : { type, t };
   if (type === old) return;
+  if (type === 'kar') msg(heavy ? 'Tipi! Kar savruluyor, göz gözü görmüyor.' : 'Kar yağmaya başladı. Ateşi besleyin, sıcak tutun.', '#dfeaff', 5);
   if (type === 'yagmur') msg('Yağmur başladı. Ateş daha hızlı sönecek.', '#9bd', 4);
   if (type === 'firtina') msg('Fırtına! Şimşekler karanlığı yırtıyor...', '#bcf', 5);
   if (type === 'sis') msg('Yoğun bir sis çöktü. Işık zayıfladı.', '#bbc', 5);
@@ -439,7 +445,8 @@ function setWeather(type, t) {
 function updWeather(dt) {
   const w = G.weather;
   if (w.t > 0) { w.t -= dt; if (w.t <= 0 && !isNight()) setWeather('acik', 0); }
-  if (A.ctx) A.rain.gain.setTargetAtTime(w.type === 'yagmur' ? 0.05 : w.type === 'firtina' ? 0.09 : 0, A.ctx.currentTime, 1.5);
+  updSeasons(dt);
+  if (A.ctx) { const lp = L ? precipAt(L.x, L.y) : null; A.rain.gain.setTargetAtTime(lp === 'yagmur' ? (w.type === 'firtina' ? 0.09 : 0.05) : 0, A.ctx.currentTime, 1.5); }
   if (w.type === 'firtina') {
     G.lightT = (G.lightT || 6) - dt;
     if (G.lightT <= 0) {
@@ -449,4 +456,109 @@ function updWeather(dt) {
     }
   }
   G.flash = Math.max(0, (G.flash || 0) - dt);
+}
+
+// =============================================================
+//  MEVSİMLER, SICAKLIK, KAR
+//  4 mevsim × 50 gün, yinelenir (1. gün = ilkbahar). Mevsim geçişleri ±3 gün yumuşatılır.
+// =============================================================
+const SEASON_LEN = 50, SEASON_BLEND = 3, SNOW_H = [0, 100, 200, 300, 400, 500], LAPSE = 0.055;
+const SEASONS = [
+  { key: 'ilkbahar', ad: 'İlkbahar', ic: '🌱', T0: 7, T1: 16, amp: 5, wx: [0.58, 0.2, 0.1, 0.12], dayRain: 0.22, grow: 1.1, berry: 1 },
+  { key: 'yaz', ad: 'Yaz', ic: '☀️', T0: 21, T1: 23, amp: 6, wx: [0.72, 0.08, 0.12, 0.08], dayRain: 0.12, grow: 1, berry: 1 },
+  { key: 'sonbahar', ad: 'Sonbahar', ic: '🍂', T0: 14, T1: 4, amp: 5, wx: [0.52, 0.2, 0.08, 0.2], dayRain: 0.25, grow: 0.7, berry: 0.45 },
+  { key: 'kis', ad: 'Kış', ic: '❄️', T0: -4, T1: -5, amp: 4, wx: [0.5, 0.34, 0.06, 0.1], dayRain: 0.3, grow: 0, berry: 0 }];
+const BIO_T = [-0.5, 0, 1, -1.5, 0, 1.5, 2, 0];
+function seasonOf(day) {
+  const d = Math.max(0, (day || 1) - 1), i = Math.floor(d / SEASON_LEN) % 4;
+  return { i, key: SEASONS[i].key, ad: SEASONS[i].ad, ic: SEASONS[i].ic, day: d % SEASON_LEN + 1, t: (d % SEASON_LEN) / SEASON_LEN };
+}
+// sürekli gün (0 = 1. günün başı); newDay'de phase 1→0 sararken day++ olduğundan kesintisiz
+const dayF = () => Math.max(0, (G.day || 1) - 1 + phase());
+// mevsim ağırlıkları [ilkbahar, yaz, sonbahar, kış]: sınırda son/ilk 3 gün komşu mevsimle karışır
+function seasonW(df) {
+  if (df === undefined) df = dayF();
+  const w = [0, 0, 0, 0], k = Math.floor(df / SEASON_LEN), i = k % 4, u = df - k * SEASON_LEN, B = SEASON_BLEND;
+  const sm = x => { x = clamp(x, 0, 1); return x * x * (3 - 2 * x); };
+  if (u < B && df >= B) { const a = sm((u + B) / (2 * B)); w[i] += a; w[(i + 3) % 4] += 1 - a; }
+  else if (u > SEASON_LEN - B) { const a = sm((u - (SEASON_LEN - B)) / (2 * B)); w[i] += 1 - a; w[(i + 1) % 4] += a; }
+  else w[i] = 1;
+  return w;
+}
+// mevsim içi ilerlemeye göre değer (ör. sonbahar başta ılık, sonda soğuk), sınırlarda karışık
+function seasonVal(f, df) {
+  if (df === undefined) df = dayF();
+  const w = seasonW(df), k = Math.floor(df / SEASON_LEN), u = (df - k * SEASON_LEN) / SEASON_LEN, i = k % 4;
+  let v = 0;
+  for (let j = 0; j < 4; j++) if (w[j] > 0) { const t = j === i ? u : j === (i + 3) % 4 ? 1 : 0; v += w[j] * f(SEASONS[j], t); }
+  return v;
+}
+function dayAnom(d) { const h = Math.sin(d * 127.1 + ((G.seed || 1) % 1000) * 0.37) * 43758.5453; return ((h - Math.floor(h)) - 0.5) * 6; }
+// kamp düzlüğündeki (yükseklik ~8, orman) hava sıcaklığı, °C. Kare başına önbellekli.
+const _TC = { t: -1, w: '', v: 0 };
+function baseTemp(wt) {
+  const w = wt || (G.weather && G.weather.type) || 'acik';
+  if (_TC.t === G.t && _TC.w === w) return _TC.v;
+  const df = dayF(), p = phase();
+  let T = seasonVal((s, u) => s.T0 + (s.T1 - s.T0) * u, df);
+  const A = seasonVal(s => s.amp, df);
+  T += A * Math.cos((p - 0.3) * TAU);                        // en sıcak öğleden sonra, en soğuk gece yarısı sonrası
+  const d0 = Math.floor(df), fr = df - d0, sf = fr * fr * (3 - 2 * fr);
+  T += dayAnom(d0) + (dayAnom(d0 + 1) - dayAnom(d0)) * sf;   // günden güne yumuşak sapma
+  T += w === 'yagmur' ? -1.5 : w === 'firtina' ? -3 : w === 'kar' ? -1 : w === 'sis' ? -1 : (isNight() ? -1.5 : 0.5);
+  _TC.t = G.t; _TC.w = w; _TC.v = T;
+  return T;
+}
+// yerel sıcaklık: mevsim + gün saati + yükseklik + biyom + hava
+function tempAt(x, y, wt) {
+  const h = typeof groundH === 'function' && HM ? groundH(x, y) : 8;
+  return baseTemp(wt) - LAPSE * Math.max(0, h - 8) + (BIO_T[biomeFast(x, y)] || 0);
+}
+const isPrecip = w => w === 'yagmur' || w === 'firtina' || w === 'kar';
+// tek yağış kaynağı: kampta G.weather.type; başka yerde aynı yağış, yerel sıcaklığa göre kar/yağmur
+function precipAt(x, y) {
+  const w = G.weather && G.weather.type;
+  if (!isPrecip(w)) return null;
+  if (Math.hypot(x - G.fire.x, y - G.fire.y) < 600) return w === 'kar' ? 'kar' : 'yagmur';
+  return tempAt(x, y) < 0.5 ? 'kar' : 'yagmur';
+}
+// kar derinliği (0..1.5): 100'lük yükseklik bantlarında saklanır, yerel değer bant arası + biyom
+function snowAt(x, y, h) {
+  const B = G.snowB; if (!B) return 0;
+  if (h === undefined) h = groundH(x, y);
+  if (h < 1) return 0;
+  const f = clamp(h / 100, 0, SNOW_H.length - 1), i = Math.min(SNOW_H.length - 2, f | 0), u = f - i, d = B[i] + (B[i + 1] - B[i]) * u;
+  const b = biomeFast(x, y); return d * (b === 5 ? 0.55 : b === 2 ? 0.75 : b === 6 ? 0 : 1);
+}
+// mevsim görünüm ağırlıkları + kar özeti (uc.js yeniden boyama tetikleyicisi)
+function seasonLook() { const w = seasonW(); return { sp: w[0], su: w[1], au: w[2], wi: w[3], snow: G.snowB ? G.snowB.slice() : [0, 0, 0, 0, 0, 0] }; }
+function updSeasons(dt) {
+  if (!G.snowB || G.snowB.length !== SNOW_H.length) G.snowB = SNOW_H.map(() => 0);
+  G.season = seasonOf(G.day);
+  G.seasonT = (G.seasonT || 0) - dt;
+  if (G.seasonT > 0) return;
+  const step = 1 + (-G.seasonT); G.seasonT = 1;
+  const w = G.weather, wt = w.type, T0 = baseTemp(), Tc = tempAt(G.fire.x, G.fire.y);
+  G.tempCamp = Tc;
+  // kampta yağış türü: histerezisli yağmur ⇄ kar
+  if ((wt === 'yagmur' || wt === 'firtina') && Tc < -0.5) { G.weather = { type: 'kar', t: w.t, heavy: wt === 'firtina' ? 1 : 0 }; msg('Yağmur kara döndü.', '#dfeaff', 4); }
+  else if (wt === 'kar' && Tc > 1.5) { G.weather = { type: w.heavy ? 'firtina' : 'yagmur', t: w.t }; msg('Kar sulu sepkene, sonra yağmura döndü.', '#9bd', 4); }
+  // kar birikimi / erime (yükseklik bantları)
+  const pr = isPrecip(G.weather.type), hv = G.weather.heavy ? 1.6 : G.weather.type === 'firtina' ? 1.3 : 1;
+  for (let i = 0; i < SNOW_H.length; i++) {
+    const Tb = T0 - LAPSE * Math.max(0, SNOW_H[i] - 8);
+    let d = G.snowB[i];
+    if (pr && Tb < 0.5) d += step * 0.0026 * hv;
+    if (Tb > 0) d -= step * Tb * 0.0007 * (pr ? 2 : 1);
+    G.snowB[i] = clamp(d, 0, 1.5);
+  }
+  // göller: -2'nin altında bir süre kalınca donar, +2'nin üstünde bir süre kalınca çözülür
+  let fz = 0, th = 0;
+  for (const l of G.lakes || []) {
+    const T = tempAt(l.x, l.y);
+    if (!l.frozen) { l.iceT = T < -2 ? (l.iceT || 0) + step : Math.max(0, (l.iceT || 0) - step); if (l.iceT > 90) { l.frozen = true; l.iceT = 0; if (dist(l, G.fire) < 3200) fz++; } }
+    else { l.iceT = T > 2 ? (l.iceT || 0) + step : Math.max(0, (l.iceT || 0) - step); if (l.iceT > 90) { l.frozen = false; l.iceT = 0; if (dist(l, G.fire) < 3200) th++; } }
+  }
+  if (fz) msg('🧊 Kampa yakın göl buz tuttu. Balıkçılar orada balık tutamaz.', '#cfe8ff', 5);
+  if (th) msg('💧 Gölün buzu çözüldü. Balıkçılar yeniden ağ atabilir.', '#9cf', 4);
 }

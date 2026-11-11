@@ -471,11 +471,13 @@ function toast(html) { const t = $('toast'); const d = document.createElement('d
 function renderMsgs() { $('msgs').innerHTML = G.msgs.map(m => `<div style="color:${m.col};opacity:${clamp(m.life, 0, 1)}">${m.t}</div>`).join(''); G.msgDirty = false; }
 
 // ---- HUD
-const WIC = { acik: '', yagmur: '🌧️', firtina: '⛈️', sis: '🌫️' };
+const WIC = { acik: '', yagmur: '🌧️', firtina: '⛈️', sis: '🌫️', kar: '🌨️' };
 function updateHUD() {
   const p = phase(), n = isNight();
+  const S = G.season || seasonOf(G.day), lp = precipAt(L.x, L.y), wk = lp ? (lp === 'kar' ? 'kar' : G.weather.type === 'kar' ? 'yagmur' : G.weather.type) : G.weather.type;
   $('dayTxt').textContent = `${G.day}. Gün`;
-  $('todTxt').textContent = (n ? '🌑 Gece' : p > 0.42 ? '🌇 Akşam' : '☀️ Gündüz') + ' ' + WIC[G.weather.type] + (G.finale ? ' 🌀' : '');
+  $('todTxt').textContent = (n ? '🌑 Gece' : p > 0.42 ? '🌇 Akşam' : '☀️ Gündüz') + ' ' + (WIC[wk] || '') + (G.finale ? ' 🌀' : '');
+  { const st = $('seaTxt'); if (st) { st.textContent = `${S.ic} ${S.ad} ${S.day}/${SEASON_LEN} · ${Math.round(tempAt(L.x, L.y))}°C`; st.title = 'Mevsim, mevsimin günü ve bulunduğun yerdeki sıcaklık'; } }
   $('todBar').style.width = (p * 100) + '%';
   const fl = k => Math.floor(G.stock[k] || 0);
   $('res').innerHTML = ['wood', 'stone', 'food', 'meyve', 'et'].map(k => `<span title="${RESN[k]}">${RES[k]} <b>${fl(k)}</b></span>`).join('') + `<span title="Halk · boş yer">👥 <b>${G.people.length}</b><small>/🛏️${freeHomes()}</small></span>`;

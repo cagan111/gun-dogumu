@@ -17,7 +17,7 @@ function resetState(diff) {
     shake: 0, red: 0, flash: 0, over: false, won: false, rescue: null, rescueAt: -1, kills: 0, deaths: 0, lost: 0,
     placing: null, flags: {}, stokeT: 0, spawnT: 0, actT: 0, hbT: 0, ambT: 3, uiT: 0, regrowT: 0, postT: 0, expT: 0, achT: 0, saveT: 45,
     interact: null, usedNames: new Set(), started: true, paused: false, modal: false, danger: 0,
-    nightPlan: [], nightWeather: 'acik', eproj: [], raid: null, scare: 0, vis: null, campT: 0, weather: { type: 'acik', t: 0 }, mimic: null, finale: null, dayRainAt: -1,
+    nightPlan: [], nightWeather: 'acik', eproj: [], raid: null, scare: 0, vis: null, campT: 0, weather: { type: 'acik', t: 0 }, mimic: null, finale: null, dayRainAt: -1, snowB: [0, 0, 0, 0, 0, 0], season: null, coldMsgDay: -9,
     explored: new Uint8Array(MAPN * MAPN), stats: { fireNights: 0, noLoss: 0, tamed: 0, hunts: 0 }, lossToday: false, fireOutTonight: false,
     tut: { on: false, step: 0 }, idc: 0, devDone: false, leaveDone: false, scoutCd: 0, silent: false, devSeenEver: false, riftHint: false,
     tutMoved: 0, tutWood: 0, tutFire: 0, tutGroup: false, uiDirty: true, toolsDirty: true, msgDirty: true, shootCd: 0
@@ -394,6 +394,7 @@ function toggleTorch() {
 //  GÜN DÖNGÜSÜ ve KORKU OLAYLARI
 // =============================================================
 function newDay() {
+  const sPrev = seasonOf(G.day).i;
   G.day++; G.flags = {}; G.devDone = false; G.leaveDone = false; G.mimic = null; G.tracks = []; G.silent = false;
   let tn = 0; for (const d of G.dinos) if (d.tamed) tn += d.type === 'boynuzlu' ? 3 : d.type === 'uzunboyun' ? 5 : 1;
   const need = 10;
@@ -405,6 +406,7 @@ function newDay() {
   G.stats.fireNights = G.fireOutTonight ? 0 : G.stats.fireNights + 1; G.fireOutTonight = false;
   G.stats.noLoss = G.lossToday ? 0 : G.stats.noLoss + 1; G.lossToday = false;
   SFX.bell();
+  seasonDawn(sPrev);
   halkDawn();
   // yeni gelenler
   assignHomes();
@@ -438,11 +440,22 @@ function newDay() {
   G.eggs = keep;
   for (const d of G.dinos) if (d.pet) { d.growth = Math.min(1, (d.growth || 0) + 0.34); d.maxhp = Math.round(30 + 50 * d.growth); d.hp = d.maxhp; }
   planNight();
-  G.dayRainAt = Math.random() < 0.2 ? rand(0.1, 0.32) : -1;
+  G.dayRainAt = Math.random() < seasonVal(s => s.dayRain) ? rand(0.1, 0.32) : -1;
   G.rescueAt = G.day > 5 && Math.random() < 0.06 ? rand(0.1, 0.3) : -1;
   checkAch();
   saveGame('dawn');
   G.uiDirty = true;
+}
+// mevsim değişimi mesajı + kış soğuğu (yataksız ya da ateşten uzak yatanlar üşür)
+function seasonDawn(sPrev) {
+  const S = G.season = seasonOf(G.day);
+  if (S.i !== sPrev) msg([`🌱 İlkbahar geldi (${G.day}. gün). Kar eriyor, çalılar yeniden meyve verecek.`, `☀️ Yaz geldi. Uzun, sıcak günler; tarlalar ve çalılar bol.`, `🍂 Sonbahar geldi. Yapraklar sararıyor; çalılar yavaş yenileniyor. Kış için stok yapın!`, `❄️ Kış geldi. Çalılar meyve vermez, tarlalar büyümez; yatak ve ateş hayati.`][S.i], '#ffe6a0', 8);
+  else if (S.i === 2 && S.day === 44) msg('🍂 Kış yaklaşıyor (6 gün). Kurutma rafı, depo ve yataklar hazır mı?', '#fda', 7);
+  const w = seasonW();
+  if (w[3] > 0.5 && (G.tempCamp === undefined || G.tempCamp < 4)) {
+    const cold = G.people.filter(q => !q.dead && (!(q.own && q.own.yatak) || (!q.inHut && !q.homeT && dist(q, G.fire) > 420))).length;
+    if (cold) { moraleAdd(-Math.min(2.5, cold * 0.25)); if (G.day - G.coldMsgDay >= 4) { G.coldMsgDay = G.day; msg(`🥶 ${cold} kişi gece üşüdü (yatak yok ya da ateşten uzak). Yatak ürettirin, ateşi canlı tutun.`, '#cde', 6); } }
+  }
 }
 function makeTracks() {
   const a = rand(0, TAU); let x = G.fire.x + Math.cos(a) * 1050, y = G.fire.y + Math.sin(a) * 1050;
@@ -455,7 +468,8 @@ function makeTracks() {
 }
 function planNight() {
   const d = G.day, ev = [];
-  const W = Math.random(); G.nightWeather = W < 0.65 ? 'acik' : W < 0.77 ? 'yagmur' : W < 0.87 ? 'firtina' : 'sis';
+  { const W = Math.random(), sw = k => seasonVal(s => s.wx[k]), a = sw(0), b = a + sw(1), c = b + sw(2);   // mevsime göre gece havası
+    G.nightWeather = W < a ? 'acik' : W < b ? 'yagmur' : W < c ? 'firtina' : 'sis'; }
   if (d <= 2) { G.nightPlan = ev; return; }
   // çoğu gece sakin geçer; olaylar nadir ama ani
   let n = Math.random() < (d < 10 ? 0.8 : d < 40 ? 0.72 : 0.65) ? 0 : (d > 30 && Math.random() < 0.15 ? 2 : 1);
@@ -662,7 +676,7 @@ function serialize() {
     carcs: G.carcs.filter(c => !c.dead).map(c => ({ x: c.x, y: c.y, r: c.r, type: c.type, ang: c.ang, meat: c.meat, bone: c.bone, hide: c.hide, age: c.age, rotten: c.rotten })),
     managers: G.managers, zone: G.zone, newGroup: G.newGroup, autoEq: !!G.autoEq, torchFuel: G.torchFuel, nightPlan: G.nightPlan, nightWeather: G.nightWeather, weather: G.weather,
     eggs: G.eggs, usedNames: [...G.usedNames], stats: G.stats, idc: G.idc, kills: G.kills, deaths: G.deaths, lost: G.lost,
-    devSeenEver: G.devSeenEver, riftFound: G.rift.found, riftHint: G.riftHint, rescueAt: G.rescueAt, dayRainAt: G.dayRainAt,
+    devSeenEver: G.devSeenEver, riftFound: G.rift.found, riftHint: G.riftHint, rescueAt: G.rescueAt, dayRainAt: G.dayRainAt, snowB: G.snowB, lakesF: (G.lakes || []).map(l => l.frozen ? 1 : 0),
     flags: G.flags, leaveDone: G.leaveDone, devDone: G.devDone, tut: G.tut.on ? G.tut.step : -1,
     trees: G.trees.map(o => o.amt), rocks: G.rocks.map(o => o.dead ? 0 : o.amt), crystals: G.crystals.map(o => o.dead ? 0 : o.amt),
     bushes: G.bushes.map(o => o.amt), herbs: G.herbs.map(o => o.amt), poisons: G.poisons.map(o => o.amt), nests: G.nests.map(n => n.eggs),
@@ -689,6 +703,9 @@ function loadGame(s) {
     weather: D.weather || { type: 'acik', t: 0 }, eggs: D.eggs || [], stats: Object.assign(G.stats, D.stats || {}), idc: D.idc, kills: D.kills, deaths: D.deaths, lost: D.lost,
     devSeenEver: D.devSeenEver, riftHint: D.riftHint, rescueAt: -1, dayRainAt: D.dayRainAt || -1, flags: D.flags || {}, leaveDone: D.leaveDone, devDone: D.devDone });
   G.autoEq = !!D.autoEq;
+  G.snowB = Array.isArray(D.snowB) ? SNOW_H.map((_, i) => clamp(+D.snowB[i] || 0, 0, 1.5)) : SNOW_H.map(() => 0);
+  (D.lakesF || []).forEach((f, i) => { if (G.lakes[i]) G.lakes[i].frozen = !!f; });
+  G.season = seasonOf(G.day);
   Object.assign(G.stock, D.stock); G.fire.fuel = D.fuel; G.rift.found = !!D.riftFound;
   (D.wrecks || []).forEach((f, i) => { if (G.wrecks && G.wrecks[i]) G.wrecks[i].found = f; });
   G.usedNames = new Set(D.usedNames); G.orders = D.orders || []; G.oid = D.oid || 0; G.unclean = D.unclean || 0;
@@ -785,7 +802,7 @@ function update(dt) {
   const LS = lights(), zones = safeZones();
   // ateş
   const wt = G.weather.type;
-  G.fire.fuel = Math.max(0, G.fire.fuel - dt * (isNight() ? 0.3 : 0.14) * DIFF[G.diff].burn * (wt === 'yagmur' ? 1.8 : wt === 'firtina' ? 2.2 : 1));
+  G.fire.fuel = Math.max(0, G.fire.fuel - dt * (isNight() ? 0.3 : 0.14) * DIFF[G.diff].burn * (wt === 'yagmur' ? 1.8 : wt === 'firtina' ? 2.2 : wt === 'kar' ? (G.weather.heavy ? 1.45 : 1.25) : 1));
   G.stokeT -= dt;
   if (G.stokeT <= 0) {
     G.stokeT = 1;
@@ -797,7 +814,8 @@ function update(dt) {
   G.regrowT -= dt;
   if (G.regrowT <= 0) {
     G.regrowT = 2;
-    if (!isNight()) { for (const b of G.bushes) if (b.amt < b.max && Math.random() < 0.03) b.amt++; for (const b of G.herbs) if (b.amt < b.max && Math.random() < 0.012) b.amt++; for (const b of G.poisons) if (b.amt < b.max && Math.random() < 0.01) b.amt++; }
+    const bk = seasonVal(s => s.berry) * (G.weather.type === 'kar' ? 0 : 1);   // sonbaharda yavaş, kışın hiç
+    if (!isNight()) { for (const b of G.bushes) if (b.amt < b.max && Math.random() < 0.03 * bk) b.amt++; for (const b of G.herbs) if (b.amt < b.max && Math.random() < 0.012) b.amt++; for (const b of G.poisons) if (b.amt < b.max && Math.random() < 0.01) b.amt++; }
   }
   for (const g of GORDER) { const a = G.abil[g]; a.cd = Math.max(0, a.cd - dt); a.act = Math.max(0, a.act - dt); }
   G.scoutCd -= dt;
@@ -805,7 +823,7 @@ function update(dt) {
   G.vis = visionSources();
   G.eqT -= dt; if (G.eqT <= 0) { G.eqT = 1; assignEquip(); }
   G.homeT2 -= dt; if (G.homeT2 <= 0) { G.homeT2 = 2; assignHomes(); assignBeds(); }
-  for (const b of G.builds) if (b.type === 'tarla' && b.built && b.planted && b.g < 1) { b.g = Math.min(1, b.g + dt / (CYCLE * 1.6) * (wt === 'yagmur' || wt === 'firtina' ? 1.4 : 1)); b.tendT = (b.tendT || 0) - dt; }
+  for (const b of G.builds) if (b.type === 'tarla' && b.built && b.planted && b.g < 1) { b.g = Math.min(1, b.g + dt / (CYCLE * 1.6) * (wt === 'yagmur' || wt === 'firtina' ? 1.4 : wt === 'kar' ? 0 : 1) * seasonVal(s => s.grow)); b.tendT = (b.tendT || 0) - dt; }
   for (const c of G.carcs) { c.age += dt; if (!c.rotten && c.age > CYCLE * 1.2 && !G.builds.some(b => b.type === 'raf' && b.built && dist(b, c) < 300)) { c.rotten = true; } if (c.age > CYCLE * 2.5) c.dead = true; }
   G.carcs = G.carcs.filter(c => !c.dead);
   if (isNight() && G.carcs.length && Math.random() < dt * 0.02) { const c = pick(G.carcs); if (dist(c, G.fire) > 900) spawnPack('kucuk', ri(2, 4), { x: c.x + rand(-200, 200), y: c.y + rand(-200, 200) }); }
@@ -858,7 +876,7 @@ function update(dt) {
   G.hbT -= dt; if (G.danger > 0.15 && G.hbT <= 0) { G.hbT = 1.1 - G.danger * 0.65; SFX.heart(0.25 + G.danger * 0.5); }
   // ortam sesleri
   if (A.ctx) {
-    const n = darkness(); A.wind.gain.setTargetAtTime(0.04 + n * 0.06 + (wt === 'firtina' ? 0.08 : 0), A.ctx.currentTime, 1); A.drone.gain.setTargetAtTime(n * 0.05 + G.danger * 0.08, A.ctx.currentTime, 1);
+    const n = darkness(); A.wind.gain.setTargetAtTime(0.04 + n * 0.06 + (wt === 'firtina' ? 0.08 : wt === 'kar' ? (G.weather.heavy ? 0.09 : 0.03) : 0), A.ctx.currentTime, 1); A.drone.gain.setTargetAtTime(n * 0.05 + G.danger * 0.08, A.ctx.currentTime, 1);
     G.ambT -= dt;
     if (G.ambT <= 0) {
       G.ambT = rand(2, 7);
