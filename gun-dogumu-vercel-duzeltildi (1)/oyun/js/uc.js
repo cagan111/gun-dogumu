@@ -831,7 +831,7 @@ function shipMesh(b) {
   if (k > 0.12) { gb.add(GEO.cyl, '#6a4a2a', L / 2 - 4, y0, 0, 3, H * 1.25, 3, 0, 0, -0.45); gb.add(GEO.cyl, '#6a4a2a', -L / 2 + 4, y0, 0, 3, H * 1.05, 3, 0, 0, 0.35); }
   // kaburgalar
   const nr = Math.floor(clamp((k - 0.1) / 0.3, 0, 1) * 13);
-  for (let i = 0; i < nr; i++) { const t = (i + 1) / 14, x = -L / 2 + t * L, w = wf(t); for (const sd of [-1, 1]) for (let j = 0; j < 4; j++) { const a0 = j / 4, a1 = (j + 1) / 4, z0 = sd * w * Math.sin(a0 * Math.PI / 2), z1 = sd * w * Math.sin(a1 * Math.PI / 2), yy0 = y0 + H * (1 - Math.cos(a0 * Math.PI / 2)) * 0.9, yy1 = y0 + H * (1 - Math.cos(a1 * Math.PI / 2)) * 0.9; const mz = (z0 + z1) / 2, my = (yy0 + yy1) / 2, len = Math.hypot(z1 - z0, yy1 - yy0); gb.add(GEO.box, '#7a5632', x, my, mz, 3, len + 1.5, 3, -Math.atan2(z1 - z0, yy1 - yy0) * 1, 0, 0); } }
+  for (let i = 0; i < nr; i++) { const t = (i + 1) / 14, x = -L / 2 + t * L, w = wf(t); gb.add(GEO.rib, '#7a5632', x, y0 + H * 0.9, 0, Math.max(4, w), H * 0.9, 34, 0, Math.PI / 2, Math.PI); }
   // kaplama tahtaları (alt sıradan yukarı)
   const np = Math.floor(clamp((k - 0.4) / 0.4, 0, 1) * 7);
   for (let j = 0; j < np; j++) { const a = (j + 0.5) / 7, yy = y0 + H * (1 - Math.cos(a * Math.PI / 2)) * 0.9, seg = 14;

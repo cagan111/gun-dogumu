@@ -496,6 +496,7 @@ function updFear(p, dt, LS, night) {
 const HOME_GROUPS = ['odun', 'tas', 'yiyecek', 'kasap', 'asci', 'ciftci', 'sifaci', 'zanaat', 'mimar', 'kasif', 'bos', 'avci'];
 function updPerson(p, dt, LS) {
   p.insideB = null; if (p.group !== 'avci') p.sneak = false;
+  p.stageAd = null;
   p.haul = p.carry > 0 ? (Object.keys(p.bag)[0] || 'mat') : null;   // görünür yük: wood → omuzda kütük, stone → kucakta taş, meyve/herb → sepet, et/cigEt → et
   if (p.grabbed) return;
   p.atkCd -= dt; p.hurtT = Math.max(0, p.hurtT - dt); p.lastHurt += dt; p.swing = Math.max(0, p.swing - dt);
@@ -665,20 +666,39 @@ function mealStep(p, dt) {
   p.mealT = (p.mealT || 0) + dt;
   if (p.mealT > 3) eatMeal(p);
 }
+function stageSay(p, ad) { if (p.stageAd !== ad && p._lastSt !== ad && L && dist(p, L) < 400 && !p.insideB) ftext(p.x, p.y - 44, ad, '#e8d4b0'); p._lastSt = ad; p.stageAd = ad; }
 function updCook(p, dt) {
   if (goHome()) return homeBehavior(p, dt);
   const k = station('mutfak', p), st = k || G.fire;
-  const canCook = (G.stock.et || 0) >= 1 || (G.stock.meyve || 0) >= 2;
-  if (!canCook || (G.stock.food || 0) >= storeCap()) return altJob(p, dt);
+  const canCook = (G.stock.et || 0) >= 1 || (G.stock.meyve || 0) >= 2, full = (G.stock.food || 0) >= storeCap();
+  if (!p.batch && (!canCook || full)) {
+    if (!G.flags.cookSaid) { G.flags.cookSaid = 1; msg(full ? `🍲 ${p.name}: "Yemek hazır, depo dolu. Başka işe bakıyorum."` : `🍲 ${p.name}: "Pişirecek malzeme kalmadı! ${(G.stock.food || 0) < G.people.length ? 'Yemek de yetmeyecek. ' : ''}Başka işe bakıyorum."`, full ? '#cde' : '#f99', 6); if (!full) SFX.bell && SFX.bell(); }
+    return altJob(p, dt);
+  }
+  // 1) malzemeyi depodan getir
+  if (!p.batch) {
+    const dp = depotOf(p), sp = k ? stnPos(k) : { x: G.fire.x + 30, y: G.fire.y + 26 }, same = Math.hypot(dp.x - sp.x, dp.y - sp.y) < 80;
+    if (!p.cookGot) {
+      if (Math.hypot(p.x - dp.x, p.y - dp.y) > 26) { steer(p, dp.x, dp.y, pSpeed(p), dt, false); p.anim += dt * 9; stageSay(p, 'Depoya gidiyor'); return; }
+      p.moving = false; p.work = 1; p.cookW = (p.cookW || 0) + dt; stageSay(p, 'Depodan malzeme alıyor'); if (p.cookW < (same ? 2 : 0.8)) return;
+      p.cookW = 0;
+      const ne = Math.min(3, Math.floor(G.stock.et || 0)), nm = ne ? 0 : Math.min(6, Math.floor((G.stock.meyve || 0) / 2) * 2);
+      if (!ne && !nm) return;
+      if (ne) G.stock.et -= ne; else G.stock.meyve -= nm;
+      p.cookGot = { et: ne, meyve: nm, out: ne ? ne * 2 : nm }; p.carry = 2; G.uiDirty = true;
+    }
+    if (!same && Math.hypot(p.x - sp.x, p.y - sp.y) > 30) { steer(p, sp.x, sp.y, pSpeed(p) * 0.9, dt, false); p.anim += dt * 8; stageSay(p, 'Malzemeyi mutfağa taşıyor'); return; }
+    p.carry = 0; p.batch = p.cookGot; p.cookGot = null; p.cook = 0;
+  }
+  // 2) ocak başında aşama aşama pişir
   if (!(k ? atStation(p, k, dt) : (dist(p, G.fire) < 50 || (steer(p, G.fire.x + 30, G.fire.y + 26, pSpeed(p), dt, false), false)))) { p.anim += dt * 9; return; }
-  p.moving = false; p.work = 1; p.cook = (p.cook || 0) + dt * workRate(p) * (k ? 1 : 0.7);
-  if (Math.random() < dt * 3) G.parts.push({ x: st.x + rand(-8, 8), y: (k ? stnPos(k).y : st.y) - 10, vx: rand(-5, 5), vy: -25, life: 0.8, col: 'rgba(230,230,230,.5)', s: 3 });
-  if (p.cook >= 3) {
-    p.cook = 0;
-    let n = 2;
-    if ((G.stock.et || 0) >= 1) G.stock.et--; else G.stock.meyve -= 2;
-    if (lvl(p, 'asci') >= 4 && Math.random() < 0.3) n++;
-    addStock('food', n, p.x, p.y); addXP(p, 'asci', 2);
+  p.moving = false; p.work = 1; p.cook += dt * workRate(p) * (k ? 1 : 0.7);
+  const B = p.batch, T = 1.5 * B.out, f = p.cook / T;
+  stageSay(p, f < 0.28 ? (B.et ? 'Et doğranıyor' : 'Meyveler ayıklanıyor') : f < 0.42 ? 'Ateş harlanıyor' : f < 0.85 ? 'Kazan karıştırılıyor' : 'Yemek masaya konuyor');
+  if (f > 0.4 && Math.random() < dt * 3) G.parts.push({ x: st.x + rand(-8, 8), y: (k ? stnPos(k).y : st.y) - 10, vx: rand(-5, 5), vy: -25, life: 0.8, col: 'rgba(230,230,230,.5)', s: 3 });
+  if (p.cook >= T) {
+    let n = B.out; if (lvl(p, 'asci') >= 4 && Math.random() < 0.5) n += Math.ceil(B.out / 6);
+    addStock('food', n, p.x, p.y); addXP(p, 'asci', B.out); p.batch = null; p.cook = 0; G.flags.cookSaid = 0;
   }
 }
 function updIdle(p, dt, helper) {
@@ -890,6 +910,7 @@ function updButcher(p, dt, thr) {
     const ok = st ? atStation(p, st, dt) : (dist(p, G.fire) < 60 || (steer(p, G.fire.x - 30, G.fire.y + 30, pSpeed(p), dt, false), false));
     if (!ok) { p.anim += dt * 9; return; }
     p.moving = false; p.work = 1; p.clean = (p.clean || 0) + dt * workRate(p);
+    stageSay(p, p.clean < 0.45 ? 'Deri yüzülüyor' : p.clean < 0.9 ? 'Et kemikten ayrılıyor' : 'Et temizleniyor');
     if (p.clean >= 1.3) {
       p.clean = 0; G.stock.cigEt--;
       const n = st ? 1.25 : 1; G.stock.et = Math.min(storeCap(), (G.stock.et || 0) + n);
@@ -971,6 +992,7 @@ function workOrder(p, dt, by, stn) {
   if (!o.paid) { pay(it.cost); o.paid = true; }
   o.prog += dt * skillMul(lvl(p, by)) * grpMul(p.group) * (abilOn(p.group) ? 2 : 1) * (tr(p, 'caliskan') ? 1.3 : 1) * (p.sick ? 0.5 : 1);
   if (Math.random() < dt * 2.5 && L && dist(p, L) < 450) SFX.hammer(0.25);
+  p.stageAd = o.stageAd || null;
   // aşama aşama: çoklu eşyalar (ok ×10) tek tek, her biri üç adımda yapılır
   { const q = it.qty || 1, per = it.work / q, done = Math.min(q, Math.floor(o.prog / per)), f = (o.prog - done * per) / per, sts = stagesOf(o.item), si = Math.min(sts.length - 1, Math.floor(f * sts.length));
     const key = done * 10 + si;

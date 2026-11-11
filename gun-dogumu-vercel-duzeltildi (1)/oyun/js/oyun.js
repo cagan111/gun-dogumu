@@ -587,7 +587,8 @@ function endMeal() {
   }
   for (const p of hungry) { if (p.hunger >= 2) { hurt(p, p.child ? 6 : 12, null); p.fear = Math.min(100, p.fear + 10); } }
   const cooked = G.people.filter(p => p.lastMeal === 'food').length;
-  if (hungry.length) { moraleAdd(-Math.min(12, hungry.length * 2)); msg(`${hungry.length} kişi aç kaldı. Avlanın, toplayın, pişirin!`, '#f99', 5); }
+  if (hungry.length) { moraleAdd(-Math.min(16, hungry.length * 2.5)); for (const p of hungry) { p.tired = true; p.fear = Math.min(100, p.fear + 6); p.hungryDay = G.day; }
+    msg(`😞 ${hungry.length} kişi aç kaldı (${hungry.slice(0, 4).map(p => p.name).join(', ')}${hungry.length > 4 ? '…' : ''}). Moralleri düştü, yorgunlar. Avlanın, toplayın, pişirin!`, '#f99', 6); }
   else if (cooked >= G.people.length * 0.7) moraleAdd(2);
   if (raw.length) msg(`${raw.length} kişi temizlenmemiş çiğ et yemek zorunda kaldı...`, '#e9a050', 4);
   G.meal = null;
