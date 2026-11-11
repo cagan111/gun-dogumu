@@ -683,7 +683,7 @@ function updCook(p, dt) {
   if (goHome()) return homeBehavior(p, dt);
   const k = station('mutfak', p), st = k || G.fire;
   const canCook = (G.stock.et || 0) >= 1 || (G.stock.meyve || 0) >= 2, full = (G.stock.food || 0) >= storeCap();
-  if (!p.batch && (!canCook || full)) {
+  if (!p.batch && !p.cookGot && (!canCook || full)) {
     if (!G.flags.cookSaid) { G.flags.cookSaid = 1; msg(full ? `🍲 ${p.name}: "Yemek hazır, depo dolu. Başka işe bakıyorum."` : `🍲 ${p.name}: "Pişirecek malzeme kalmadı! ${(G.stock.food || 0) < G.people.length ? 'Yemek de yetmeyecek. ' : ''}Başka işe bakıyorum."`, full ? '#cde' : '#f99', 6); if (!full) SFX.bell && SFX.bell(); }
     return altJob(p, dt);
   }
@@ -1034,7 +1034,7 @@ function updCrafter(p, dt) {
 function blueprintFor(p) {
   let best = null, bd = 1e9;
   for (const b of G.builds) {
-    if (b.built || b.dead || dist(b, G.fire) > 2200) continue;
+    if (b.built || b.dead || (b.type !== 'gemi' && dist(b, G.fire) > 2200)) continue;
     const d = dist(b, p) + dist(b, G.fire) * 0.3;
     if (d < bd) { bd = d; best = b; }
   }

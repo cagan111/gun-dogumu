@@ -381,7 +381,7 @@ function addOrder(id, n, byId) {
 }
 function cancelOrder(oid) {
   const i = G.orders.findIndex(o => o.id === oid); if (i < 0) return;
-  const o = G.orders[i]; if (o.paid) for (const k in ITEMS[o.item].cost) G.stock[k] += ITEMS[o.item].cost[k];
+  const o = G.orders[i]; if (o.paid) { const it = ITEMS[o.item], q = it.qty || 1, f = Math.max(0, 1 - (o.made || 0) / q); for (const k in it.cost) G.stock[k] = (G.stock[k] || 0) + Math.floor(it.cost[k] * f); }   // yalnızca teslim edilmemiş kısmın malzemesi iade edilir
   G.orders.splice(i, 1); G.craftDirty = true;
 }
 function toggleTorch() {

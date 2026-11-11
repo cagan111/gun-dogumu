@@ -502,7 +502,7 @@ function hudTick(dt) {
 }
 
 // ---- ekranlar
-function saveInfo() { const s = store.get('sonAtesKayit4'); if (!s) return null; try { const d = JSON.parse(s); if (d.v !== 3) return null; return { day: d.day, diff: d.diff, s }; } catch (e) { return null; } }
+function saveInfo() { const s = store.get('sonAtesKayit4'); if (!s) return null; try { const d = JSON.parse(s); if (d.v !== 4) return null; return { day: d.day, diff: d.diff, s }; } catch (e) { return null; } }
 function startScreen() {
   G.started = false; $('hud').style.display = 'none';
   const sv = saveInfo(), tutDone = store.get('sonAtesTutDone');

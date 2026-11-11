@@ -1745,7 +1745,7 @@ function updCook(p, dt) {
   if (goHome()) return homeBehavior(p, dt);
   const k = station('mutfak', p), st = k || G.fire;
   const canCook = (G.stock.et || 0) >= 1 || (G.stock.meyve || 0) >= 2, full = (G.stock.food || 0) >= storeCap();
-  if (!p.batch && (!canCook || full)) {
+  if (!p.batch && !p.cookGot && (!canCook || full)) {
     if (!G.flags.cookSaid) { G.flags.cookSaid = 1; msg(full ? `🍲 ${p.name}: "Yemek hazır, depo dolu. Başka işe bakıyorum."` : `🍲 ${p.name}: "Pişirecek malzeme kalmadı! ${(G.stock.food || 0) < G.people.length ? 'Yemek de yetmeyecek. ' : ''}Başka işe bakıyorum."`, full ? '#cde' : '#f99', 6); if (!full) SFX.bell && SFX.bell(); }
     return altJob(p, dt);
   }
@@ -2096,7 +2096,7 @@ function updCrafter(p, dt) {
 function blueprintFor(p) {
   let best = null, bd = 1e9;
   for (const b of G.builds) {
-    if (b.built || b.dead || dist(b, G.fire) > 2200) continue;
+    if (b.built || b.dead || (b.type !== 'gemi' && dist(b, G.fire) > 2200)) continue;
     const d = dist(b, p) + dist(b, G.fire) * 0.3;
     if (d < bd) { bd = d; best = b; }
   }
@@ -3777,7 +3777,7 @@ function addOrder(id, n, byId) {
 }
 function cancelOrder(oid) {
   const i = G.orders.findIndex(o => o.id === oid); if (i < 0) return;
-  const o = G.orders[i]; if (o.paid) for (const k in ITEMS[o.item].cost) G.stock[k] += ITEMS[o.item].cost[k];
+  const o = G.orders[i]; if (o.paid) { const it = ITEMS[o.item], q = it.qty || 1, f = Math.max(0, 1 - (o.made || 0) / q); for (const k in it.cost) G.stock[k] = (G.stock[k] || 0) + Math.floor(it.cost[k] * f); }   // yalnızca teslim edilmemiş kısmın malzemesi iade edilir
   G.orders.splice(i, 1); G.craftDirty = true;
 }
 function toggleTorch() {
@@ -9569,7 +9569,7 @@ function hudTick(dt) {
 }
 
 // ---- ekranlar
-function saveInfo() { const s = store.get('sonAtesKayit4'); if (!s) return null; try { const d = JSON.parse(s); if (d.v !== 3) return null; return { day: d.day, diff: d.diff, s }; } catch (e) { return null; } }
+function saveInfo() { const s = store.get('sonAtesKayit4'); if (!s) return null; try { const d = JSON.parse(s); if (d.v !== 4) return null; return { day: d.day, diff: d.diff, s }; } catch (e) { return null; } }
 function startScreen() {
   G.started = false; $('hud').style.display = 'none';
   const sv = saveInfo(), tutDone = store.get('sonAtesTutDone');
