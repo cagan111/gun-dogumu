@@ -654,7 +654,7 @@ function buildWorld() {
   for (const m of [U3.ents, U3.builds, U3.carcs, U3.camps]) { for (const e of m.values()) { if (m === U3.ents) dropEnt(e); else dropStatic(e); } m.clear(); }
   const W = U3.world = new THREE.Group(); U3.scene.add(W);
   // zemin: dörtlü ağaç arazi + deniz (her karede terUpdate ile güncellenir)
-  terReset(); TER.group = new THREE.Group(); W.add(TER.group);
+  terReset(); TER.group = new THREE.Group(); W.add(TER.group); U3.sl = typeof seasonLook === 'function' ? seasonLook() : null;
   U3.sea = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), MAT.sea); U3.sea.rotation.x = -Math.PI / 2; U3.sea.scale.set(30000, 30000, 1); U3.sea.renderOrder = 2; W.add(U3.sea);
   // göller ve bataklık havuzları: kıyı yüksekliklerinin en düşüğüne oturan düz su
   const waterY = (o, r) => { let m = 1e9; for (let i = 0; i < 8; i++) { const a = i / 8 * TAU; m = Math.min(m, gh(o.x + Math.cos(a) * r, o.y + Math.sin(a) * r)); } return Math.max(m, gh(o.x, o.y)) + 0.8; };
