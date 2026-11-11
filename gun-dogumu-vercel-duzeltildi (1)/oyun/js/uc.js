@@ -1650,8 +1650,8 @@ function inBuild(b) {
     wall.translate(cx, 27, cz); cone.translate(cx, 54 + 60, cz);
     const tm = triPatch(new THREE.MeshLambertMaterial({ color: 0x9a7650, side: THREE.DoubleSide, emissive: 0x000000, flatShading: true }), 0.06, 0.5);
     IN.tentMat = tm; root.add(new THREE.Mesh(wall, tm)); root.add(new THREE.Mesh(cone, tm));
-    for (let i = 0; i < 10; i++) { const a = i / 10 * TAU + 0.2; gb.add(GEO.cyl, '#5a3c20', cx + Math.cos(a) * (rw - 4), 0, cz + Math.sin(a) * (rw - 4), 1.6, 186, 1.6, -Math.sin(a) * 0.95 * 0, 0, 0); }
-    for (let i = 0; i < 10; i++) { const a = i / 10 * TAU + 0.2, px = cx + Math.cos(a) * (rw - 4), pz = cz + Math.sin(a) * (rw - 4), dx = cx - px, dz = cz - pz, len = Math.hypot(dx, 174 - 54, dz); gb.add(GEO.cyl, '#4a3018', px, 54, pz, 1.5, len, 1.5, 0, Math.atan2(dx, dz), 0).add(GEO.cyl, '#4a3018', px, 54, pz, 1.5, 0, 1.5); }
+    for (let i = 0; i < 10; i++) { const a = i / 10 * TAU + 0.2, px = cx + Math.cos(a) * (rw - 6), pz = cz + Math.sin(a) * (rw - 6), dx = cx - px, dz = cz - pz, hz = Math.hypot(dx, dz);
+      gb.cyl('#5a3c20', px, 0, pz, 1.6, 54); gb.add(GEO.cyl, '#4a3018', px, 52, pz, 1.5, Math.hypot(hz, 124) + 8, 1.5, Math.atan2(hz, 124), Math.atan2(dx, dz), 0); }
     gb.add(GEO.disc, '#4a3a2a', cx, 0.3, cz, rw, 1, rw);
     for (let i = 0; i < 4; i++) { const a = i / 4 * TAU + 0.8; gb.sph(['#6a4a30', '#8a6a48', '#5a4232', '#a08060'][i], cx + Math.cos(a) * 95, 2.2, cz + Math.sin(a) * 75, 26, 2.6, 15); gb.add(GEO.cyl, '#c8b490', cx + Math.cos(a) * 118, 5, cz + Math.sin(a) * 92, 3, 12, 3, Math.PI / 2, a, 0); }
     inFurniture(gb, { k: 'hearth', x: cx, y: cz - 10, t: 'mutfak' }, R, 'tent', X);
