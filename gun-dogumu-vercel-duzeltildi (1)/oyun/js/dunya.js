@@ -497,18 +497,19 @@ function dayAnom(d) { const h = Math.sin(d * 127.1 + ((G.seed || 1) % 1000) * 0.
 // kamp düzlüğündeki (yükseklik ~8, orman) hava sıcaklığı, °C. Kare başına önbellekli.
 const _TC = { t: -1, w: '', v: 0 };
 function baseTemp(wt) {
-  const w = wt || (G.weather && G.weather.type) || 'acik';
-  if (_TC.t === G.t && _TC.w === w) return _TC.v;
+  const w = wt || (G.weather && G.weather.type) || 'acik', ck = wt ? '!' + wt : w;
+  if (_TC.t === G.t && _TC.w === ck) return _TC.v;
   const df = dayF(), p = phase();
   let T = seasonVal((s, u) => s.T0 + (s.T1 - s.T0) * u, df);
   const A = seasonVal(s => s.amp, df);
   T += A * Math.cos((p - 0.3) * TAU);                        // en sıcak öğleden sonra, en soğuk gece yarısı sonrası
   const d0 = Math.floor(df), fr = df - d0, sf = fr * fr * (3 - 2 * fr);
   T += dayAnom(d0) + (dayAnom(d0 + 1) - dayAnom(d0)) * sf;   // günden güne yumuşak sapma
-  T += w === 'yagmur' ? -1.5 : w === 'firtina' ? -3 : w === 'kar' ? -1 : w === 'sis' ? -1 : (isNight() ? -1.5 : 0.5);
-  _TC.t = G.t; _TC.w = w; _TC.v = T;
+  T += wt ? wxOff(w) : G.wxOff !== undefined ? G.wxOff : wxOff(w);   // hava etkisi: updSeasons'ta yumuşatılır (sıçrama yok)
+  _TC.t = G.t; _TC.w = ck; _TC.v = T;
   return T;
 }
+const wxOff = w => (w === 'yagmur' ? -1.5 : w === 'firtina' ? -3 : w === 'kar' ? -1 : w === 'sis' ? -1 : 0.5) - 2 * baseDark();
 // yerel sıcaklık: mevsim + gün saati + yükseklik + biyom + hava
 function tempAt(x, y, wt) {
   const h = typeof groundH === 'function' && HM ? groundH(x, y) : 8;
@@ -535,6 +536,7 @@ function seasonLook() { const w = seasonW(); return { sp: w[0], su: w[1], au: w[
 function updSeasons(dt) {
   if (!G.snowB || G.snowB.length !== SNOW_H.length) G.snowB = SNOW_H.map(() => 0);
   G.season = seasonOf(G.day);
+  { const tg = wxOff(G.weather.type); G.wxOff = G.wxOff === undefined ? tg : G.wxOff + (tg - G.wxOff) * Math.min(1, dt / 40); }
   G.seasonT = (G.seasonT || 0) - dt;
   if (G.seasonT > 0) return;
   const step = 1 + (-G.seasonT); G.seasonT = 1;
