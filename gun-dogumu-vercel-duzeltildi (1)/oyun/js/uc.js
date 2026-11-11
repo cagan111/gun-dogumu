@@ -142,6 +142,7 @@ function initMat() {
   MAT.rockV = triPatch(L_({ vertexColors: true, flatShading: true }), 0.045, 0.45);
   MAT.ground = L_({ map: TEX.ground, vertexColors: true });
   MAT.water = L_({ color: 0x2a6a88, emissive: 0x06141c, transparent: true, opacity: 0.9 });
+  MAT.ice = L_({ color: 0xb8d4e2, emissive: 0x0c1a22 });
   MAT.sand = L_({ color: 0x968258 });
   MAT.swamp = L_({ color: 0x2f3a22, emissive: 0x040603 });
   // yumuşak leke gölge: merkezde koyu, kenara doğru sönen radyal geçiş (alphaMap = G kanalı)
@@ -569,7 +570,7 @@ function initTerrainMat() {
 }
 
 // ---- yakın çevre otları: kamerayı izleyen karo halkası; her karonun örnekli ağda sabit yuvası var
-const GR = { T: 80, R: 4, nB: 30, nF: 10, nE: 3, slots: new Map(), free: [], cx: 1e9, cz: 1e9 };
+const GR = { T: 80, R: 4, nB: 30, nF: 10, nE: 3, slots: new Map(), free: [], cx: 1e9, cz: 1e9, sg: new Map(), gen: 0 };
 function initGrass() {
   // ot öbeği: dışa eğik 5 yaprak, dipte koyu
   { const p = [], c = [];
@@ -607,19 +608,27 @@ function grassFill(ti, tj, slot) {
     const b = bioAt(x, z), h = gh(x, z);
     const dens = [0.6, 0.3, 0.75, 0.55, 1, 0.14][b] || 0.6;
     if (r1 > dens || h < 2 || h > 470 || !ok(x, z)) continue;
-    const pal = GR_COL[b] || GR_COL[0], meadow = b === 4, s = (meadow ? 9 : b === 2 ? 8 : b === 5 ? 7 : 5.5) * (0.65 + r2 * 0.7);
-    B.setMatrixAt(ib, mat4(x, h - 0.5, z, s * 1.1, s * (meadow ? 1.5 : 1.1), s * 1.1, 0, r3 * TAU, 0)); B.setColorAt(ib, _col.set(pal[Math.floor(r3 * pal.length)]).multiplyScalar(0.85 + r2 * 0.3)); ib++;
-    if (ifl < eF && (meadow ? R() < 0.42 : b === 0 ? R() < 0.06 : b === 3 ? R() < 0.04 : false)) {
+    const sc = snowCover(x, z, h); if (sc > 0.45 + r2 * 0.4) continue;                // karın altında kalan ot
+    const pal = GR_COL[b] || GR_COL[0], meadow = b === 4, s = (meadow ? 9 : b === 2 ? 8 : b === 5 ? 7 : 5.5) * (0.65 + r2 * 0.7) * (1 - sc * 0.4);
+    B.setMatrixAt(ib, mat4(x, h - 0.5, z, s * 1.1, s * (meadow ? 1.5 : 1.1), s * 1.1, 0, r3 * TAU, 0)); B.setColorAt(ib, seaTint(_col.set(pal[Math.floor(r3 * pal.length)]).multiplyScalar(0.85 + r2 * 0.3), 2, r3, sc * 0.6)); ib++;
+    const flOk = !U3.sl || (U3.sl.au + U3.sl.wi < r2 * 1.4 && sc < 0.1);              // sonbahar/kışta çiçek yok
+    if (ifl < eF && flOk && (meadow ? R() < 0.42 : b === 0 ? R() < 0.06 : b === 3 ? R() < 0.04 : false)) {
       const fc = meadow ? FL_COL[Math.floor(R() * FL_COL.length)] : '#eeeadf', fs = 1.3 + R() * 0.9, fh = s * (meadow ? 1.05 : 0.8);
       F.setMatrixAt(ifl, mat4(x + 2, h, z + 1, fs, fh, fs, 0, r1 * 9, 0)); F.setColorAt(ifl, _col.set(fc)); ifl++;
     }
     if (ie < eE && (b === 0 || b === 2) && R() < 0.12) {
-      const fs = 10 + R() * 8; E.setMatrixAt(ie, mat4(x, h - 0.5, z, fs, fs * 0.9, fs, 0, r2 * 9, 0)); E.setColorAt(ie, _col.set(b === 2 ? '#4a5a2a' : '#3c6e2c').multiplyScalar(0.8 + r3 * 0.4)); ie++;
+      const fs = 10 + R() * 8; E.setMatrixAt(ie, mat4(x, h - 0.5, z, fs, fs * 0.9, fs, 0, r2 * 9, 0)); E.setColorAt(ie, seaTint(_col.set(b === 2 ? '#4a5a2a' : '#3c6e2c').multiplyScalar(0.8 + r3 * 0.4), 2, r3, sc * 0.6)); ie++;
     }
   }
   for (; ib < eB; ib++) B.setMatrixAt(ib, _zeroM);
   for (; ifl < eF; ifl++) F.setMatrixAt(ifl, _zeroM);
   for (; ie < eE; ie++) E.setMatrixAt(ie, _zeroM);
+}
+// mevsim/kar değişince ot karolarını yavaşça (kare başına birkaç) yeniden doldur
+function grassReseason(budget) {
+  let n = 0;
+  for (const [k, sl] of GR.slots) { if (GR.sg.get(k) === GR.gen) continue; if (n >= budget) break; const [i, j] = k.split(',').map(Number); grassFill(i, j, sl); GR.sg.set(k, GR.gen); n++; }
+  if (n) for (const m of [U3.grB, U3.grF, U3.grE]) instDone(m);
 }
 function grassUpdate(cx, cz, budget) {
   const T = GR.T, ci = Math.floor(cx / T), cj = Math.floor(cz / T);
@@ -632,7 +641,7 @@ function grassUpdate(cx, cz, budget) {
   const order = [...want].filter(k => !GR.slots.has(k)).sort((a, b) => { const [ai, aj] = a.split(',').map(Number), [bi, bj] = b.split(',').map(Number); return ((ai - ci) ** 2 + (aj - cj) ** 2) - ((bi - ci) ** 2 + (bj - cj) ** 2); });
   for (const k of order) {
     if (done >= budget || !GR.free.length) { GR.pend = true; break; }
-    const [i, j] = k.split(',').map(Number), s = GR.free.pop(); GR.slots.set(k, s); grassFill(i, j, s); done++;
+    const [i, j] = k.split(',').map(Number), s = GR.free.pop(); GR.slots.set(k, s); grassFill(i, j, s); GR.sg.set(k, GR.gen); done++;
   }
   if (done || order.length) for (const m of [U3.grB, U3.grF, U3.grE]) instDone(m);
 }
@@ -649,7 +658,7 @@ function buildWorld() {
   U3.sea = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), MAT.sea); U3.sea.rotation.x = -Math.PI / 2; U3.sea.scale.set(30000, 30000, 1); U3.sea.renderOrder = 2; W.add(U3.sea);
   // göller ve bataklık havuzları: kıyı yüksekliklerinin en düşüğüne oturan düz su
   const waterY = (o, r) => { let m = 1e9; for (let i = 0; i < 8; i++) { const a = i / 8 * TAU; m = Math.min(m, gh(o.x + Math.cos(a) * r, o.y + Math.sin(a) * r)); } return Math.max(m, gh(o.x, o.y)) + 0.8; };
-  for (const l of G.lakes) { const m = new THREE.Mesh(GEO.disc, MAT.water); m.scale.set(l.r + 6, 1, l.r + 6); m.position.set(l.x, l.h !== undefined ? l.h : waterY(l, l.r), l.y); W.add(m); }
+  U3.lakeM = []; for (const l of G.lakes) { const m = new THREE.Mesh(GEO.disc, l.frozen ? MAT.ice : MAT.water); m.scale.set(l.r + 6, 1, l.r + 6); m.position.set(l.x, l.h !== undefined ? l.h : waterY(l, l.r), l.y); W.add(m); U3.lakeM.push([l, m]); }
   for (const p of G.pools) { const m = new THREE.Mesh(GEO.disc, MAT.swamp); m.scale.set(p.r + 4, 1, p.r + 4); m.position.set(p.x, p.h !== undefined ? p.h : waterY(p, p.r) - 0.3, p.y); W.add(m); }
   U3.grassN = -1; GR.cx = 1e9; GR.slots.clear(); GR.free = []; for (let i = 0; i < (2 * GR.R + 1) ** 2; i++) GR.free.push(i);
   for (const m of [U3.grB, U3.grF, U3.grE]) { for (let i = 0; i < m.count; i++) m.setMatrixAt(i, _zeroM); instDone(m); }
@@ -724,13 +733,25 @@ function rebuildNests() {
     g.add(gb.mesh());
   }
 }
-const TREE_C = {};
+const TREE_C = {}, _fa = new THREE.Color(), _fb = new THREE.Color(), _fc = new THREE.Color();
 function treeCols(b, tone) {
   const key = b + '_' + Math.floor(tone * 6);
   let o = TREE_C[key]; if (o) return o;
   const pals = TREE_PAL[b] || TREE_PAL[0], pal = pals[Math.floor(tone * pals.length) % pals.length], v = 0.9 + (Math.floor(tone * 6) % 3) * 0.1;
   o = TREE_C[key] = { a: new THREE.Color(pal[1]).multiplyScalar(v * 1.15), b: new THREE.Color(pal[2]).multiplyScalar(v), c: new THREE.Color(pal[3] || pal[2]).multiplyScalar(v * 0.95), t: new THREE.Color(b === 3 ? '#4a443e' : b === 2 ? '#4a3a26' : b === 5 ? '#7a6448' : '#5a3d26').multiplyScalar(0.85 + (Math.floor(tone * 6) % 2) * 0.2) };
   return o;
+}
+// mevsim rengi: kind 0 iğne yapraklı, 1 geniş yapraklı, 2 ot/çalı; sc = kar örtüsü (beyazlatma)
+const SEA_C = { au: ['#c8782a', '#b04a22', '#d4aa3a'].map(c => new THREE.Color(c)), sp: new THREE.Color('#72b442'), bare: new THREE.Color('#6a5c4e'), straw: new THREE.Color('#a39462'), snow: new THREE.Color('#eef2f6') };
+function seaTint(col, kind, tone, sc) {
+  const S = U3.sl;
+  if (S) {
+    if (kind === 1) { if (S.au > 0.01) col.lerp(SEA_C.au[Math.floor(tone * 3) % 3], S.au * 0.85); if (S.wi > 0.01) col.lerp(SEA_C.bare, S.wi * 0.9); if (S.sp > 0.01) col.lerp(SEA_C.sp, S.sp * 0.3); }
+    else if (kind === 2) { if (S.au > 0.01) col.lerp(SEA_C.straw, S.au * 0.45); if (S.wi > 0.01) col.lerp(SEA_C.straw, S.wi * 0.6); if (S.sp > 0.01) col.lerp(SEA_C.sp, S.sp * 0.25); }
+    else if (S.wi > 0.01) col.multiplyScalar(1 - S.wi * 0.12);
+  }
+  if (sc > 0) col.lerp(SEA_C.snow, Math.min(1, sc));
+  return col;
 }
 function worldSig() {
   let s = 0, r = 0, c = 0, b = 0, h = 0, n = 0;
@@ -767,17 +788,18 @@ function rebuildInst(cx, cy) {
         for (let m = 0; m < 3; m++) instAdd(I.moss, ex + (m - 1) * 3, ey, ez + ((m * 5) % 3 - 1) * 3, 2.6, 16 + ((i + m) % 3) * 9, 2.6, a + m, mossC, Math.PI, 0); }
       if (r2 < 0.3) instAdd(I.blob, t.x, y0 + th + 6, t.y, cr * 0.6, H * 0.12, cr * 0.6, t.sw, C.b);
     } else if (b === 1 || b === 3 || (b === 0 && r2 < 0.55)) {   // iğne yapraklı: üç kat
-      const thin = b === 3 ? 0.7 : b === 1 ? 0.82 : 1, base = Math.max(40, H * 0.22), sn = y0 > 400 ? clamp((y0 - 400) / 120, 0, 0.7) : 0;
+      const thin = b === 3 ? 0.7 : b === 1 ? 0.82 : 1, base = Math.max(40, H * 0.22), sn = Math.max(y0 > 400 ? clamp((y0 - 400) / 120, 0, 0.7) : 0, snowCover(t.x, t.y, y0) * 0.75);
       instAdd(I.trunk, t.x, y0, t.y, 8, H * 0.8, 8, t.sw, C.t);
       const cs = [C.a, C.b, C.c];
-      for (let i = 0; i < 3; i++) { const yy = base + i * (H - base) * 0.27, rr = cr * (0.86 - i * 0.2) * thin, hh = (H - base) * (0.52 - i * 0.07); col.copy(cs[i]); if (sn) col.lerp(snowC, sn * (0.5 + i * 0.2)); instAdd(I.cone, t.x, y0 + yy, t.y, rr, hh, rr, t.sw + i * 0.7, col); }
+      for (let i = 0; i < 3; i++) { const yy = base + i * (H - base) * 0.27, rr = cr * (0.86 - i * 0.2) * thin, hh = (H - base) * (0.52 - i * 0.07); col.copy(cs[i]); seaTint(col, 0, t.tone, 0); if (sn) col.lerp(snowC, sn * (0.5 + i * 0.2)); instAdd(I.cone, t.x, y0 + yy, t.y, rr, hh, rr, t.sw + i * 0.7, col); }
     } else {                                             // geniş yapraklı (çayırda tek, iri)
-      const lone = b === 4, th = H * (lone ? 0.5 : 0.62), cw = lone ? 1.45 : 1.05, tw = lone ? 12 : 9.5;
+      const lone = b === 4, th = H * (lone ? 0.5 : 0.62), wi = U3.sl ? U3.sl.wi : 0, cw = (lone ? 1.45 : 1.05) * (1 - wi * 0.35), tw = lone ? 12 : 9.5, tsc = snowCover(t.x, t.y, y0) * 0.55;
+      const fa = seaTint(_fa.copy(C.a), 1, t.tone, tsc), fb = seaTint(_fb.copy(C.b), 1, (t.tone * 3.7) % 1, tsc), fc = seaTint(_fc.copy(C.c), 1, (t.tone * 7.3) % 1, tsc);
       instAdd(I.trunk, t.x, y0, t.y, tw, th, tw, t.sw, C.t, Math.sin(t.sw) * 0.04, Math.cos(t.sw) * 0.04);
       if (lone) for (let i = 0; i < 3; i++) { const a = t.sw + i * 2.1; instAdd(I.trunk, t.x, y0 + th * 0.7, t.y, 4, cr * 0.7, 4, a, C.t, 0, 0.9); }
-      instAdd(I.blob, t.x, y0 + th + cr * 0.25, t.y, cr * 1.05 * cw, H * (lone ? 0.22 : 0.27), cr * 1.05 * cw, t.sw, C.a);
-      instAdd(I.blob, t.x + Math.cos(t.sw) * cr * 0.45 * cw, y0 + th + H * 0.18, t.y + Math.sin(t.sw) * cr * 0.45 * cw, cr * 0.72 * cw, H * 0.2, cr * 0.72 * cw, t.sw * 2, C.b);
-      instAdd(I.blob, t.x - Math.cos(t.sw + 0.8) * cr * 0.5 * cw, y0 + th + H * 0.08, t.y - Math.sin(t.sw + 0.8) * cr * 0.5 * cw, cr * 0.62 * cw, H * 0.17, cr * 0.62 * cw, t.sw * 3, C.c);
+      instAdd(I.blob, t.x, y0 + th + cr * 0.25, t.y, cr * 1.05 * cw, H * (lone ? 0.22 : 0.27) * (1 - wi * 0.3), cr * 1.05 * cw, t.sw, fa);
+      instAdd(I.blob, t.x + Math.cos(t.sw) * cr * 0.45 * cw, y0 + th + H * 0.18, t.y + Math.sin(t.sw) * cr * 0.45 * cw, cr * 0.72 * cw, H * 0.2 * (1 - wi * 0.3), cr * 0.72 * cw, t.sw * 2, fb);
+      instAdd(I.blob, t.x - Math.cos(t.sw + 0.8) * cr * 0.5 * cw, y0 + th + H * 0.08, t.y - Math.sin(t.sw + 0.8) * cr * 0.5 * cw, cr * 0.62 * cw, H * 0.17 * (1 - wi * 0.3), cr * 0.62 * cw, t.sw * 3, fc);
     }
   }
   for (const r of G.rocks) {
@@ -791,7 +813,7 @@ function rebuildInst(cx, cy) {
   for (const b of G.bushes) {
     if (!near(b, BUSH_R)) continue;
     const h = hash2(b.x, b.y), y0 = gh(b.x, b.y);
-    col.set('#2f5a24').multiplyScalar(0.85 + h * 0.4);
+    seaTint(col.set('#2f5a24').multiplyScalar(0.85 + h * 0.4), 2, h, snowCover(b.x, b.y, y0) * 0.6);
     instAdd(I.bush, b.x, y0 + b.r * 0.45, b.y, b.r * 1.15, b.r * 0.8, b.r * 1.15, h * 6, col);
     instAdd(I.bush, b.x - 7, y0 + b.r * 0.4, b.y - 4, b.r * 0.75, b.r * 0.6, b.r * 0.75, h * 9, col);
     if (near(b, 520)) { const n = Math.min(7, b.amt + Math.floor(b.amt / 2)), bc = c3(b.col); for (let i = 0; i < n; i++) { const q = b.berries[i], rr = (q[0] * q[0] + q[1] * q[1]) / (b.r * b.r * 1.3); instAdd(I.berry, b.x + q[0], y0 + b.r * 0.45 + Math.sqrt(Math.max(0.05, 1 - rr)) * b.r * 0.8, b.y + q[1], 2.3, 2.3, 2.3, i, bc); } }
@@ -1287,13 +1309,29 @@ function initWeather() {
   const n = 900, g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n * 6), 3));
   U3.rain = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: 0xaab8cc, transparent: true, opacity: 0.4, depthWrite: false })); U3.rain.frustumCulled = false; U3.rain.visible = false; U3.scene.add(U3.rain);
   U3.rainSeed = []; const R = mulberry32(41); for (let i = 0; i < n; i++) U3.rainSeed.push([R(), R(), R(), R()]);
+  { const ns = 1400, sg = new THREE.BufferGeometry(); sg.setAttribute('position', new THREE.BufferAttribute(new Float32Array(ns * 3), 3));
+    U3.snowP = new THREE.Points(sg, new THREE.PointsMaterial({ color: 0xffffff, size: 2.6, transparent: true, opacity: 0.85, depthWrite: false, fog: true })); U3.snowP.frustumCulled = false; U3.snowP.visible = false; U3.scene.add(U3.snowP); }
   U3.mist = []; for (let i = 0; i < 12; i++) { const s = sprite(TEX.soft, 0xffffff, false, true); s.visible = false; U3.scene.add(s); U3.mist.push(s); }
   U3.clouds = []; const C = mulberry32(57);
   for (let i = 0; i < 11; i++) { const s = sprite(TEX.cloud, 0xffffff, false, false); s.renderOrder = -7; s.userData = { a: C() * TAU, d: 3000 + C() * 2200, h: 900 + C() * 900, w: 1400 + C() * 1600, sp: 0.5 + C() }; U3.scene.add(s); U3.clouds.push(s); }
 }
 function updWeather3D(dt, t, dk) {
-  const w = G.weather.type, cp = U3.cam.position, wet = w === 'yagmur' || w === 'firtina', st = w === 'firtina';
+  const w = G.weather.type, cp = U3.cam.position, lp = precipAt(L.x, L.y), wet = lp === 'yagmur', st = w === 'firtina' || (w === 'kar' && G.weather.heavy);
   U3.rainK = (U3.rainK || 0) + ((wet && !G.inside ? 1 : 0) - (U3.rainK || 0)) * Math.min(1, dt * 1.5);
+  // kar taneleri: yavaş düşer, salınır; tipide yana savrulur
+  U3.snowK = (U3.snowK || 0) + ((lp === 'kar' && !G.inside ? 1 : 0) - (U3.snowK || 0)) * Math.min(1, dt * 1.2);
+  { const SP = U3.snowP; SP.visible = U3.snowK > 0.02;
+    if (SP.visible) {
+      const pa = SP.geometry.attributes.position, n = pa.count, B = 260, H = 220, act = Math.floor(n * U3.snowK * (st ? 1 : 0.6)), wx = st ? 60 : 8;
+      for (let i = 0; i < n; i++) {
+        const q = U3.rainSeed[i % U3.rainSeed.length], q3 = (q[3] + i * 0.618) % 1;
+        if (i >= act) { pa.setXYZ(i, 0, -9999, 0); continue; }
+        const ph = (t * (st ? 70 : 38) / H + q[2] + q3) % 1, dx = Math.sin(t * 0.9 + q3 * 20) * 6 + wx * ph * 3, dz = Math.cos(t * 0.7 + q[0] * 20) * 6;
+        const x = cp.x + ((((q[0] + q3 * 0.37) % 1) * B * 2 - (cp.x % (B * 2)) + B * 4) % (B * 2)) - B, z = cp.z + ((((q[1] + q3 * 0.71) % 1) * B * 2 - (cp.z % (B * 2)) + B * 4) % (B * 2)) - B;
+        pa.setXYZ(i, x + dx, cp.y + H * 0.55 - ph * H, z + dz);
+      }
+      pa.needsUpdate = true; SP.material.opacity = 0.9 * U3.snowK * (1 - dk * 0.55); SP.material.size = st ? 3.2 : 2.6;
+    } }
   const RN = U3.rain; RN.visible = U3.rainK > 0.02;
   if (RN.visible) {
     const pa = RN.geometry.attributes.position, n = pa.count / 2, B = 420, H = 300, wx = st ? 0.35 : 0.08, sp = st ? 1300 : 950, len = st ? 30 : 22, act = Math.floor(n * U3.rainK * (st ? 1 : 0.7));
@@ -1320,7 +1358,7 @@ function updWeather3D(dt, t, dk) {
     const u = s.userData, a = u.a + t * 0.0025 * u.sp;
     s.visible = !G.inside; s.position.set(cp.x + Math.cos(a) * u.d, u.h, cp.z + Math.sin(a) * u.d); s.scale.set(u.w, u.w * 0.42, 1);
     s.material.color.copy(c3(0xffffff)).lerp(U3.scene.fog.color, 0.35 + (1 - cl) * 0.4).lerp(c3(0x1a1e26), clamp(dk * 1.1, 0, 0.85));
-    if (wet || w === 'sis') s.material.color.multiplyScalar(0.72);
+    if (wet || w === 'sis' || w === 'kar') s.material.color.multiplyScalar(0.72);
     s.material.opacity = (0.55 + cl * 0.35) * over * (i % 3 === 2 && w === 'acik' ? 0.4 : 1);
   });
 }
@@ -1333,7 +1371,7 @@ function updAtmos(dt, t, LS) {
   const dk = darkness(), p = phase(), w = G.weather.type, cam = U3.cam, cp = cam.position;
   const bm = biomeFast(L.x, L.y);
   // sis yoğunluğu hedefi (hava + sisli vadi), yumuşak geçiş
-  const tk = (w === 'sis' ? 0.4 : w === 'firtina' ? 0.6 : w === 'yagmur' ? 0.72 : 1) * (bm === 3 ? 0.42 : bm === 2 ? 0.8 : 1);
+  const tk = (w === 'sis' ? 0.4 : w === 'firtina' ? 0.6 : w === 'yagmur' ? 0.72 : w === 'kar' ? (G.weather.heavy ? 0.45 : 0.7) : 1) * (bm === 3 ? 0.42 : bm === 2 ? 0.8 : 1);
   U3.fogK += (tk - U3.fogK) * Math.min(1, dt * 0.8);
   const grayK = clamp((1 - U3.fogK) * 1.5, 0, 1);
   let warm = 0;
@@ -1447,7 +1485,10 @@ function render3D(dt) {
   if (Math.abs(cam.fov - fov) > 0.01 || cam.aspect !== U3.camA) { cam.fov += (fov - cam.fov) * Math.min(1, dt * 6); if (Math.abs(cam.fov - fov) < 0.05) cam.fov = fov; U3.camA = cam.aspect; cam.updateProjectionMatrix(); }
   cam.updateMatrixWorld();
   // ---- arazi, deniz, otlar
+  if (!U3.sl) U3.sl = seasonLook();
   terUpdate(cam.position.x, cam.position.z, U3.frame < 3 ? 1e9 : 8);
+  seasonSync(dt, cam.position.x, cam.position.z);
+  if (U3.lakeM) { const sk = Math.min(1, ((U3.sl && U3.sl.snow[0]) || 0) * 1.4); MAT.ice.color.setRGB(0.72 + 0.2 * sk, 0.83 + 0.12 * sk, 0.89 + 0.08 * sk); for (const [l, m] of U3.lakeM) { const mt = l.frozen ? MAT.ice : MAT.water; if (m.material !== mt) m.material = mt; } }
   U3.sea.position.set(Math.round(cam.position.x / 500) * 500, SEA_Y, Math.round(cam.position.z / 500) * 500);
   { const nb = G.builds.reduce((a, b) => a + (b.dead ? 0 : 1), 0); if (nb !== U3.grassN) { U3.grassN = nb; GR.slots.clear(); GR.free = []; for (let i = 0; i < (2 * GR.R + 1) ** 2; i++) GR.free.push(i); GR.cx = 1e9; } }
   grassUpdate(cam.position.x, cam.position.z, U3.frame < 3 ? 1e9 : 10);
