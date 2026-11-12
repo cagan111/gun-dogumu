@@ -49,4 +49,4 @@ Ada dünyası, 3B birinci şahıs, mağara içi, eylem menüsü, zimmet/yatak, a
 1. Gerçek bilgisayar/iPhone performansı ölçülmedi (~628k üçgen).
 
 ## Şu an kim neyde
-- (boş)
+- Codex: uc.js ağaç LOD + frustum ayıklama (codex/tree-lod-20261112). Claude uc.js'e dokunmaz.
