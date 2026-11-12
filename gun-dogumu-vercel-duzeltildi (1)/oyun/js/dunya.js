@@ -546,7 +546,7 @@ function updSeasons(dt) {
   { const tg = wxOff(G.weather.type); G.wxOff = G.wxOff === undefined ? tg : G.wxOff + (tg - G.wxOff) * Math.min(1, dt / 40); }
   G.seasonT = (G.seasonT || 0) - dt;
   if (G.seasonT > 0) return;
-  const step = 1 + (-G.seasonT); G.seasonT = 1;
+  const step = (1 + (-G.seasonT)) / DAYK; G.seasonT = 1;   // kar/buz günlük hızı gün uzunluğundan bağımsız
   const w = G.weather, wt = w.type, T0 = baseTemp(), Tc = tempAt(G.fire.x, G.fire.y);
   G.tempCamp = Tc;
   // kampta yağış türü: histerezisli yağmur ⇄ kar

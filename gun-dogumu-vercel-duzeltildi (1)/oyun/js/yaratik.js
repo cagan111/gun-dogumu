@@ -481,7 +481,7 @@ function updPred(d, dt, prey, zones) {
     }
     d.tgt = best;
     d.scent = best ? null : scentTrailFor(d, sense * 0.9);
-    if (!d.terr && d.type === 'yirtici' && night && G.day >= 3 && Math.random() < 0.004 * G.day * DIFF[G.diff].spawn) d.rush = rand(2, 4);
+    if (!d.terr && d.type === 'yirtici' && night && G.day >= 3 && Math.random() < 0.004 / DAYK * G.day * DIFF[G.diff].spawn) d.rush = rand(2, 4);
     if (d.type === 'dev' && night && G.day >= 4 && Math.random() < 0.01) d.rush = rand(5, 9);
   }
   if (d.terr && d.tgt && !(d.rush > 0) && Math.hypot(d.tgt.x - d.terr.x, d.tgt.y - d.terr.y) > d.terr.r * 1.25) { d.tgt = null; d.engaged = false; }

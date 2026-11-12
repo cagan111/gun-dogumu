@@ -623,7 +623,7 @@ let lastT = performance.now();
 function loop(now) {
   const dt = Math.min(0.05, (now - lastT) / 1000); lastT = now;
   if (G.started && L) {
-    if (!G.paused && !G.over && !G.modal) { if (G.sleep) { for (let i = 0; i < 10 && G.sleep; i++) update(0.05); } else update(dt * TEMPO); }
+    if (!G.paused && !G.over && !G.modal) { if (G.sleep) { for (let i = 0; i < 10 * DAYK && G.sleep; i++) update(0.05); } else update(dt * TEMPO); }
     $('sleepV').style.display = G.sleep ? 'flex' : 'none';
     if (L) { render(); hudTick(dt); }
   }

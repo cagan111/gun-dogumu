@@ -550,7 +550,7 @@ function timeEvents() {
   const ym = hasEv('yamyam');
   if (ym && ym.sign && p > 0.33 && !f.paint) { f.paint = 1; msg('Kampın yakınında boyalı el izleri... Birileri sizi izliyor.', '#c98', 6); }
   if ((nw === 'firtina' || nw === 'yagmur') && p > 0.3 && !f.clouds && Math.random() < 0.5) { f.clouds = 1; msg('Ufukta kara bulutlar toplanıyor.', '#9ab', 5); }
-  if (G.dayRainAt > 0 && p > G.dayRainAt) { G.dayRainAt = -1; setWeather('yagmur', rand(40, 80)); }
+  if (G.dayRainAt > 0 && p > G.dayRainAt) { G.dayRainAt = -1; setWeather('yagmur', rand(40, 80) * DAYK); }
   if (p > 0.2 && !f.m1) { f.m1 = 1; startMeal('Öğle yemeği'); }
   if (p > 0.42 && !f.m2) { f.m2 = 1; startMeal('Akşam yemeği'); }
   if (p > 0.40 && !f.a) { f.a = 1; msg('Güneş alçalıyor. Gece için odun stokla!', '#fda', 5); }
@@ -594,7 +594,7 @@ function timeEvents() {
 }
 function startMeal(name) {
   const t = tablePos();
-  G.meal = { t: 28, table: t, feast: !!G.feastNext, name };
+  G.meal = { t: 28 * (1 + (DAYK - 1) * 0.5), table: t, feast: !!G.feastNext, name };
   if (G.feastNext) { G.feastNext = false; moraleAdd(10); }
   for (const p of G.people) { p.ate = false; p.mealT = 0; if (p.bed || p.leader || p.inHut || p.grabbed) eatMeal(p); }
   const cooked = Math.floor(G.stock.food || 0);
@@ -677,7 +677,7 @@ function serialize() {
   const pf = ['id', 'name', 'x', 'y', 'leader', 'child', 'age', 'traits', 'story', 'group', 'hp', 'maxhp', 'fear', 'skin', 'hair', 'injury', 'downed', 'tired', 'watched', 'partner', 'parentA', 'parentB', 'stam', 'seat', 'r', 'sk', 'sick', 'wasDowned', 'bedUntil', 'routine', 'alt', 'hunger', 'own', 'joinHunt', 'bag', 'carry', 'cookGot', 'batch', 'prevG', 'rtBase'];
   let ex = ''; for (let i = 0; i < G.explored.length; i++) ex += G.explored[i] ? '1' : '0';
   return JSON.stringify({
-    v: 4, wrecks: (G.wrecks || []).map(w => !!w.found), inside: G.inside ? G.builds.indexOf(G.inside.b) : -1, seed: G.seed, diff: G.diff, t: G.t, day: G.day, stock: G.stock, fuel: G.fire.fuel, morale: G.morale, orders: G.orders.map(o => Object.assign({}, o, { worker: 0 })), oid: G.oid, unclean: G.unclean,
+    v: 4, wrecks: (G.wrecks || []).map(w => !!w.found), inside: G.inside ? G.builds.indexOf(G.inside.b) : -1, seed: G.seed, diff: G.diff, t: G.t, cyc: CYCLE, day: G.day, stock: G.stock, fuel: G.fire.fuel, morale: G.morale, orders: G.orders.map(o => Object.assign({}, o, { worker: 0 })), oid: G.oid, unclean: G.unclean,
     carcs: G.carcs.filter(c => !c.dead).map(c => ({ x: c.x, y: c.y, r: c.r, type: c.type, ang: c.ang, meat: c.meat, bone: c.bone, hide: c.hide, age: c.age, rotten: c.rotten })),
     managers: G.managers, zone: G.zone, newGroup: G.newGroup, autoEq: !!G.autoEq, torchFuel: G.torchFuel, nightPlan: G.nightPlan, nightWeather: G.nightWeather, weather: G.weather,
     eggs: G.eggs, usedNames: [...G.usedNames], stats: G.stats, idc: G.idc, kills: G.kills, deaths: G.deaths, lost: G.lost,
@@ -704,7 +704,7 @@ function loadGame(s) {
   const D = JSON.parse(s);
   resetState(D.diff);
   G.seed = D.seed; genWorld(G.seed);
-  Object.assign(G, { t: D.t, day: D.day, morale: D.morale, newGroup: D.newGroup || 'bos', torchFuel: D.torchFuel || 0, nightPlan: D.nightPlan || [], nightWeather: D.nightWeather || 'acik',
+  Object.assign(G, { t: D.t * CYCLE / (D.cyc || 300), day: D.day, morale: D.morale, newGroup: D.newGroup || 'bos', torchFuel: D.torchFuel || 0, nightPlan: D.nightPlan || [], nightWeather: D.nightWeather || 'acik',
     weather: D.weather || { type: 'acik', t: 0 }, eggs: D.eggs || [], stats: Object.assign(G.stats, D.stats || {}), idc: D.idc, kills: D.kills, deaths: D.deaths, lost: D.lost,
     devSeenEver: D.devSeenEver, riftHint: D.riftHint, rescueAt: -1, dayRainAt: D.dayRainAt || -1, flags: D.flags || {}, leaveDone: D.leaveDone, devDone: D.devDone });
   G.autoEq = !!D.autoEq;
@@ -810,7 +810,7 @@ function update(dt) {
   const LS = lights(), zones = safeZones();
   // ateş
   const wt = G.weather.type;
-  G.fire.fuel = Math.max(0, G.fire.fuel - dt * (isNight() ? 0.3 : 0.14) * DIFF[G.diff].burn * (wt === 'yagmur' ? 1.8 : wt === 'firtina' ? 2.2 : wt === 'kar' ? (G.weather.heavy ? 1.45 : 1.25) : 1));
+  G.fire.fuel = Math.max(0, G.fire.fuel - dt / DAYK * (isNight() ? 0.3 : 0.14) * DIFF[G.diff].burn * (wt === 'yagmur' ? 1.8 : wt === 'firtina' ? 2.2 : wt === 'kar' ? (G.weather.heavy ? 1.45 : 1.25) : 1));
   G.stokeT -= dt;
   if (G.stokeT <= 0) {
     G.stokeT = 1;
@@ -822,8 +822,8 @@ function update(dt) {
   G.regrowT -= dt;
   if (G.regrowT <= 0) {
     G.regrowT = 2;
-    const bk = seasonVal(s => s.berry) * (G.weather.type === 'kar' ? 0 : 1);   // sonbaharda yavaş, kışın hiç
-    if (!isNight()) { for (const b of G.bushes) if (b.amt < b.max && Math.random() < 0.03 * bk) b.amt++; for (const b of G.herbs) if (b.amt < b.max && Math.random() < 0.012) b.amt++; for (const b of G.poisons) if (b.amt < b.max && Math.random() < 0.01) b.amt++; }
+    const RG = 1.25 / DAYK, bk = seasonVal(s => s.berry) * (G.weather.type === 'kar' ? 0 : 1);   // sonbaharda yavaş, kışın hiç
+    if (!isNight()) { for (const b of G.bushes) if (b.amt < b.max && Math.random() < 0.03 * bk * RG) b.amt++; for (const b of G.herbs) if (b.amt < b.max && Math.random() < 0.012 * RG) b.amt++; for (const b of G.poisons) if (b.amt < b.max && Math.random() < 0.01 / DAYK) b.amt++; }
   }
   for (const g of GORDER) { const a = G.abil[g]; a.cd = Math.max(0, a.cd - dt); a.act = Math.max(0, a.act - dt); }
   G.scoutCd -= dt;
@@ -834,7 +834,7 @@ function update(dt) {
   for (const b of G.builds) if (b.type === 'tarla' && b.built && b.planted && b.g < 1) { b.g = Math.min(1, b.g + dt / (CYCLE * 1.6) * (wt === 'yagmur' || wt === 'firtina' ? 1.4 : wt === 'kar' ? 0 : 1) * seasonVal(s => s.grow)); b.tendT = (b.tendT || 0) - dt; }
   for (const c of G.carcs) { c.age += dt; if (!c.rotten && c.age > CYCLE * 1.2 && !G.builds.some(b => b.type === 'raf' && b.built && dist(b, c) < 300)) { c.rotten = true; } if (c.age > CYCLE * 2.5) c.dead = true; }
   G.carcs = G.carcs.filter(c => !c.dead);
-  if (isNight() && G.carcs.length && Math.random() < dt * 0.02) { const c = pick(G.carcs); if (dist(c, G.fire) > 900) spawnPack('kucuk', ri(2, 4), { x: c.x + rand(-200, 200), y: c.y + rand(-200, 200) }, 'carcass'); }
+  if (isNight() && G.carcs.length && Math.random() < dt * 0.02 / DAYK) { const c = pick(G.carcs); if (dist(c, G.fire) > 900) spawnPack('kucuk', ri(2, 4), { x: c.x + rand(-200, 200), y: c.y + rand(-200, 200) }, 'carcass'); }
   if (G.sleep) sleepTick(dt); else updLeader(dt);
   for (const q of G.people) kbStep(q, dt);
   for (const p of G.people.slice()) if (p !== L && !p.dead) {

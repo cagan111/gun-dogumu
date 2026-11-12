@@ -27,7 +27,7 @@ const cap1 = s => s[0].toLocaleUpperCase('tr') + s.slice(1);
 function compass(a) { const d = ['doğu', 'güneydoğu', 'güney', 'güneybatı', 'batı', 'kuzeybatı', 'kuzey', 'kuzeydoğu']; return d[Math.round((((a % TAU) + TAU) % TAU) / (TAU / 8)) % 8]; }
 
 // ---- dünya sabitleri
-const WORLD = 16000, CAMP = { x: 8000, y: 8000 }, CYCLE = 300;
+const WORLD = 16000, CAMP = { x: 8000, y: 8000 }, DAYK = 2, CYCLE = 300 * DAYK;   // DAYK: gün uzunluğu çarpanı (gün başına etkisi sabit kalması gereken saniyelik oranlar DAYK'ya bölünür)
 const MAPN = 200, MAPC = WORLD / MAPN;
 
 const NAMES = ['Arda','Ece','Toprak','Deniz','Kaya','Ilgın','Bora','Su','Tan','Yağmur','Doruk','Nehir','Çınar','Defne','Alp','Elif','Umut','Ay','Bulut','Duru','Ege','Lale','Oğuz','Selin','Yiğit','Mert','Zeynep','Kuzey','Asya','Poyraz','Rüzgar','Sema','Ozan','Ada','Kartal','Pınar','Barış','Cemre','Dilan','Eren','Feride','Gökay','Hazal','İlkay','Jale','Kerem','Leyla','Melis','Nazlı','Orhan','Pelin','Reşat','Sarp','Şule','Tuna','Ufuk','Vedat','Yasemin','Zafer','Aslı','Berk','Ceren','Dağhan','Esin','Fırat','Gizem','Harun','Irmak','Koray','Mira','Nil','Okan','Serra','Tolga','Volkan','Yaren','Ahu','Batu','Cansu','Demir','Ebru','Filiz','Gökhan','Hande','Işıl','Kaan','Lara','Meltem','Nur','Onur','Pars','Rana','Sevgi','Tamer','Ülkü','Yavuz','Zerrin','Atlas','Bengü','Cihan','Derin','Emre','Funda','Gül','Hakan','İpek','Kıvanç','Mavi','Nehir Su','Özge','Rüya','Selim','Tuğçe','Uğur','Yonca'];
