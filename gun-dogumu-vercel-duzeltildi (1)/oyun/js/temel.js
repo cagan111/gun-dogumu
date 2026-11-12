@@ -28,10 +28,18 @@ function compass(a) { const d = ['doğu', 'güneydoğu', 'güney', 'güneybatı'
 
 // ---- dünya sabitleri
 let ISLK = 1.5, WORLD = 16000 * ISLK; const CAMP = { x: WORLD / 2, y: WORLD / 2 }, DAYK = 2, CYCLE = 300 * DAYK;   // DAYK: gün uzunluğu çarpanı (gün başına etkisi sabit kalması gereken saniyelik oranlar DAYK'ya bölünür)
+// Ada kökeni CAMP, yerleşim kökeni HOME. Merkez seçimi sonraki dünya profiline aittir.
+const HOME={x:CAMP.x,y:CAMP.y,ang:0};
+function setHome(data) {
+  const ok=data&&data.v===1&&Number.isFinite(data.x)&&Number.isFinite(data.y)&&Number.isFinite(data.ang)&&data.x>=128&&data.y>=128&&data.x<=WORLD-128&&data.y<=WORLD-128;
+  HOME.x=ok?data.x:CAMP.x;HOME.y=ok?data.y:CAMP.y;HOME.ang=ok?Math.atan2(Math.sin(data.ang),Math.cos(data.ang)):0;
+}
+function homeWorld(x,y) { const c=Math.cos(HOME.ang),s=Math.sin(HOME.ang);return{x:HOME.x+x*c-y*s,y:HOME.y+x*s+y*c}; }
+function homeLocal(x,y) { const dx=x-HOME.x,dy=y-HOME.y,c=Math.cos(HOME.ang),s=Math.sin(HOME.ang);return{x:dx*c+dy*s,y:-dx*s+dy*c}; }
 let MAPN = Math.round(200 * ISLK), MAPC = WORLD / MAPN;
 // ada ölçeği: yeni oyun 1.5, eski kayıtlar (isl alanı yok) 1 ile açılır
 function setIslandScale(k) {
-  ISLK = k; WORLD = 16000 * k; CAMP.x = CAMP.y = WORLD / 2; MAPN = Math.round(200 * k); MAPC = WORLD / MAPN;
+  ISLK = k; WORLD = 16000 * k; CAMP.x = CAMP.y = WORLD / 2; setHome(null); MAPN = Math.round(200 * k); MAPC = WORLD / MAPN;
   if (typeof islandGridReset === 'function') islandGridReset();
   if (typeof fogC !== 'undefined') { fogC = null; miniBase = null; miniKey = null; }
 }

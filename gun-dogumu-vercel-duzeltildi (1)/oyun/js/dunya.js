@@ -51,11 +51,11 @@ let HM = null, TMUL = null;
 // Sürüm1 yalnız yeni oyunlarda: eski v4 kayıtlarının arazisi değişmez.
 function cavSiteReserved(x,y,margin=0) {
   if (G.caveTerrain!==1) return false;
-  const dx=x-CAMP.x,dy=y-CAMP.y;
+  const q=homeLocal(x,y),dx=q.x,dy=q.y;
   return Math.hypot(dx,dy+430)<200+margin || (Math.abs(dx)<60+margin&&dy>-430-margin&&dy<40+margin);
 }
 function cavSiteHeight(x,y) {
-  const dx=x-CAMP.x,dy=y-CAMP.y;
+  const q=homeLocal(x,y),dx=q.x,dy=q.y;
   if (Math.abs(dx)>700||dy>180||dy<-1350) return 0;
   const ramp=128*sstep(40,300,-dy)*(1-sstep(180,420,Math.abs(dx)))*(1-sstep(650,1100,-dy));
   const ridge=320*(1-sstep(0,1,Math.hypot(dx/550,(dy+790)/510)));
@@ -66,7 +66,8 @@ function cavSiteRocks() {
   const R=mulberry32(G.seed^0x51ac), points=[[-83,-300,48],[83,-300,48],[-145,-450,64],[145,-450,64],[-74,-580,60],[74,-580,60]];
   for (const [dx,dy,r] of points) {
     const v=[];for(let i=0;i<8;i++){const a=i/8*TAU;v.push([Math.cos(a)*r*(.85+R()*.2),Math.sin(a)*r*(.85+R()*.2)])}
-    const o={x:CAMP.x+dx,y:CAMP.y+dy,r,kind:'rock',res:'stone',amt:28,v,shade:.95+R()*.1,i:G.rocks.length,shelter:true};G.rocks.push(o);gAdd(o);
+    const q=homeWorld(dx,dy);
+    const o={x:q.x,y:q.y,r,kind:'rock',res:'stone',amt:28,v,shade:.95+R()*.1,i:G.rocks.length,shelter:true};G.rocks.push(o);gAdd(o);
   }
 }
 function rawH(x, y) {
@@ -95,7 +96,7 @@ function rawH(x, y) {
     const pk = fbm(x / 1500 - 9.1, y / 1500 + 4.4, 2);
     h += Math.pow(mm, 1.35) * (330 + 330 * rg * rg + 260 * pk);
   }
-  const dc = Math.hypot(x - CAMP.x, y - CAMP.y);
+  const dc = Math.hypot(x - HOME.x, y - HOME.y);
   if (dc < 1500) h = 8 + (h - 8) * sstep(700, 1500, dc);       // kamp düzlüğü
   if (G.caveTerrain===1) h+=cavSiteHeight(x,y);
   return Math.max(h, 1.2);
@@ -174,7 +175,7 @@ function genWorld(seed) {
   nzSeed = (seed * 2654435761) | 0; HM = null; TMUL = null;
   ISL = { R0: sr(6750, 6950) * ISLK, a2: sr(120, 260), p2: sr(0, TAU), a3: sr(100, 220), p3: sr(0, TAU), a5: sr(60, 140), p5: sr(0, TAU), a9: sr(30, 70), p9: sr(0, TAU) };
   const dC = (x, y) => Math.hypot(x - CAMP.x, y - CAMP.y);
-  const nearCamp = (x, y, m) => dC(x, y) < m;
+  const nearCamp = (x, y, m) => Math.hypot(x-HOME.x,y-HOME.y)<m;
   const inW = (x, y, m = 80) => x > m && y > m && x < WORLD - m && y < WORLD - m;
   const polar = (a, r) => ({ x: CAMP.x + Math.cos(a) * r, y: CAMP.y + Math.sin(a) * r });
 
@@ -210,7 +211,7 @@ function genWorld(seed) {
   HM = new Float32Array(HW * HW);
   for (let j = 0; j < HW; j++) for (let i = 0; i < HW; i++) HM[j * HW + i] = rawH(i * HC, j * HC);
   flattenH(G.rift.x, G.rift.y, 160, 260, groundH(G.rift.x, G.rift.y));
-  if (G.caveTerrain===1) flattenH(CAMP.x,CAMP.y-430,110,70,136);
+  if (G.caveTerrain===1) { const q=homeWorld(0,-430);flattenH(q.x,q.y,110,70,136); }
   // biyom haritası
   G.bmap = new Uint8Array(MAPN * MAPN);
   for (let j = 0; j < MAPN; j++) for (let i = 0; i < MAPN; i++) G.bmap[j * MAPN + i] = biomeAt((i + 0.5) * MAPC, (j + 0.5) * MAPC);
@@ -283,7 +284,7 @@ function genWorld(seed) {
     if (b === 0 && dC(x, y) > 3200) { t.cr = sr(48, 72); t.tone *= 0.6; t.dark = 1; }   // sık, karanlık orman
     G.trees.push(t); gAdd(t);
   }
-  for (let i = 0; i < 20; i++) { const a = sr(0, TAU), r = sr(270, 560); addTree(CAMP.x + Math.cos(a) * r, CAMP.y + Math.sin(a) * r); }
+  for (let i = 0; i < 20; i++) { const a = sr(0, TAU), r = sr(270, 560); addTree(HOME.x + Math.cos(a) * r, HOME.y + Math.sin(a) * r); }
   for (let c = 0; c < Math.round(1150 * ISLK * ISLK); c++) {
     const cx = rx(), cy = ry(), b = B(cx, cy); if (b === B_SEA) continue;
     const far = dC(cx, cy) > 3200;
@@ -308,7 +309,7 @@ function genWorld(seed) {
     for (let i = 0; i < n; i++) { const a = i / n * TAU; v.push([Math.cos(a) * r * sr(0.75, 1.15), Math.sin(a) * r * sr(0.75, 1.15)]); }
     const o = { x, y, r, kind: 'rock', res: 'stone', amt: big ? 22 : 14, v, shade: sr(0.85, 1.15), i: G.rocks.length }; G.rocks.push(o); gAdd(o);
   }
-  for (let i = 0; i < 7; i++) { const a = sr(0, TAU), r = sr(300, 600); addRock(CAMP.x + Math.cos(a) * r, CAMP.y + Math.sin(a) * r); }
+  for (let i = 0; i < 7; i++) { const a = sr(0, TAU), r = sr(300, 600); addRock(HOME.x + Math.cos(a) * r, HOME.y + Math.sin(a) * r); }
   for (const b of G.blobs) if (b.k === 1) for (let i = 0, n = Math.round(80 * (b.r / 560) ** 2); i < n; i++) { const a = sr(0, TAU), rr = sr(0, b.r * 1.1), x = b.x + Math.cos(a) * rr, y = b.y + Math.sin(a) * rr; if (B(x, y) === 1) addRock(x, y); }
   for (let c = 0; c < Math.round(1000 * ISLK * ISLK); c++) {
     const cx = rx(), cy = ry(), b = B(cx, cy); if (b === B_SEA) continue;
@@ -327,9 +328,9 @@ function genWorld(seed) {
     const b = B(x, y); if (b === 1 || b === 3 || b === 5 || b === B_SEA || (b === 4 && S() < 0.4)) return;
     G.bushes.push({ x, y, r: 16, res: 'meyve', amt: 5, max: 5, berries: Array.from({ length: 7 }, () => [sr(-11, 11), sr(-11, 11)]), col: spick(['#b3243a', '#6a2a8a', '#c4382a']) });
   }
-  for (let i = 0; i < 12; i++) { const a = sr(0, TAU), r = sr(200, 480); addBush(CAMP.x + Math.cos(a) * r, CAMP.y + Math.sin(a) * r); }
+  for (let i = 0; i < 12; i++) { const a = sr(0, TAU), r = sr(200, 480); addBush(HOME.x + Math.cos(a) * r, HOME.y + Math.sin(a) * r); }
   for (let i = 0; i < Math.round(3600 * ISLK * ISLK); i++) addBush(rx(), ry());
-  for (let i = 0; i < 6; i++) { const a = sr(0, TAU), r = sr(350, 650), x = CAMP.x + Math.cos(a) * r, y = CAMP.y + Math.sin(a) * r; if (free(x, y, 15)) G.herbs.push({ x, y, r: 10, res: 'herb', amt: 3, max: 3 }); }
+  for (let i = 0; i < 6; i++) { const a = sr(0, TAU), r = sr(350, 650), x = HOME.x + Math.cos(a) * r, y = HOME.y + Math.sin(a) * r; if (free(x, y, 15)) G.herbs.push({ x, y, r: 10, res: 'herb', amt: 3, max: 3 }); }
   for (let i = 0; i < 4000 * ISLK * ISLK && G.herbs.length < 380 * ISLK * ISLK; i++) {
     const x = rx(), y = ry(), b = B(x, y);
     if ((b === 0 || b === 2 || b === 4) && free(x, y, 15) && !nearCamp(x, y, 300) && !inPool(x, y, 10)) G.herbs.push({ x, y, r: 10, res: 'herb', amt: 3, max: 3 });

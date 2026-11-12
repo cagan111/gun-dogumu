@@ -725,8 +725,8 @@ function wanderSlow(d, dt, spd) {
     d.wt = rand(5, 12) * (isNight() ? 2 : 1);
     const c = d.terr && Math.hypot(d.x - d.terr.x, d.y - d.terr.y) > d.terr.r * 0.7 ? d.terr : d;
     d.wx = c.x + rand(-300, 300); d.wy = c.y + rand(-300, 300);
-    if (Math.hypot(d.wx - CAMP.x, d.wy - CAMP.y) < 450) { d.wx += 450; }
-    if (isSea(d.wx, d.wy)) { d.wx = d.x + (CAMP.x - d.x) * 0.05; d.wy = d.y + (CAMP.y - d.y) * 0.05; }
+    if (Math.hypot(d.wx - HOME.x, d.wy - HOME.y) < 450) { d.wx += 450; }
+    if (isSea(d.wx, d.wy)) { d.wx = d.x + (HOME.x - d.x) * 0.05; d.wy = d.y + (HOME.y - d.y) * 0.05; }
   }
   if (isNight()) spd *= 0.5;                                      // gece sürü dinlenir
   if (Math.hypot(d.wx - d.x, d.wy - d.y) > 10) { steer(d, d.wx, d.wy, spd, dt, true); d.anim += dt * 3; } else d.moving = false;

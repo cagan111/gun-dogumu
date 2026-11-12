@@ -9,7 +9,7 @@ function resetState(diff) {
   Object.assign(G, {
     diff, seed: 0, t: CYCLE * 0.05, day: 1, now: 0, dt: 0,
     stock: { wood: 30, stone: 10, food: 20, meyve: 14, et: 6, cigEt: 0, bone: 3, hide: 6, herb: 3, poison: 0, crystal: 0, yatak: 0, halat: 0, yelkenBezi: 0, gemiParca: 0, mizrak: 1, balta: 1, kazma: 0, sepet: 0, ok: 0, zok: 0, yay: 0, zirh: 0, mesale: 0, eyer: 0, kemikMizrak: 0, yarikTasi: 0, bandaj: 2, ilac: 1, icki: 0 },
-    fire: { x: CAMP.x, y: CAMP.y, fuel: 85, out: false },
+    fire: { x: HOME.x, y: HOME.y, fuel: 85, out: false },
     builds: [], people: [], dinos: [], parts: [], texts: [], msgs: [], proj: [], stains: [], tracks: [], rainDrops: [],
     meal: null, feastNext: false, cave: null, tutIn: false, carcs: [], orders: [], hunt: null, huntMode: false, unclean: 0, lcarry: null, oid: 0, eqT: 0, homeT2: 0,
     managers: {}, zone: {}, abil: {}, morale: 60, newGroup: 'bos',
@@ -30,14 +30,16 @@ function newGame(diff, tutOn) {
   for (const key of Object.keys(G.stock)) G.stock[key]=0;
   G.seed = Math.floor(Math.random() * 1e9);
   genWorld(G.seed);
-  L = mkPerson(CAMP.x, CAMP.y + 70, 'Sen', true); G.people.push(L);
+  const start=homeWorld(0,70);
+  L = mkPerson(start.x,start.y,'Sen',true); G.people.push(L);
   ['odun', 'tas', 'yiyecek', 'asci', 'yiyecek', 'mimar', 'muhafiz', 'zanaat'].forEach((g, i) => {
-    const a = i / 8 * TAU + 0.5, p = mkPerson(CAMP.x + Math.cos(a) * 80, CAMP.y + Math.sin(a) * 80, freshName(), false);
+    const a=i/8*TAU+.5,q=homeWorld(Math.cos(a)*80,Math.sin(a)*80),p=mkPerson(q.x,q.y,freshName(),false);
     p.group = g; G.people.push(p);
     if (g === 'mimar' && lvl(p, 'insaat') < 2) p.sk.insaat = XPL[1] + 1;
     if (g === 'asci' && lvl(p, 'asci') < 2) p.sk.asci = XPL[1] + 1;
   });
-  G.cave = makeBuild('magara', CAMP.x, CAMP.y - 430, 0); finishBuild(G.cave, true);
+  const cavePos=homeWorld(0,-430);
+  G.cave = makeBuild('magara',cavePos.x,cavePos.y,HOME.ang); finishBuild(G.cave, true);
   G.cave.rooms = BUILD.magara.rooms.slice();
   G.cave.furniture={v:1,rooms:'',next:1,rev:1,items:[]};
   msg('Erzak ve alet yok. Oduncu, taşçı ve toplayıcılar ilk malzemeleri getirsin. Yamaçtaki boş mağaraya yürüyerek gir; I ile eşya planla.', '#cfe', 9);
@@ -433,7 +435,7 @@ function newDay() {
     let came = 0;
     while (n > 0 && free > 0) {
       const couple = n >= 2 && Math.random() < 0.3;
-      const a = rand(0, TAU), p = mkPerson(CAMP.x + Math.cos(a) * 380, CAMP.y + Math.sin(a) * 380, freshName(), false);
+      const a = rand(0, TAU), p = mkPerson(HOME.x + Math.cos(a) * 380, HOME.y + Math.sin(a) * 380, freshName(), false);
       p.fear = 30; p.group = G.newGroup; G.people.push(p); came++; n--;
       if (couple) {
         const q = mkPerson(p.x + 20, p.y, freshName(), false); q.fear = 30; q.group = G.newGroup; G.people.push(q); came++; n--;
@@ -694,7 +696,7 @@ function serialize() {
   const pf = ['id', 'name', 'x', 'y', 'leader', 'child', 'age', 'traits', 'story', 'group', 'hp', 'maxhp', 'fear', 'skin', 'hair', 'injury', 'downed', 'tired', 'watched', 'partner', 'parentA', 'parentB', 'stam', 'seat', 'r', 'sk', 'sick', 'wasDowned', 'bedUntil', 'routine', 'alt', 'hunger', 'own', 'joinHunt', 'bag', 'carry', 'cookGot', 'batch', 'prevG', 'rtBase', 'planHunt', 'planHuntPrev'];
   let ex = ''; for (let i = 0; i < G.explored.length; i++) ex += G.explored[i] ? '1' : '0';
   return JSON.stringify({
-    v: 4, caveTerrain:G.caveTerrain===1?1:0, isl: ISLK, wrecks: (G.wrecks || []).map(w => !!w.found), inside: G.inside ? G.builds.indexOf(G.inside.b) : -1, seed: G.seed, diff: G.diff, t: G.t, cyc: CYCLE, day: G.day, stock: G.stock, fuel: G.fire.fuel, morale: G.morale, orders: G.orders.map(o => Object.assign({}, o, { worker: 0 })), oid: G.oid, unclean: G.unclean, planToday: G.planToday, planNext: G.planNext, seeds: G.seeds, seedSeen: G.seedSeen,
+    v: 4, home:{v:1,x:HOME.x,y:HOME.y,ang:HOME.ang}, caveTerrain:G.caveTerrain===1?1:0, isl: ISLK, wrecks: (G.wrecks || []).map(w => !!w.found), inside: G.inside ? G.builds.indexOf(G.inside.b) : -1, seed: G.seed, diff: G.diff, t: G.t, cyc: CYCLE, day: G.day, stock: G.stock, fuel: G.fire.fuel, morale: G.morale, orders: G.orders.map(o => Object.assign({}, o, { worker: 0 })), oid: G.oid, unclean: G.unclean, planToday: G.planToday, planNext: G.planNext, seeds: G.seeds, seedSeen: G.seedSeen,
     carcs: G.carcs.filter(c => !c.dead).map(c => ({ x: c.x, y: c.y, r: c.r, type: c.type, ang: c.ang, meat: c.meat, bone: c.bone, hide: c.hide, age: c.age, rotten: c.rotten })),
     managers: G.managers, zone: G.zone, newGroup: G.newGroup, autoEq: !!G.autoEq, torchFuel: G.torchFuel, nightPlan: G.nightPlan, nightWeather: G.nightWeather, weather: G.weather,
     eggs: G.eggs, usedNames: [...G.usedNames], stats: G.stats, idc: G.idc, kills: G.kills, deaths: G.deaths, lost: G.lost,
@@ -719,7 +721,7 @@ function saveGame(kind) {
 }
 function loadGame(s) {
   const D = JSON.parse(s);
-  setIslandScale(D.isl || 1); resetState(D.diff);
+  setIslandScale(D.isl || 1); setHome(D.home); resetState(D.diff);
   G.caveTerrain=D.caveTerrain===1?1:0;
   G.seed = D.seed; genWorld(G.seed);
   Object.assign(G, { t: D.t * CYCLE / (D.cyc || 300), day: D.day, morale: D.morale, newGroup: D.newGroup || 'bos', torchFuel: D.torchFuel || 0, nightPlan: D.nightPlan || [], nightWeather: D.nightWeather || 'acik',

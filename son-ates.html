@@ -276,10 +276,18 @@ function compass(a) { const d = ['doğu', 'güneydoğu', 'güney', 'güneybatı'
 
 // ---- dünya sabitleri
 let ISLK = 1.5, WORLD = 16000 * ISLK; const CAMP = { x: WORLD / 2, y: WORLD / 2 }, DAYK = 2, CYCLE = 300 * DAYK;   // DAYK: gün uzunluğu çarpanı (gün başına etkisi sabit kalması gereken saniyelik oranlar DAYK'ya bölünür)
+// Ada kökeni CAMP, yerleşim kökeni HOME. Merkez seçimi sonraki dünya profiline aittir.
+const HOME={x:CAMP.x,y:CAMP.y,ang:0};
+function setHome(data) {
+  const ok=data&&data.v===1&&Number.isFinite(data.x)&&Number.isFinite(data.y)&&Number.isFinite(data.ang)&&data.x>=128&&data.y>=128&&data.x<=WORLD-128&&data.y<=WORLD-128;
+  HOME.x=ok?data.x:CAMP.x;HOME.y=ok?data.y:CAMP.y;HOME.ang=ok?Math.atan2(Math.sin(data.ang),Math.cos(data.ang)):0;
+}
+function homeWorld(x,y) { const c=Math.cos(HOME.ang),s=Math.sin(HOME.ang);return{x:HOME.x+x*c-y*s,y:HOME.y+x*s+y*c}; }
+function homeLocal(x,y) { const dx=x-HOME.x,dy=y-HOME.y,c=Math.cos(HOME.ang),s=Math.sin(HOME.ang);return{x:dx*c+dy*s,y:-dx*s+dy*c}; }
 let MAPN = Math.round(200 * ISLK), MAPC = WORLD / MAPN;
 // ada ölçeği: yeni oyun 1.5, eski kayıtlar (isl alanı yok) 1 ile açılır
 function setIslandScale(k) {
-  ISLK = k; WORLD = 16000 * k; CAMP.x = CAMP.y = WORLD / 2; MAPN = Math.round(200 * k); MAPC = WORLD / MAPN;
+  ISLK = k; WORLD = 16000 * k; CAMP.x = CAMP.y = WORLD / 2; setHome(null); MAPN = Math.round(200 * k); MAPC = WORLD / MAPN;
   if (typeof islandGridReset === 'function') islandGridReset();
   if (typeof fogC !== 'undefined') { fogC = null; miniBase = null; miniKey = null; }
 }
@@ -811,11 +819,11 @@ let HM = null, TMUL = null;
 // Sürüm1 yalnız yeni oyunlarda: eski v4 kayıtlarının arazisi değişmez.
 function cavSiteReserved(x,y,margin=0) {
   if (G.caveTerrain!==1) return false;
-  const dx=x-CAMP.x,dy=y-CAMP.y;
+  const q=homeLocal(x,y),dx=q.x,dy=q.y;
   return Math.hypot(dx,dy+430)<200+margin || (Math.abs(dx)<60+margin&&dy>-430-margin&&dy<40+margin);
 }
 function cavSiteHeight(x,y) {
-  const dx=x-CAMP.x,dy=y-CAMP.y;
+  const q=homeLocal(x,y),dx=q.x,dy=q.y;
   if (Math.abs(dx)>700||dy>180||dy<-1350) return 0;
   const ramp=128*sstep(40,300,-dy)*(1-sstep(180,420,Math.abs(dx)))*(1-sstep(650,1100,-dy));
   const ridge=320*(1-sstep(0,1,Math.hypot(dx/550,(dy+790)/510)));
@@ -826,7 +834,8 @@ function cavSiteRocks() {
   const R=mulberry32(G.seed^0x51ac), points=[[-83,-300,48],[83,-300,48],[-145,-450,64],[145,-450,64],[-74,-580,60],[74,-580,60]];
   for (const [dx,dy,r] of points) {
     const v=[];for(let i=0;i<8;i++){const a=i/8*TAU;v.push([Math.cos(a)*r*(.85+R()*.2),Math.sin(a)*r*(.85+R()*.2)])}
-    const o={x:CAMP.x+dx,y:CAMP.y+dy,r,kind:'rock',res:'stone',amt:28,v,shade:.95+R()*.1,i:G.rocks.length,shelter:true};G.rocks.push(o);gAdd(o);
+    const q=homeWorld(dx,dy);
+    const o={x:q.x,y:q.y,r,kind:'rock',res:'stone',amt:28,v,shade:.95+R()*.1,i:G.rocks.length,shelter:true};G.rocks.push(o);gAdd(o);
   }
 }
 function rawH(x, y) {
@@ -855,7 +864,7 @@ function rawH(x, y) {
     const pk = fbm(x / 1500 - 9.1, y / 1500 + 4.4, 2);
     h += Math.pow(mm, 1.35) * (330 + 330 * rg * rg + 260 * pk);
   }
-  const dc = Math.hypot(x - CAMP.x, y - CAMP.y);
+  const dc = Math.hypot(x - HOME.x, y - HOME.y);
   if (dc < 1500) h = 8 + (h - 8) * sstep(700, 1500, dc);       // kamp düzlüğü
   if (G.caveTerrain===1) h+=cavSiteHeight(x,y);
   return Math.max(h, 1.2);
@@ -934,7 +943,7 @@ function genWorld(seed) {
   nzSeed = (seed * 2654435761) | 0; HM = null; TMUL = null;
   ISL = { R0: sr(6750, 6950) * ISLK, a2: sr(120, 260), p2: sr(0, TAU), a3: sr(100, 220), p3: sr(0, TAU), a5: sr(60, 140), p5: sr(0, TAU), a9: sr(30, 70), p9: sr(0, TAU) };
   const dC = (x, y) => Math.hypot(x - CAMP.x, y - CAMP.y);
-  const nearCamp = (x, y, m) => dC(x, y) < m;
+  const nearCamp = (x, y, m) => Math.hypot(x-HOME.x,y-HOME.y)<m;
   const inW = (x, y, m = 80) => x > m && y > m && x < WORLD - m && y < WORLD - m;
   const polar = (a, r) => ({ x: CAMP.x + Math.cos(a) * r, y: CAMP.y + Math.sin(a) * r });
 
@@ -970,7 +979,7 @@ function genWorld(seed) {
   HM = new Float32Array(HW * HW);
   for (let j = 0; j < HW; j++) for (let i = 0; i < HW; i++) HM[j * HW + i] = rawH(i * HC, j * HC);
   flattenH(G.rift.x, G.rift.y, 160, 260, groundH(G.rift.x, G.rift.y));
-  if (G.caveTerrain===1) flattenH(CAMP.x,CAMP.y-430,110,70,136);
+  if (G.caveTerrain===1) { const q=homeWorld(0,-430);flattenH(q.x,q.y,110,70,136); }
   // biyom haritası
   G.bmap = new Uint8Array(MAPN * MAPN);
   for (let j = 0; j < MAPN; j++) for (let i = 0; i < MAPN; i++) G.bmap[j * MAPN + i] = biomeAt((i + 0.5) * MAPC, (j + 0.5) * MAPC);
@@ -1043,7 +1052,7 @@ function genWorld(seed) {
     if (b === 0 && dC(x, y) > 3200) { t.cr = sr(48, 72); t.tone *= 0.6; t.dark = 1; }   // sık, karanlık orman
     G.trees.push(t); gAdd(t);
   }
-  for (let i = 0; i < 20; i++) { const a = sr(0, TAU), r = sr(270, 560); addTree(CAMP.x + Math.cos(a) * r, CAMP.y + Math.sin(a) * r); }
+  for (let i = 0; i < 20; i++) { const a = sr(0, TAU), r = sr(270, 560); addTree(HOME.x + Math.cos(a) * r, HOME.y + Math.sin(a) * r); }
   for (let c = 0; c < Math.round(1150 * ISLK * ISLK); c++) {
     const cx = rx(), cy = ry(), b = B(cx, cy); if (b === B_SEA) continue;
     const far = dC(cx, cy) > 3200;
@@ -1068,7 +1077,7 @@ function genWorld(seed) {
     for (let i = 0; i < n; i++) { const a = i / n * TAU; v.push([Math.cos(a) * r * sr(0.75, 1.15), Math.sin(a) * r * sr(0.75, 1.15)]); }
     const o = { x, y, r, kind: 'rock', res: 'stone', amt: big ? 22 : 14, v, shade: sr(0.85, 1.15), i: G.rocks.length }; G.rocks.push(o); gAdd(o);
   }
-  for (let i = 0; i < 7; i++) { const a = sr(0, TAU), r = sr(300, 600); addRock(CAMP.x + Math.cos(a) * r, CAMP.y + Math.sin(a) * r); }
+  for (let i = 0; i < 7; i++) { const a = sr(0, TAU), r = sr(300, 600); addRock(HOME.x + Math.cos(a) * r, HOME.y + Math.sin(a) * r); }
   for (const b of G.blobs) if (b.k === 1) for (let i = 0, n = Math.round(80 * (b.r / 560) ** 2); i < n; i++) { const a = sr(0, TAU), rr = sr(0, b.r * 1.1), x = b.x + Math.cos(a) * rr, y = b.y + Math.sin(a) * rr; if (B(x, y) === 1) addRock(x, y); }
   for (let c = 0; c < Math.round(1000 * ISLK * ISLK); c++) {
     const cx = rx(), cy = ry(), b = B(cx, cy); if (b === B_SEA) continue;
@@ -1087,9 +1096,9 @@ function genWorld(seed) {
     const b = B(x, y); if (b === 1 || b === 3 || b === 5 || b === B_SEA || (b === 4 && S() < 0.4)) return;
     G.bushes.push({ x, y, r: 16, res: 'meyve', amt: 5, max: 5, berries: Array.from({ length: 7 }, () => [sr(-11, 11), sr(-11, 11)]), col: spick(['#b3243a', '#6a2a8a', '#c4382a']) });
   }
-  for (let i = 0; i < 12; i++) { const a = sr(0, TAU), r = sr(200, 480); addBush(CAMP.x + Math.cos(a) * r, CAMP.y + Math.sin(a) * r); }
+  for (let i = 0; i < 12; i++) { const a = sr(0, TAU), r = sr(200, 480); addBush(HOME.x + Math.cos(a) * r, HOME.y + Math.sin(a) * r); }
   for (let i = 0; i < Math.round(3600 * ISLK * ISLK); i++) addBush(rx(), ry());
-  for (let i = 0; i < 6; i++) { const a = sr(0, TAU), r = sr(350, 650), x = CAMP.x + Math.cos(a) * r, y = CAMP.y + Math.sin(a) * r; if (free(x, y, 15)) G.herbs.push({ x, y, r: 10, res: 'herb', amt: 3, max: 3 }); }
+  for (let i = 0; i < 6; i++) { const a = sr(0, TAU), r = sr(350, 650), x = HOME.x + Math.cos(a) * r, y = HOME.y + Math.sin(a) * r; if (free(x, y, 15)) G.herbs.push({ x, y, r: 10, res: 'herb', amt: 3, max: 3 }); }
   for (let i = 0; i < 4000 * ISLK * ISLK && G.herbs.length < 380 * ISLK * ISLK; i++) {
     const x = rx(), y = ry(), b = B(x, y);
     if ((b === 0 || b === 2 || b === 4) && free(x, y, 15) && !nearCamp(x, y, 300) && !inPool(x, y, 10)) G.herbs.push({ x, y, r: 10, res: 'herb', amt: 3, max: 3 });
@@ -1541,7 +1550,7 @@ function useAbility(g) {
   const a = G.abil[g];
   if (a.cd > 0) { msg(`${ABIL[g].ad} henüz hazır değil (${Math.ceil(a.cd)} sn).`, '#ccc', 2); return; }
   a.cd = ABIL[g].cd; a.act = ABIL[g].dur;
-  if (g === 'yiyecek') for (const b of G.bushes) if (Math.hypot(b.x - CAMP.x, b.y - CAMP.y) < 900) b.amt = b.max;
+  if (g === 'yiyecek') for (const b of G.bushes) if (Math.hypot(b.x - HOME.x, b.y - HOME.y) < 900) b.amt = b.max;
   if (g === 'ciftci') for (const b of G.builds) if (b.type === 'tarla' && b.planted) b.g = Math.min(1, b.g + 0.5);
   if (g === 'sifaci') for (const p of G.people) if (Math.hypot(p.x - G.fire.x, p.y - G.fire.y) < Math.max(fireR(), 260) || p.bed) {
     if (p.downed > 0) { p.downed = 0; p.hp = 1; p.wasDowned = true; }
@@ -1563,7 +1572,7 @@ function clearZone(g) { G.zone[g] = null; msg(`${GROUPS[g].ad} grubu kampa yakı
 
 // ---- kaynaklar
 function nearestRes(p, g) {
-  const ref = G.zone[g] || CAMP;
+  const ref = G.zone[g] || HOME;
   let lists;
   if (g === 'odun') lists = [G.trees];
   else if (g === 'tas') lists = p.eq.kazma ? [G.rocks, G.crystals] : [G.rocks];
@@ -2180,7 +2189,7 @@ function updHealer(p, dt, thr) {
   updGather(p, dt, 'sifaci', thr);
 }
 function pickScoutTarget(p) {
-  const z = G.zone.kasif, c = z || CAMP, R = z ? 900 : 4200;
+  const z = G.zone.kasif, c = z || HOME, R = z ? 900 : 4200;
   let best = null, bs = 1e9;
   for (let k = 0; k < 70; k++) {
     const a = rand(0, TAU), r = Math.sqrt(Math.random()) * R, x = clamp(c.x + Math.cos(a) * r, 100, WORLD - 100), y = clamp(c.y + Math.sin(a) * r, 100, WORLD - 100);
@@ -3398,8 +3407,8 @@ function wanderSlow(d, dt, spd) {
     d.wt = rand(5, 12) * (isNight() ? 2 : 1);
     const c = d.terr && Math.hypot(d.x - d.terr.x, d.y - d.terr.y) > d.terr.r * 0.7 ? d.terr : d;
     d.wx = c.x + rand(-300, 300); d.wy = c.y + rand(-300, 300);
-    if (Math.hypot(d.wx - CAMP.x, d.wy - CAMP.y) < 450) { d.wx += 450; }
-    if (isSea(d.wx, d.wy)) { d.wx = d.x + (CAMP.x - d.x) * 0.05; d.wy = d.y + (CAMP.y - d.y) * 0.05; }
+    if (Math.hypot(d.wx - HOME.x, d.wy - HOME.y) < 450) { d.wx += 450; }
+    if (isSea(d.wx, d.wy)) { d.wx = d.x + (HOME.x - d.x) * 0.05; d.wy = d.y + (HOME.y - d.y) * 0.05; }
   }
   if (isNight()) spd *= 0.5;                                      // gece sürü dinlenir
   if (Math.hypot(d.wx - d.x, d.wy - d.y) > 10) { steer(d, d.wx, d.wy, spd, dt, true); d.anim += dt * 3; } else d.moving = false;
@@ -4156,7 +4165,7 @@ function resetState(diff) {
   Object.assign(G, {
     diff, seed: 0, t: CYCLE * 0.05, day: 1, now: 0, dt: 0,
     stock: { wood: 30, stone: 10, food: 20, meyve: 14, et: 6, cigEt: 0, bone: 3, hide: 6, herb: 3, poison: 0, crystal: 0, yatak: 0, halat: 0, yelkenBezi: 0, gemiParca: 0, mizrak: 1, balta: 1, kazma: 0, sepet: 0, ok: 0, zok: 0, yay: 0, zirh: 0, mesale: 0, eyer: 0, kemikMizrak: 0, yarikTasi: 0, bandaj: 2, ilac: 1, icki: 0 },
-    fire: { x: CAMP.x, y: CAMP.y, fuel: 85, out: false },
+    fire: { x: HOME.x, y: HOME.y, fuel: 85, out: false },
     builds: [], people: [], dinos: [], parts: [], texts: [], msgs: [], proj: [], stains: [], tracks: [], rainDrops: [],
     meal: null, feastNext: false, cave: null, tutIn: false, carcs: [], orders: [], hunt: null, huntMode: false, unclean: 0, lcarry: null, oid: 0, eqT: 0, homeT2: 0,
     managers: {}, zone: {}, abil: {}, morale: 60, newGroup: 'bos',
@@ -4177,14 +4186,16 @@ function newGame(diff, tutOn) {
   for (const key of Object.keys(G.stock)) G.stock[key]=0;
   G.seed = Math.floor(Math.random() * 1e9);
   genWorld(G.seed);
-  L = mkPerson(CAMP.x, CAMP.y + 70, 'Sen', true); G.people.push(L);
+  const start=homeWorld(0,70);
+  L = mkPerson(start.x,start.y,'Sen',true); G.people.push(L);
   ['odun', 'tas', 'yiyecek', 'asci', 'yiyecek', 'mimar', 'muhafiz', 'zanaat'].forEach((g, i) => {
-    const a = i / 8 * TAU + 0.5, p = mkPerson(CAMP.x + Math.cos(a) * 80, CAMP.y + Math.sin(a) * 80, freshName(), false);
+    const a=i/8*TAU+.5,q=homeWorld(Math.cos(a)*80,Math.sin(a)*80),p=mkPerson(q.x,q.y,freshName(),false);
     p.group = g; G.people.push(p);
     if (g === 'mimar' && lvl(p, 'insaat') < 2) p.sk.insaat = XPL[1] + 1;
     if (g === 'asci' && lvl(p, 'asci') < 2) p.sk.asci = XPL[1] + 1;
   });
-  G.cave = makeBuild('magara', CAMP.x, CAMP.y - 430, 0); finishBuild(G.cave, true);
+  const cavePos=homeWorld(0,-430);
+  G.cave = makeBuild('magara',cavePos.x,cavePos.y,HOME.ang); finishBuild(G.cave, true);
   G.cave.rooms = BUILD.magara.rooms.slice();
   G.cave.furniture={v:1,rooms:'',next:1,rev:1,items:[]};
   msg('Erzak ve alet yok. Oduncu, taşçı ve toplayıcılar ilk malzemeleri getirsin. Yamaçtaki boş mağaraya yürüyerek gir; I ile eşya planla.', '#cfe', 9);
@@ -4580,7 +4591,7 @@ function newDay() {
     let came = 0;
     while (n > 0 && free > 0) {
       const couple = n >= 2 && Math.random() < 0.3;
-      const a = rand(0, TAU), p = mkPerson(CAMP.x + Math.cos(a) * 380, CAMP.y + Math.sin(a) * 380, freshName(), false);
+      const a = rand(0, TAU), p = mkPerson(HOME.x + Math.cos(a) * 380, HOME.y + Math.sin(a) * 380, freshName(), false);
       p.fear = 30; p.group = G.newGroup; G.people.push(p); came++; n--;
       if (couple) {
         const q = mkPerson(p.x + 20, p.y, freshName(), false); q.fear = 30; q.group = G.newGroup; G.people.push(q); came++; n--;
@@ -4841,7 +4852,7 @@ function serialize() {
   const pf = ['id', 'name', 'x', 'y', 'leader', 'child', 'age', 'traits', 'story', 'group', 'hp', 'maxhp', 'fear', 'skin', 'hair', 'injury', 'downed', 'tired', 'watched', 'partner', 'parentA', 'parentB', 'stam', 'seat', 'r', 'sk', 'sick', 'wasDowned', 'bedUntil', 'routine', 'alt', 'hunger', 'own', 'joinHunt', 'bag', 'carry', 'cookGot', 'batch', 'prevG', 'rtBase', 'planHunt', 'planHuntPrev'];
   let ex = ''; for (let i = 0; i < G.explored.length; i++) ex += G.explored[i] ? '1' : '0';
   return JSON.stringify({
-    v: 4, caveTerrain:G.caveTerrain===1?1:0, isl: ISLK, wrecks: (G.wrecks || []).map(w => !!w.found), inside: G.inside ? G.builds.indexOf(G.inside.b) : -1, seed: G.seed, diff: G.diff, t: G.t, cyc: CYCLE, day: G.day, stock: G.stock, fuel: G.fire.fuel, morale: G.morale, orders: G.orders.map(o => Object.assign({}, o, { worker: 0 })), oid: G.oid, unclean: G.unclean, planToday: G.planToday, planNext: G.planNext, seeds: G.seeds, seedSeen: G.seedSeen,
+    v: 4, home:{v:1,x:HOME.x,y:HOME.y,ang:HOME.ang}, caveTerrain:G.caveTerrain===1?1:0, isl: ISLK, wrecks: (G.wrecks || []).map(w => !!w.found), inside: G.inside ? G.builds.indexOf(G.inside.b) : -1, seed: G.seed, diff: G.diff, t: G.t, cyc: CYCLE, day: G.day, stock: G.stock, fuel: G.fire.fuel, morale: G.morale, orders: G.orders.map(o => Object.assign({}, o, { worker: 0 })), oid: G.oid, unclean: G.unclean, planToday: G.planToday, planNext: G.planNext, seeds: G.seeds, seedSeen: G.seedSeen,
     carcs: G.carcs.filter(c => !c.dead).map(c => ({ x: c.x, y: c.y, r: c.r, type: c.type, ang: c.ang, meat: c.meat, bone: c.bone, hide: c.hide, age: c.age, rotten: c.rotten })),
     managers: G.managers, zone: G.zone, newGroup: G.newGroup, autoEq: !!G.autoEq, torchFuel: G.torchFuel, nightPlan: G.nightPlan, nightWeather: G.nightWeather, weather: G.weather,
     eggs: G.eggs, usedNames: [...G.usedNames], stats: G.stats, idc: G.idc, kills: G.kills, deaths: G.deaths, lost: G.lost,
@@ -4866,7 +4877,7 @@ function saveGame(kind) {
 }
 function loadGame(s) {
   const D = JSON.parse(s);
-  setIslandScale(D.isl || 1); resetState(D.diff);
+  setIslandScale(D.isl || 1); setHome(D.home); resetState(D.diff);
   G.caveTerrain=D.caveTerrain===1?1:0;
   G.seed = D.seed; genWorld(G.seed);
   Object.assign(G, { t: D.t * CYCLE / (D.cyc || 300), day: D.day, morale: D.morale, newGroup: D.newGroup || 'bos', torchFuel: D.torchFuel || 0, nightPlan: D.nightPlan || [], nightWeather: D.nightWeather || 'acik',
@@ -5497,7 +5508,7 @@ function render2D() {
   ctx.fillStyle = '#0b1408';
   if (cx < 0) ctx.fillRect(cx, cy, -cx, VH); if (cy < 0) ctx.fillRect(cx, cy, VW, -cy);
   if (cx + VW > WORLD) ctx.fillRect(WORLD, cy, cx + VW - WORLD, VH); if (cy + VH > WORLD) ctx.fillRect(cx, WORLD, VW, cy + VH - WORLD);
-  { const g = ctx.createRadialGradient(CAMP.x, CAMP.y, 20, CAMP.x, CAMP.y, 260); g.addColorStop(0, 'rgba(110,85,52,.75)'); g.addColorStop(0.6, 'rgba(95,75,45,.35)'); g.addColorStop(1, 'rgba(90,70,45,0)'); ctx.fillStyle = g; circle(CAMP.x, CAMP.y, 260); }
+  { const g = ctx.createRadialGradient(HOME.x, HOME.y, 20, HOME.x, HOME.y, 260); g.addColorStop(0, 'rgba(110,85,52,.75)'); g.addColorStop(0.6, 'rgba(95,75,45,.35)'); g.addColorStop(1, 'rgba(90,70,45,0)'); ctx.fillStyle = g; circle(HOME.x, HOME.y, 260); }
   for (const l of G.lakes) if (inV(l.x, l.y, l.r + 20)) drawLake(l);
   for (const p of G.pools) if (inV(p.x, p.y, p.r + 10)) drawPool(p);
   for (const d of G.deco) if (inV(d.x, d.y, 20)) drawDeco(d);
@@ -8878,7 +8889,7 @@ function terColor(x, z, h, ny, out) {
     TC.sc = snowCover(x, z, h, n2) * (1 - smooth(0.5, 0.75, slope)); }                 // kar örtüsü (derinlik alanından, yamalı) — sonda uygulanır
   TC.sk = 0; { const bs = bioAt(x, z) === 5 ? 1 : 0, s = Math.max(h < 8 ? smooth(8, 1.2, h + (n2 - 0.5) * 3) : 0, bs * (1 - rk)); if (s > 0) { out.lerp(TC.sand, s * 0.92); gr *= 1 - s; TC.sn *= 1 - s * 0.92; TC.sk = s; } }
   if (h < SEA_Y + 0.6) { out.lerp(TC.wet, smooth(SEA_Y + 0.6, -3, h)); out.lerp(TC.deep, smooth(-2, -45, h)); gr = 0; TC.sn = 0; }
-  const dc = Math.hypot(x - CAMP.x, z - CAMP.y); if (dc < 320) { out.lerp(TC.dirt, smooth(320, 60, dc) * (0.75 + n2 * 0.2)); gr *= 0.4 + 0.6 * smooth(60, 320, dc); TC.sn *= 1 - smooth(320, 60, dc) * (0.75 + n2 * 0.2); }
+  const dc = Math.hypot(x - HOME.x, z - HOME.y); if (dc < 320) { out.lerp(TC.dirt, smooth(320, 60, dc) * (0.75 + n2 * 0.2)); gr *= 0.4 + 0.6 * smooth(60, 320, dc); TC.sn *= 1 - smooth(320, 60, dc) * (0.75 + n2 * 0.2); }
   if (G.lakes) for (const l of G.lakes) { const dl = Math.hypot(x - l.x, z - l.y); if (dl < l.r + 70) { const s = smooth(l.r + 70, l.r, dl) * 0.75; out.lerp(TC.wet, s); gr *= 1 - s; TC.sn *= 1 - s; } }
   if (TC.sc > 0 && h > SEA_Y + 0.6) { const sc = TC.sc * (dc < 320 ? 0.6 + 0.4 * smooth(60, 320, dc) : 1) * (1 - TC.sk * 0.5); out.lerp(TC.snow, sc * 0.97); TC.sn += (1 - TC.sn) * sc * 0.97; gr *= 1 - sc; if (sc > 0.3) TC.sk = 0; }
   return gr;

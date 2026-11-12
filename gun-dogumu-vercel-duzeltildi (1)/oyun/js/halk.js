@@ -179,7 +179,7 @@ function useAbility(g) {
   const a = G.abil[g];
   if (a.cd > 0) { msg(`${ABIL[g].ad} henüz hazır değil (${Math.ceil(a.cd)} sn).`, '#ccc', 2); return; }
   a.cd = ABIL[g].cd; a.act = ABIL[g].dur;
-  if (g === 'yiyecek') for (const b of G.bushes) if (Math.hypot(b.x - CAMP.x, b.y - CAMP.y) < 900) b.amt = b.max;
+  if (g === 'yiyecek') for (const b of G.bushes) if (Math.hypot(b.x - HOME.x, b.y - HOME.y) < 900) b.amt = b.max;
   if (g === 'ciftci') for (const b of G.builds) if (b.type === 'tarla' && b.planted) b.g = Math.min(1, b.g + 0.5);
   if (g === 'sifaci') for (const p of G.people) if (Math.hypot(p.x - G.fire.x, p.y - G.fire.y) < Math.max(fireR(), 260) || p.bed) {
     if (p.downed > 0) { p.downed = 0; p.hp = 1; p.wasDowned = true; }
@@ -201,7 +201,7 @@ function clearZone(g) { G.zone[g] = null; msg(`${GROUPS[g].ad} grubu kampa yakı
 
 // ---- kaynaklar
 function nearestRes(p, g) {
-  const ref = G.zone[g] || CAMP;
+  const ref = G.zone[g] || HOME;
   let lists;
   if (g === 'odun') lists = [G.trees];
   else if (g === 'tas') lists = p.eq.kazma ? [G.rocks, G.crystals] : [G.rocks];
@@ -818,7 +818,7 @@ function updHealer(p, dt, thr) {
   updGather(p, dt, 'sifaci', thr);
 }
 function pickScoutTarget(p) {
-  const z = G.zone.kasif, c = z || CAMP, R = z ? 900 : 4200;
+  const z = G.zone.kasif, c = z || HOME, R = z ? 900 : 4200;
   let best = null, bs = 1e9;
   for (let k = 0; k < 70; k++) {
     const a = rand(0, TAU), r = Math.sqrt(Math.random()) * R, x = clamp(c.x + Math.cos(a) * r, 100, WORLD - 100), y = clamp(c.y + Math.sin(a) * r, 100, WORLD - 100);

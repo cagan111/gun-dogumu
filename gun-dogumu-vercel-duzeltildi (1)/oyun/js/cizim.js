@@ -346,7 +346,7 @@ function render2D() {
   ctx.fillStyle = '#0b1408';
   if (cx < 0) ctx.fillRect(cx, cy, -cx, VH); if (cy < 0) ctx.fillRect(cx, cy, VW, -cy);
   if (cx + VW > WORLD) ctx.fillRect(WORLD, cy, cx + VW - WORLD, VH); if (cy + VH > WORLD) ctx.fillRect(cx, WORLD, VW, cy + VH - WORLD);
-  { const g = ctx.createRadialGradient(CAMP.x, CAMP.y, 20, CAMP.x, CAMP.y, 260); g.addColorStop(0, 'rgba(110,85,52,.75)'); g.addColorStop(0.6, 'rgba(95,75,45,.35)'); g.addColorStop(1, 'rgba(90,70,45,0)'); ctx.fillStyle = g; circle(CAMP.x, CAMP.y, 260); }
+  { const g = ctx.createRadialGradient(HOME.x, HOME.y, 20, HOME.x, HOME.y, 260); g.addColorStop(0, 'rgba(110,85,52,.75)'); g.addColorStop(0.6, 'rgba(95,75,45,.35)'); g.addColorStop(1, 'rgba(90,70,45,0)'); ctx.fillStyle = g; circle(HOME.x, HOME.y, 260); }
   for (const l of G.lakes) if (inV(l.x, l.y, l.r + 20)) drawLake(l);
   for (const p of G.pools) if (inV(p.x, p.y, p.r + 10)) drawPool(p);
   for (const d of G.deco) if (inV(d.x, d.y, 20)) drawDeco(d);

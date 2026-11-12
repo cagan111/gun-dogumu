@@ -486,7 +486,7 @@ function terColor(x, z, h, ny, out) {
     TC.sc = snowCover(x, z, h, n2) * (1 - smooth(0.5, 0.75, slope)); }                 // kar örtüsü (derinlik alanından, yamalı) — sonda uygulanır
   TC.sk = 0; { const bs = bioAt(x, z) === 5 ? 1 : 0, s = Math.max(h < 8 ? smooth(8, 1.2, h + (n2 - 0.5) * 3) : 0, bs * (1 - rk)); if (s > 0) { out.lerp(TC.sand, s * 0.92); gr *= 1 - s; TC.sn *= 1 - s * 0.92; TC.sk = s; } }
   if (h < SEA_Y + 0.6) { out.lerp(TC.wet, smooth(SEA_Y + 0.6, -3, h)); out.lerp(TC.deep, smooth(-2, -45, h)); gr = 0; TC.sn = 0; }
-  const dc = Math.hypot(x - CAMP.x, z - CAMP.y); if (dc < 320) { out.lerp(TC.dirt, smooth(320, 60, dc) * (0.75 + n2 * 0.2)); gr *= 0.4 + 0.6 * smooth(60, 320, dc); TC.sn *= 1 - smooth(320, 60, dc) * (0.75 + n2 * 0.2); }
+  const dc = Math.hypot(x - HOME.x, z - HOME.y); if (dc < 320) { out.lerp(TC.dirt, smooth(320, 60, dc) * (0.75 + n2 * 0.2)); gr *= 0.4 + 0.6 * smooth(60, 320, dc); TC.sn *= 1 - smooth(320, 60, dc) * (0.75 + n2 * 0.2); }
   if (G.lakes) for (const l of G.lakes) { const dl = Math.hypot(x - l.x, z - l.y); if (dl < l.r + 70) { const s = smooth(l.r + 70, l.r, dl) * 0.75; out.lerp(TC.wet, s); gr *= 1 - s; TC.sn *= 1 - s; } }
   if (TC.sc > 0 && h > SEA_Y + 0.6) { const sc = TC.sc * (dc < 320 ? 0.6 + 0.4 * smooth(60, 320, dc) : 1) * (1 - TC.sk * 0.5); out.lerp(TC.snow, sc * 0.97); TC.sn += (1 - TC.sn) * sc * 0.97; gr *= 1 - sc; if (sc > 0.3) TC.sk = 0; }
   return gr;
