@@ -2586,8 +2586,8 @@ function realGrassTex() {
     const R = mulberry32(77); g.clearRect(0, 0, S, S);
     for (let i = 0; i < 95; i++) {
       const x0 = S * (0.08 + R() * 0.84), h = S * (0.45 + R() * 0.53), lean = (R() - 0.5) * S * 0.35, w = 1.2 + R() * 2.6;
-      const gr = g.createLinearGradient(0, S, 0, S - h); const v = 0.55 + R() * 0.45;
-      gr.addColorStop(0, `rgba(${40 * v | 0},${62 * v | 0},${26 * v | 0},1)`); gr.addColorStop(0.5, `rgba(${120 * v | 0},${160 * v | 0},${70 * v | 0},1)`); gr.addColorStop(1, `rgba(${200 * v | 0},${215 * v | 0},${140 * v | 0},1)`);
+      const gr = g.createLinearGradient(0, S, 0, S - h); const v = 0.8 + R() * 0.2;
+      gr.addColorStop(0, `rgba(${120 * v | 0},${140 * v | 0},${95 * v | 0},1)`); gr.addColorStop(0.45, `rgba(${200 * v | 0},${225 * v | 0},${160 * v | 0},1)`); gr.addColorStop(1, `rgba(${240 * v | 0},${245 * v | 0},${205 * v | 0},1)`);
       g.fillStyle = gr; g.beginPath(); g.moveTo(x0 - w, S); g.quadraticCurveTo(x0 + lean * 0.3, S - h * 0.55, x0 + lean, S - h); g.quadraticCurveTo(x0 + lean * 0.3 + w * 0.4, S - h * 0.55, x0 + w, S); g.fill();
     }
   });
@@ -2603,4 +2603,6 @@ function realGrass() {
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(p, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setAttribute('normal', new THREE.Float32BufferAttribute(nr, 3)); g.setIndex(idx);
   const m = MAT.grass; m.map = tex; m.alphaTest = 0.45; m.vertexColors = false; m.needsUpdate = true;
   GEO.bladeReal = g; U3.grB.geometry = g; if (U3.inst && U3.inst.tgrass) U3.inst.tgrass.geometry = g;
+  if (U3.grE) U3.grE.visible = false;   // köşeli eğrelti öbekleri: gerçek eğreltiler var
+  m.color.setRGB(1.35, 1.35, 1.3);       // örnek renkleri (biyom paleti) koyu: kartları aydınlat
 }
