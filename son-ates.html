@@ -12866,7 +12866,7 @@ function terBuild(key) {
   geo.setAttribute('color', new THREE.BufferAttribute(col, 3)); geo.setAttribute('aG', new THREE.BufferAttribute(grs, 1)); geo.setAttribute('aSnow', new THREE.BufferAttribute(snow, 1));
   geo.setIndex(terIndex());
   geo.boundingSphere = new THREE.Sphere(new THREE.Vector3(size / 2, (ymin + ymax) / 2, size / 2), Math.hypot(size * 0.71, (ymax - ymin) / 2 + sk));
-  const m = new THREE.Mesh(geo, MAT.terrain); m.position.set(x0, 0, z0); m.matrixAutoUpdate = false; m.updateMatrix(); m.visible = false;
+  const m = new THREE.Mesh(geo, MAT.terrain); m.position.set(x0, 0, z0); m.matrixAutoUpdate = false; m.updateMatrix(); m.visible = false; m.receiveShadow = true;
   TER.group.add(m);
   return { m, used: 0, gen: TER.gen || 0, x0, z0, s: size };
 }
@@ -13219,7 +13219,7 @@ function rebuildTreeInst(cx, cy, writeShadows) {
     if (!treeInView(t.x, y0 + H * 0.5, t.y, Math.hypot(H * 0.65, cr * 2) + 16, distance)) { stats.culled++; continue; }
     stats[far ? 'far' : 'near']++;
     if (b !== 5 && !(b === 2 && r2 < 0.65)) { const con = b === 1 || b === 3 || (b === 0 && r2 < 0.55);   // gerçek model: iğne yapraklı göknar / geniş yapraklı ada ağacı
-      const rk = con ? 'conifer' : 'tree', rh = H * (con ? 1.0 : 0.85), ys = con ? 1.7 : 1.6;   // uzun gövde, taç yukarıda (altında rahat yürünür)
+      const rk = con ? 'conifer' : 'tree', rh = H * (con ? 1.0 : 1.05), ys = con ? 1.7 : 1.2;   // uzun gövde, taç yukarıda (altında rahat yürünür)
       if (realPut(rk, t.tone + t.sw, t.x, y0 + 1, t.y, rh, 0, t.sw, distance, ys)) continue;
       if (distance > realR(rk) && realFar(rk, t.tone + t.sw, t.x, y0 + 1, t.y, rh, ys)) continue; }
     if (b === 5) {                                       // palmiye: kıvrık gövde + taç yaprakları
@@ -14737,7 +14737,7 @@ function cav3Render() {
 // =============================================================
 const REAL = { started: false, ready: false, base: 'assets/ph/', M: {}, low: typeof window !== 'undefined' && ('ontouchstart' in window), cnt: {} };
 const REAL_SET = {
-  tree: ['island_tree_01', 'island_tree_02', 'island_tree_03'], conifer: ['fir_tree_01_b'],
+  tree: ['tree_small_02', 'jacaranda_tree', 'tree_small_02'], conifer: ['fir_tree_01_b'],
   rock: ['rock_moss_set_01', 'rock_moss_set_02', 'boulder_01', 'namaqualand_boulder_02'],
   stump: ['tree_stump_01'], fern: ['fern_02'], dead: ['dead_tree_trunk_02']
 };
@@ -14746,8 +14746,8 @@ function realStart() {
   if (REAL.started) return;
   if (typeof THREE.GLTFLoader !== 'function' || (typeof location !== 'undefined' && location.protocol === 'file:')) { REAL.started = true; REAL.why = typeof THREE.GLTFLoader !== 'function' ? 'yükleyici yok' : 'dosyadan açıldı'; if (typeof msg === 'function') msg('🌲 Gerçekçi modeller kapalı (' + REAL.why + ')', '#e99', 6); return; }
   REAL.started = true;
-  const loader = new THREE.GLTFLoader(), names = [].concat(...Object.values(REAL_SET)); let left = names.length;
-  const done = () => { if (--left === 0) { const n = Object.keys(REAL.M).length; REAL.ready = n > 0; U3.instX = 1e9;
+  const loader = new THREE.GLTFLoader(), names = [...new Set([].concat(...Object.values(REAL_SET)))]; let left = names.length;
+  const done = () => { if (--left === 0) { const n = Object.keys(REAL.M).length; REAL.ready = n > 0; U3.instX = 1e9; if (n) realShadows();
     if (typeof msg === 'function') msg(n ? `🌲 Gerçekçi modeller yüklendi (${n}/${names.length})` : `🌲 Gerçekçi modeller yüklenemedi (${REAL.err || '?'} · ${location.protocol})`, n ? '#9e9' : '#e99', 6); } };
   // .glb yoksa aynı ikili dosya .wasm adıyla da aranır (artifact yalnız bilinen türleri sunar)
   const ok = n => g => { try { realPrep(n, g.scene); } catch (e) { console.warn('varlık', n, e); } done(); };
@@ -14777,7 +14777,7 @@ function realPrep(name, scene) {
     if (leafy || m.transparent) { m.transparent = false; m.alphaTest = 0.5; m.side = THREE.DoubleSide; }
     if (leafy) realWind(m);
     m.needsUpdate = true;
-    const im = new THREE.InstancedMesh(g, m, cap); im.count = 0; im.frustumCulled = false; im.userData.max = cap; im.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    const im = new THREE.InstancedMesh(g, m, cap); im.count = 0; im.frustumCulled = false; im.castShadow = !REAL.low; im.userData.max = cap; im.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     U3.scene.add(im); return im;
   });
   REAL.M[name] = { meshes, h0, w0 };
@@ -14847,6 +14847,16 @@ function realFarReset() { for (const k of ['tree', 'conifer']) for (const n of R
 function realFarDone() {
   const dk = U3.dk || 0, b = 1 - Math.min(0.85, dk * 0.9);
   for (const k of ['tree', 'conifer']) for (const n of REAL_SET[k]) { const M = REAL.M[n]; if (M && M.imp) { M.imp.ib.instanceMatrix.needsUpdate = true; M.imp.mat.color.setRGB(b, b, b * 0.98); } }
+}
+
+// güneş gölgesi (masaüstü): oyuncu çevresinde ~800 birimlik gölge haritası; gerçek ağaç/kaya düşürür, arazi ve yapılar alır
+function realShadows() {
+  if (REAL.low || REAL.shadow || !U3.sun) return; REAL.shadow = true;
+  const r = U3.r; r.shadowMap.enabled = true; r.shadowMap.type = THREE.PCFSoftShadowMap;
+  const S = U3.sun; S.castShadow = true; S.shadow.mapSize.set(2048, 2048); S.shadow.bias = -0.0008; S.shadow.normalBias = 1.5;
+  const c = S.shadow.camera; c.left = c.bottom = -800; c.right = c.top = 800; c.near = 50; c.far = 2600; c.updateProjectionMatrix();
+  U3.scene.traverse(o => { if (o.isMesh && (o.material === MAT.terrain)) o.receiveShadow = true; });
+  REAL.recv = true;
 }
 
 </script>
