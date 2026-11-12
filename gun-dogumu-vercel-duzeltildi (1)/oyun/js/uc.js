@@ -1703,9 +1703,12 @@ function render3D(dt) {
   const lp = G.lookP && !G.lookP.dead && G.lookP !== L ? G.lookP : null;
   U3.lookRing.visible = !!lp;
   if (lp) { const rr = (lp.child ? 9 : 13) + Math.sin(t * 6) * 0.8; U3.lookRing.position.set(lp.x, ghE(lp.x, lp.y) + 1, lp.y); U3.lookRing.children[0].scale.set(rr, 1, rr); U3.lookRing.children[1].position.y = (lp.child ? 34 : 50) + Math.sin(t * 4) * 2; U3.lookRing.children[1].rotation.y = t * 2; MAT.ring.opacity = 0.65 + Math.sin(t * 6) * 0.15; }
-  const cm = peek && U3.builds.get(G.inside.b), mo = cm && cm.g.userData.mouth;
-  if (mo) for (const m of mo) m.visible = false;                 // içeriden bakarken ağzın karanlık kapağı görüşü kapatmasın
+  const cm = peek && U3.builds.get(G.inside.b), mo = cm && [cm.g];
+  if (mo) for (const m of mo) m.visible = false;                 // içeriden bakarken mağaranın dış kaya kütlesi görüşü kapatmasın (tünel çerçeveler)
+  if (peek) { const pb = G.inside.b, a = pb.ang || 0, ez = pb.r * 0.92, nx = -Math.sin(a), nz = Math.cos(a), mx = pb.x + nx * ez, mz = pb.y + nz * ez;
+    PORT.clip = PORT.clip || new THREE.Plane(); PORT.clip.normal.set(nx, 0, nz); PORT.clip.constant = -(nx * mx + nz * mz) - 12; U3.r.clippingPlanes = [PORT.clip]; }
   U3.r.render(U3.scene, cam);
+  if (peek) U3.r.clippingPlanes = [];
   if (mo) for (const m of mo) m.visible = true;
   if (peek) return render3DInterior(dt, t, yaw, pitch, bobY, sh, true);
   cavPortalPass(t, cam);
@@ -1916,6 +1919,17 @@ function caveTunnel(W, H) {
   const add = q => { pos.push(q[0], q[1], q[2]); cc.copy(base).multiplyScalar(0.55 + q[3] * 0.7); col.push(cc.r, cc.g, cc.b); };
   for (let v = 0; v < NV; v++) for (let u = 0; u < NU; u++) { const a = P[v][u], b = P[v][u + 1], c = P[v + 1][u], d = P[v + 1][u + 1]; [a, c, b, b, c, d].forEach(add); }
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); g.computeVertexNormals();
+  return new THREE.Mesh(g, MAT.caveRock);
+}
+// tünel ağzı çevresinde kaya perde: kabukta tünel için açılan boşluğu kapatır (içeriden dış dünya sızmasın)
+function caveCollar(W, H) {
+  const s = new THREE.Shape(); s.moveTo(-240, -40); s.lineTo(240, -40); s.lineTo(240, 240); s.lineTo(-240, 240); s.lineTo(-240, -40);
+  const h = new THREE.Path(); h.moveTo(44, -20); for (let i = 0; i <= 18; i++) { const a = i / 18 * Math.PI; h.lineTo(Math.cos(a) * 44, Math.sin(a) * 76); } h.lineTo(-44, -20); h.lineTo(44, -20);
+  s.holes.push(h);
+  const g = new THREE.ShapeGeometry(s, 6); g.translate(W / 2, 0, H + 14);
+  const p = g.attributes.position, col = new Float32Array(p.count * 3), cc = new THREE.Color(), base = c3('#4c4038');
+  for (let i = 0; i < p.count; i++) { const n = fbm3(p.getX(i) * 0.03, p.getY(i) * 0.03, 7); cc.copy(base).multiplyScalar(0.5 + n * 0.6); col[i * 3] = cc.r; col[i * 3 + 1] = cc.g; col[i * 3 + 2] = cc.b; }
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3)); g.computeVertexNormals();
   return new THREE.Mesh(g, MAT.caveRock);
 }
 function caveFloor(W, H, hx, hz) {
@@ -2139,7 +2153,7 @@ function inBuild(b) {
   if (st === 'cave') {
     const hz = main ? main.y : H * 0.6;
     shell = caveShell(W, H, hz); root.add(shell);
-    root.add(caveTunnel(W, H)); root.add(caveFloor(W, H, main ? main.x : W / 2, hz));
+    root.add(caveTunnel(W, H)); root.add(caveCollar(W, H)); root.add(caveFloor(W, H, main ? main.x : W / 2, hz));
     root.updateMatrixWorld(true);
     ceil = (x, z) => { const h = inRay([shell], x, 6, z, 0, 1, 0, 400); return h ? h.point.y : 140; };
     // sarkıt ve dikitler
