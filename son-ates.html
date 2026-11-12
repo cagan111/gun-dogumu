@@ -10635,7 +10635,7 @@ function inBuild(b) {
   else { ov.scale.set(110, 120, 1); ov.position.set(W / 2, 50, H / 2 + 260); }
   ov.rotation.y = Math.PI; root.add(ov); IN.out = [ov];
   for (const [x, y, z, w, h] of X.windows || []) { const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), ov.material); m.scale.set(h, w, 1); m.position.set(x, y, z); m.rotation.y = -Math.PI / 2; root.add(m); IN.out.push(m); }
-  IN.mouthGlow = sprite(TEX.glow, 0xffffff, true, false); IN.mouthGlow.position.set(door.x, 44, st === 'tent' ? H / 2 + 180 : door.y + (st === 'cave' ? 40 : 14)); IN.mouthGlow.scale.set(260, 200, 1); root.add(IN.mouthGlow);
+  IN.mouthGlow = sprite(TEX.glow, 0xffffff, true, false); IN.mouthGlow.position.set(door.x, 44, st === 'tent' ? H / 2 + 180 : door.y + (st === 'cave' ? 40 : 14)); IN.mouthGlow.scale.set(260, 200, 1); root.add(IN.mouthGlow); IN.mouthGlow.visible = st !== 'cave';
   // gün ışığı huzmeleri (mağara ağzından içeri)
   IN.shafts = [];
   if (false) for (let i = 0; i < 3; i++) { const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: TEX.shaft, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: false, color: 0xfff0d8 }));
@@ -10685,7 +10685,7 @@ function inAnimate(t, b) {
   for (let i = 0; i < 6; i++) {
     const l = IN.lights[i], pl = IN.pl[i];
     if (!l) { pl.intensity = 0; continue; }
-    if (l.door) { pl.color.copy(_col); pl.intensity = 0.25 + day * 1.4; }
+    if (l.door) { pl.color.copy(_col); pl.intensity = IN.kind === 'magara' ? 0.1 + day * 0.35 : 0.25 + day * 1.4; }
     else { pl.color.setHex(l.col); const f = l.fl ? 0.86 + Math.sin(t * 9.3 + i * 2) * 0.07 + Math.sin(t * 23.1 + i) * 0.05 + Math.sin(t * 3.7 + i * 5) * 0.05 : 1; pl.intensity = l.int * f; }
     pl.distance = l.dist; pl.position.set(l.x + (l.fl ? Math.sin(t * 7 + i) * 1.5 : 0), l.y + (l.fl ? Math.sin(t * 11 + i) * 1.2 : 0), l.z);
   }
