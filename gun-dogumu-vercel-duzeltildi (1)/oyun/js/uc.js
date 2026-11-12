@@ -596,13 +596,19 @@ function terReset() {
   if (TER.group) for (const n of TER.nodes.values()) { TER.group.remove(n.m); n.m.geometry.dispose(); }
   TER.nodes.clear(); TER.want = TER.wantSet = TER.shown = null; TER.wx = 1e9;
 }
+const REALG = { on: { value: 0 }, g: { value: null }, s: { value: null }, r: { value: null }, c: { value: null } };
+function realGround() {
+  if (REALG.started || typeof location === 'undefined' || location.protocol === 'file:') return; REALG.started = true;
+  const L = new THREE.TextureLoader(), list = [['g', 'forest_ground_04'], ['s', 'coast_sand_01'], ['r', 'dark_rock'], ['c', 'aerial_grass_rock']]; let n = 0;
+  for (const [k, f] of list) L.load(REAL.base + 'tex/' + f + '_diff.jpg', t => { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = U3.r.capabilities.getMaxAnisotropy(); REALG[k].value = t; if (++n === list.length) REALG.on.value = 1; });
+}
 function initTerrainMat() {
   const m = MAT.terrain = new THREE.MeshLambertMaterial({ vertexColors: true });
   U3.fogCap = { value: 0.86 }; U3.fogLift = { value: 0.3 };
   m.onBeforeCompile = sh => {
-    Object.assign(sh.uniforms, { tGround: { value: TEX.ground }, tNoise: { value: TEX.noise }, uTime: U3.uTime, uFogCap: U3.fogCap, uFogLift: U3.fogLift });
+    Object.assign(sh.uniforms, { tGround: { value: TEX.ground }, tNoise: { value: TEX.noise }, uTime: U3.uTime, uFogCap: U3.fogCap, uFogLift: U3.fogLift, uReal: REALG.on, tRG: REALG.g, tRS: REALG.s, tRR: REALG.r, tRC: REALG.c });
     sh.vertexShader = 'attribute float aG;\nattribute float aSnow;\nvarying float vSnow;\nvarying float vG;\nvarying float vSlope;\nvarying vec3 vWP;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\nvG = aG; vSnow = aSnow; vSlope = clamp(1.0 - abs(normal.y), 0.0, 1.0); vWP = (modelMatrix * vec4(transformed, 1.0)).xyz;');
-    sh.fragmentShader = 'varying float vSnow;\nvarying float vG;\nvarying float vSlope;\nvarying vec3 vWP;\nuniform sampler2D tGround;\nuniform sampler2D tNoise;\nuniform float uTime;\nuniform float uFogCap;\nuniform float uFogLift;\n' + sh.fragmentShader
+    sh.fragmentShader = 'varying float vSnow;\nvarying float vG;\nvarying float vSlope;\nvarying vec3 vWP;\nuniform sampler2D tGround;\nuniform sampler2D tNoise;\nuniform float uTime;\nuniform float uFogCap;\nuniform float uFogLift;\nuniform float uReal;\nuniform sampler2D tRG;\nuniform sampler2D tRS;\nuniform sampler2D tRR;\nuniform sampler2D tRC;\n' + sh.fragmentShader
       .replace('#include <color_fragment>', `#include <color_fragment>
         float g1 = texture2D(tGround, vWP.xz / 150.0).r;
         float g2 = texture2D(tNoise, vWP.xz / 64.0).r;
@@ -618,6 +624,17 @@ function initTerrainMat() {
         float strata = 0.5 + 0.5 * sin(vWP.y * 0.13 + g2 * 3.0 + g3 * 5.0);
         vec3 rock = mix(vec3(0.30, 0.285, 0.25), vec3(0.49, 0.46, 0.39), smoothstep(0.25, 0.75, strata));
         diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * 0.55 + rock * 0.45, cliff);
+        if (uReal > 0.5) {   // gerçek fotoğraf dokuları (Poly Haven): orman tabanı / kum / kaya, yakında; uzakta eski renk
+          vec2 uv = vWP.xz / 70.0, uv2 = vWP.xz / 260.0;
+          vec3 pg = mix(texture2D(tRG, uv).rgb, texture2D(tRG, uv2 + 0.31).rgb, 0.35);
+          pg = mix(pg, mix(texture2D(tRC, uv * 0.6).rgb, texture2D(tRC, uv2).rgb, 0.3), smoothstep(0.15, 0.7, gk));
+          vec3 ps = texture2D(tRS, uv * 0.8).rgb, pr = texture2D(tRR, vec2(vWP.x + vWP.z, vWP.y) / 90.0).rgb;
+          vec3 ph = mix(mix(pg, ps, sk), pr, cliff);
+          float lum = dot(diffuseColor.rgb, vec3(0.333)) + 0.001;
+          vec3 tint = mix(vec3(1.0), diffuseColor.rgb / lum, 0.45);
+          float nf = (1.0 - smoothstep(700.0, 2200.0, distance(cameraPosition.xz, vWP.xz))) * (1.0 - snowMask) * (1.0 - gk * 0.0);
+          diffuseColor.rgb = mix(diffuseColor.rgb, ph * tint * lum * 2.1, nf * 0.85);
+        }
         float wl = 0.25 * sin(uTime * 0.9 + (vWP.x + vWP.z * 0.6) * 0.012);
         float shr = 1.0 - smoothstep(0.0, 0.45, abs(vWP.y - wl));
         float fw = 0.5 + 0.5 * sin(uTime * 1.3 + (vWP.x * 0.7 + vWP.z) * 0.05 + g2 * 9.0);
@@ -2439,6 +2456,7 @@ const REAL_SET = {
 };
 function realR(kind) { return kind === 'tree' || kind === 'conifer' ? (REAL.low ? 200 : 420) : kind === 'rock' ? (REAL.low ? 300 : 800) : (REAL.low ? 200 : 520); }
 function realStart() {
+  realGround();
   if (REAL.started) return;
   if (typeof THREE.GLTFLoader !== 'function' || (typeof location !== 'undefined' && location.protocol === 'file:')) { REAL.started = true; REAL.why = typeof THREE.GLTFLoader !== 'function' ? 'yükleyici yok' : 'dosyadan açıldı'; if (typeof msg === 'function') msg('🌲 Gerçekçi modeller kapalı (' + REAL.why + ')', '#e99', 6); return; }
   REAL.started = true;
