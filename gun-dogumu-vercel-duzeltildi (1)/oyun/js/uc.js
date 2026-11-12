@@ -1061,6 +1061,7 @@ function caveMesh(b, ghost) {
   const d1 = new THREE.Mesh(GEO.box, MAT.dark); d1.scale.set(54, 40, 26); d1.position.set(0, 20, ez - 12); g.add(d1);
   const d2 = new THREE.Mesh(GEO.arch, MAT.dark); d2.scale.set(27, 22, 1); d2.position.set(0, 40, ez + 1.2); g.add(d2);
   const d3 = new THREE.Mesh(new THREE.PlaneGeometry(54, 40), MAT.dark); d3.position.set(0, 20, ez + 1.15); g.add(d3);
+  g.userData.mouth = [d1, d2, d3];
   const gl = new THREE.Mesh(GEO.arch, new THREE.MeshBasicMaterial({ map: TEX.glow, color: 0xff8a3a, transparent: true, opacity: 0, depthWrite: false, fog: false })); gl.scale.set(26, 44, 1); gl.position.set(0, 0, ez + 1.5); g.add(gl); g.userData.glow = gl;
   return g;
 }
@@ -1651,8 +1652,9 @@ function render3D(dt) {
   U3.eye += (eyeT - U3.eye) * Math.min(1, dt * 7);
   const mvK = U3.vmSway || 0, bobY = Math.sin(U3.bob) * (L.sneak ? 0.6 : 1.0) * mvK, sh = Math.min(G.shake || 0, 20);
   let yaw = G.yaw === undefined ? (L.ang || 0) : G.yaw, pitch = G.pitch || 0, px = L.x, py = L.y;
-  if (G.inside) return render3DInterior(dt, t, yaw, pitch, bobY, sh);
-  if (IN.b) interiorExit();
+  let peek = null;
+  if (G.inside) { peek = cavPeekT(); if (!peek) return render3DInterior(dt, t, yaw, pitch, bobY, sh); }
+  else cavOutside();
   if (G.sleep && G.sleep.b) { const b = G.sleep.b; px = b.x; py = b.y + b.r + 16; yaw = Math.PI / 2; pitch = 0.05; }
   const gT = ghE(px, py);
   if (U3.gY === undefined || Math.abs(gT - U3.gY) > 40) U3.gY = gT; else U3.gY += (gT - U3.gY) * Math.min(1, dt * 14);
@@ -1661,6 +1663,7 @@ function render3D(dt) {
   const fov = U3.baseFov / (1 + (G.scare || 0) * 0.14) * (L.sprinting && L.moving ? 1.04 : 1);
   if (Math.abs(cam.fov - fov) > 0.01 || cam.aspect !== U3.camA) { cam.fov += (fov - cam.fov) * Math.min(1, dt * 6); if (Math.abs(cam.fov - fov) < 0.05) cam.fov = fov; U3.camA = cam.aspect; cam.updateProjectionMatrix(); }
   cam.updateMatrixWorld();
+  if (peek) cavPeekCam(peek, yaw, pitch, bobY);
   // ---- arazi, deniz, otlar
   if (!U3.sl) U3.sl = seasonLook();
   terUpdate(cam.position.x, cam.position.z, U3.frame < 3 ? 1e9 : 8);
@@ -1700,8 +1703,82 @@ function render3D(dt) {
   const lp = G.lookP && !G.lookP.dead && G.lookP !== L ? G.lookP : null;
   U3.lookRing.visible = !!lp;
   if (lp) { const rr = (lp.child ? 9 : 13) + Math.sin(t * 6) * 0.8; U3.lookRing.position.set(lp.x, ghE(lp.x, lp.y) + 1, lp.y); U3.lookRing.children[0].scale.set(rr, 1, rr); U3.lookRing.children[1].position.y = (lp.child ? 34 : 50) + Math.sin(t * 4) * 2; U3.lookRing.children[1].rotation.y = t * 2; MAT.ring.opacity = 0.65 + Math.sin(t * 6) * 0.15; }
+  const cm = peek && U3.builds.get(G.inside.b), mo = cm && cm.g.userData.mouth;
+  if (mo) for (const m of mo) m.visible = false;                 // içeriden bakarken ağzın karanlık kapağı görüşü kapatmasın
   U3.r.render(U3.scene, cam);
+  if (mo) for (const m of mo) m.visible = true;
+  if (peek) return render3DInterior(dt, t, yaw, pitch, bobY, sh, true);
+  cavPortalPass(t, cam);
   return true;
+}
+
+// =============================================================
+//  MAĞARA AĞZI PORTALI: dışarıdan ağza bakınca içerisi canlı görünür;
+//  içeriden tünele gelince dış dünya görünür. İç koordinat -> dünya: cavPortalT
+//  (tünel ucu y = H + CAV_TUN_K, dış ağız düzlemine oturur; rampa aşağı iner).
+// =============================================================
+const PORT = { scene: null, mask: null, cam: null, T: new THREE.Matrix4(), Ti: new THREE.Matrix4(), m: new THREE.Matrix4(), q: new THREE.Quaternion(), v: new THREE.Vector3(), sc: new THREE.Vector3(), on: false };
+function cavPortalT(b) {
+  const e = U3.builds && U3.builds.get(b); if (!e || b.dead || !b.built) return null;
+  e.g.updateMatrixWorld();
+  const D = inDims(b), te = cavTunEnd(b), fe = cavFloorH(D.w / 2, te);
+  PORT.m.makeTranslation(-D.w / 2, -fe, b.r * 0.92 - te);
+  return PORT.T.multiplyMatrices(e.g.matrixWorld, PORT.m);
+}
+// içeride, tünele yakınken: dış dünyayı da çizmek için dönüşüm
+function cavPeekT() {
+  const I = G.inside, b = I && I.b; if (!b || b.type !== 'magara' || !U3.builds) return null;
+  if (I.y < inDims(b).h - 170) return null;
+  return cavPortalT(b);
+}
+function cavPeekCam(T, yaw, pitch, bobY) {
+  const I = G.inside, cam = U3.cam;
+  cam.position.set(I.x, inFloorY(I.x, I.y) + U3.eye + bobY, I.y);
+  cam.rotation.set(clamp(pitch, -1.45, 1.45), -yaw - Math.PI / 2, 0);
+  cam.updateMatrix(); PORT.m.multiplyMatrices(T, cam.matrix); PORT.m.decompose(cam.position, cam.quaternion, PORT.sc);
+  cam.updateMatrixWorld();
+}
+// dışarıda: kamera dünyaya döner; mağara dışındaki iç sahne bırakılır, mağaranınki portal için kalır
+function cavOutside() {
+  if (U3.cam.parent !== U3.scene) { cav3Clear(); cavPlaceStop(); U3.scene.add(U3.cam); U3.gY = undefined; }
+  if (IN.b && (IN.b !== G.cave || IN.b.dead)) interiorExit();
+}
+function cavPortalInit() {
+  if (PORT.scene) return;
+  PORT.scene = new THREE.Scene();
+  const mat = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false, stencilWrite: true, stencilRef: 1, stencilFunc: THREE.AlwaysStencilFunc, stencilZPass: THREE.ReplaceStencilOp, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -4 });
+  const g = PORT.mask = new THREE.Group(); g.matrixAutoUpdate = false;
+  const a = new THREE.Mesh(GEO.arch, mat); a.scale.set(27, 22, 1); a.position.set(0, 40, 0);
+  const pl = new THREE.Mesh(new THREE.PlaneGeometry(54, 40), mat); pl.position.set(0, 20, 0);
+  g.add(a, pl); PORT.scene.add(g);
+  PORT.cam = new THREE.PerspectiveCamera();
+}
+function inStencil(on) {
+  IN.scene.traverse(o => { const m = o.material; if (!m) return; for (const mm of Array.isArray(m) ? m : [m]) { mm.stencilWrite = on; if (on) { mm.stencilFunc = THREE.EqualStencilFunc; mm.stencilRef = 1; mm.stencilFail = mm.stencilZFail = mm.stencilZPass = THREE.KeepStencilOp; } } });
+}
+function cavPortalPass(t, cam) {
+  const b = G.cave; if (!b || b.type !== 'magara' || b.dead || !b.built || G.sleep) return;
+  const e = U3.builds.get(b); if (!e) return;
+  const a = b.ang || 0, ez = b.r * 0.92, mx = b.x - Math.sin(a) * ez, mz = b.y + Math.cos(a) * ez;
+  const dx = cam.position.x - mx, dz = cam.position.z - mz, dist = Math.hypot(dx, dz);
+  const far = U3.quality === 'dusuk' ? 1400 : 2600;
+  if (dist > far) { if (IN.b && dist > far + 600) interiorExit(); return; }
+  if (-Math.sin(a) * dx + Math.cos(a) * dz < 1) return;                     // ağzın arkasından bakılıyor
+  PORT.v.set(mx, ghE(mx, mz) + 30, mz).project(cam);
+  if (PORT.v.z > 1 || Math.abs(PORT.v.x) > 1.6 || Math.abs(PORT.v.y) > 1.8) return;   // ekranda değil
+  cavPortalInit(); inSync(b);
+  const T = cavPortalT(b); if (!T) return;
+  PORT.Ti.copy(T).invert();
+  const pc = PORT.cam; PORT.m.multiplyMatrices(PORT.Ti, cam.matrixWorld); PORT.m.decompose(pc.position, pc.quaternion, PORT.sc);
+  pc.projectionMatrix.copy(cam.projectionMatrix); pc.projectionMatrixInverse.copy(cam.projectionMatrixInverse); pc.updateMatrixWorld();
+  inAnimate(t, b);
+  for (const o of IN.out) o.visible = false;
+  const fg = IN.scene.fog, n0 = fg.near, f0 = fg.far; fg.near = n0 + dist * 0.6; fg.far = f0 + dist * 0.6;
+  PORT.mask.matrix.copy(e.g.matrixWorld); PORT.mask.matrix.multiply(PORT.m.makeTranslation(0, 0, ez + 1.3)); PORT.mask.matrixWorldNeedsUpdate = true; PORT.mask.updateMatrixWorld(true);
+  const r = U3.r; r.autoClear = false;
+  r.render(PORT.scene, cam); r.clearDepth();
+  inStencil(true); r.render(IN.scene, pc); inStencil(false);
+  r.autoClear = true; fg.near = n0; fg.far = f0;
 }
 
 // dünya noktası -> ekran (CSS px). z: kameranın önündeyse > 0 (uzaklık), arkadaysa < 0
@@ -1722,9 +1799,11 @@ const IN = { b: null, key: '', scene: null, root: null, ppl: new Map(), lights: 
 function inKind() { const b = (G.inside && G.inside.b) || IN.b; return b ? b.type : ''; }
 function inFloorY(x, y) {
   const k = inKind();
-  if (k === 'magara') return 2.2 + 1.6 * Math.sin(x * 0.045 + 1.3) * Math.sin(y * 0.038) + 1.1 * Math.sin(x * 0.11 + y * 0.09);
+  if (k === 'magara') return cavFloorH(x, y);
   return k === 'kulube' ? 2 : 0.8;
 }
+// mağara zemini: tünelde (y > H+20) ağza doğru yükselen rampa — dışarıdan içeri aşağı inilir
+function cavFloorH(x, y) { return 2.2 + 1.6 * Math.sin(x * 0.045 + 1.3) * Math.sin(y * 0.038) + 1.1 * Math.sin(x * 0.11 + y * 0.09) + Math.max(0, y - 480) * 0.6; }
 function inInit() {
   if (IN.scene) return;
   const sc = IN.scene = new THREE.Scene();
@@ -1821,7 +1900,8 @@ function caveShell(W, H, hz) {
   const vcol = q => { cc.copy(base).multiplyScalar(0.55 + q[3] * 0.75 + (q[4] - 0.5) * 0.3); if (q[1] < 20) cc.multiplyScalar(0.75); if (Math.sin(q[0] * 0.09 + q[3] * 9) > 0.86) cc.lerp(wet, 0.5); const hd = Math.hypot(q[0] - cx, q[2] - hz); if (q[1] > 60 && hd < 220) cc.lerp(soot, (1 - hd / 220) * 0.75); return cc; };
   const tri = (a, b, c) => {
     const my = (a[1] + b[1] + c[1]) / 3, mz = (a[2] + b[2] + c[2]) / 3, mx = (a[0] + b[0] + c[0]) / 3;
-    if (mz > H - 4 && Math.abs(mx - cx) < 46 && my < 78) return;   // mağara ağzı
+    { const x0 = Math.min(a[0], b[0], c[0]), x1 = Math.max(a[0], b[0], c[0]), z1 = Math.max(a[2], b[2], c[2]), y0 = Math.min(a[1], b[1], c[1]);
+      if (z1 > H - 8 && x1 > cx - 64 && x0 < cx + 64 && y0 < 150 && mz > H * 0.55) return; }   // mağara ağzı: tünel boşluğuna giren kabuk üçgenleri
     for (const q of [a, b, c]) { pos.push(q[0], q[1], q[2]); const k = vcol(q); col.push(k.r, k.g, k.b); }
   };
   for (let j = 0; j < NP; j++) for (let i = 0; i < NT; i++) { const a = V[j][i], b = V[j][i + 1], c = V[j + 1][i], d = V[j + 1][i + 1]; tri(a, c, b); tri(b, c, d); }
@@ -1831,7 +1911,7 @@ function caveShell(W, H, hz) {
 // ---- ağız tüneli: kemer biçimli kısa geçit, ucunda dış dünya ışığı
 function caveTunnel(W, H) {
   const cx = W / 2, pos = [], col = [], NU = 12, NV = 6, P = [];
-  for (let v = 0; v <= NV; v++) { const z = H - 6 + v * 22, row = []; for (let u = 0; u <= NU; u++) { const a = u / NU * Math.PI, n = fbm3(u * 0.7, v * 0.6, 4.2); row.push([cx + Math.cos(a) * (50 + (n - 0.5) * 22 + v * 3), Math.sin(a) * (78 + (n - 0.5) * 18 + v * 2) - 4, z + (n - 0.5) * 8, n]); } P.push(row); }
+  for (let v = 0; v <= NV; v++) { const z = H - 6 + v * 22, row = []; for (let u = 0; u <= NU; u++) { const a = u / NU * Math.PI, n = fbm3(u * 0.7, v * 0.6, 4.2); row.push([cx + Math.cos(a) * (50 + (n - 0.5) * 22 + v * 3), Math.sin(a) * (78 + (n - 0.5) * 18 + v * 11) - 4, z + (n - 0.5) * 8, n]); } P.push(row); }
   const cc = new THREE.Color(), base = c3('#5e5148');
   const add = q => { pos.push(q[0], q[1], q[2]); cc.copy(base).multiplyScalar(0.55 + q[3] * 0.7); col.push(cc.r, cc.g, cc.b); };
   for (let v = 0; v < NV; v++) for (let u = 0; u < NU; u++) { const a = P[v][u], b = P[v][u + 1], c = P[v + 1][u], d = P[v + 1][u + 1]; [a, c, b, b, c, d].forEach(add); }
@@ -1843,7 +1923,8 @@ function caveFloor(W, H, hx, hz) {
   const p = pg.attributes.position, col = new Float32Array(p.count * 3), cc = new THREE.Color(), dirt = c3('#4c3e32'), ash = c3('#5c5752'), path = c3('#6a5a48'), stone = c3('#5a524a');
   for (let i = 0; i < p.count; i++) {
     const x = p.getX(i), z = p.getZ(i), out = Math.max(0, -x, x - W, -z, z - H - 20);
-    const y = 2.2 + 1.6 * Math.sin(x * 0.045 + 1.3) * Math.sin(z * 0.038) + 1.1 * Math.sin(x * 0.11 + z * 0.09) + out * 0.45 + (out > 0 ? fbm3(x * 0.05, 0, z * 0.05) * 12 : 0);
+    const tn = z > H && Math.abs(x - W / 2) < 70 ? clamp((Math.abs(x - W / 2) - 30) / 40, 0, 1) : 1;
+    const y = 2.2 + 1.6 * Math.sin(x * 0.045 + 1.3) * Math.sin(z * 0.038) + 1.1 * Math.sin(x * 0.11 + z * 0.09) + out * 0.45 + Math.max(0, z - H - 20) * 0.15 + (out > 0 ? fbm3(x * 0.05, 0, z * 0.05) * 12 * tn : 0);
     p.setY(i, y);
     const n = fbm3(x * 0.03, 1, z * 0.03);
     cc.copy(dirt).multiplyScalar(0.7 + n * 0.6); if (n > 0.62) cc.lerp(stone, 0.6);
@@ -2198,18 +2279,14 @@ function interiorExit() {
   if (U3.cam.parent !== U3.scene) U3.scene.add(U3.cam);
   U3.gY = undefined;
 }
-function render3DInterior(dt, t, yaw, pitch, bobY, sh) {
-  const I = G.inside, b = I.b, cam = U3.cam;
+function inSync(b) {
   const furnitureRev = b.type === 'magara' && typeof cavFurnitureSync === 'function' ? cavFurnitureSync(b).rev || 0 : 0;
   const key = b.type + '|' + (b.rooms || []).join() + '|' + Math.round(b.x) + ',' + Math.round(b.y) + '|' + furnitureRev;
-  if (IN.b !== b || IN.key !== key) { if (IN.root) { IN.scene.remove(IN.root); inDispose(); } inBuild(b); IN.key = key; }
-  if (cam.parent !== IN.scene) IN.scene.add(cam);
+  if (IN.b !== b || IN.key !== key) { inInit(); if (IN.root) { IN.scene.remove(IN.root); inDispose(); } inBuild(b); IN.key = key; }
+}
+// iç sahnenin ışık, toz ve insan canlandırması (içeriden ya da ağızdan bakarken)
+function inAnimate(t, b) {
   const D = IN.D;
-  cam.position.set(I.x + (Math.random() - 0.5) * sh * 0.3, inFloorY(I.x, I.y) + U3.eye + bobY, I.y + (Math.random() - 0.5) * sh * 0.3);
-  cam.rotation.set(clamp(pitch, -1.45, 1.45), -yaw - Math.PI / 2, Math.sin(U3.bob * 0.5) * 0.006 * (U3.vmSway || 0));
-  const fov = U3.baseFov / (1 + (G.scare || 0) * 0.14);
-  if (cam.fov !== fov || cam.aspect !== U3.camA) { cam.fov = fov; U3.camA = cam.aspect; cam.updateProjectionMatrix(); }
-  cam.updateMatrixWorld();
   // dış ışık: gündüz parlak, gece lacivert
   const dk = U3.dk = darkness(), day = 1 - clamp(dk / 0.95, 0, 1), ph = phase();
   let warm = 0; if (ph > 0.38 && ph < 0.6) warm = clamp((ph - 0.38) / 0.1, 0, 1) * day;
@@ -2250,10 +2327,23 @@ function render3DInterior(dt, t, yaw, pitch, bobY, sh) {
     for (const q of list) { if (!q.p || q.p === L) continue; const sl = q.pose === 'sleep'; instAdd(m, ...inShadowArgs(q.x, q.y, sl ? 17 : 8.5, sl ? 9 : 7.5, -q.ang, sl ? 4 : 30)); }
     instDone(m); MAT.inShadow.opacity = 0.5 - 0.15 * (1 - dk);
   }
+}
+function render3DInterior(dt, t, yaw, pitch, bobY, sh, overlay) {
+  const I = G.inside, b = I.b, cam = U3.cam;
+  inSync(b);
+  if (cam.parent !== IN.scene) IN.scene.add(cam);
+  cam.position.set(I.x + (Math.random() - 0.5) * sh * 0.3, inFloorY(I.x, I.y) + U3.eye + bobY, I.y + (Math.random() - 0.5) * sh * 0.3);
+  cam.rotation.set(clamp(pitch, -1.45, 1.45), -yaw - Math.PI / 2, Math.sin(U3.bob * 0.5) * 0.006 * (U3.vmSway || 0));
+  const fov = U3.baseFov / (1 + (G.scare || 0) * 0.14);
+  if (cam.fov !== fov || cam.aspect !== U3.camA) { cam.fov = fov; U3.camA = cam.aspect; cam.updateProjectionMatrix(); }
+  cam.updateMatrixWorld();
+  inAnimate(t, b);
   updFlames(t); updViewModel(dt, t);
-  U3.r.setClearColor(0x000000, 1);
   cav3Render();
-  U3.r.render(IN.scene, cam);
+  // overlay: dış dünya önce çizildi (ağızdan görünen); iç sahne üstüne, sahte dış ışık levhası gizli
+  for (const o of IN.out) o.visible = !overlay;
+  if (overlay) { U3.r.autoClear = false; U3.r.clearDepth(); U3.r.render(IN.scene, cam); U3.r.autoClear = true; }
+  else { U3.r.setClearColor(0x000000, 1); U3.r.render(IN.scene, cam); }
   return true;
 }
 

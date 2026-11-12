@@ -9,6 +9,8 @@
 //    inFurn(b)   -> [{ k, x, y, ang, room, t }]     eşyalar (k: bed, crate, hearth, table, bench, block, rack, healbed, herbs, door, torch, paint)
 //    inPeople(b) -> [{ p, x, y, ang, pose }]         pose: sleep | work | sit | eat | stand
 // =============================================================
+// tünelin dış ucu (iç y): dış ağız düzlemine denk gelir; arada yukarı çıkan rampa (uc.js cavFloorH)
+function cavTunEnd(b) { return inDims(b).h + 112; }
 function inDims(b) { const n = (b.rooms || [0]).length; return b.type === 'magara' ? { w: 600, h: 460, wallH: 120 } : n > 1 ? { w: 400, h: 320, wallH: 80 } : { w: 220, h: 200, wallH: 70 }; }
 function inLegacyRooms(b) {
   const D = inDims(b), rooms = (b.type === 'magara' ? b.rooms : typeof roomsOf === 'function' ? roomsOf(b) : b.rooms) || ['bos'], n = rooms.length, out = [];
@@ -265,7 +267,7 @@ function cavWalkEnter(fromX, fromY) {
     const yaw=G.yaw, pitch=G.pitch;
     enterBuilding(b);
     if (!G.inside || G.inside.b !== b) return false;
-    G.inside.x=inDims(b).w/2+side; G.yaw=yaw-a; G.pitch=pitch;
+    G.inside.x=inDims(b).w/2+side; G.inside.y=cavTunEnd(b)-3; G.yaw=yaw-a; G.pitch=pitch;
     L.x=b.x;L.y=b.y;L.insideB=b;G.interact=null;G.lookP=null;G.actT=G.actProg=0;
     return true;
   }
@@ -275,7 +277,7 @@ function exitBuilding(walk = false) {
   if (!G.inside) return; const I=G.inside, b=I.b, D=b ? inDims(b) : null, yaw=G.yaw;
   G.inside=null;L.insideB=null;
   if (b && !b.dead) {
-    const q=b.type==='magara'?cavMouth(b,clamp(I.x-D.w/2,-22,22),26):stnPos(b);
+    const q=b.type==='magara'?cavMouth(b,clamp(I.x-D.w/2,-22,22),walk?3:26):stnPos(b);
     L.x=q.x;L.y=q.y+(b.type==='magara'?0:16);
   }
   G.yaw=walk&&b&&b.type==='magara'?yaw+(b.ang||0):Math.PI/2+(b&&b.type==='magara'?b.ang||0:0);
@@ -284,8 +286,11 @@ function exitBuilding(walk = false) {
 }
 function inMove(mx, my, spd, dt) {
   const I = G.inside, D = inDims(I.b); let x = I.x + mx * spd * dt, y = I.y + my * spd * dt;
-  if (I.b.type==='magara' && my>0 && y>=D.h-10 && Math.abs(x-D.w/2)<=26) { exitBuilding(true); return; }
-  x = clamp(x, 14, D.w - 14); y = clamp(y, 14, D.h - 10);
+  const cav = I.b.type === 'magara', te = cav ? cavTunEnd(I.b) : 0;
+  if (cav && y >= te && Math.abs(x - D.w / 2) <= 26) { exitBuilding(true); return; }
+  // mağarada ağız tüneli yürünür (rampa); dar geçit
+  if (cav && y > D.h - 10) { x = clamp(x, D.w / 2 - 30, D.w / 2 + 30); y = Math.min(y, te + 2); }
+  else { x = clamp(x, 14, D.w - 14); y = clamp(y, 14, cav && Math.abs(x - D.w / 2) <= 30 ? te + 2 : D.h - 10); }
   for (const f of inFurn(I.b)) { if (f.k === 'door' || f.k === 'paint' || f.k === 'torch' || f.k === 'mat') continue; const r = f.k === 'table' ? 30 : f.k === 'hearth' ? 22 : 18, dx = x - f.x, dy = y - f.y, d = Math.hypot(dx, dy); if (d < r && d > 0.01) { x = f.x + dx / d * r; y = f.y + dy / d * r; } }
   // duvar, sütun ve kaya bölmeleri (çizici tanımlar): içinden geçilmez
   if (typeof inSolids === 'function') for (const o of inSolids(I.b)) { const dx = x - o.x, dy = y - o.y, d = Math.hypot(dx, dy), r = o.r + 9; if (d < r && d > 0.01) { x = o.x + dx / d * r; y = o.y + dy / d * r; } }
