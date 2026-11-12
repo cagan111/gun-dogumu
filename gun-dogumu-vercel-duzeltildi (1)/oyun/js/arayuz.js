@@ -17,6 +17,9 @@ addEventListener('keydown', e => {
   if (e.code === 'KeyN' && first && typeof sesMute === 'function') sesMute();
   if (!playing()) return;
   if (G.sleep) { if (first) wakeUp('Uyandın.'); return; }
+  if (e.code === 'Escape' && CAV_PLACE.recipe) { cavPlaceStop(); return; }
+  if (e.code === 'KeyR' && first && CAV_PLACE.recipe) { CAV_PLACE.ang = (CAV_PLACE.ang + Math.PI / 2) % TAU; e.preventDefault(); return; }
+  if (e.code === 'KeyE' && first && cavPlaceAct()) return;
   if (e.code === 'KeyE' && first) onActPress();
   if (e.code === 'KeyU' && first) trySleep();
   if ((e.code === 'KeyB' || e.code === 'KeyQ') && first) toggleMenu();
@@ -52,6 +55,7 @@ cv.addEventListener('pointerdown', e => {
     return;
   }
   if (!locked()) { try { const r = cv.requestPointerLock(); if (r && r.catch) r.catch(() => {}); } catch (_) {} return; }
+  if (CAV_PLACE.recipe) { if (e.button === 2) cavPlaceStop(); else cavPlaceConfirm(); return; }
   if (G.huntMode && e.button !== 2) { pickHuntTarget(); return; }
   if (e.button === 2) { if (G.placing) cancelPlace(); else mouse.right = true; return; }
   if (G.placing) { tryPlace(); return; }
@@ -90,7 +94,7 @@ if (isTouch) {
   joy.addEventListener('pointerup', end); joy.addEventListener('pointercancel', end);
   const hold = (id, k) => {
     const el = $(id);
-    el.addEventListener('pointerdown', e => { audioInit(); e.preventDefault(); if (G.sleep) { wakeUp('Uyandın.'); return; } if (k === 'atk' && G.huntMode) { pickHuntTarget(); return; } touch[k] = true; if (k === 'atk' && G.placing) { tryPlace(); touch[k] = false; } if (k === 'act') onActPress(); });
+    el.addEventListener('pointerdown', e => { audioInit(); e.preventDefault(); if (G.sleep) { wakeUp('Uyandın.'); return; } if (CAV_PLACE.recipe && (k === 'atk' || k === 'shoot')) { cavPlaceConfirm(); return; } if (k === 'act' && cavPlaceAct()) return; if (k === 'atk' && G.huntMode) { pickHuntTarget(); return; } touch[k] = true; if (k === 'atk' && G.placing) { tryPlace(); touch[k] = false; } if (k === 'act') onActPress(); });
     const up = () => touch[k] = false; el.addEventListener('pointerup', up); el.addEventListener('pointerleave', up); el.addEventListener('pointercancel', up);
   };
   hold('tAtk', 'atk'); hold('tAct', 'act'); hold('tRun', 'run'); hold('tShoot', 'shoot');
@@ -361,6 +365,7 @@ function openInterior(b) {
   if (!playing()) return;
   if (!b) b = interiorTargets().filter(x => dist(x, L) < x.r + 220).sort((a, c) => dist(a, L) - dist(c, L))[0] || G.cave;
   if (!b) return;
+  if (b.type === 'magara') { closeInterior(); if (!G.inside || G.inside.b !== b) { msg('Eşya yerleştirmek için mağaranın içine gir.', '#cde', 3); return; } cavPlaceStart(); return; }
   UI.inB = b; UI.cavDraft = null; UI.cavNote = ''; UI.cavAngle = 0; G.tutIn = true; $('inM').style.display = 'flex'; G.modal = true; if (G.placing) cancelPlace(); renderInterior();
 }
 function closeInterior() { UI.inB = null; $('inM').style.display = 'none'; G.modal = !!UI.char || $('craft').style.display === 'flex'; }
@@ -381,7 +386,7 @@ function occupants(b) {
 const IN_HITS = [];
 function renderInterior() {
   const b = UI.inB; if (!b || b.dead) { closeInterior(); return; }
-  if (b.type === 'magara') return cavRenderPlanner(b);
+  if (b.type === 'magara') { closeInterior(); cavPlaceStart(); return; }
   const c = $('inC'), W = Math.round(Math.min(700, innerWidth * 0.92, innerHeight * 0.5 / 0.56)), H = Math.round(W * 0.56);
   if (c.width !== Math.round(W * DPR)) { c.width = Math.round(W * DPR); c.height = Math.round(H * DPR); c.style.width = W + 'px'; c.style.height = H + 'px'; }
   const g = c.getContext('2d'); g.setTransform(DPR, 0, 0, DPR, 0, 0);
@@ -426,48 +431,64 @@ function renderInterior() {
   h += `<p class="hint" style="padding:0 12px 10px">İçerideki birine dokun: karakter kartı açılır. Sol/sağ ok ile diğer yapılara geç.</p>`;
   $('inInfo').innerHTML = h;
 }
-// Mağara planı: dokunmatik ve fare aynı yerel koordinat dönüşümünü kullanır.
 const CAV_UI_NAMES = { mat: 'Yer yatağı', bed: 'Yatak', crate: 'Sandık', rack: 'Raf', hearth: 'Ocak', table: 'Masa', bench: 'Zanaat tezgâhı', bowbench: 'Yay tezgâhı', tannery: 'Deri tezgâhı', healbed: 'Tedavi yatağı', herbs: 'Şifa masası', block: 'Kasap kütüğü' };
 function cavUiName(f) { const key = f.recipe || (f.k === 'bench' && f.t === 'okcu' ? 'bowbench' : f.k === 'bench' && f.t === 'tabak' ? 'tannery' : f.k); return CAV_UI_NAMES[key] || 'Eşya'; }
-function cavRenderPlanner(b) {
-  const c = $('inC'), W = Math.round(Math.min(700, innerWidth * .88, innerHeight * .5 / .56)), H = Math.round(W * .56), D = inDims(b);
-  c.width = Math.round(W * DPR); c.height = Math.round(H * DPR); c.style.width = W + 'px'; c.style.height = H + 'px'; c.style.touchAction = 'none';
-  const g = c.getContext('2d'); g.setTransform(DPR, 0, 0, DPR, 0, 0); g.fillStyle = '#17130e'; g.fillRect(0, 0, W, H);
-  const scale = Math.min((W - 24) / D.w, (H - 24) / D.h), ox = (W - D.w * scale) / 2, oy = (H - D.h * scale) / 2;
-  UI.cavMap = { x: ox, y: oy, s: scale };
-  g.strokeStyle = '#887052'; g.lineWidth = 2; g.strokeRect(ox, oy, D.w * scale, D.h * scale);
-  g.fillStyle = '#423a30'; if (typeof inSolids === 'function') for (const o of inSolids(b)) { g.beginPath(); g.arc(ox + o.x * scale, oy + o.y * scale, o.r * scale, 0, TAU); g.fill(); }
-  const data = cavFurnitureSync(b);
-  for (const f of data.items) { g.save(); g.translate(ox + f.x * scale, oy + f.y * scale); g.rotate(f.ang || 0); g.fillStyle = f.built ? (f.k === 'healbed' || f.k === 'herbs' ? '#8fae9a' : '#b39a70') : '#537d99'; g.fillRect(-10 * scale, -18 * scale, 20 * scale, 36 * scale); g.restore(); }
-  g.fillStyle = '#e9d8b2'; g.font = '11px Georgia'; g.textAlign = 'center'; g.fillText('GİRİŞ', ox + D.w * scale / 2, H - 2);
-  if (!Object.hasOwn(CAV_FURN_RECIPES, UI.cavRecipe)) UI.cavRecipe = 'bed';
-  const def = CAV_FURN_RECIPES[UI.cavRecipe], draft = UI.cavDraft, valid = !!draft && cavFurnitureCanPlace(b, UI.cavRecipe, draft.x, draft.y);
-  if (draft) { g.save(); g.translate(ox + draft.x * scale, oy + draft.y * scale); g.rotate(UI.cavAngle || 0); g.fillStyle = valid ? '#7cce8a' : '#d86e60'; g.globalAlpha = .8; g.fillRect(-14 * scale, -22 * scale, 28 * scale, 44 * scale); g.restore(); }
-  let h = `<div class="ch"><b>Mağara — eşya yerleşimi</b><button data-ix="close" aria-label="Kapat">✕</button></div>`;
-  h += `<div style="padding:8px 12px"><label>Eşya <select id="cavRecipe" style="min-height:44px;max-width:100%">${Object.entries(CAV_UI_NAMES).map(([key,name]) => `<option value="${key}" ${key === UI.cavRecipe ? 'selected' : ''}>${name}</option>`).join('')}</select></label><p>${costTxt(def.cost)} · Temel iş: ${def.work} sn<br>${canAfford(def.cost) ? 'Malzemeler hazır.' : 'Malzemeler eksik; plan mimar ve malzeme gelene kadar bekler.'}</p>`;
-  h += `<p id="cavPlacementHint">${draft ? valid ? 'Konum uygun. Planı ekleyebilirsin.' : 'Bu konum çakışıyor veya sınır dışında. Başka yere dokun.' : 'Planda boş bir yere dokunarak konum seç.'}</p><button data-cav-action="rotate" style="min-height:44px">Döndür (${Math.round((UI.cavAngle || 0) / Math.PI * 180) % 360}°)</button> <button data-cav-action="queue" style="min-height:44px" ${valid ? '' : 'disabled'}>Planı ekle</button><p role="status">${UI.cavNote || ''}</p><p class="hint">Menüyü kapatınca mimarlar çalışır. İnşaata başlarken malzeme bir kez alınır.</p>`;
-  const pending = data.items.map((f,i)=>({f,i})).filter(o=>!o.f.built);
-  h += `<h4>İnşa planları (${pending.length})</h4>`;
-  for (const {f,i} of pending) { const refund = cavFurnitureRefund(f), recipe = CAV_FURN_RECIPES[f.recipe]; const status = f.paid ? `İnşa: %${Math.floor(f.prog * 100)}` : recipe && !canAfford(recipe.cost) ? 'Malzeme bekliyor' : 'Mimar bekliyor'; h += `<div style="margin:6px 0;padding:6px;border:1px solid #66543d"><b>${cavUiName(f)}</b> — ${status}<br><button data-cav-cancel="${i}" style="min-height:44px">Planı iptal et</button> <small>İade: ${refund && Object.keys(refund).length ? costTxt(refund) : 'yok'}</small></div>`; }
-  const counts = {}; for (const f of data.items.filter(f=>f.built)) { const name = cavUiName(f); counts[name] = (counts[name] || 0) + 1; }
-  h += `<details><summary>Tamamlanan eşyalar (${data.items.filter(f=>f.built).length})</summary><p>${Object.entries(counts).map(([name,n])=>`${name}: ${n}`).join(' · ')}</p></details><p class="hint">İptalde yalnız kullanılmamış malzeme iade edilir. Tamamlanmış eşyalar bu ekrandan sökülmez.</p></div>`;
-  const box = $('inInfo'); if (box._cavH !== h) { box._cavH = h; box.innerHTML = h; }   // yalnız içerik değişince: tıklama/odak kaybolmasın
+// Birinci şahıs eşya yerleştirme: harita/modal yok, dünya çalışmayı sürdürür.
+function cavPlaceStart() {
+  if (!G.inside || G.inside.b.type !== 'magara' || G.sleep || G.over) return;
+  toggleMenu(false); if (G.placing) cancelPlace(); G.huntMode = false;
+  CAV_PLACE.b = G.inside.b; CAV_PLACE.recipe = 'bed'; CAV_PLACE.ang = 0;
+  mouse.down = mouse.right = false; touch.atk = touch.act = touch.shoot = false;
+  cavPlaceAim(); cavPlacePanel();
 }
-$('inM').addEventListener('change', e => { if (e.target.id === 'cavRecipe' && UI.inB && UI.inB.type === 'magara') { UI.cavRecipe = e.target.value; cavRenderPlanner(UI.inB); } });
-$('inM').addEventListener('click', e => {
-  const button = e.target.closest('[data-cav-action],[data-cav-cancel]'), b = UI.inB; if (!button || !b || b.type !== 'magara') return;
-  e.preventDefault();
-  if (button.dataset.cavAction === 'rotate') UI.cavAngle = ((UI.cavAngle || 0) + Math.PI / 2) % TAU;
-  else if (button.dataset.cavAction === 'queue' && UI.cavDraft) {
-    const f = cavFurnitureQueue(b, UI.cavRecipe, UI.cavDraft.x, UI.cavDraft.y, UI.cavAngle || 0);
-    UI.cavNote = f ? 'Plan eklendi. Menüyü kapatıp mimarların çalışmasını bekle.' : 'Plan eklenemedi. Boş bir konum seç.';
-    if (f) UI.cavDraft = null;
-  } else if (button.dataset.cavCancel !== undefined) {
-    const f = cavFurnitureSync(b).items[+button.dataset.cavCancel];
-    UI.cavNote = f && cavFurnitureCancel(b, f.id) ? 'Plan iptal edildi; kullanılmamış malzemeler iade edildi.' : 'Plan iptal edilemedi. İade için depoda yer aç.';
+function cavPlaceConfirm() { const f = cavPlaceCommit(); if (f) unlockPtr(); cavPlacePanel(); return f; }
+function cavPlaceAct() {
+  if (G.paused || G.modal || G.sleep || !G.inside) return false;
+  if (CAV_PLACE.recipe) { cavPlaceConfirm(); return true; }
+  const f = cavPendingLook(); if (!f) return false;
+  UI.cavCancel = f.id; unlockPtr(); cavPlacePanel(); return true;
+}
+function cavPlacePanel() {
+  let el = $('cavPlaceBar');
+  if (!el) {
+    el = document.createElement('div'); el.id = 'cavPlaceBar';
+    el.style.cssText = 'position:fixed;z-index:35;bottom:12px;left:50%;transform:translateX(-50%);width:min(430px,calc(100vw - 260px));min-width:180px;padding:8px;background:#17130eeb;border:1px solid #9b835b;border-radius:8px;color:#eadcc0;pointer-events:auto;font:13px Georgia';
+    document.body.appendChild(el);
+    el.addEventListener('pointerdown', e => e.stopPropagation());
+    el.addEventListener('change', e => { if (e.target.id === 'cavRecipe') { CAV_PLACE.recipe = e.target.value; cavPlaceAim(); } });
+    el.addEventListener('click', e => {
+      const btn = e.target.closest('[data-cav3]'); if (!btn) return;
+      const a = btn.dataset.cav3;
+      if (a === 'start') cavPlaceStart();
+      else if (a === 'rotate') CAV_PLACE.ang = (CAV_PLACE.ang + Math.PI / 2) % TAU;
+      else if (a === 'place') cavPlaceConfirm();
+      else if (a === 'stop') { cavPlaceStop(); UI.cavCancel = null; }
+      else if (a === 'cancel') {
+        const f = cavPendingLook();
+        if (f && f.id === UI.cavCancel) msg(cavFurnitureCancel(G.inside.b, f.id) ? 'Plan iptal edildi; kullanılmayan malzeme iade edildi.' : 'İade için depoda yer aç.', '#cde', 3);
+        UI.cavCancel = null;
+      }
+      cavPlacePanel();
+    });
   }
-  cavRenderPlanner(b);
-});
+  const active = playing() && G.inside && G.inside.b.type === 'magara' && !G.sleep && !G.paused && !G.modal;
+  el.style.display = active ? 'block' : 'none';
+  if (!active) { cavPlaceStop(); UI.cavCancel = null; return; }
+  if (CAV_PLACE.recipe) cavPlaceAim();
+  const S = CAV_PLACE, f = cavPendingLook(), button = (a,t) => `<button data-cav3="${a}" style="min-height:44px;min-width:44px;margin:2px;background:#3d3325;color:#eadcc0;border:1px solid #9b835b;border-radius:4px">${t}</button>`;
+  if (!f || f.id !== UI.cavCancel) UI.cavCancel = null;
+  let h;
+  if (S.recipe) {
+    const def = CAV_FURN_RECIPES[S.recipe];
+    h = `<label>Eşya <select id="cavRecipe" style="min-height:44px;max-width:100%">${Object.entries(CAV_UI_NAMES).map(([k,n])=>`<option value="${k}" ${k===S.recipe?'selected':''}>${n}</option>`).join('')}</select></label><div>${costTxt(def.cost)} · ${def.work} sn</div><div id="cav3Status">${S.valid?'Konum uygun':'Çakışıyor / sınır dışında'} · ${Math.round(S.ang*180/Math.PI)}°</div>${button('rotate','Döndür (R)')}${button('place','Koy')}${button('stop','✕')}<div>Bak / yürü · Tık / E ile koy</div>`;
+  } else if (UI.cavCancel) {
+    const refund = cavFurnitureRefund(f);
+    h = `<div>${cavUiName(f)} · %${Math.floor((f.prog||0)*100)}<br>İade: ${refund&&Object.keys(refund).length?costTxt(refund):'yok'}</div>${button('cancel','Planı iptal et')}${button('stop','Vazgeç')}`;
+  } else h = button('start','Eşya yerleştir (I)') + (f ? `<div>${cavUiName(f)} · %${Math.floor((f.prog||0)*100)} · E: planı iptal et</div>` : '');
+  // Seçenek ve düğme DOM'u aynı kaldığında değiştirme: native select/focus korunur.
+  if (el._cavH !== h) { el.innerHTML = h; el._cavH = h; }
+}
+cv.addEventListener('wheel', e => { if (CAV_PLACE.recipe && !G.modal && !G.paused) { e.preventDefault(); CAV_PLACE.ang = (CAV_PLACE.ang + (e.deltaY > 0 ? 1 : -1)*Math.PI/2 + TAU) % TAU; } }, { passive: false });
 function drawRoomFurniture(g, t, x, y, w, h) {
   const R = mulberry32(Math.floor(x * 3 + y));
   if (t === 'yatak') for (let i = 0; i < 4; i++) { const bx = x + 18 + (i % 2) * (w / 2), by = y + h * 0.45 + Math.floor(i / 2) * h * 0.25; g.fillStyle = '#9a8048'; g.fillRect(bx, by, w / 2 - 30, 18); g.fillStyle = ['#7a3a3a', '#3a5a7a', '#5a7a3a', '#7a6a3a'][Math.floor(R() * 4)]; g.fillRect(bx + 14, by + 2, w / 2 - 46, 14); }
@@ -496,11 +517,6 @@ function drawMiniPerson(g, p, x, y) {
 $('inM').addEventListener('pointerdown', e => {
   if (e.target.id === 'inM') { closeInterior(); return; }
   if (e.target.id === 'inC') {
-    if (UI.inB && UI.inB.type === 'magara') {
-      const r = e.target.getBoundingClientRect(), m = UI.cavMap;
-      if (m) UI.cavDraft = { x: (e.clientX - r.left - m.x) / m.s, y: (e.clientY - r.top - m.y) / m.s };
-      cavRenderPlanner(UI.inB); return;
-    }
     const r = e.target.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
     const hit = IN_HITS.find(h => Math.hypot(h.x - x, h.y - y) < 22);
     if (hit) openChar(hit.id);
@@ -596,6 +612,7 @@ function updateShipGoalHUD() {
   }
 }
 function hudTick(dt) {
+  cavPlacePanel();
   UI.hudT -= dt; if (UI.hudT <= 0) { UI.hudT = 0.15; updateHUD(); renderMsgs(); }
   UI.goalT = (UI.goalT || 0) - dt; if (UI.goalT <= 0) { UI.goalT = 1; updateShipGoalHUD(); }
   else if (G.msgDirty) renderMsgs();

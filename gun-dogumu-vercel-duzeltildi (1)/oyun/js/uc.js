@@ -2132,7 +2132,14 @@ function inBuild(b) {
     }
     for (let i = 0; i < 3; i++) inFurniture(gb, { k: 'crate', x: cx - 70 + i * 34, y: 8, ang: 0 }, R, 'tent', X);
   }
-  for (const f of furn) inFurniture(gb, f, R, st, X);
+  for (const f of furn) {
+    if (st === 'cave' && f.source === 'placed' && Object.hasOwn(CAV_FURN_RECIPES, f.recipe)) {
+      const m = new THREE.Mesh(cav3Geometry(f.recipe).clone(), MAT.inV);
+      m.position.set(f.x, inFloorY(f.x, f.y), f.y); m.rotation.y = -(f.ang || 0); root.add(m);
+      // Envanterdeki ocak ışığı gerçek konumdan gelsin; hayalet ışık üretmez.
+      if (f.k === 'hearth') { X.flames.push([f.x, inFloorY(f.x,f.y)+8, f.y, 9]); X.lights.push({x:f.x,y:32,z:f.y,col:0xffa860,int:2,dist:300,pri:0,fl:1}); }
+    } else inFurniture(gb, f, R, st, X);
+  }
   if (st !== 'tent') inDividers(gb, b, D, st, R, X, ceil);
   // oda zeminleri: yatak odasına post, mutfağa kül, depoya saman
   for (const r of inRooms(b)) {
@@ -2185,6 +2192,7 @@ function inDispose() {
   IN.root = null;
 }
 function interiorExit() {
+  cav3Clear(); cavPlaceStop();
   if (IN.root) { IN.scene.remove(IN.root); inDispose(); }
   IN.b = null; IN.key = '';
   if (U3.cam.parent !== U3.scene) U3.scene.add(U3.cam);
@@ -2244,6 +2252,56 @@ function render3DInterior(dt, t, yaw, pitch, bobY, sh) {
   }
   updFlames(t); updViewModel(dt, t);
   U3.r.setClearColor(0x000000, 1);
+  cav3Render();
   U3.r.render(IN.scene, cam);
   return true;
+}
+
+// Yerleştirme hayaleti ve bekleyen iskeletler: tarif geometrisi paylaşılır,
+// ilerleme değişirken iç mekânın tamamı yeniden üretilmez.
+const CAV3 = { scene: null, root: null, b: null, geo: new Map(), plans: new Map(), ghost: null, recipe: null };
+function cav3Geometry(recipe) {
+  if (CAV3.geo.has(recipe)) return CAV3.geo.get(recipe);
+  const def = CAV_FURN_RECIPES[recipe], gb = new GB();
+  inFurniture(gb, { k: def.k, t: def.t, x: 0, y: 0, ang: 0 }, mulberry32(41), 'cave', {flames:[],lights:[],embers:[],decals:[],walls:[],hides:[]});
+  const geo = gb.mesh().geometry; geo.translate(0, -inFloorY(0,0), 0); CAV3.geo.set(recipe, geo); return geo;
+}
+function cav3Clear() {
+  if (CAV3.root) {
+    CAV3.root.traverse(m => { if (m.material) m.material.dispose(); });
+    if (CAV3.root.parent) CAV3.root.parent.remove(CAV3.root);
+  }
+  CAV3.root = null; CAV3.b = null; CAV3.ghost = null; CAV3.recipe = null; CAV3.plans.clear();
+}
+function cav3Mesh(recipe, col, wire) {
+  return new THREE.Mesh(cav3Geometry(recipe), new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:wire?.38:.48,wireframe:!!wire,depthWrite:false,side:THREE.DoubleSide}));
+}
+function cav3Render() {
+  const I = G.inside;
+  if (!I || I.b.type !== 'magara') { cav3Clear(); return; }
+  if (CAV3.b !== I.b || CAV3.scene !== IN.scene) {
+    cav3Clear(); CAV3.b = I.b; CAV3.scene = IN.scene; CAV3.root = new THREE.Group(); IN.scene.add(CAV3.root);
+  }
+  const root = CAV3.root, seen = new Set();
+  for (const f of cavFurnitureSync(I.b).items) {
+    if (f.built || !Object.hasOwn(CAV_FURN_RECIPES,f.recipe)) continue;
+    seen.add(f.id); let g = CAV3.plans.get(f.id);
+    if (!g) {
+      g = new THREE.Group(); const wire = cav3Mesh(f.recipe,0x80bde0,true), fill = cav3Mesh(f.recipe,0xa3c7dc,false);
+      fill.material.opacity = .12; g.add(wire,fill); CAV3.plans.set(f.id,g); root.add(g);
+    }
+    g.position.set(f.x,inFloorY(f.x,f.y),f.y); g.rotation.y = -(f.ang||0);
+    g.children[1].scale.y = Math.max(.03,clamp(f.prog||0,0,1));
+    g.children[1].material.opacity = .12 + .46*clamp(f.prog||0,0,1);
+  }
+  for (const [id,g] of CAV3.plans) if (!seen.has(id)) { root.remove(g); g.traverse(m=>{if(m.material)m.material.dispose()}); CAV3.plans.delete(id); }
+  const q = cavPlaceAim(), S = CAV_PLACE;
+  if (!q) { if(CAV3.ghost)CAV3.ghost.visible=false; return; }
+  if (CAV3.recipe !== S.recipe || !CAV3.ghost) {
+    if(CAV3.ghost){root.remove(CAV3.ghost);CAV3.ghost.material.dispose()}
+    CAV3.ghost = cav3Mesh(S.recipe,0x65ee8b,false); CAV3.recipe = S.recipe; root.add(CAV3.ghost);
+  }
+  const m = CAV3.ghost; m.visible = !G.modal && !G.paused && !G.sleep;
+  m.position.set(q.x,inFloorY(q.x,q.y),q.y); m.rotation.y = -S.ang;
+  m.material.color.setHex(S.valid?0x65ee8b:0xff5148);
 }

@@ -273,3 +273,35 @@ function inInteract() {
   }
   return best;
 }
+
+// Geçici yerleştirme durumu kayda girmez; yalnız mevcut mağarada geçerlidir.
+const CAV_PLACE = { b: null, recipe: null, ang: 0, point: null, valid: false };
+function cavPlaceStop() { CAV_PLACE.b = null; CAV_PLACE.recipe = null; CAV_PLACE.point = null; CAV_PLACE.valid = false; }
+function cavPlaceAim() {
+  const I = G.inside, S = CAV_PLACE;
+  if (!I || I.b !== S.b || I.b.dead || !Object.hasOwn(CAV_FURN_RECIPES, S.recipe)) { cavPlaceStop(); return null; }
+  // Bakışın zeminle kesişimi: ufka bakarken erişim mesafesinde tut.
+  const yaw = G.yaw || 0, pitch = G.pitch || 0, eye = typeof U3 !== 'undefined' ? U3.eye || 30 : 30;
+  let reach = pitch < -.06 ? eye / Math.tan(-pitch) : 145;
+  reach = clamp(reach, 45, 145);
+  const q = S.point = { x: I.x + Math.cos(yaw) * reach, y: I.y + Math.sin(yaw) * reach };
+  S.valid = cavFurnitureCanPlace(I.b, S.recipe, q.x, q.y); return q;
+}
+function cavPlaceCommit() {
+  const q = cavPlaceAim(), S = CAV_PLACE;
+  if (!q || !S.valid || G.paused || G.modal || G.sleep || G.over) return null;
+  const f = cavFurnitureQueue(S.b, S.recipe, q.x, q.y, S.ang);
+  if (f) cavPlaceStop(); return f;
+}
+function cavPendingLook() {
+  const I = G.inside; if (!I || I.b.type !== 'magara' || (G.pitch || 0) > .35) return null;
+  let best = null, score = .15;
+  for (const f of cavFurnitureSync(I.b).items) {
+    if (f.built) continue;
+    const dx = f.x - I.x, dy = f.y - I.y, d = Math.hypot(dx, dy);
+    if (d < 12 || d > 155) continue;
+    const aim = 1 - (dx * Math.cos(G.yaw || 0) + dy * Math.sin(G.yaw || 0)) / d;
+    if (aim < score) { best = f; score = aim; }
+  }
+  return best;
+}
