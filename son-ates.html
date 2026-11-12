@@ -4885,7 +4885,7 @@ function update(dt) {
   for (const c of G.carcs) { c.age += dt; if (!c.rotten && c.age > CYCLE * 1.2 && !G.builds.some(b => b.type === 'raf' && b.built && dist(b, c) < 300)) { c.rotten = true; } if (c.age > CYCLE * 2.5) c.dead = true; }
   G.carcs = G.carcs.filter(c => !c.dead);
   if (isNight() && G.carcs.length && Math.random() < dt * 0.02 / DAYK) { const c = pick(G.carcs); if (dist(c, G.fire) > 900) spawnPack('kucuk', ri(2, 4), { x: c.x + rand(-200, 200), y: c.y + rand(-200, 200) }, 'carcass'); }
-  if (G.sleep) sleepTick(dt); else updLeader(dt);
+  if (G.sleep) { sleepTick(dt); if (L && !L.dead) updInjury(L, dt); } else updLeader(dt);   // uykuda da yara/kanama ilerler
   for (const q of G.people) kbStep(q, dt);
   for (const p of G.people.slice()) if (p !== L && !p.dead) {
     const ox = p.x, oy = p.y; updPerson(p, dt, LS);
