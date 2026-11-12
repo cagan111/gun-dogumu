@@ -1513,16 +1513,32 @@ function updWeather3D(dt, t, dk) {
 //  IŞIK, GÖK, SİS
 // =============================================================
 const SKY = { dayZ: new THREE.Color(0x4a86c8), dayH: new THREE.Color(0xb4cbd8), nightZ: new THREE.Color(0x02030a), nightH: new THREE.Color(0x05070e), dusk: new THREE.Color(0xff9448), mist: new THREE.Color(0x9aa0a8), storm: new THREE.Color(0x565c66), z: new THREE.Color(), h: new THREE.Color(), t: new THREE.Color() };
+// Görsel geçişler simülasyonun darkness()/görüş/AI değerlerini değiştirmez.
+const ATMOS_WEATHER = {
+  acik: { color: new THREE.Color(0xa8c7de), fog: 1 },
+  yagmur: { color: new THREE.Color(0x718897), fog: 0.72 },
+  sis: { color: new THREE.Color(0xb2b9af), fog: 0.4 },
+  firtina: { color: new THREE.Color(0x4c586c), fog: 0.6 },
+  kar: { color: new THREE.Color(0xc8d7df), fog: 0.7 },
+  tipi: { color: new THREE.Color(0x9baebb), fog: 0.45 }
+};
+const atmosEase = dt => 1 - Math.exp(-Math.max(0, Math.min(1, dt)) * 0.8);
 function updAtmos(dt, t, LS) {
-  const dk = darkness(), p = phase(), w = G.weather.type, cam = U3.cam, cp = cam.position;
+  const targetDk = darkness(), p = phase(), w = G.weather.type, cam = U3.cam, cp = cam.position;
+  const weather = ATMOS_WEATHER[w === 'kar' && G.weather.heavy ? 'tipi' : w] || ATMOS_WEATHER.acik;
+  // Yeni dünya/kayıtta eski havanın görsel belleğini taşımama.
+  if (!U3.atmos || U3.atmos.world !== G.trees) U3.atmos = { world: G.trees, color: weather.color.clone(), dk: targetDk, lightDir: new THREE.Vector3() };
+  const ease = atmosEase(dt), at = U3.atmos;
+  at.color.lerp(weather.color, ease); at.dk += (targetDk - at.dk) * ease;
+  const dk = at.dk;
   const bm = biomeFast(L.x, L.y);
   // sis yoğunluğu hedefi (hava + sisli vadi), yumuşak geçiş
-  const tk = (w === 'sis' ? 0.4 : w === 'firtina' ? 0.6 : w === 'yagmur' ? 0.72 : w === 'kar' ? (G.weather.heavy ? 0.45 : 0.7) : 1) * (bm === 3 ? 0.42 : bm === 2 ? 0.8 : 1);
-  U3.fogK += (tk - U3.fogK) * Math.min(1, dt * 0.8);
+  const tk = weather.fog * (bm === 3 ? 0.42 : bm === 2 ? 0.8 : 1);
+  U3.fogK += (tk - U3.fogK) * ease;
   const grayK = clamp((1 - U3.fogK) * 1.5, 0, 1);
   let warm = 0;
   if (p < 0.1) warm = 1 - p / 0.1; else if (p > 0.34 && p < 0.6) warm = Math.min(1, (p - 0.34) / 0.1) * clamp(1 - (dk - 0.3) / 0.5, 0, 1); else if (p > 0.9) warm = (p - 0.9) / 0.1;
-  const dayH = SKY.t.copy(SKY.dayH).lerp(w === 'sis' || bm === 3 ? SKY.mist : SKY.storm, grayK * 0.9);
+  const dayH = SKY.t.copy(SKY.dayH).lerp(bm === 3 ? SKY.mist : at.color, grayK * 0.9);
   SKY.h.copy(dayH).lerp(SKY.dusk, warm * 0.5 * (1 - grayK * 0.7)).lerp(SKY.nightH, clamp(dk * 1.04, 0, 1));
   if (dk > 0.3 && grayK > 0) SKY.h.lerp(c3(0x1a1d24), grayK * 0.35 * dk);
   SKY.z.copy(SKY.dayZ).lerp(dayH, grayK * 0.85).lerp(SKY.nightZ, clamp(dk * 1.04, 0, 1));
@@ -1536,7 +1552,14 @@ function updAtmos(dt, t, LS) {
   U3.r.setClearColor(SKY.h, 1);
   // kubbe renkleri
   const dc = U3.dome.geometry.attributes.color, dp = U3.dome.geometry.attributes.position;
-  for (let i = 0; i < dp.count; i++) { const k = Math.pow(clamp(dp.getY(i) / 7000, 0, 1), 0.5); dc.setXYZ(i, SKY.h.r + (SKY.z.r - SKY.h.r) * k, SKY.h.g + (SKY.z.g - SKY.h.g) * k, SKY.h.b + (SKY.z.b - SKY.h.b) * k); }
+  const solarX = -Math.cos(clamp(p / 0.5, 0, 1) * Math.PI);
+  for (let i = 0; i < dp.count; i++) {
+    const k = Math.pow(clamp(dp.getY(i) / 7000, 0, 1), 0.5);
+    const towardSun = Math.max(0, (dp.getX(i) * solarX + dp.getZ(i) * 0.38) / 7000);
+    const glow = towardSun * towardSun * Math.pow(1 - k, 3) * warm * (1 - grayK) * (1 - dk) * 0.65;
+    const r = SKY.h.r + (SKY.z.r - SKY.h.r) * k, g = SKY.h.g + (SKY.z.g - SKY.h.g) * k, b = SKY.h.b + (SKY.z.b - SKY.h.b) * k;
+    dc.setXYZ(i, r + (SKY.dusk.r - r) * glow, g + (SKY.dusk.g - g) * glow, b + (SKY.dusk.b - b) * glow);
+  }
   dc.needsUpdate = true;
   U3.sky.position.set(cp.x, 0, cp.z);
   U3.stars.material.opacity = clamp((dk - 0.45) / 0.4, 0, 1) * 0.9 * clamp(U3.fogK * 1.6 - 0.6, 0, 1);
@@ -1557,8 +1580,12 @@ function updAtmos(dt, t, LS) {
   U3.hemi.intensity = (0.1 + 0.82 * day) * (dk > 0.5 ? 1 : dim) + (G.flash > 0 ? G.flash * 5 : 0);
   U3.hemi.color.copy(c3(0x6a7cae)).lerp(c3(0xd4e4ff), day).lerp(SKY.dusk, warm * 0.25);
   U3.hemi.groundColor.copy(c3(0x0c0e16)).lerp(c3(0x56603a), day);
-  if (day > 0.05) { U3.sun.intensity = 0.95 * day * (0.35 + 0.65 * clamp(sy * 2.5, 0, 1)) * dim * dim; U3.sun.color.copy(c3(0xfff0d0)).lerp(c3(0xff9a50), warm * 0.7); }
-  else { U3.sun.intensity = 0.1 * U3.moonS.material.opacity; U3.sun.color.set(0x8fa6e0); U3.sun.position.copy(cp).addScaledVector(_v2, 1000); }
+  const solar = THREE.MathUtils.smoothstep(day, 0.03, 0.18);
+  U3.sun.intensity = 0.95 * day * (0.35 + 0.65 * clamp(sy * 2.5, 0, 1)) * dim * dim * solar + 0.14 * U3.moonS.material.opacity * (1 - solar);
+  SKY.t.copy(c3(0xfff0d0)).lerp(c3(0xff9a50), warm * 0.7);
+  U3.sun.color.copy(c3(0x8fa6e0)).lerp(SKY.t, solar);
+  at.lightDir.copy(_v2).lerp(_v, solar).normalize();
+  U3.sun.position.copy(cp).addScaledVector(at.lightDir, 1000);
   // nokta ışıkları: lights() içinden en yakın MAXL tanesi
   const arr = [];
   for (const l of LS) { const d = Math.hypot(l.x - cp.x, l.y - cp.z); if (d < 1500) arr.push([d - l.r, l]); }
@@ -1570,7 +1597,9 @@ function updAtmos(dt, t, LS) {
     const l = e[1], mine = G.torchOn && l.x === L.x && l.y === L.y && !l.safe, tall = l.r / lightMul() > 188, ly = gh(l.x, l.y);
     pl.color.set(l.blue ? 0x4f86ff : l.red ? 0xff4a22 : mine ? 0xffa050 : 0xff9a40);
     pl.distance = l.r * (l.safe ? 1.9 : 1.75);
-    pl.intensity = (l.safe ? 2.5 : l.blue ? 2.2 : mine ? 2.0 : 1.9) * lk;
+    // Sabit zaman/faz: ek RNG tüketmez; mavi yarık ışığı sabit kalır.
+    const flicker = l.blue ? 1 : 1 + Math.sin(t * 11 + l.x * 0.01) * 0.055 + Math.sin(t * 23.7 + l.y * 0.01) * 0.025;
+    pl.intensity = (l.safe ? 2.5 : l.blue ? 2.2 : mine ? 2.0 : 1.9) * lk * flicker;
     if (mine) { _v.set(-5, -1, -6).applyQuaternion(cam.quaternion); pl.position.set(cp.x + _v.x, cp.y + _v.y, cp.z + _v.z); }
     else if (l.guard && U3.guardPos) pl.position.copy(U3.guardPos).y += 4;
     else pl.position.set(l.x, ly + (l.safe ? 26 : l.blue ? 50 : l.red ? 22 : tall ? 80 : 38), l.safe || l.blue || l.red ? l.y : l.y + (tall ? 10 : 20));
