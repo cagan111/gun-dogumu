@@ -54,8 +54,9 @@ Ada dünyası, 3B birinci şahıs, mağara içi, eylem menüsü, zimmet/yatak, a
 4. **Oda sistemi kalkıyor:** mağara içinde her eşya ayrı yerleştirilir (şifa yatağı, şifa tezgâhı, mutfak masası, pişirme tezgâhı, yatak, raf, zanaat tezgâhı…); malzeme+süre+iş; eski kayıtlar dönüştürülür. Muhafız ve yerleşim ilk girişte seçilir.
 5. **Gece/uyku:** muhafız mağara içinde kapıda; başlangıç yatakları kalkar; uyku yeri üç kademe: çıplak yer < yer yatağı (ucuz: ot/post) < gerçek yatak; kademeye göre homurdanma/mutsuzluk/dinlenme değişir (karakter özelliğine göre de: bazıları yere aldırmaz); içkiden sonra yavaş yavaş dağılıp yatar, bazıları uyumaz; muhafız gün gün nöbetleşir, uyuyakalabilir. Yamyam baskını ve taklitçi 15. güne kadar hiç olmadı → incele; mağaraya yalnız bu ikisi dalabilir.
 6. **Codex görsel/içerik sırası:** karakterler (pozlar `p.pose`, taşıma, yaralı, kan lekesi) → etçiller daha korkunç → ağaç/taş çeşitliliği → dağda keşfedilecek, içinden yaratık çıkan mağaralar → öğünler daha uzun + sırayla işe dönüş + tarlalar 2–3× büyük.
-7. Sonra: kış hazırlığı (kürk, kışlık odun uyarısı), depo/ambar + bozulma, ilişkiler, keşif, gemi finali, ayarlar menüsü, kayıt yuvaları, odun tekrar koşusu.
-8. Gerçek cihaz performansı ölçülmedi.
+7. **Moral ve ilişkiler (sahip istedi):** moralin iş etkisi şu an kaba (`moraleMul`: >70 ×1.15, <30 ×0.8) → kademeli ve görünür olsun (yüksek moral: hız, kalite, beceri kazanımı, hasat/üretim miktarı). Düşük moralde kişiler arası kavga (kişi kartında ilişki puanı, kavga olayı, yaralanma riski, araya girme). Eş olma şu an YALNIZ gelen çiftlerle oluyor (oyun.js ~432) → mevcut halk arasında yakınlık puanı (akşam muhabbeti, birlikte çalışma, kurtarma) ile flört → eş olma; eşler birlikte yatar, ayrılık/yas. Moral çok düşükse ayrılanlar (mevcut `desert` mantığı halk.js ~553–565 ve ~1210) daha görünür ve kademeli olsun.
+8. Sonra: kış hazırlığı (kürk, kışlık odun uyarısı), depo/ambar + bozulma, ilişkiler, keşif, gemi finali, ayarlar menüsü, kayıt yuvaları, odun tekrar koşusu.
+9. Gerçek cihaz performansı ölçülmedi.
 
 ## Şu an kim neyde
 - Codex: model3d.js (karakterler).
