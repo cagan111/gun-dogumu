@@ -58,6 +58,9 @@ function autoAim(range) {
 }
 function updLeader(dt) {
   const p = L;
+  // Sağlık, içeride/sofrada erken dönüş olsa da yalnız bir kez ilerler.
+  updInjury(p, dt);
+  if (p.dead || p !== L || G.over) return;
   if (G.yaw == null || isNaN(G.yaw)) { G.yaw = angTo(L, G.cave || G.fire); G.pitch = 0; }
   let mx = 0, my = 0;
   if (keys.KeyW || keys.ArrowUp) my -= 1; if (keys.KeyS || keys.ArrowDown) my += 1;
@@ -158,7 +161,6 @@ function updLeader(dt) {
     if (p.lastHurt > 5 && dist(p, G.fire) < fireR()) p.hp = Math.min(p.maxhp, p.hp + 2 * dt * (nearSifahane(p) ? 2 : 1));
     else if (p.lastHurt > 8) p.hp = Math.min(p.maxhp, p.hp + 0.3 * dt);
   }
-  updInjury(p, dt);
   // sırtındaki yaralı
   if (G.lcarry) {
     const q = G.lcarry;
@@ -736,7 +738,7 @@ function loadGame(s) {
     Object.assign(p, s2); p.inHut = null; p.homeT = null; p.bed = null; p.eq = {}; p.sk = Object.assign({}, p.sk || {});
     p.bag = s2.bag && typeof s2.bag === 'object' ? Object.assign({}, s2.bag) : {}; p.carry = +s2.carry || 0; p.cookGot = s2.cookGot || null; p.batch = s2.batch || null; p.cook = p.cook || 0;
     const ht = G.builds[s2.homeT]; if (s2.homeT >= 0 && ht && ht.type === 'cadir') moveHome(p, ht);
-    if (s2.bed) { const sb = G.builds[s2.bed[0]]; if (sb && sb.type === 'sifahane' && sb.built) { sb.beds[s2.bed[1]] = p.id; p.bed = { s: sb, i: s2.bed[1] }; } }
+    if (s2.bed) { const slot = healBedFor(G.builds[s2.bed[0]], s2.bed[1], p); if (slot) { slot.s.beds[slot.i] = p.id; p.bed = slot; } }
     G.people.push(p); if (p.leader) L = p;
   }
   if (!L) L = G.people[0];

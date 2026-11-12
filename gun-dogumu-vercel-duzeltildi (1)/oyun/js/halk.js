@@ -374,6 +374,14 @@ function needsCare(q) {
   return false;
 }
 function bedCount(b) { return b.type === 'sifahane' ? 4 : roomCount(b, 'sifa') * 2; }
+// Kayıt geri yükleme ve yatak ayırma aynı güncel kapasiteyi doğrular.
+function healBedFor(s, i, person) {
+  if (!s || !s.built || s.dead || !Number.isInteger(i) || i < 0 || i >= bedCount(s)) return null;
+  if (!Array.isArray(s.beds)) s.beds = [];
+  while (s.beds.length < bedCount(s)) s.beds.push(0);
+  if (s.beds[i] && (!person || s.beds[i] !== person.id)) return null;
+  return { s, i };
+}
 const sifahaneler = () => G.builds.filter(b => b.built && !b.dead && bedCount(b) > 0);
 function treat(q, healer) {
   if (q.downed > 0) { q.downed = 0; q.hp = Math.max(q.hp, 25); q.wasDowned = true; msg(`${q.name} ayağa kaldırıldı${sifahaneler().length ? ' — şifahanede dinlenmeli' : ''}.`, '#9f9', 3); }
@@ -411,7 +419,7 @@ function assignBeds() {
     if (q.bedRes && (q.bedRes.s.dead || !needsBed(q))) { q.bedRes.s.beds[q.bedRes.i] = 0; q.bedRes = null; }
     if (!needsBed(q) || q.bedRes) continue;
     let slot = null;
-    for (const s of S) { const i = s.beds.indexOf(0); if (i >= 0) { slot = { s, i }; break; } }
+    for (const s of S) { const i = s.beds.indexOf(0); if (i >= 0) { slot = healBedFor(s, i, q); if (slot) break; } }
     if (!slot) break;
     slot.s.beds[slot.i] = q.id; q.bedRes = slot;
   }

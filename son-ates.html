@@ -1704,6 +1704,14 @@ function needsCare(q) {
   return false;
 }
 function bedCount(b) { return b.type === 'sifahane' ? 4 : roomCount(b, 'sifa') * 2; }
+// Kayıt geri yükleme ve yatak ayırma aynı güncel kapasiteyi doğrular.
+function healBedFor(s, i, person) {
+  if (!s || !s.built || s.dead || !Number.isInteger(i) || i < 0 || i >= bedCount(s)) return null;
+  if (!Array.isArray(s.beds)) s.beds = [];
+  while (s.beds.length < bedCount(s)) s.beds.push(0);
+  if (s.beds[i] && (!person || s.beds[i] !== person.id)) return null;
+  return { s, i };
+}
 const sifahaneler = () => G.builds.filter(b => b.built && !b.dead && bedCount(b) > 0);
 function treat(q, healer) {
   if (q.downed > 0) { q.downed = 0; q.hp = Math.max(q.hp, 25); q.wasDowned = true; msg(`${q.name} ayağa kaldırıldı${sifahaneler().length ? ' — şifahanede dinlenmeli' : ''}.`, '#9f9', 3); }
@@ -1741,7 +1749,7 @@ function assignBeds() {
     if (q.bedRes && (q.bedRes.s.dead || !needsBed(q))) { q.bedRes.s.beds[q.bedRes.i] = 0; q.bedRes = null; }
     if (!needsBed(q) || q.bedRes) continue;
     let slot = null;
-    for (const s of S) { const i = s.beds.indexOf(0); if (i >= 0) { slot = { s, i }; break; } }
+    for (const s of S) { const i = s.beds.indexOf(0); if (i >= 0) { slot = healBedFor(s, i, q); if (slot) break; } }
     if (!slot) break;
     slot.s.beds[slot.i] = q.id; q.bedRes = slot;
   }
@@ -4088,6 +4096,9 @@ function autoAim(range) {
 }
 function updLeader(dt) {
   const p = L;
+  // Sağlık, içeride/sofrada erken dönüş olsa da yalnız bir kez ilerler.
+  updInjury(p, dt);
+  if (p.dead || p !== L || G.over) return;
   if (G.yaw == null || isNaN(G.yaw)) { G.yaw = angTo(L, G.cave || G.fire); G.pitch = 0; }
   let mx = 0, my = 0;
   if (keys.KeyW || keys.ArrowUp) my -= 1; if (keys.KeyS || keys.ArrowDown) my += 1;
@@ -4188,7 +4199,6 @@ function updLeader(dt) {
     if (p.lastHurt > 5 && dist(p, G.fire) < fireR()) p.hp = Math.min(p.maxhp, p.hp + 2 * dt * (nearSifahane(p) ? 2 : 1));
     else if (p.lastHurt > 8) p.hp = Math.min(p.maxhp, p.hp + 0.3 * dt);
   }
-  updInjury(p, dt);
   // sırtındaki yaralı
   if (G.lcarry) {
     const q = G.lcarry;
@@ -4766,7 +4776,7 @@ function loadGame(s) {
     Object.assign(p, s2); p.inHut = null; p.homeT = null; p.bed = null; p.eq = {}; p.sk = Object.assign({}, p.sk || {});
     p.bag = s2.bag && typeof s2.bag === 'object' ? Object.assign({}, s2.bag) : {}; p.carry = +s2.carry || 0; p.cookGot = s2.cookGot || null; p.batch = s2.batch || null; p.cook = p.cook || 0;
     const ht = G.builds[s2.homeT]; if (s2.homeT >= 0 && ht && ht.type === 'cadir') moveHome(p, ht);
-    if (s2.bed) { const sb = G.builds[s2.bed[0]]; if (sb && sb.type === 'sifahane' && sb.built) { sb.beds[s2.bed[1]] = p.id; p.bed = { s: sb, i: s2.bed[1] }; } }
+    if (s2.bed) { const slot = healBedFor(G.builds[s2.bed[0]], s2.bed[1], p); if (slot) { slot.s.beds[slot.i] = p.id; p.bed = slot; } }
     G.people.push(p); if (p.leader) L = p;
   }
   if (!L) L = G.people[0];
