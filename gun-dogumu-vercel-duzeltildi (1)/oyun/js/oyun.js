@@ -37,7 +37,7 @@ function newGame(diff, tutOn) {
   });
   G.cave = makeBuild('magara', CAMP.x, CAMP.y - 230, 0); finishBuild(G.cave, true);
   G.cave.rooms = BUILD.magara.rooms.slice();
-  msg('Halkın bir mağarada yaşıyor. Kapısına gidip E ile içeri gir; içeride dolaş, insanlara bakıp E ile emir ver.', '#cfe', 9);
+  msg('Halkın bir mağarada yaşıyor. Ağzından yürüyerek içeri gir; içeride dolaş, insanlara bakıp E ile emir ver.', '#cfe', 9);
   assignHomes(); autoDistribute(); assignEquip();
   msg('Kimsenin yatağı yok; herkes yerde yatıyor. Zanaatkâra 🛏️ Yatak ürettir ve kişilere ver.', '#cde', 9);
   G.tut = { on: !!tutOn, step: 0 };
@@ -73,7 +73,7 @@ function updLeader(dt) {
   if (G.inside) {
     const b = G.inside.b; if (!b || b.dead) { exitBuilding(); return; }
     p.moving = m > 0.1; p.sprinting = false; p.stam = clamp(p.stam + 16 * dt, 0, 100);
-    if (p.moving) { inMove(mx / m, my / m, 110 * Math.min(1, m) * (p.sneak ? 0.5 : 1), dt); p.anim += dt * 9; }
+    if (p.moving) { inMove(mx / m, my / m, 110 * Math.min(1, m) * (p.sneak ? 0.5 : 1), dt); p.anim += dt * 9; if (!G.inside) return; }
     { const I = G.inside, rm = inRooms(b).find(r => r.t === 'sifa' && I.x >= r.x && I.x <= r.x + r.w && I.y >= r.y && I.y <= r.y + r.h);
       const care = b.type === 'magara' ? inFurn(b).some(f => f.k === 'herbs' && Math.hypot(I.x - f.x, I.y - f.y) < 90) : !!rm;
       if (care) leaderHeal(dt, 5); else G.healT = 0; }
@@ -104,7 +104,9 @@ function updLeader(dt) {
     p.moving = m > 0.1;
     if (p.moving) {
       const k = Math.min(1, m), spd = pSpeed(p) * (p.sprinting ? 1.6 : 1);
+      const fromX=p.x, fromY=p.y;
       p.x += mx / m * spd * k * dt; p.y += my / m * spd * k * dt; pushOut(p, false);
+      if (cavWalkEnter(fromX,fromY)) return;
       p.anim += dt * (p.sprinting ? 14 : 9); G.tutMoved += spd * k * dt;
     }
   }
@@ -219,7 +221,7 @@ function findInteract() {
   }
   if (!G.carryEgg) for (const n of G.nests) if (n.eggs > 0) { const dd = dist(n, p) - n.r; if (dd < 30) consider(n, 'egg', dd - 10, 'Yumurta çal (anneler gelir!)'); }
   for (const c of G.carcs) { if (c.dead) continue; const dd = dist(c, p) - c.r; if (dd < 20) consider(c, 'carc', dd + 5, c.meat > 0 ? `Leşten çiğ et kes (${c.meat}) — et ustasına götürülmeli` : 'Leşten deri/kemik al'); }
-  for (const b of G.builds) if (b.built && (isRoomy(b) || b.type === 'cadir' || BUILD[b.type].rooms || ['sifahane', 'kasaphane', 'atolye'].includes(b.type))) { const dd = dist(b, p) - b.r; if (dd < 30) consider(b, 'info', dd + 15, enterable(b) ? `${BUILD[b.type].ic} ${BUILD[b.type].ad} — içeri gir` : `${BUILD[b.type].ic} ${BUILD[b.type].ad} — içini gör [I]`); }
+  for (const b of G.builds) if (b.type !== 'magara' && b.built && (isRoomy(b) || b.type === 'cadir' || BUILD[b.type].rooms || ['sifahane', 'kasaphane', 'atolye'].includes(b.type))) { const dd = dist(b, p) - b.r; if (dd < 30) consider(b, 'info', dd + 15, enterable(b) ? `${BUILD[b.type].ic} ${BUILD[b.type].ad} — içeri gir` : `${BUILD[b.type].ic} ${BUILD[b.type].ad} — içini gör [I]`); }
   for (const b of G.builds) if (b.built && b.type === 'tarla' && !b.dead) { const dd = dist(b, p) - b.r; if (dd < 20) { const k = cropOf(b); consider(b, 'field', dd + 20, `🌾 Tarla: ${CROPS[CROPS[b.crop] ? b.crop : k].ic} ${CROPS[CROPS[b.crop] ? b.crop : k].ad}${b.planted ? ' %' + Math.round(b.g * 100) : b.noSeed ? ' (tohum yok)' : ''} — ekini seç`); } }
   for (const b of G.builds) if (!b.built) { const dd = dist(b, p) - b.r; if (dd < 24) consider(b, 'build', dd, `${BUILD[b.type].ad} inşasına yardım et (${Math.floor(b.prog / b.need * 100)}%)`); }
   for (const w of G.wrecks || []) if (!w.found) { const dd = dist(w, p) - w.r; if (dd < 40) consider(w, 'wreck', dd - 30, 'Enkazı ara — basılı tut'); }
@@ -802,7 +804,7 @@ const TUT = [
   { t: '☰ Eylemler → İnşa: bir ⛺ Çadır planla (önüne bak, Saldır / tıkla). Mimarlar inşa eder.', done: () => G.builds.some(b => b.type !== 'magara') },
   { t: 'Üretim menüsünü aç (C) ve zanaatkârlara bir emir ver: balta, kazma, ok...', done: () => G.orders.length > 0 || IORDER.some(k => k !== 'mizrak' && k !== 'balta' && k !== 'bandaj' && k !== 'ilac' && G.stock[k] > 0) },
   { t: 'Kâşif grubuna birini ekle (🧭), sonra haritada (M) bilinmeyen bir yere dokun.', done: () => !!G.zone.kasif },
-  { t: 'Mağaranın kapısına git ve E / Topla ile içeri gir. İçeride birine bakıp E ile emir ver; I ile odaları düzenle.', done: () => !!G.tutIn },
+  { t: 'Mağara ağzından yürüyerek gir; çıkmak için ağızdan dışarı yürü. İçeride birine bakıp E ile emir ver; I ile eşya yerleştir.', done: () => !!G.tutIn },
   { t: 'Halkın büyümesi için yer gerekir: ⛺ çadır (1 hane), 🛖 kulübe ya da yeni bir yatakhane odası (2 hane). Yeni insanlar çok nadir gelir; her canın kıymeti var.', done: () => freeHomes() > 0 || G.builds.some(b => b.type === 'kulube' || b.type === 'cadir') },
   { t: 'Gece geliyor. Ateşi doldur, halkını ışıkta tut. İyi şanslar.', done: () => isNight() }
 ];

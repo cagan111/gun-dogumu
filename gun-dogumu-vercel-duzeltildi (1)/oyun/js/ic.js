@@ -247,12 +247,44 @@ function enterBuilding(b) {
   const D = inDims(b); G.inside = { b, x: D.w / 2, y: D.h - 34 }; G.yaw = -Math.PI / 2; G.pitch = 0;
   if (G.placing) cancelPlace(); G.huntMode = false; G.tutIn = true; SFX.pickup && SFX.pickup();
 }
-function exitBuilding() {
-  if (!G.inside) return; const b = G.inside.b; G.inside = null; L.insideB = null;
-  if (b && !b.dead) { const q = stnPos(b); L.x = q.x; L.y = q.y + 16; } G.yaw = Math.PI / 2; G.pitch = 0; pushOut(L, false);
+// Dış çizicideki ağız +yerel y yönünde, r*.92; yapı dönüşünü de izle.
+function cavMouth(b, side = 0, out = 0) {
+  const a = b.ang || 0, c = Math.cos(a), sn = Math.sin(a), y = b.r * .92 + out;
+  return { x: b.x + side * c - y * sn, y: b.y + side * sn + y * c };
+}
+function cavWalkEnter(fromX, fromY) {
+  if (!L || G.inside || G.mount || G.sleep || G.over || L.dead || L.downed || L.grabbed || Math.hypot(L.x-fromX,L.y-fromY)>80) return false;
+  for (const b of G.builds) {
+    if (b.type !== 'magara' || !enterable(b)) continue;
+    const a = b.ang || 0, c = Math.cos(a), sn = Math.sin(a), mouth = b.r * .92;
+    const x0=(fromX-b.x)*c+(fromY-b.y)*sn, y0=-(fromX-b.x)*sn+(fromY-b.y)*c;
+    const x1=(L.x-b.x)*c+(L.y-b.y)*sn, y1=-(L.x-b.x)*sn+(L.y-b.y)*c;
+    if (y0 < mouth || y1 >= mouth || y1 >= y0) continue;
+    const t=(y0-mouth)/(y0-y1), side=x0+(x1-x0)*t;
+    if (Math.abs(side)>22) continue;
+    const yaw=G.yaw, pitch=G.pitch;
+    enterBuilding(b);
+    if (!G.inside || G.inside.b !== b) return false;
+    G.inside.x=inDims(b).w/2+side; G.yaw=yaw-a; G.pitch=pitch;
+    L.x=b.x;L.y=b.y;L.insideB=b;G.interact=null;G.lookP=null;G.actT=G.actProg=0;
+    return true;
+  }
+  return false;
+}
+function exitBuilding(walk = false) {
+  if (!G.inside) return; const I=G.inside, b=I.b, D=b ? inDims(b) : null, yaw=G.yaw;
+  G.inside=null;L.insideB=null;
+  if (b && !b.dead) {
+    const q=b.type==='magara'?cavMouth(b,clamp(I.x-D.w/2,-22,22),26):stnPos(b);
+    L.x=q.x;L.y=q.y+(b.type==='magara'?0:16);
+  }
+  G.yaw=walk&&b&&b.type==='magara'?yaw+(b.ang||0):Math.PI/2+(b&&b.type==='magara'?b.ang||0:0);
+  if (!walk) G.pitch=0;
+  cavPlaceStop();G.interact=null;G.lookP=null;G.actT=G.actProg=0;pushOut(L,false);
 }
 function inMove(mx, my, spd, dt) {
   const I = G.inside, D = inDims(I.b); let x = I.x + mx * spd * dt, y = I.y + my * spd * dt;
+  if (I.b.type==='magara' && my>0 && y>=D.h-10 && Math.abs(x-D.w/2)<=26) { exitBuilding(true); return; }
   x = clamp(x, 14, D.w - 14); y = clamp(y, 14, D.h - 10);
   for (const f of inFurn(I.b)) { if (f.k === 'door' || f.k === 'paint' || f.k === 'torch' || f.k === 'mat') continue; const r = f.k === 'table' ? 30 : f.k === 'hearth' ? 22 : 18, dx = x - f.x, dy = y - f.y, d = Math.hypot(dx, dy); if (d < r && d > 0.01) { x = f.x + dx / d * r; y = f.y + dy / d * r; } }
   // duvar, sütun ve kaya bölmeleri (çizici tanımlar): içinden geçilmez
@@ -266,7 +298,7 @@ function inInteract() {
   const test = (x, y, o, maxD) => { const dx = x - I.x, dy = y - I.y, d = Math.hypot(dx, dy); if (d > maxD) return; const s = d < 26 ? 0.2 : 1 - (dx * fx + dy * fy) / d; if (s < bs) { bs = s; best = o; } };
   for (const q of inPeople(b)) test(q.x, q.y, { kind: 'person', p: q.p, label: `${q.p.name} — emir ver` }, 150);
   for (const f of inFurn(b)) {
-    if (f.k === 'door') test(f.x, f.y, { kind: 'exit', label: 'Dışarı çık' }, 80);
+    if (f.k === 'door') { if (b.type !== 'magara') test(f.x, f.y, { kind: 'exit', label: 'Dışarı çık' }, 80); }
     else if (f.k === 'bed' || f.k === 'mat') test(f.x, f.y, { kind: 'sleep', label: goHome() ? 'Uyu' : 'Yatak (gece uyuyabilirsin)' }, 70);
     else if (f.k === 'bench') { const od = G.orders.find(o => o.worker && o.stageAd && !(o.trips > 0)); test(f.x, f.y, { kind: 'craft', label: od ? `Üretim masası — ${ITEMS[od.item].ad}: ${od.stageAd}` : 'Üretim masası' }, 80); }
     else if (f.k === 'crate') test(f.x, f.y, { kind: 'store', label: 'Depo — oda türünü değiştir (I)' }, 60);
