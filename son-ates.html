@@ -8338,6 +8338,7 @@ function terColor(x, z, h, ny, out) {
   const rk = Math.max(smooth(0.2, 0.42, slope), smooth(360, 470, h) * 0.85);
   if (rk > 0) { TC.t.copy(n2 > 0.5 ? TC.rock : TC.rock2).multiplyScalar(0.85 + n1 * 0.3); out.lerp(TC.t, rk); gr *= 1 - rk; }
   const sn = smooth(430, 500, h + (n1 - 0.5) * 140 + (n2 - 0.5) * 40) * (1 - smooth(0.5, 0.75, slope));
+  TC.sn = sn;
   if (sn > 0) { out.lerp(TC.snow, sn); gr *= 1 - sn; }
   { const S = U3.sl;                                                                 // mevsim: bitki örtüsü rengi
     if (S && gr > 0.05) { const k = Math.min(1, gr * 1.3);
@@ -8345,11 +8346,11 @@ function terColor(x, z, h, ny, out) {
       if (S.wi > 0.01) out.lerp(TC.straw, S.wi * 0.5 * k);
       if (S.sp > 0.01) out.lerp(TC.fresh, S.sp * 0.22 * k); }
     TC.sc = snowCover(x, z, h, n2) * (1 - smooth(0.5, 0.75, slope)); }                 // kar örtüsü (derinlik alanından, yamalı) — sonda uygulanır
-  TC.sk = 0; { const bs = bioAt(x, z) === 5 ? 1 : 0, s = Math.max(h < 8 ? smooth(8, 1.2, h + (n2 - 0.5) * 3) : 0, bs * (1 - rk)); if (s > 0) { out.lerp(TC.sand, s * 0.92); gr *= 1 - s; TC.sk = s; } }
-  if (h < SEA_Y + 0.6) { out.lerp(TC.wet, smooth(SEA_Y + 0.6, -3, h)); out.lerp(TC.deep, smooth(-2, -45, h)); gr = 0; }
-  const dc = Math.hypot(x - CAMP.x, z - CAMP.y); if (dc < 320) { out.lerp(TC.dirt, smooth(320, 60, dc) * (0.75 + n2 * 0.2)); gr *= 0.4 + 0.6 * smooth(60, 320, dc); }
-  if (G.lakes) for (const l of G.lakes) { const dl = Math.hypot(x - l.x, z - l.y); if (dl < l.r + 70) { const s = smooth(l.r + 70, l.r, dl) * 0.75; out.lerp(TC.wet, s); gr *= 1 - s; } }
-  if (TC.sc > 0 && h > SEA_Y + 0.6) { const sc = TC.sc * (dc < 320 ? 0.6 + 0.4 * smooth(60, 320, dc) : 1) * (1 - TC.sk * 0.5); out.lerp(TC.snow, sc * 0.97); gr *= 1 - sc; if (sc > 0.3) TC.sk = 0; }
+  TC.sk = 0; { const bs = bioAt(x, z) === 5 ? 1 : 0, s = Math.max(h < 8 ? smooth(8, 1.2, h + (n2 - 0.5) * 3) : 0, bs * (1 - rk)); if (s > 0) { out.lerp(TC.sand, s * 0.92); gr *= 1 - s; TC.sn *= 1 - s * 0.92; TC.sk = s; } }
+  if (h < SEA_Y + 0.6) { out.lerp(TC.wet, smooth(SEA_Y + 0.6, -3, h)); out.lerp(TC.deep, smooth(-2, -45, h)); gr = 0; TC.sn = 0; }
+  const dc = Math.hypot(x - CAMP.x, z - CAMP.y); if (dc < 320) { out.lerp(TC.dirt, smooth(320, 60, dc) * (0.75 + n2 * 0.2)); gr *= 0.4 + 0.6 * smooth(60, 320, dc); TC.sn *= 1 - smooth(320, 60, dc) * (0.75 + n2 * 0.2); }
+  if (G.lakes) for (const l of G.lakes) { const dl = Math.hypot(x - l.x, z - l.y); if (dl < l.r + 70) { const s = smooth(l.r + 70, l.r, dl) * 0.75; out.lerp(TC.wet, s); gr *= 1 - s; TC.sn *= 1 - s; } }
+  if (TC.sc > 0 && h > SEA_Y + 0.6) { const sc = TC.sc * (dc < 320 ? 0.6 + 0.4 * smooth(60, 320, dc) : 1) * (1 - TC.sk * 0.5); out.lerp(TC.snow, sc * 0.97); TC.sn += (1 - TC.sn) * sc * 0.97; gr *= 1 - sc; if (sc > 0.3) TC.sk = 0; }
   return gr;
 }
 // kar örtüsü 0..1: dunya.js derinlik bantlarından (U3.sl.snow, yeniden boyama anındaki kopya); az karda yamalı
@@ -8363,14 +8364,14 @@ function snowCover(x, z, h, n) {
 }
 // mevsim/kar değişince görünen parçaları yeniden boya: kare başına birkaç parça, en yakından başlayarak
 function terColorsOf(x0, z0, size, geo) {
-  const N = TER.N, V = (N + 1) * (N + 1), pos = geo.attributes.position.array, nor = geo.attributes.normal.array, col = geo.attributes.color.array, grs = geo.attributes.aG.array;
+  const N = TER.N, V = (N + 1) * (N + 1), pos = geo.attributes.position.array, nor = geo.attributes.normal.array, col = geo.attributes.color.array, grs = geo.attributes.aG.array, snow = geo.attributes.aSnow.array;
   for (let v = 0; v < V; v++) {
-    const gx = x0 + pos[v * 3], gz = z0 + pos[v * 3 + 2], g = terColor(gx, gz, pos[v * 3 + 1], nor[v * 3 + 1], _col), n = 0.92 + hash2(gx, gz) * 0.16;
-    col[v * 3] = _col.r * n; col[v * 3 + 1] = _col.g * n; col[v * 3 + 2] = _col.b * n; grs[v] = g > 0.02 ? g : -TC.sk;
+    const gx = x0 + pos[v * 3], gz = z0 + pos[v * 3 + 2], g = terColor(gx, gz, pos[v * 3 + 1], nor[v * 3 + 1], _col), n = 1 + (hash2(gx, gz) - 0.5) * 0.16 * (1 - TC.sn * 0.85);
+    col[v * 3] = _col.r * n; col[v * 3 + 1] = _col.g * n; col[v * 3 + 2] = _col.b * n; grs[v] = g > 0.02 ? g : -TC.sk; snow[v] = TC.sn;
   }
   const ed = [[0, 1], [N * (N + 1), 1], [0, N + 1], [N, N + 1]];
-  ed.forEach(([s, st], q) => { for (let k = 0; k <= N; k++) { const a = s + k * st, b = V + q * (N + 1) + k; col[b * 3] = col[a * 3]; col[b * 3 + 1] = col[a * 3 + 1]; col[b * 3 + 2] = col[a * 3 + 2]; grs[b] = grs[a]; } });
-  geo.attributes.color.needsUpdate = true; geo.attributes.aG.needsUpdate = true;
+  ed.forEach(([s, st], q) => { for (let k = 0; k <= N; k++) { const a = s + k * st, b = V + q * (N + 1) + k; col[b * 3] = col[a * 3]; col[b * 3 + 1] = col[a * 3 + 1]; col[b * 3 + 2] = col[a * 3 + 2]; grs[b] = grs[a]; snow[b] = snow[a]; } });
+  geo.attributes.color.needsUpdate = true; geo.attributes.aG.needsUpdate = true; geo.attributes.aSnow.needsUpdate = true;
 }
 function seasonSync(dt, cx, cz) {
   const now = performance.now();
@@ -8404,7 +8405,7 @@ function terIndex() {
 function terBuild(key) {
   const [x0, z0, size] = key.split(',').map(Number), N = TER.N, c = size / N, E = N + 3, H = new Float32Array(E * E);
   for (let j = 0; j < E; j++) for (let i = 0; i < E; i++) H[j * E + i] = gh(x0 + (i - 1) * c, z0 + (j - 1) * c);
-  const V = (N + 1) * (N + 1), T = V + 4 * (N + 1), pos = new Float32Array(T * 3), nor = new Float32Array(T * 3), col = new Float32Array(T * 3), grs = new Float32Array(T);
+  const V = (N + 1) * (N + 1), T = V + 4 * (N + 1), pos = new Float32Array(T * 3), nor = new Float32Array(T * 3), col = new Float32Array(T * 3), grs = new Float32Array(T), snow = new Float32Array(T);
   let ymin = 1e9, ymax = -1e9;
   for (let j = 0; j <= N; j++) for (let i = 0; i <= N; i++) {
     const v = j * (N + 1) + i, e = (j + 1) * E + i + 1, h = H[e];
@@ -8412,15 +8413,15 @@ function terBuild(key) {
     nx /= nl; nz /= nl; const ny = 1 / nl;
     pos[v * 3] = i * c; pos[v * 3 + 1] = h; pos[v * 3 + 2] = j * c;
     nor[v * 3] = nx; nor[v * 3 + 1] = ny; nor[v * 3 + 2] = nz;
-    const gx = x0 + i * c, gz = z0 + j * c, g = terColor(gx, gz, h, ny, _col), n = 0.92 + hash2(gx, gz) * 0.16;
-    col[v * 3] = _col.r * n; col[v * 3 + 1] = _col.g * n; col[v * 3 + 2] = _col.b * n; grs[v] = g > 0.02 ? g : -TC.sk;
+    const gx = x0 + i * c, gz = z0 + j * c, g = terColor(gx, gz, h, ny, _col), n = 1 + (hash2(gx, gz) - 0.5) * 0.16 * (1 - TC.sn * 0.85);
+    col[v * 3] = _col.r * n; col[v * 3 + 1] = _col.g * n; col[v * 3 + 2] = _col.b * n; grs[v] = g > 0.02 ? g : -TC.sk; snow[v] = TC.sn;
     if (h < ymin) ymin = h; if (h > ymax) ymax = h;
   }
   const sk = 6 + size * 0.03, ed = [[0, 1], [N * (N + 1), 1], [0, N + 1], [N, N + 1]];
-  ed.forEach(([s, st], q) => { for (let k = 0; k <= N; k++) { const a = s + k * st, b = V + q * (N + 1) + k; for (let m = 0; m < 3; m++) { pos[b * 3 + m] = pos[a * 3 + m]; nor[b * 3 + m] = nor[a * 3 + m]; col[b * 3 + m] = col[a * 3 + m]; } pos[b * 3 + 1] -= sk; grs[b] = grs[a]; } });
+  ed.forEach(([s, st], q) => { for (let k = 0; k <= N; k++) { const a = s + k * st, b = V + q * (N + 1) + k; for (let m = 0; m < 3; m++) { pos[b * 3 + m] = pos[a * 3 + m]; nor[b * 3 + m] = nor[a * 3 + m]; col[b * 3 + m] = col[a * 3 + m]; } pos[b * 3 + 1] -= sk; grs[b] = grs[a]; snow[b] = snow[a]; } });
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
-  geo.setAttribute('color', new THREE.BufferAttribute(col, 3)); geo.setAttribute('aG', new THREE.BufferAttribute(grs, 1));
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 3)); geo.setAttribute('aG', new THREE.BufferAttribute(grs, 1)); geo.setAttribute('aSnow', new THREE.BufferAttribute(snow, 1));
   geo.setIndex(terIndex());
   geo.boundingSphere = new THREE.Sphere(new THREE.Vector3(size / 2, (ymin + ymax) / 2, size / 2), Math.hypot(size * 0.71, (ymax - ymin) / 2 + sk));
   const m = new THREE.Mesh(geo, MAT.terrain); m.position.set(x0, 0, z0); m.matrixAutoUpdate = false; m.updateMatrix(); m.visible = false;
@@ -8462,8 +8463,8 @@ function initTerrainMat() {
   U3.fogCap = { value: 0.86 }; U3.fogLift = { value: 0.3 };
   m.onBeforeCompile = sh => {
     Object.assign(sh.uniforms, { tGround: { value: TEX.ground }, tNoise: { value: TEX.noise }, uTime: U3.uTime, uFogCap: U3.fogCap, uFogLift: U3.fogLift });
-    sh.vertexShader = 'attribute float aG;\nvarying float vG;\nvarying float vSlope;\nvarying vec3 vWP;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\nvG = aG; vSlope = clamp(1.0 - abs(normal.y), 0.0, 1.0); vWP = (modelMatrix * vec4(transformed, 1.0)).xyz;');
-    sh.fragmentShader = 'varying float vG;\nvarying float vSlope;\nvarying vec3 vWP;\nuniform sampler2D tGround;\nuniform sampler2D tNoise;\nuniform float uTime;\nuniform float uFogCap;\nuniform float uFogLift;\n' + sh.fragmentShader
+    sh.vertexShader = 'attribute float aG;\nattribute float aSnow;\nvarying float vSnow;\nvarying float vG;\nvarying float vSlope;\nvarying vec3 vWP;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\nvG = aG; vSnow = aSnow; vSlope = clamp(1.0 - abs(normal.y), 0.0, 1.0); vWP = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+    sh.fragmentShader = 'varying float vSnow;\nvarying float vG;\nvarying float vSlope;\nvarying vec3 vWP;\nuniform sampler2D tGround;\nuniform sampler2D tNoise;\nuniform float uTime;\nuniform float uFogCap;\nuniform float uFogLift;\n' + sh.fragmentShader
       .replace('#include <color_fragment>', `#include <color_fragment>
         float g1 = texture2D(tGround, vWP.xz / 150.0).r;
         float g2 = texture2D(tNoise, vWP.xz / 64.0).r;
@@ -8471,8 +8472,11 @@ function initTerrainMat() {
         float g4 = texture2D(tNoise, vWP.xz / 13.0).r;
         float gk = clamp(vG, 0.0, 1.0), sk = clamp(-vG, 0.0, 1.0);
         float det = mix(mix(1.0 + (g2 - 0.69) * 0.95 + (g4 - 0.69) * 0.35, 1.02 + (g4 - 0.69) * 0.22 + (g3 - 0.69) * 0.2, sk), 0.5 + g1 * 0.62, gk);
-        diffuseColor.rgb *= det * (1.0 + (g3 - 0.69) * 1.1);
-        float cliff = smoothstep(0.12, 0.45, vSlope) * (1.0 - sk);
+        float snowMask = clamp(vSnow, 0.0, 1.0);
+        float soilDetail = det * (1.0 + (g3 - 0.69) * 1.1);
+        float snowDetail = clamp(1.0 + (g4 - 0.69) * 0.12 + (g2 - 0.69) * 0.08, 0.94, 1.04);
+        diffuseColor.rgb *= mix(soilDetail, snowDetail, snowMask);
+        float cliff = smoothstep(0.12, 0.45, vSlope) * (1.0 - sk) * (1.0 - snowMask);
         float strata = 0.5 + 0.5 * sin(vWP.y * 0.13 + g2 * 3.0 + g3 * 5.0);
         vec3 rock = mix(vec3(0.30, 0.285, 0.25), vec3(0.49, 0.46, 0.39), smoothstep(0.25, 0.75, strata));
         diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * 0.55 + rock * 0.45, cliff);
