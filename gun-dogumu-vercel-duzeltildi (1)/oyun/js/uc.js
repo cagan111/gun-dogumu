@@ -7,6 +7,7 @@
 // =============================================================
 const U3 = {
   ok: null, r: null, scene: null, cam: null, w: 0, h: 0,
+  treeCulling: false, // gerçek cihaz profilinde yararlıysa aç; mesafe LOD her zaman açık
   world: null, worldKey: null, inst: null, instX: 1e9, instY: 1e9, sig: '', sigT: 0,
   ents: new Map(), builds: new Map(), carcs: new Map(), camps: new Map(),
   flames: [], frame: 0, bob: 0, LS: [], fogK: 1, eye: 30, dk: 0
@@ -250,7 +251,7 @@ function sprite(tex, color, add, fog) {
   return new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, color, transparent: true, depthWrite: false, blending: add ? THREE.AdditiveBlending : THREE.NormalBlending, fog: !!fog }));
 }
 function disposeTree(o, mats) {
-  o.traverse(m => { if (m.geometry && !Object.values(GEO).includes(m.geometry)) m.geometry.dispose(); if (mats && m.material && !Object.values(MAT).includes(m.material)) { if (m.material.map && !Object.values(TEX).includes(m.material.map)) m.material.map.dispose(); m.material.dispose(); } });
+  o.traverse(m => { if (m.isInstancedMesh) m.dispose(); if (m.geometry && !Object.values(GEO).includes(m.geometry)) m.geometry.dispose(); if (mats && m.material && !Object.values(MAT).includes(m.material)) { if (m.material.map && !Object.values(TEX).includes(m.material.map)) m.material.map.dispose(); m.material.dispose(); } });
 }
 
 // ---- alev (yapılar, kamp ateşi, el meşalesi)
@@ -354,7 +355,15 @@ function instAdd(m, x, y, z, sx, sy, sz, ry, col, rx, rz) {
   if (col) m.setColorAt(i, col);
   m.count = i + 1;
 }
-function instDone(m) { m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true; }
+function instDone(m) {
+  if (!m.count) return;
+  m.instanceMatrix.updateRange.offset = 0; m.instanceMatrix.updateRange.count = m.count * 16;
+  m.instanceMatrix.needsUpdate = true;
+  if (m.instanceColor) {
+    m.instanceColor.updateRange.offset = 0; m.instanceColor.updateRange.count = m.count * 3;
+    m.instanceColor.needsUpdate = true;
+  }
+}
 
 // ---- birinci şahıs: eller, mızrak, yay, meşale
 function buildViewModel() {
@@ -733,8 +742,13 @@ function buildWorld() {
   // örnekli ağlar
   const I = U3.inst = {};
   const nT = G.trees.length + G.deco.length;
-  I.trunk = mkInst(GEO.treeTrunk, MAT.inst, nT * 5 + 8); I.cone = mkInst(GEO.treeCrown, MAT.treeCone, G.trees.length * 3 + 8); I.blob = mkInst(GEO.treeLeaf, MAT.treeLeaf, G.trees.length * 3 + 8);
+  I.trunk = mkInst(GEO.treeTrunk, MAT.inst, G.trees.length * 5 + 8);
+  I.decorTrunk = mkInst(GEO.treeTrunk, MAT.inst, G.deco.length * 3 + 8); I.cone = mkInst(GEO.treeCrown, MAT.treeCone, G.trees.length * 3 + 8); I.blob = mkInst(GEO.treeLeaf, MAT.treeLeaf, G.trees.length * 3 + 8);
   I.moss = mkInst(GEO.cone4, MAT.instD, G.trees.length * 3 + 8); I.frond = mkInst(GEO.frond, MAT.treeFrond, G.trees.length * 9 + 8);
+  I.trunkFar = mkInst(GEO.trunk, MAT.inst, 64);
+  I.coneFar = mkInst(GEO.cone, MAT.treeCone, 64);
+  I.blobFar = mkInst(GEO.ico1, MAT.treeLeaf, 64);
+  U3.treeLod = new WeakMap(); U3.instView = null;
   I.tshadow = mkInst(GEO.disc, MAT.tshadow, G.trees.length + G.rocks.length + 8); I.tshadow.renderOrder = 1;
   I.rock = mkInst(GEO.dod, MAT.rock, G.rocks.length * 2 + G.deco.length + 8);
   I.bush = mkInst(GEO.ico, MAT.inst, G.bushes.length * 2 + (G.herbs.length + G.poisons.length) + 8);
@@ -831,45 +845,109 @@ function worldSig() {
   for (const o of G.nests) n += o.eggs;
   return s + '_' + r + '_' + c + '_' + b + '_' + h + '_' + n;
 }
+// Ağaç başına paylı frustum testi; gölge listesi bundan bağımsız kalır.
+const TREE_FRUSTUM = new THREE.Frustum(), TREE_VP = new THREE.Matrix4();
+const TREE_SPHERE = new THREE.Sphere(), TREE_DIR = new THREE.Vector3();
+function treeViewChanged() {
+  if (!U3.treeCulling) return false;
+  const cam = U3.cam; if (!cam) return false;
+  cam.getWorldDirection(TREE_DIR);
+  return !U3.instView || !U3.instRotation || Math.abs(cam.quaternion.dot(U3.instRotation)) < 0.99755 || Math.abs(cam.position.y - U3.instCamY) > 80 || TREE_DIR.dot(U3.instView) < 0.9902 ||
+    Math.abs((U3.instPX || 0) - cam.projectionMatrix.elements[0]) > 0.01 ||
+    Math.abs((U3.instPY || 0) - cam.projectionMatrix.elements[5]) > 0.01;
+}
+function treeInView(x, y, z, radius, distance) {
+  if (!U3.treeCulling || !U3.cam) return true;
+  TREE_SPHERE.center.set(x, y, z);
+  // 200 birimlik konum önbelleği, rüzgâr ve dönüş eşiği için koruyucu pay.
+  TREE_SPHERE.radius = radius + 220 + distance * 0.18;
+  return TREE_FRUSTUM.intersectsSphere(TREE_SPHERE);
+}
+function treeFarLOD(t, distance2) {
+  if (!U3.treeLod) U3.treeLod = new WeakMap();
+  const previous = U3.treeLod.get(t);
+  const limit = previous === true ? 750 : previous === false ? 950 : 850;
+  const far = distance2 > limit * limit;
+  U3.treeLod.set(t, far); return far;
+}
+// Yeniden doldurma başında count=0 iken büyüt; ortak geometri/malzemeyi koru.
+function reserveTreeFar(key, required) {
+  const old = U3.inst[key]; if (old.userData.max >= required) return;
+  let capacity = old.userData.max; while (capacity < required) capacity *= 2;
+  const next = mkInst(old.geometry, old.material, capacity), parent = old.parent;
+  if (parent) { parent.remove(old); parent.add(next); }
+  old.dispose(); U3.inst[key] = next;
+}
+function rebuildTreeInst(cx, cy, writeShadows) {
+  const I = U3.inst, TS = U3.tsh;
+  for (const k of ['trunk', 'cone', 'blob', 'moss', 'frond', 'trunkFar', 'coneFar', 'blobFar']) I[k].count = 0;
+  if (U3.cam) {
+    U3.cam.getWorldDirection(TREE_DIR); U3.instView = TREE_DIR.clone(); U3.instRotation = U3.cam.quaternion.clone();
+    U3.instCamY = U3.cam.position.y; U3.instPX = U3.cam.projectionMatrix.elements[0]; U3.instPY = U3.cam.projectionMatrix.elements[5];
+    TREE_FRUSTUM.setFromProjectionMatrix(TREE_VP.multiplyMatrices(U3.cam.projectionMatrix, U3.cam.matrixWorldInverse));
+  }
+  let farTrees = 0;
+  for (const t of G.trees) {
+    const dx = t.x - cx, dz = t.y - cy, d2 = dx * dx + dz * dz;
+    if (d2 < TREE_R * TREE_R && treeFarLOD(t, d2)) farTrees++;
+  }
+  reserveTreeFar('trunkFar', farTrees * 5 + 8);
+  reserveTreeFar('coneFar', farTrees * 3 + 8);
+  reserveTreeFar('blobFar', farTrees * 3 + 8);
+  const F = { trunk: I.trunkFar, cone: I.coneFar, blob: I.blobFar, moss: I.moss, frond: I.frond };
+  const stats = U3.treeStats = { near: 0, far: 0, culled: 0 };
+
+  const near = (o, R) => { const dx = o.x - cx, dy = o.y - cy; return dx * dx + dy * dy < R * R; };
+  const stumpC = c3('#8a6a44'), col = _col, snowC = c3('#e8eef2'), mossC = c3('#7d8c5a'), deadC = c3('#4e4740');
+  for (const t of G.trees) {
+    if (!near(t, TREE_R)) continue;
+    const y0 = gh(t.x, t.y) - 1.5;
+    const dx = t.x - cx, dz = t.y - cy, distance2 = dx * dx + dz * dz, distance = Math.sqrt(distance2);
+    const far = treeFarLOD(t, distance2), T = far ? F : I;
+    if (t.stump) {
+      if (!treeInView(t.x, y0 + 5, t.y, 16, distance)) { stats.culled++; continue; }
+      instAdd(T.trunk, t.x, y0, t.y, 9, 8.5, 9, t.sw, stumpC); stats[far ? 'far' : 'near']++; continue;
+    }
+    const b = t.b === undefined ? bioAt(t.x, t.y) : t.b, C = treeCols(b, t.tone), k = (t.cr - 36) / 26, H = (125 + k * 120 + ((t.tone * 37) % 1) * 30) * (t.dark ? 1.35 : 1), cr = t.cr, r2 = (t.tone * 13) % 1;
+    if (writeShadows) TS.push([t.x, t.y, cr * (b === 5 ? 0.9 : 1.05), b === 5 ? H * 0.7 : H * 0.55]);
+    if (!treeInView(t.x, y0 + H * 0.5, t.y, Math.hypot(H * 0.65, cr * 2) + 16, distance)) { stats.culled++; continue; }
+    stats[far ? 'far' : 'near']++;
+    if (b === 5) {                                       // palmiye: kıvrık gövde + taç yaprakları
+      let x = t.x, y = y0, z = t.y; const seg = 5, L = (H * 0.75) / seg, lean = 0.25 + r2 * 0.35;
+      for (let i = 0; i < seg; i++) { const rz = lean * (i + 1) / seg, w = 5.2 - i * 0.55; instAdd(T.trunk, x, y, z, w, L * 1.06, w, t.sw, C.t, 0, rz); x += -Math.sin(rz) * Math.cos(t.sw) * L; y += Math.cos(rz) * L; z += Math.sin(rz) * Math.sin(t.sw) * L; }
+      for (let i = 0; i < 9; i++) { const a = i / 9 * TAU + t.sw, l = cr * (0.95 + ((i * 7) % 3) * 0.12); instAdd(T.frond, x, y - 1, z, l, l * 0.9, l * 0.85, a, i % 2 ? C.a : C.b, 0, -0.1 + (i % 3) * 0.12); }
+      instAdd(T.blob, x, y - 4, z, 6, 6, 6, 0, C.t);
+    } else if (b === 2 && r2 < 0.65) {                   // bataklık: kurumuş, yosun sarkan eğri ağaç
+      const th = H * 0.55; instAdd(T.trunk, t.x, y0, t.y, 8, th, 8, t.sw, deadC, 0.08, 0.1);
+      for (let i = 0; i < 4; i++) { const a = t.sw + i * 1.7, by = th * (0.55 + i * 0.12), bl = cr * (0.9 + (i % 2) * 0.4), rz = 0.85 + (i % 2) * 0.3;
+        instAdd(T.trunk, t.x, y0 + by, t.y, 3.2 - i * 0.3, bl, 3.2 - i * 0.3, a, deadC, 0, rz);
+        const ex = t.x - Math.sin(rz) * Math.cos(a) * bl * 0.8, ey = y0 + by + Math.cos(rz) * bl * 0.8, ez = t.y + Math.sin(rz) * Math.sin(a) * bl * 0.8;
+        for (let m = 0; m < 3; m++) instAdd(T.moss, ex + (m - 1) * 3, ey, ez + ((m * 5) % 3 - 1) * 3, 2.6, 16 + ((i + m) % 3) * 9, 2.6, a + m, mossC, Math.PI, 0); }
+      if (r2 < 0.3) instAdd(T.blob, t.x, y0 + th + 6, t.y, cr * 0.6, H * 0.12, cr * 0.6, t.sw, C.b);
+    } else if (b === 1 || b === 3 || (b === 0 && r2 < 0.55)) {   // iğne yapraklı: üç kat
+      const thin = b === 3 ? 0.7 : b === 1 ? 0.82 : 1, base = Math.max(40, H * 0.22), sn = Math.max(y0 > 400 ? clamp((y0 - 400) / 120, 0, 0.7) : 0, snowCover(t.x, t.y, y0) * 0.75);
+      instAdd(T.trunk, t.x, y0, t.y, 8, H * 0.8, 8, t.sw, C.t);
+      const cs = [C.a, C.b, C.c];
+      for (let i = 0; i < 3; i++) { const yy = base + i * (H - base) * 0.27, rr = cr * (0.86 - i * 0.2) * thin, hh = (H - base) * (0.52 - i * 0.07); col.copy(cs[i]); seaTint(col, 0, t.tone, 0); if (sn) col.lerp(snowC, sn * (0.5 + i * 0.2)); instAdd(T.cone, t.x, y0 + yy, t.y, rr, hh, rr, t.sw + i * 0.7, col); }
+    } else {                                             // geniş yapraklı (çayırda tek, iri)
+      const lone = b === 4, th = H * (lone ? 0.5 : 0.62), wi = U3.sl ? U3.sl.wi : 0, cw = (lone ? 1.45 : 1.05) * (1 - wi * 0.35), tw = lone ? 12 : 9.5, tsc = snowCover(t.x, t.y, y0) * 0.55;
+      const fa = seaTint(_fa.copy(C.a), 1, t.tone, tsc), fb = seaTint(_fb.copy(C.b), 1, (t.tone * 3.7) % 1, tsc), fc = seaTint(_fc.copy(C.c), 1, (t.tone * 7.3) % 1, tsc);
+      instAdd(T.trunk, t.x, y0, t.y, tw, th, tw, t.sw, C.t, Math.sin(t.sw) * 0.04, Math.cos(t.sw) * 0.04);
+      if (lone) for (let i = 0; i < 3; i++) { const a = t.sw + i * 2.1; instAdd(T.trunk, t.x, y0 + th * 0.7, t.y, 4, cr * 0.7, 4, a, C.t, 0, 0.9); }
+      instAdd(T.blob, t.x, y0 + th + cr * 0.25, t.y, cr * 1.05 * cw, H * (lone ? 0.22 : 0.27) * (1 - wi * 0.3), cr * 1.05 * cw, t.sw, fa);
+      instAdd(T.blob, t.x + Math.cos(t.sw) * cr * 0.45 * cw, y0 + th + H * 0.18, t.y + Math.sin(t.sw) * cr * 0.45 * cw, cr * 0.72 * cw, H * 0.2 * (1 - wi * 0.3), cr * 0.72 * cw, t.sw * 2, fb);
+      instAdd(T.blob, t.x - Math.cos(t.sw + 0.8) * cr * 0.5 * cw, y0 + th + H * 0.08, t.y - Math.sin(t.sw + 0.8) * cr * 0.5 * cw, cr * 0.62 * cw, H * 0.17 * (1 - wi * 0.3), cr * 0.62 * cw, t.sw * 3, fc);
+    }
+  }
+  if (!writeShadows) for (const k of ['trunk', 'cone', 'blob', 'moss', 'frond', 'trunkFar', 'coneFar', 'blobFar']) instDone(I[k]);
+}
 function rebuildInst(cx, cy) {
   const I = U3.inst; for (const k in I) I[k].count = 0;
   const TS = U3.tsh = [];   // ağaç/kaya gölgeleri: [x, z, yarıçap, gölge yüksekliği] — güneş yönüne göre fillTreeShadows yerleştirir
   U3.instX = cx; U3.instY = cy;
   const near = (o, R) => { const dx = o.x - cx, dy = o.y - cy; return dx * dx + dy * dy < R * R; };
   const stumpC = c3('#8a6a44'), col = _col, snowC = c3('#e8eef2'), mossC = c3('#7d8c5a'), deadC = c3('#4e4740');
-  for (const t of G.trees) {
-    if (!near(t, TREE_R)) continue;
-    const y0 = gh(t.x, t.y) - 1.5;
-    if (t.stump) { instAdd(I.trunk, t.x, y0, t.y, 9, 8.5, 9, t.sw, stumpC); continue; }
-    const b = t.b === undefined ? bioAt(t.x, t.y) : t.b, C = treeCols(b, t.tone), k = (t.cr - 36) / 26, H = (125 + k * 120 + ((t.tone * 37) % 1) * 30) * (t.dark ? 1.35 : 1), cr = t.cr, r2 = (t.tone * 13) % 1;
-    TS.push([t.x, t.y, cr * (b === 5 ? 0.9 : 1.05), b === 5 ? H * 0.7 : H * 0.55]);
-    if (b === 5) {                                       // palmiye: kıvrık gövde + taç yaprakları
-      let x = t.x, y = y0, z = t.y; const seg = 5, L = (H * 0.75) / seg, lean = 0.25 + r2 * 0.35;
-      for (let i = 0; i < seg; i++) { const rz = lean * (i + 1) / seg, w = 5.2 - i * 0.55; instAdd(I.trunk, x, y, z, w, L * 1.06, w, t.sw, C.t, 0, rz); x += -Math.sin(rz) * Math.cos(t.sw) * L; y += Math.cos(rz) * L; z += Math.sin(rz) * Math.sin(t.sw) * L; }
-      for (let i = 0; i < 9; i++) { const a = i / 9 * TAU + t.sw, l = cr * (0.95 + ((i * 7) % 3) * 0.12); instAdd(I.frond, x, y - 1, z, l, l * 0.9, l * 0.85, a, i % 2 ? C.a : C.b, 0, -0.1 + (i % 3) * 0.12); }
-      instAdd(I.blob, x, y - 4, z, 6, 6, 6, 0, C.t);
-    } else if (b === 2 && r2 < 0.65) {                   // bataklık: kurumuş, yosun sarkan eğri ağaç
-      const th = H * 0.55; instAdd(I.trunk, t.x, y0, t.y, 8, th, 8, t.sw, deadC, 0.08, 0.1);
-      for (let i = 0; i < 4; i++) { const a = t.sw + i * 1.7, by = th * (0.55 + i * 0.12), bl = cr * (0.9 + (i % 2) * 0.4), rz = 0.85 + (i % 2) * 0.3;
-        instAdd(I.trunk, t.x, y0 + by, t.y, 3.2 - i * 0.3, bl, 3.2 - i * 0.3, a, deadC, 0, rz);
-        const ex = t.x - Math.sin(rz) * Math.cos(a) * bl * 0.8, ey = y0 + by + Math.cos(rz) * bl * 0.8, ez = t.y + Math.sin(rz) * Math.sin(a) * bl * 0.8;
-        for (let m = 0; m < 3; m++) instAdd(I.moss, ex + (m - 1) * 3, ey, ez + ((m * 5) % 3 - 1) * 3, 2.6, 16 + ((i + m) % 3) * 9, 2.6, a + m, mossC, Math.PI, 0); }
-      if (r2 < 0.3) instAdd(I.blob, t.x, y0 + th + 6, t.y, cr * 0.6, H * 0.12, cr * 0.6, t.sw, C.b);
-    } else if (b === 1 || b === 3 || (b === 0 && r2 < 0.55)) {   // iğne yapraklı: üç kat
-      const thin = b === 3 ? 0.7 : b === 1 ? 0.82 : 1, base = Math.max(40, H * 0.22), sn = Math.max(y0 > 400 ? clamp((y0 - 400) / 120, 0, 0.7) : 0, snowCover(t.x, t.y, y0) * 0.75);
-      instAdd(I.trunk, t.x, y0, t.y, 8, H * 0.8, 8, t.sw, C.t);
-      const cs = [C.a, C.b, C.c];
-      for (let i = 0; i < 3; i++) { const yy = base + i * (H - base) * 0.27, rr = cr * (0.86 - i * 0.2) * thin, hh = (H - base) * (0.52 - i * 0.07); col.copy(cs[i]); seaTint(col, 0, t.tone, 0); if (sn) col.lerp(snowC, sn * (0.5 + i * 0.2)); instAdd(I.cone, t.x, y0 + yy, t.y, rr, hh, rr, t.sw + i * 0.7, col); }
-    } else {                                             // geniş yapraklı (çayırda tek, iri)
-      const lone = b === 4, th = H * (lone ? 0.5 : 0.62), wi = U3.sl ? U3.sl.wi : 0, cw = (lone ? 1.45 : 1.05) * (1 - wi * 0.35), tw = lone ? 12 : 9.5, tsc = snowCover(t.x, t.y, y0) * 0.55;
-      const fa = seaTint(_fa.copy(C.a), 1, t.tone, tsc), fb = seaTint(_fb.copy(C.b), 1, (t.tone * 3.7) % 1, tsc), fc = seaTint(_fc.copy(C.c), 1, (t.tone * 7.3) % 1, tsc);
-      instAdd(I.trunk, t.x, y0, t.y, tw, th, tw, t.sw, C.t, Math.sin(t.sw) * 0.04, Math.cos(t.sw) * 0.04);
-      if (lone) for (let i = 0; i < 3; i++) { const a = t.sw + i * 2.1; instAdd(I.trunk, t.x, y0 + th * 0.7, t.y, 4, cr * 0.7, 4, a, C.t, 0, 0.9); }
-      instAdd(I.blob, t.x, y0 + th + cr * 0.25, t.y, cr * 1.05 * cw, H * (lone ? 0.22 : 0.27) * (1 - wi * 0.3), cr * 1.05 * cw, t.sw, fa);
-      instAdd(I.blob, t.x + Math.cos(t.sw) * cr * 0.45 * cw, y0 + th + H * 0.18, t.y + Math.sin(t.sw) * cr * 0.45 * cw, cr * 0.72 * cw, H * 0.2 * (1 - wi * 0.3), cr * 0.72 * cw, t.sw * 2, fb);
-      instAdd(I.blob, t.x - Math.cos(t.sw + 0.8) * cr * 0.5 * cw, y0 + th + H * 0.08, t.y - Math.sin(t.sw + 0.8) * cr * 0.5 * cw, cr * 0.62 * cw, H * 0.17 * (1 - wi * 0.3), cr * 0.62 * cw, t.sw * 3, fc);
-    }
-  }
+  rebuildTreeInst(cx, cy, true);
   for (const r of G.rocks) {
     if (r.dead || !near(r, ROCK_R)) continue;
     const g = (112 * r.shade) / 255, b = bioAt(r.x, r.y), mtn = b === 1, h = hash2(r.x, r.y), y0 = gh(r.x, r.y);
@@ -906,11 +984,11 @@ function rebuildInst(cx, cy) {
     else if (d.t === 'bone') { instAdd(I.box, d.x, y0 + 1.2, d.y, 15 * s, 2.2, 2.6, -d.a, c3('#d8d0ba')); instAdd(I.box, d.x + Math.cos(d.a) * 4, y0 + 1.6, d.y + Math.sin(d.a) * 4, 2.2, 2.2, 9 * s, -d.a + 0.5, c3('#cfc6ae')); }
     else if (d.t === 'reed') { for (let i = -1; i <= 1; i++) instAdd(I.reed, d.x + i * 4, y0, d.y + (i * i) * 3, 1.3, (20 + i * 4) * s, 1.3, 0, c3(i ? '#6a7a3a' : '#7a8a44'), 0, i * 0.08); }
     else if (d.t === 'pebble') { instAdd(I.rock, d.x, y0 + 1, d.y, 4 * s, 2.6 * s, 3.6 * s, d.a, c3('#857d70')); instAdd(I.rock, d.x + 6, y0 + 0.6, d.y + 2, 2.4 * s, 1.6 * s, 2.4 * s, d.a * 2, c3('#a49c8e')); }
-    else if (d.t === 'deadtree') { const cg = c3('#4a4540'); instAdd(I.trunk, d.x, y0, d.y, 5 * s, 62 * s, 5 * s, d.a, cg, 0.06, 0.05); instAdd(I.trunk, d.x, y0 + 34 * s, d.y, 2.2 * s, 30 * s, 2.2 * s, d.a, cg, 0, 0.9); instAdd(I.trunk, d.x, y0 + 46 * s, d.y, 1.8 * s, 24 * s, 1.8 * s, d.a + 2.4, cg, 0, 0.8); }
+    else if (d.t === 'deadtree') { const cg = c3('#4a4540'); instAdd(I.decorTrunk, d.x, y0, d.y, 5 * s, 62 * s, 5 * s, d.a, cg, 0.06, 0.05); instAdd(I.decorTrunk, d.x, y0 + 34 * s, d.y, 2.2 * s, 30 * s, 2.2 * s, d.a, cg, 0, 0.9); instAdd(I.decorTrunk, d.x, y0 + 46 * s, d.y, 1.8 * s, 24 * s, 1.8 * s, d.a + 2.4, cg, 0, 0.8); }
     else if (d.t === 'flower') { const fc = c3(FL_COL[Math.floor((d.a * 7) % 1 * FL_COL.length)]); for (let i = 0; i < 5; i++) instAdd(I.berry, d.x + Math.cos(i * 2.4) * 5 * s, y0 + 5 + (i % 2) * 2, d.y + Math.sin(i * 2.4) * 5 * s, 1.8, 1.3, 1.8, i, fc); }
     else if (d.t === 'grass') { const gc = c3(['#86a63e', '#9ab448', '#a8b85a', '#7c9a38'][Math.floor(((d.a * 5) % 1) * 4)]); for (let i = 0; i < 3; i++) instAdd(I.tgrass, d.x + Math.cos(d.a + i * 2.1) * 6 * s, y0 - 0.5, d.y + Math.sin(d.a + i * 2.1) * 6 * s, 13 * s, 22 * s * (0.8 + i * 0.15), 13 * s, d.a + i, gc); }
-    else if (d.t === 'shell' || d.t === 'driftwood' || d.t === 'drift') { instAdd(I.trunk, d.x, y0 + 1.2, d.y, 2.6 * s, 38 * s, 2.6 * s, d.a, c3('#a89a84'), 0, Math.PI / 2 - 0.05); instAdd(I.trunk, d.x + Math.cos(d.a) * 8, y0 + 1, d.y - Math.sin(d.a) * 8, 1.4 * s, 14 * s, 1.4 * s, d.a + 0.8, c3('#9a8c76'), 0, Math.PI / 2); }
-    else if (d.t === 'shell') { instAdd(I.trunk, d.x, y0 + 1.5, d.y, 2.4 * s, 34 * s, 2.4 * s, d.a, c3('#a89a84'), 0, Math.PI / 2); }
+    else if (d.t === 'shell' || d.t === 'driftwood' || d.t === 'drift') { instAdd(I.decorTrunk, d.x, y0 + 1.2, d.y, 2.6 * s, 38 * s, 2.6 * s, d.a, c3('#a89a84'), 0, Math.PI / 2 - 0.05); instAdd(I.decorTrunk, d.x + Math.cos(d.a) * 8, y0 + 1, d.y - Math.sin(d.a) * 8, 1.4 * s, 14 * s, 1.4 * s, d.a + 0.8, c3('#9a8c76'), 0, Math.PI / 2); }
+    else if (d.t === 'shell') { instAdd(I.decorTrunk, d.x, y0 + 1.5, d.y, 2.4 * s, 34 * s, 2.4 * s, d.a, c3('#a89a84'), 0, Math.PI / 2); }
   }
   for (const c of G.crystals) {
     if (c.dead || !near(c, ROCK_R)) continue;
@@ -1568,6 +1646,7 @@ function render3D(dt) {
   U3.sigT -= dt;
   if (U3.sigT <= 0) { U3.sigT = 0.4; const s = worldSig(); if (s !== U3.sig) { U3.sig = s; U3.instX = 1e9; const ns = G.nests.reduce((a, n) => a + n.eggs, 0) + G.nests.length * 100; if (ns !== U3.nestSig) { U3.nestSig = ns; rebuildNests(); } } }
   if (Math.abs(px - U3.instX) + Math.abs(py - U3.instY) > 200) rebuildInst(px, py);
+  else if (treeViewChanged()) rebuildTreeInst(U3.instX, U3.instY, false);
   // ---- gölgeler: gece ve kapalı havada söner; ağaç gölgeleri güneşle döner
   { const day = clamp(1 - dk / 0.75, 0, 1), soft = 0.55 + 0.45 * clamp(U3.fogK, 0, 1);
     MAT.shadow.opacity = 0.5 * day * soft + 0.1 * (1 - day); MAT.tshadow.opacity = 0.42 * day * soft;
