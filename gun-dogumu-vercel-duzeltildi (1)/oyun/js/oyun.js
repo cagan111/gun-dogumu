@@ -745,6 +745,7 @@ function loadGame(s) {
   });
   assignHomes(); assignEquip(); assignBeds();
   G.tut = D.tut >= 0 ? { on: true, step: D.tut } : { on: false, step: 0 };
+  { const ib = D.inside >= 0 ? G.builds[D.inside] : null; if (enterable(ib)) { enterBuilding(ib); L.x = ib.x; L.y = ib.y; L.insideB = ib; } }
   msg(`Kayıt yüklendi: ${G.day}. gün.`, '#cfe', 4);
   onGameStart();
 }
