@@ -107,6 +107,14 @@ button{font-family:Georgia,serif;color:var(--ink);cursor:pointer}
 #inBox .nav{position:absolute;top:50%;transform:translateY(-50%);font-size:16px;padding:6px 10px;opacity:.85}
 #inBox .nav.l{left:4px}#inBox .nav.r{right:4px}
 #charM{z-index:6}
+#talkM{z-index:6}
+#talkBox{background:#15110c;border:1px solid #6a5030;border-radius:12px;width:min(560px,94vw);max-height:86vh;max-height:86dvh;display:flex;flex-direction:column;font-size:13px}
+#talkBox .cl{overflow-y:auto;-webkit-overflow-scrolling:touch;touch-action:pan-y;overscroll-behavior:contain;min-height:0;flex:1}
+#talkBox button{background:#2b2419;border:1px solid #5a4a30;border-radius:8px;padding:8px 11px;font-size:13px;line-height:1.3;color:inherit;text-align:left}
+#talkBox button.no{opacity:.45}
+#talkBox .tsel{gap:6px}
+#talkBox .tsel button{flex:1 1 46%;min-height:44px}
+#talkBox button small{color:var(--muted)}
 #charBox{background:#15110c;border:1px solid #6a5030;border-radius:12px;width:min(520px,94vw);max-height:86vh;max-height:86dvh;display:flex;flex-direction:column;font-size:13px}
 #charBox .cl{overflow-y:auto;-webkit-overflow-scrolling:touch;touch-action:pan-y;overscroll-behavior:contain;min-height:0;flex:1;padding-bottom:28px}
 #charBox button,.ctabs button,.obtns button{background:#2b2419;border:1px solid #5a4a30;border-radius:6px;padding:4px 9px;font-size:12px}
@@ -208,6 +216,7 @@ summary{cursor:pointer;color:#e8d4b0}
 <div id="craft"><div id="craftBox"></div></div>
 <div id="inM" class="modalw"><div id="inBox"><div style="position:relative"><canvas id="inC"></canvas><button data-nav="-1" class="nav l">◀</button><button data-nav="1" class="nav r">▶</button></div><div id="inInfo"></div></div></div>
 <div id="charM" class="modalw"><div id="charBox"></div></div>
+<div id="talkM" class="modalw"><div id="talkBox"></div></div>
 <div id="toast"></div>
 
 <div id="sleepV"><div>😴<br><b>Uyuyorsun…</b><br><small id="sleepTxt">uyanmak için dokun / bir tuşa bas</small></div></div>
@@ -235,6 +244,7 @@ summary{cursor:pointer;color:#e8d4b0}
 <script src="js/model3d.js"></script>
 <script src="js/uc.js"></script>
 <script src="js/arayuz.js"></script>
+<script src="js/sohbet.js"></script>
 <script>
 (function(){const t=document.getElementById('top');try{if(localStorage.getItem('sonAtesTop')==='0')t.classList.add('kapali')}catch(e){}
 t.style.pointerEvents='auto';t.addEventListener('click',function(e){e.stopPropagation();t.classList.toggle('kapali');try{localStorage.setItem('sonAtesTop',t.classList.contains('kapali')?'0':'1')}catch(e){}});

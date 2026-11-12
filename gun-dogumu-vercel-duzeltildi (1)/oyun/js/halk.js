@@ -107,7 +107,7 @@ function workRate(p) {
   if (p.tired) w *= 0.75;
   if (p.sick) w *= 0.5;
   if ((p.group === 'odun' && p.eq.balta) || (p.group === 'tas' && p.eq.kazma)) w *= 1.5;
-  return w * grpMul(p.group) * (abilOn(p.group) ? 2 : 1) * moraleMul();
+  return w * grpMul(p.group) * (abilOn(p.group) ? 2 : 1) * moraleMul() * (typeof planMul === 'function' ? planMul(p) : 1);
 }
 function dmgOf(p) {
   const t = spearTier(p);
@@ -537,7 +537,10 @@ function updPerson(p, dt, LS) {
     p.hp = Math.min(p.maxhp, p.hp + h * dt);
   }
   if (night && p.group === 'muhafiz') p.watched = true;
+  const gth = G.gather && gatherOk(p);
+  if (p.inHut && gth) leaveHut(p);
   if (p.inHut) { if (!goHome() || !(p.child || HOME_GROUPS.includes(p.group)) || p.bedRes) leaveHut(p); return; }
+  if (!gth && p.gSeat) { p.gSeat = false; p.pose = null; }
   if (p.bedRes && !needsCarry(p)) {
     const bp = bedPos(p.bedRes.s, p.bedRes.i);
     if (steer(p, bp.x, bp.y + 24, pSpeed(p), dt, false) || dist(p, p.bedRes.s) < p.bedRes.s.r + 16) putInBed(p);
@@ -575,6 +578,7 @@ function updPerson(p, dt, LS) {
     return;
   }
   if (G.meal && !p.ate && !p.carrying && !p.desert && !(p.post) && dist(p, G.meal.table) < 3600 && !(thr && dist(thr, p) < 150)) return mealStep(p, dt);
+  if (gth && !(thr && dist(thr, p) < 150)) return gatherStep(p, dt);
   if (p.child) return updChild(p, dt);
   if (p.carryOrder) { if (carryOrderStep(p, dt)) return; p.carryOrder = 0; }
   applyRoutine(p);
@@ -684,6 +688,7 @@ function stageSay(p, ad) { if (p.stageAd !== ad && p._lastSt !== ad && L && dist
 function updCook(p, dt) {
   if (goHome()) return homeBehavior(p, dt);
   const k = station('mutfak', p), st = k || G.fire;
+  if (!p.batch && !p.cookGot && typeof brewWanted === 'function' && (p.brewT > 0 || brewWanted())) return brewStep(p, dt, k);
   const canCook = (G.stock.et || 0) >= 1 || (G.stock.meyve || 0) >= 2, full = (G.stock.food || 0) >= storeCap();
   if (!p.batch && !p.cookGot && (!canCook || full)) {
     if (!G.flags.cookSaid) { G.flags.cookSaid = 1; msg(full ? `🍲 ${p.name}: "Yemek hazır, depo dolu. Başka işe bakıyorum."` : `🍲 ${p.name}: "Pişirecek malzeme kalmadı! ${(G.stock.food || 0) < G.people.length ? 'Yemek de yetmeyecek. ' : ''}Başka işe bakıyorum."`, full ? '#cde' : '#f99', 6); if (!full) SFX.bell && SFX.bell(); }

@@ -188,8 +188,8 @@ const STAGES = {
 const stagesOf = k => STAGES[k] || ['Hazırlanıyor', 'İşleniyor', 'Bitiriliyor'];
 const IORDER = ['balta', 'kazma', 'mizrak', 'sepet', 'ok', 'mesale', 'yay', 'zirh', 'zok', 'eyer', 'kemikMizrak', 'yatak', 'halat', 'yelkenBezi', 'bandaj', 'ilac'];
 
-const RES = { wood: '🪵', stone: '🪨', food: '🍲', meyve: '🫐', et: '🍖', cigEt: '🥩', bone: '🦴', hide: '🟫', herb: '🌿', poison: '🧪', crystal: '💎' };
-const RESN = { wood: 'Odun', stone: 'Taş', food: 'Pişmiş yemek', meyve: 'Meyve ve tahıl', et: 'Temiz et', cigEt: 'Çiğ et (temizlenmemiş)', bone: 'Kemik', hide: 'Deri', herb: 'Şifalı ot', poison: 'Zehir', crystal: 'Kristal' };
+const RES = { wood: '🪵', stone: '🪨', food: '🍲', meyve: '🫐', et: '🍖', cigEt: '🥩', bone: '🦴', hide: '🟫', herb: '🌿', poison: '🧪', crystal: '💎', icki: '🍵' };
+const RESN = { wood: 'Odun', stone: 'Taş', food: 'Pişmiş yemek', meyve: 'Meyve ve tahıl', et: 'Temiz et', cigEt: 'Çiğ et (temizlenmemiş)', bone: 'Kemik', hide: 'Deri', herb: 'Şifalı ot', poison: 'Zehir', crystal: 'Kristal', icki: 'Ot çayı / meyve şerbeti (akşam muhabbetinde içilir)' };
 // ---- odalar (mağara ve kulübe içinde seçilir)
 const ROOMS = {
   yatak:  { ad: 'Yatakhane',    ic: '🛏️', desc: 'İki hane burada uyur' },

@@ -220,6 +220,20 @@ function drawLabelsIn() {
   }
   ctx.globalAlpha = 1;
 }
+// konuşma balonu (akşam muhabbeti): sarılmış metin, küçük kuyruk
+function sayBubble(x, y, t, a) {
+  if (a <= 0.02) return;
+  ctx.save(); ctx.globalAlpha = a; ctx.font = '12px Georgia'; ctx.textAlign = 'center';
+  const maxW = Math.min(220, VW * 0.42), words = t.split(' '), lines = []; let cur = '';
+  for (const w of words) { const tt = cur ? cur + ' ' + w : w; if (ctx.measureText(tt).width > maxW && cur) { lines.push(cur); cur = w; } else cur = tt; }
+  if (cur) lines.push(cur);
+  const lh = 15, w = Math.max(...lines.map(l => ctx.measureText(l).width)) + 16, h = lines.length * lh + 8, bx = clamp(x - w / 2, 4, VW - w - 4), by = y - h - 8;
+  ctx.fillStyle = 'rgba(28,22,14,.86)'; ctx.strokeStyle = 'rgba(255,214,150,.55)'; ctx.lineWidth = 1;
+  ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(bx, by, w, h, 7); else ctx.rect(bx, by, w, h); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x - 5, by + h); ctx.lineTo(x, by + h + 7); ctx.lineTo(x + 5, by + h); ctx.fill();
+  ctx.fillStyle = '#f3e6c8'; lines.forEach((l, i) => ctx.fillText(l, bx + w / 2, by + 4 + lh * (i + 0.78)));
+  ctx.restore();
+}
 function drawLabels3D(LS, dk) {
   ctx.textAlign = 'center';
   const label = (s, text, col, ic) => {
@@ -242,6 +256,7 @@ function drawLabels3D(LS, dk) {
     label(s, (isM ? '★ ' : '') + p.name, p.fear >= 80 ? '#f99' : isM ? '#ffd27a' : '#eadcc0', ic);
     if (p.stageAd && s.z < 250) { ctx.globalAlpha = clamp((250 - s.z) / 80, 0, 1); ctx.font = '10px Georgia'; ctx.fillStyle = 'rgba(0,0,0,.7)'; ctx.fillText(p.stageAd, s.x + 1, s.y + 13); ctx.fillStyle = '#cfe0b0'; ctx.fillText(p.stageAd, s.x, s.y + 12); ctx.globalAlpha = 1; }
     if ((p.hp < p.maxhp * 0.75 || p.hurtT > 0) && s.z < 380) hpBar(s.x, s.y + 4, p.hp / p.maxhp, 26);
+    if (p.say && s.z < 460) sayBubble(s.x, s.y - 26, p.say.t, clamp(p.say.life * 1.5, 0, 1) * clamp((460 - s.z) / 120, 0, 1));
   }
   for (const d of G.dinos) {
     if (d.hidden || d.dead || Math.abs(d.x - L.x) > 700 || Math.abs(d.y - L.y) > 700) continue;

@@ -8,7 +8,7 @@ function resetState(diff) {
   for (const k of Object.keys(G)) delete G[k];
   Object.assign(G, {
     diff, seed: 0, t: CYCLE * 0.05, day: 1, now: 0, dt: 0,
-    stock: { wood: 30, stone: 10, food: 20, meyve: 14, et: 6, cigEt: 0, bone: 3, hide: 6, herb: 3, poison: 0, crystal: 0, yatak: 0, halat: 0, yelkenBezi: 0, gemiParca: 0, mizrak: 1, balta: 1, kazma: 0, sepet: 0, ok: 0, zok: 0, yay: 0, zirh: 0, mesale: 0, eyer: 0, kemikMizrak: 0, yarikTasi: 0, bandaj: 2, ilac: 1 },
+    stock: { wood: 30, stone: 10, food: 20, meyve: 14, et: 6, cigEt: 0, bone: 3, hide: 6, herb: 3, poison: 0, crystal: 0, yatak: 0, halat: 0, yelkenBezi: 0, gemiParca: 0, mizrak: 1, balta: 1, kazma: 0, sepet: 0, ok: 0, zok: 0, yay: 0, zirh: 0, mesale: 0, eyer: 0, kemikMizrak: 0, yarikTasi: 0, bandaj: 2, ilac: 1, icki: 0 },
     fire: { x: CAMP.x, y: CAMP.y, fuel: 85, out: false },
     builds: [], people: [], dinos: [], parts: [], texts: [], msgs: [], proj: [], stains: [], tracks: [], rainDrops: [],
     meal: null, feastNext: false, cave: null, tutIn: false, carcs: [], orders: [], hunt: null, huntMode: false, unclean: 0, lcarry: null, oid: 0, eqT: 0, homeT2: 0,
@@ -20,7 +20,7 @@ function resetState(diff) {
     nightPlan: [], nightWeather: 'acik', eproj: [], raid: null, scare: 0, vis: null, campT: 0, weather: { type: 'acik', t: 0 }, mimic: null, finale: null, dayRainAt: -1, snowB: [0, 0, 0, 0, 0, 0], season: null, coldMsgDay: -9,
     explored: new Uint8Array(MAPN * MAPN), stats: { fireNights: 0, noLoss: 0, tamed: 0, hunts: 0 }, lossToday: false, fireOutTonight: false,
     tut: { on: false, step: 0 }, idc: 0, devDone: false, leaveDone: false, scoutCd: 0, silent: false, devSeenEver: false, riftHint: false,
-    tutMoved: 0, tutWood: 0, tutFire: 0, tutGroup: false, uiDirty: true, toolsDirty: true, msgDirty: true, shootCd: 0
+    tutMoved: 0, tutWood: 0, tutFire: 0, tutGroup: false, gather: null, seated: null, planToday: null, planNext: null, planHuntT: 0, uiDirty: true, toolsDirty: true, msgDirty: true, shootCd: 0
   });
   for (const g of GORDER) { G.managers[g] = null; G.zone[g] = null; G.abil[g] = { cd: 0, act: 0 }; }
 }
@@ -77,6 +77,7 @@ function updLeader(dt) {
     G.interact = findInteract(); G.lookP = G.interact && G.interact.kind === 'person' ? G.interact.o : null; G.actT = 0; G.actProg = 0;
     return;
   }
+  if (G.seated && seatedTick(dt)) { G.interact = null; return; }
   p.sprinting = !p.sneak && (keys.ShiftLeft || keys.ShiftRight || touch.run) && m > 0.1 && p.stam > 1;
   p.stam = clamp(p.stam + (p.sprinting ? -28 : 16) * dt, 0, 100);
   const mouseAim = !isTouch;
@@ -142,7 +143,7 @@ function updLeader(dt) {
   G.interact = findInteract();
   const act = keys.KeyE || touch.act;
   const it = G.interact;
-  if (act && it && it.kind !== 'mount' && it.kind !== 'info' && it.kind !== 'carry' && it.kind !== 'drop' && it.kind !== 'person' && it.kind !== 'ship') {
+  if (act && it && it.kind !== 'mount' && it.kind !== 'info' && it.kind !== 'carry' && it.kind !== 'drop' && it.kind !== 'person' && it.kind !== 'ship' && it.kind !== 'meal' && it.kind !== 'chat') {
     G.actT += dt;
     const rate = { fire: 0.18, tame: 2.0, tameLong: 2.0, tameFly: 1.5, rescue: 0.6, free: 1.2, revive: 1.5, treat: 1.5, egg: 1.0, rift: 1.5, carc: 0.35, build: 0.25, wreck: 2.5 }[it.kind] || 0.4;
     G.actProg = clamp(G.actT / rate, 0, 1);
@@ -187,6 +188,8 @@ function onActPress() {
   if (it && it.kind === 'craft') { toggleCraft(true); return true; }
   if (it && it.kind === 'store') { openInterior(G.inside.b); return true; }
   if (it && it.kind === 'ship') { setSail(it.o); return true; }
+  if (it && it.kind === 'meal') { sitAtTable(); return true; }
+  if (it && it.kind === 'chat') { joinChat(); return true; }
   if (it && it.kind === 'carry') { G.lcarry = it.o; it.o.carriedBy = -1; if (it.o.inHut) leaveHut(it.o); msg(`${acc(it.o.name)} sırtladın. ${it.o.bedRes ? 'Şifahaneye götür.' : 'Boş yatak yok!'}`, '#9fd', 3); return true; }
   return false;
 }
@@ -219,6 +222,8 @@ function findInteract() {
   if (0) { const dd = dist(G.rift, p) - G.rift.r; if (dd < 70 && !G.finale) consider(G.rift, 'rift', dd - 10, (G.stock.yarikTasi || 0) > 0 ? 'Yarık Taşı’nı yerleştir — son savaş başlar!' : 'Zaman yarığı. Açmak için Yarık Taşı gerekli.'); }
   if (G.rescue) { const dd = dist(G.rescue, p); if (dd < 55) consider(G.rescue, 'rescue', dd - 40, `${acc(G.rescue.name)} kurtar`); }
   for (const c of G.ccamps) c.captives.forEach((cp, k) => { const x = c.x - 30 + k * 24, y = c.y + 34, dd = Math.hypot(x - p.x, y - p.y); if (dd < 45) consider({ x, y, c, k }, 'free', dd - 40, `${gen(cp.p.name)} iplerini çöz`); });
+  if (G.meal && !p.ate && !G.seated) { const t = G.meal.table, dd = Math.hypot(t.x - p.x, t.y - p.y); if (dd < 110) consider(t, 'meal', dd - 300, `🍲 Sofraya otur — ${G.meal.name}`); }
+  if (G.gather) { const dd = dist(G.fire, p); if (dd < 230 && dd > 75) consider(G.fire, 'chat', dd - 300, `🔥 Muhabbete katıl (${G.people.filter(q => q.gSeat).length} kişi)`); }
   { const dd = dist(G.fire, p) - 30; if (dd < 50) consider(G.fire, 'fire', dd, G.stock.wood > 0 ? 'Ateşe odun at' : 'Odun yok!'); }
   for (const arr of [G.bushes, G.herbs, G.poisons]) for (const b of arr) { if (b.amt < 1) continue; const dd = dist(b, p) - b.r; if (dd < 26) consider(b, 'gather', dd, { meyve: 'Meyve topla', herb: 'Şifalı ot topla', poison: 'Zehirli bitki topla' }[b.res]); }
   for (const o of gQuery(p.x, p.y, 70)) {
@@ -231,7 +236,7 @@ function findInteract() {
   }
   // nişangâhtaki kişi: doğrudan emir
   G.lookP = null;
-  if (!(best && ['revive', 'carry', 'treat', 'mount', 'rescue', 'free'].includes(best.kind))) {
+  if (!(best && ['revive', 'carry', 'treat', 'mount', 'rescue', 'free', 'meal', 'chat'].includes(best.kind))) {
     let bp = null, ba = 0.2;
     for (const q of G.people) { if (q === p || q.inHut || q.insideB || q.grabbed || q.dead || q.bed) continue; const dd = dist(q, p); if (dd > 190 || dd < 1) continue; const a = angDiff(angTo(p, q), G.yaw) - Math.atan2(9, dd); if (a < ba) { ba = a; bp = q; } }
     if (bp) { G.lookP = bp; best = { o: bp, kind: 'person', label: `${bp.name} (${GROUPS[bp.group] ? GROUPS[bp.group].ad : ''}) — emir ver` }; }
@@ -407,7 +412,9 @@ function newDay() {
   G.stats.noLoss = G.lossToday ? 0 : G.stats.noLoss + 1; G.lossToday = false;
   SFX.bell();
   seasonDawn(sPrev);
+  endGather(); planDawnClear();
   halkDawn();
+  planDawnApply();
   // yeni gelenler
   assignHomes();
   let free = emptyTents();
@@ -596,9 +603,9 @@ function startMeal(name) {
   const t = tablePos();
   G.meal = { t: 28 * (1 + (DAYK - 1) * 0.5), table: t, feast: !!G.feastNext, name };
   if (G.feastNext) { G.feastNext = false; moraleAdd(10); }
-  for (const p of G.people) { p.ate = false; p.mealT = 0; if (p.bed || p.leader || p.inHut || p.grabbed) eatMeal(p); }
+  for (const p of G.people) { p.ate = false; p.mealT = 0; if (p.bed || p.inHut || p.grabbed) eatMeal(p); }
   const cooked = Math.floor(G.stock.food || 0);
-  msg(`🍲 ${name} vakti! ${cooked >= G.people.length ? 'Masada sıcak yemek var.' : cooked > 0 ? 'Yemek herkese yetmeyecek.' : 'Pişmiş yemek yok — çiğ yiyecekler yenecek.'}${t.b ? '' : ' (Mutfak yok; ateş başında.)'}`, '#ffd9a0', 5);
+  msg(`🍲 ${name} vakti! ${L && !L.ate && !G.sleep ? 'Sofraya katıl (masanın yanında E). ' : ''}${cooked >= G.people.length ? 'Masada sıcak yemek var.' : cooked > 0 ? 'Yemek herkese yetmeyecek.' : 'Pişmiş yemek yok — çiğ yiyecekler yenecek.'}${t.b ? '' : ' (Mutfak yok; ateş başında.)'}`, '#ffd9a0', 5);
 }
 function endMeal() {
   const hungry = [], raw = [];
@@ -674,10 +681,10 @@ function gameOver() {
 //  KAYIT
 // =============================================================
 function serialize() {
-  const pf = ['id', 'name', 'x', 'y', 'leader', 'child', 'age', 'traits', 'story', 'group', 'hp', 'maxhp', 'fear', 'skin', 'hair', 'injury', 'downed', 'tired', 'watched', 'partner', 'parentA', 'parentB', 'stam', 'seat', 'r', 'sk', 'sick', 'wasDowned', 'bedUntil', 'routine', 'alt', 'hunger', 'own', 'joinHunt', 'bag', 'carry', 'cookGot', 'batch', 'prevG', 'rtBase'];
+  const pf = ['id', 'name', 'x', 'y', 'leader', 'child', 'age', 'traits', 'story', 'group', 'hp', 'maxhp', 'fear', 'skin', 'hair', 'injury', 'downed', 'tired', 'watched', 'partner', 'parentA', 'parentB', 'stam', 'seat', 'r', 'sk', 'sick', 'wasDowned', 'bedUntil', 'routine', 'alt', 'hunger', 'own', 'joinHunt', 'bag', 'carry', 'cookGot', 'batch', 'prevG', 'rtBase', 'planHunt', 'planHuntPrev'];
   let ex = ''; for (let i = 0; i < G.explored.length; i++) ex += G.explored[i] ? '1' : '0';
   return JSON.stringify({
-    v: 4, wrecks: (G.wrecks || []).map(w => !!w.found), inside: G.inside ? G.builds.indexOf(G.inside.b) : -1, seed: G.seed, diff: G.diff, t: G.t, cyc: CYCLE, day: G.day, stock: G.stock, fuel: G.fire.fuel, morale: G.morale, orders: G.orders.map(o => Object.assign({}, o, { worker: 0 })), oid: G.oid, unclean: G.unclean,
+    v: 4, wrecks: (G.wrecks || []).map(w => !!w.found), inside: G.inside ? G.builds.indexOf(G.inside.b) : -1, seed: G.seed, diff: G.diff, t: G.t, cyc: CYCLE, day: G.day, stock: G.stock, fuel: G.fire.fuel, morale: G.morale, orders: G.orders.map(o => Object.assign({}, o, { worker: 0 })), oid: G.oid, unclean: G.unclean, planToday: G.planToday, planNext: G.planNext,
     carcs: G.carcs.filter(c => !c.dead).map(c => ({ x: c.x, y: c.y, r: c.r, type: c.type, ang: c.ang, meat: c.meat, bone: c.bone, hide: c.hide, age: c.age, rotten: c.rotten })),
     managers: G.managers, zone: G.zone, newGroup: G.newGroup, autoEq: !!G.autoEq, torchFuel: G.torchFuel, nightPlan: G.nightPlan, nightWeather: G.nightWeather, weather: G.weather,
     eggs: G.eggs, usedNames: [...G.usedNames], stats: G.stats, idc: G.idc, kills: G.kills, deaths: G.deaths, lost: G.lost,
@@ -706,7 +713,7 @@ function loadGame(s) {
   G.seed = D.seed; genWorld(G.seed);
   Object.assign(G, { t: D.t * CYCLE / (D.cyc || 300), day: D.day, morale: D.morale, newGroup: D.newGroup || 'bos', torchFuel: D.torchFuel || 0, nightPlan: D.nightPlan || [], nightWeather: D.nightWeather || 'acik',
     weather: D.weather || { type: 'acik', t: 0 }, eggs: D.eggs || [], stats: Object.assign(G.stats, D.stats || {}), idc: D.idc, kills: D.kills, deaths: D.deaths, lost: D.lost,
-    devSeenEver: D.devSeenEver, riftHint: D.riftHint, rescueAt: -1, dayRainAt: D.dayRainAt || -1, flags: D.flags || {}, leaveDone: D.leaveDone, devDone: D.devDone });
+    devSeenEver: D.devSeenEver, riftHint: D.riftHint, rescueAt: -1, dayRainAt: D.dayRainAt || -1, flags: D.flags || {}, leaveDone: D.leaveDone, devDone: D.devDone, planToday: PLANS[D.planToday] ? D.planToday : null, planNext: PLANS[D.planNext] ? D.planNext : null });
   G.autoEq = !!D.autoEq;
   G.snowB = Array.isArray(D.snowB) ? SNOW_H.map((_, i) => clamp(+D.snowB[i] || 0, 0, 1.5)) : SNOW_H.map(() => 0);
   (D.lakesF || []).forEach((f, i) => { if (G.lakes[i]) G.lakes[i].frozen = !!f; });
@@ -906,6 +913,7 @@ function update(dt) {
   for (const t of G.trees) if (t.shake > 0) t.shake -= dt;
   for (const b of G.builds) if (b.hit > 0) b.hit -= dt;
   if (G.meal) { G.meal.t -= dt; if (G.meal.t <= 0) endMeal(); }
+  updGather(dt);
   for (const p of G.people) if (p.grabT > 0) p.grabT -= dt;
   G.routineT = (G.routineT || 0) - dt;
   G.shake *= Math.pow(0.02, dt); G.red = Math.max(0, G.red - dt); G.scare = Math.max(0, G.scare - dt);

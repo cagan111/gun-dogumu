@@ -28,7 +28,7 @@ addEventListener('keydown', e => {
   if (e.code === 'Tab') unlockPtr();
   if (e.code === 'KeyG') toggleHunt();
   if (e.code === 'KeyI') { if (UI.inB) closeInterior(); else openInterior(G.inside ? G.inside.b : undefined); }
-  if (e.code === 'Escape') { if ($('tools').classList.contains('open')) toggleMenu(false); else if (UI.char) closeChar(); else if (UI.inB) closeInterior(); else if (G.modal) toggleCraft(false); else if (G.placing) cancelPlace(); else if (G.huntMode) G.huntMode = false; else togglePause(); }
+  if (e.code === 'Escape') { if ($('talkM').style.display === 'flex') closeTalk(); else if ($('tools').classList.contains('open')) toggleMenu(false); else if (UI.char) closeChar(); else if (UI.inB) closeInterior(); else if (G.modal) toggleCraft(false); else if (G.placing) cancelPlace(); else if (G.huntMode) G.huntMode = false; else togglePause(); }
   if (e.code === 'KeyP') togglePause();
   const n = parseInt(e.key);
   if (n >= 1 && n <= 9) { const list = BORDER.filter(buildUnlocked); if (list[n - 1]) startPlace(list[n - 1]); }
@@ -115,6 +115,8 @@ $('tools').addEventListener('pointerdown', e => {
   if (x === 'hunt') toggleHunt();
   if (x === 'in') openInterior(G.inside ? G.inside.b : undefined);
   if (x === 'sleep') trySleep();
+  if (x === 'meal' && G.meal && !L.ate && !G.inside) { const t = G.meal.table; if (Math.hypot(t.x - L.x, t.y - L.y) > 140) msg('Önce sofraya yürü — masa ' + (t.b ? 'mutfağın önünde' : 'ateşin yanında') + '.', '#ffd9a0', 3); else sitAtTable(); }
+  if (x === 'chat' && G.gather && !G.inside) { if (dist(L, G.fire) > 320) msg('Ateşin başına yürü; halk orada toplandı.', '#ffd9a0', 3); else joinChat(); }
   if (x === 'sneak') { G.sneakOn = !G.sneakOn; msg(G.sneakOn ? 'Eğildin: sessiz ama yavaşsın.' : 'Doğruldun.', '#cde', 2); }
   if (x === 'people') toggleSide(true);
   if (x === 'self') openChar(L.id);
@@ -132,6 +134,8 @@ function buildTools() {
   const X = (x, t, sub, cls) => `<button data-x="${x}" class="${cls || ''}">${t}${sub ? `<br><small>${sub}</small>` : ''}</button>`;
   let h = `<div class="mhead"><b>Eylemler</b><button data-x="close">✕</button></div>`;
   h += `<div class="cat">Şimdi</div><div class="mrow">`
+    + (G.meal && !L.ate ? X('meal', '🍲 Sofraya otur', G.meal.name + ' · masaya gider', '') : '')
+    + (G.gather ? X('chat', '🔥 Muhabbete katıl', 'ateş başı · plan, hikâye', '') : '')
     + X('hunt', G.hunt ? '🎯 Avı bırak' : '🎯 Av emri', 'G · hayvana bak', G.hunt || G.huntMode ? 'on' : '')
     + X('sleep', '😴 Uyu', 'U · gece, barınakta', goHome() ? '' : 'no')
     + X('sneak', G.sneakOn ? '🧍 Doğrul' : '🦶 Eğil / sessiz yürü', 'X', G.sneakOn ? 'on' : '')
@@ -212,7 +216,7 @@ function renderSide() {
   const tamed = G.dinos.filter(d => d.tamed);
   const tm = tamed.length ? `<div class="note">🦕 Evcil: ${Object.entries(tamed.reduce((a, d) => { const k = d.pet ? 'Yırtıcı yavrusu' : DINO[d.type].ad; a[k] = (a[k] || 0) + 1; return a; }, {})).map(([k, v]) => `${k} ×${v}`).join(', ')}</div>` : '';
   if (UI.tab === 'g') {
-    let h = `<div class="note">Moral <b style="color:${G.morale > 70 ? '#9e9' : G.morale < 30 ? '#f88' : '#eed'}">${Math.round(G.morale)}</b> · ⛑️ ${bedsT ? beds + '/' + bedsT + ' yatak' : 'şifa yeri yok'}${G.meal ? ' · 🍲 yemek vakti' : ''} · 🤒 ${G.people.filter(p => p.sick).length} · 🏚️ ${homelessCount()}</div>`;
+    let h = `<div class="note">Moral <b style="color:${G.morale > 70 ? '#9e9' : G.morale < 30 ? '#f88' : '#eed'}">${Math.round(G.morale)}</b> · ⛑️ ${bedsT ? beds + '/' + bedsT + ' yatak' : 'şifa yeri yok'}${G.meal ? ' · 🍲 yemek vakti' : ''}${G.gather ? ' · 🔥 muhabbet' : ''}${G.planToday ? ' · ' + PLANS[G.planToday].ic + ' ' + PLANS[G.planToday].ad : G.planNext ? ' · yarın: ' + PLANS[G.planNext].ic : ''} · 🤒 ${G.people.filter(p => p.sick).length} · 🏚️ ${homelessCount()}</div>`;
     for (const g of GORDER) {
       const m = members(g), mg = mgr(g), ab = G.abil[g];
       h += `<div class="grp" data-g="${g}"><div class="gh"><span title="${GROUPS[g].desc}">${GROUPS[g].ic} ${GROUPS[g].ad} <b>${m.length}</b></span><span class="gm">${mg ? '★ ' + mg.name + (tr(mg, 'onder') ? ' ⭐' : '') : (g === 'bos' ? '' : '<i>yönetici yok</i>')}</span></div><div class="gb">`;
