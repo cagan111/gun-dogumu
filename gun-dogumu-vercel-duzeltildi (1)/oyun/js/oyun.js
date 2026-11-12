@@ -603,7 +603,7 @@ function startMeal(name) {
 function endMeal() {
   const hungry = [], raw = [];
   for (const p of G.people) {
-    if (!p.ate) { if (!p.grabbed && dist(p, G.meal.table) < 1600 && !p.post) eatMeal(p); else continue; }
+    if (!p.ate) { if (p.grabbed) continue; eatMeal(p); } // uzaktaki/nöbetteki azığını stoktan alır; stok boşsa acıkır
     if (!p.lastMeal) hungry.push(p); else if (p.lastMeal === 'cigEt') raw.push(p);
   }
   for (const p of hungry) { if (p.hunger >= 2) { hurt(p, p.child ? 6 : 12, null); p.fear = Math.min(100, p.fear + 10); } }
