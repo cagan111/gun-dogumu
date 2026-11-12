@@ -1340,8 +1340,10 @@ function syncEnts(t, dk) {
   for (const p of G.people) {
     const show = p !== L && !p.inHut && !p.insideB && !p.dead && nearCam(p);
     const e = put(p, 'p', () => M3.person(p), show); if (!e) continue;
-    const tw = towerOf && towerOf.get(p), y0 = tw ? buildY(tw) + 62.5 : ghE(p.x, p.y);
-    e.g.position.set(p.x, y0, p.y); e.g.rotation.y = -p.ang;
+    const tw = towerOf && towerOf.get(p);
+    const carrier = p.carriedBy === -1 ? L : p.carriedBy ? G.people.find(q => q.id === p.carriedBy) : null;
+    const y0 = carrier ? ghE(carrier.x, carrier.y) : tw ? buildY(tw) + 62.5 : ghE(p.x, p.y);
+    e.g.position.set(p.x, y0, p.y); e.g.rotation.y = -(carrier ? carrier.ang : p.ang);
     if (p === guard && !p.torch) { const v = e.gv || (e.gv = {}); for (const k in v) delete v[k]; Object.assign(v, p); v.torch = true; M3.updPerson(e.g, v, t); }
     else M3.updPerson(e.g, p, t);
     if (!tw) blobShadow(p.x, y0, p.y, p.child ? 6 : 8.5, p.child ? 5.5 : 7.5, -p.ang, p.child ? 20 : 32);

@@ -1130,8 +1130,12 @@ const M3 = (function () {
   function torsoG(tun) {
     return geo('p_torso' + tun, pb => {
       const T = col(tun), D = shd(tun, -0.28), F = mix(tun, '#e6d8b8', 0.5);
-      pb.tube([0, 0.4, 0], [0, 11.3, 0], 2.75, 3.05, T, { n: 7, wz: 1.55 });
-      pb.ball(0, 11.1, 0, 2.95, 1.6, 5.2, T, { d: 0 });
+      pb.loft([[0, 0.4, 2.6, 2.55, 3.8], [0, 3.5, 2.35, 2.4, 3.6],
+        [0.1, 8.5, 3.05, 2.8, 4.6], [0, 11.1, 2.65, 2.6, 5.0], [0, 12.0, 1.9, 1.9, 3.3]],
+        { n: 10, col: T, dk: D, bel: T, jit: 0.012 });
+      // Deri panelleri ve yıpranmış dikişler aynı geometride: ek draw-call yok.
+      for (const z of [-2.6, 2.6]) for (let i = 0; i < 4; i++)
+        pb.box(2.72, 3.5 + i * 1.4, z, 0.18, 0.32, 0.45, F);
       pb.ball(0, 11.7, 0, 3.15, 1.25, 4.9, F);                                           // kürk yaka
       for (let i = 0; i < 6; i++) { const a = (i / 5 - 0.5) * 2.4; pb.cone([Math.cos(a) * 2.9, 11.2, Math.sin(a) * 4.4], [Math.cos(a) * 3.5, 9.9, Math.sin(a) * 5.0], 0.55, F, { n: 3 }); }
       pb.box(2.98, 7.6, 0, 0.3, 5.2, 0.32, D);                                          // göğüs bağcığı
@@ -1160,11 +1164,13 @@ const M3 = (function () {
       pb.wedge(2.85, 3.95, 2.6, 3.95, 2.65, 3.15, 0.55, 0.32, Sd);                         // burun
       for (const s of [-1, 1]) {
         pb.ball(0.15, 3.5, s * 2.95, 0.6, 0.95, 0.35, Sd, { d: 0 });                        // kulak
-        pb.ball(2.72, 4.1, s * 1.2, 0.42, 0.42, 0.56, '#ece4d2', { d: 0 });                 // göz akı
-        pb.ball(3.06, 4.08, s * 1.2, 0.27, 0.33, 0.3, '#22160e', { d: 0 });                 // göz bebeği
+        pb.ball(2.72, 4.1, s * 1.2, 0.29, 0.25, 0.47, '#bcb4a2', { d: 0 });                 // göz akı
+        pb.ball(2.96, 4.08, s * 1.2, 0.15, 0.20, 0.24, '#30281f', { d: 0 });                 // göz bebeği
         pb.ball(2.55, 4.55, s * 1.2, 0.5, 0.25, 0.7, Sd, { d: 0 });                         // göz kapağı
       }
-      pb.box(3.08, 2.05, 0, 0.35, 0.3, 1.35, Lip);                                          // ağız
+      pb.box(3.08, 2.05, 0, 0.24, 0.15, 1.25, Lip);
+      pb.ball(2.72, 1.18, 0, 0.65, 0.42, 1.05, S, { d: 0 }); // çene ucu
+      for (const side of [-1, 1]) pb.ball(2.85, 2.93, side * 0.42, 0.22, 0.15, 0.18, Sd, { d: 0 });                                          // ağız
     });
   }
   const HAIRN = 6;
@@ -1200,7 +1206,8 @@ const M3 = (function () {
     return geo('p_farm' + skin, pb => {
       pb.tube([0, 0, 0], [0, -5.2, 0], 1.1, 0.88, skin, { n: 6 });
       pb.tube([0, -3.9, 0], [0, -4.9, 0], 1.04, 0.98, LEATHER, { n: 6 });
-      pb.ball(0.15, -6.05, 0, 0.92, 1.3, 1.1, skin, { d: 0 });
+      pb.ball(0.15, -5.9, 0, 0.76, 1.05, 1.0, skin, { d: 0 });
+      for (let i = 0; i < 4; i++) pb.tube([0.1, -6.2, (i - 1.5) * 0.43], [0.3, -7.1 + Math.abs(i - 1.5) * 0.12, (i - 1.5) * 0.43], 0.20, 0.16, skin, { n: 4 });
       pb.ball(0.75, -5.6, 0.55, 0.36, 0.62, 0.36, skin, { d: 0 });
     });
   }
@@ -1317,11 +1324,19 @@ const M3 = (function () {
       for (const A of ud.arms) A.u.material = A.f.material = m;
       for (const L of ud.legs) L.th.material = L.sh.material = L.ft.material = m;
     }
+    // Yalnız görsel leke: kan miktarı/kanama simülasyonu eklemez; iyileşince gizlenir.
+    const wounded = !can && (!!p.injury || p.downed > 0);
+    if (wounded && !ud.wound) ud.wound = mesh(geo('p_wound', pb => {
+      pb.box(3.18, 7.1, -1.25, 0.14, 1.5, 1.0, '#60251e');
+      pb.tri([3.26, 6.6, -1.7], [3.26, 5.2, -1.3], [3.26, 6.8, -0.9], '#772d22');
+    }), VC, ud.torso);
+    if (ud.wound) ud.wound.visible = wounded;
     // iş aksesuarı (sadak, önlük, heybe...)
     const ak = can || p.child ? null : (p.leader ? null : ACC[p.group] || null);
     if (ak !== ud.ak) { ud.ak = ak; if (ak && !ud.acc) ud.acc = mesh(accG(ak), VC, ud.torso); if (ud.acc) { ud.acc.visible = !!ak; if (ak) ud.acc.geometry = accG(ak); } }
     // alet (yay sol elde)
-    const tk = ud.hkK ? null : toolOf(p, working);
+    const pk = POSES[ud.pose || p.pose] || 0;
+    const tk = ud.hkK || p.carrying || (pk >= 1 && pk <= 3) ? null : toolOf(p, working);
     if (tk !== ud.toolK) {
       ud.toolK = tk; ud.tool.visible = !!tk;
       if (tk) { ud.tool.geometry = toolGeo(tk); const hand = ud.arms[tk === 'bow' ? 0 : 1].f; if (ud.tool.parent !== hand) hand.add(ud.tool); ud.tool.position.set(0.3, -6.0, tk === 'bow' ? -0.2 : 0.2); }
@@ -1404,7 +1419,8 @@ const M3 = (function () {
     p = p || {}; t = t || 0;
     const dt = ud.lt < 0 ? 0.016 : cl(t - ud.lt, 0, 0.1); ud.lt = t;
     const id = p.id || 0, can = ud.can, h = ud.h;
-    const pose = POSES[ud.pose] || 0;
+    // İç mekânın açık poz seçimi öncelikli; dışarıdaki sofra/ateş pozunu doğrudan oku.
+    const pose = POSES[ud.pose || p.pose] || 0;
     // adım fazı: yer değiştirmeden (kaymasız), yoksa anim sayacından
     const x = +p.x || 0, y = +p.y || 0, an = +p.anim || 0;
     if (ud.px == null) { ud.px = x; ud.py = y; ud.ph = an; ud.la = an; ud.spd = 0; ud.mv = p.moving ? 1 : 0; }
@@ -1420,12 +1436,12 @@ const M3 = (function () {
     let w = moved > 1e-3 ? moved / stride * TAU2 : (p.moving ? da : 0); w = Math.min(w, (14 + ud.spr * 6) * dt); ud.ph += w;
     const ph = ud.ph, s = Math.sin(ph), c = Math.cos(ph), mv = ud.mv;
     const lying = p.downed > 0 || !!p.bed || !!p.carriedBy || !!p.dead || !!p.grabbed || pose === 1;
-    const working = !lying && !mvB && !p.child && !can && (p.work > 0.05 || pose === 4);
+    const working = !lying && !mvB && !(pose === 2 || pose === 3) && !p.child && !can && (p.work > 0.05 || pose === 4);
     const hk = !lying && !working && !(pose === 2 || pose === 3) && !p.carrying && !can && p.haul ? HAULK[p.haul] || 'bundle' : null;
     ud.hkK = hk; haulMesh(ud, hk);
     look(ud, p, working);
     const root = ud.root, sc = sc0;
-    if (ud.sc !== sc) { ud.sc = sc; root.scale.setScalar(sc); ud.headG.scale.setScalar(p.child ? 1.32 : 1); }
+    if (ud.sc !== sc) { ud.sc = sc; root.scale.setScalar(sc); ud.headG.scale.setScalar(p.child ? 1.32 : can ? 1 : 0.92); }
     const A = ud.arms, Lg = ud.legs, torso = ud.torso, head = ud.headG, J = ud.J;
     const br = Math.sin(t * 1.7 + id), breathe = Math.sin(t * 1.5 + id * 0.7);
     if (lying) {
@@ -1434,6 +1450,9 @@ const M3 = (function () {
       const flail = (p.grabbed && !p.dead) ? 1 : 0, alive = p.dead ? 0 : 1, wv = p.downed > 0 && !p.dead ? Math.sin(t * 2.6 + id) : 0;
       root.rotation.set(sleep ? 0 : wv * 0.08, yaw, PI / 2);
       root.position.set(Math.cos(yaw) * 17 * sc, lift * (lift < 4 ? sc : 1), -Math.sin(yaw) * 17 * sc);
+      if (p.carriedBy) { // sırtın iki yanına sarkan gövde; yönü çizici taşıyana hizalar
+        root.rotation.set(0, PI / 2, PI / 2); root.position.set(6, 28, -17 * sc);
+      }
       const bth = 1 + (sleep ? 0.035 : 0.02) * Math.sin(t * (sleep ? 1.1 : 2.4) + id) * alive;
       torso.position.set(0, 15.5, 0); torso.rotation.set(0, 0, p.carriedBy ? 0.25 : wv * 0.06); torso.scale.set(1, 1, bth); ud.skirt.position.set(0, 15.5, 0); ud.skirt.rotation.set(0, 0, 0);
       head.rotation.set(flail * Math.sin(t * 9 + id) * 0.3 + (sleep ? (h & 1 ? 0.35 : -0.35) : 0), alive * Math.sin(t * 0.7 + id) * 0.15 * (sleep ? 0.2 : 1) + (sleep ? 0 : (id % 2 ? 0.5 : -0.5)) * (1 - flail), p.carriedBy ? 0.3 : sleep ? -0.15 : -0.1);
@@ -1445,6 +1464,11 @@ const M3 = (function () {
         A[1].u.rotation.set(-0.5 - flail * Math.sin(t * 12 + 2) * 0.6, 0, -0.2 + flail * Math.sin(t * 10) * 0.8 + wv * 0.15); A[1].f.rotation.z = 0.4 + Math.max(0, wv) * 0.5;
         for (let i = 0; i < 2; i++) { const L = Lg[i]; L.th.position.set(0, 15.5, L.s * 2.15); L.th.rotation.set(i ? 0.12 : -0.2, 0, (i ? 0.12 : 0.55) * (p.carriedBy ? 2 : 1) + flail * Math.sin(t * 12 + i * 3) * 0.7 + (i ? wv * 0.2 : 0)); L.sh.rotation.z = -(i ? 0.2 : 0.95) - flail * 0.4 - (i ? Math.max(0, -wv) * 0.4 : 0); L.ft.rotation.z = -0.5; }
       }
+      if (p.carriedBy) { // yerçekimi: kol ve alt bacaklar omuzun iki yanından aşağı sarkar
+        for (const a of A) { a.u.rotation.set(0, 0, -1.35); a.f.rotation.set(0, 0, 0.22); }
+        for (const leg of Lg) { leg.th.rotation.set(0, 0, -1.15); leg.sh.rotation.z = 0.28; leg.ft.rotation.z = -0.15; }
+        head.rotation.z = 0.42;
+      }
       if (ud.tool) ud.tool.visible = false; ud.toolK = undefined;
       if (ud.torch) ud.torch.visible = false; ud.tch = false;
       if (ud.cloak) ud.cloak.rotation.z = 0.25;
@@ -1454,6 +1478,7 @@ const M3 = (function () {
     root.rotation.set(0, 0, 0); root.position.set(0, 0, 0); torso.scale.set(1, 1, 1);
     // ---- durum ağırlıkları
     const spr = ud.spr * mv, snk = ud.snk * mv, walk = mv;
+    const limp = !can && !!p.injury && !p.carrying ? 1 : 0;
     const fear = can ? 0 : cl(((p.fear || 0) - 55) / 35, 0, 1), sick = p.sick ? 1 : 0;
     const thr = p.swing > 0 ? cl(p.swing / 0.2, 0, 1) : 0;
     ud.thr += (thr - ud.thr) * Math.min(1, dt * 30); const k = ud.thr;
@@ -1505,7 +1530,7 @@ const M3 = (function () {
       if (H.l) { armTo(0, 10.9, -5.75, H.l[0], H.l[1], H.l[2]); aL = ARM.a; eL = ARM.e; sL = ARM.r; } else { aL = -armSw * 0.8 + 0.05; }
       const hv = HAULW[hk] || 0; lean += H.lean * (0.7 + 0.3 * walk) - walk * hv * 0.05; drop += hv * (0.9 + walk * 0.5); hz -= hv * 0.12; twist *= 1 - hv * 0.6;
     } else if (p.carrying) {                                                                 // yaralıyı omuzda taşır
-      aL = 2.45; eL = 1.45; aR = 2.45; eR = 1.45; sL = sR = 0.35; lean -= 0.28; drop += 1.2; hz += 0.12;
+      aL = 2.15; eL = 1.8; aR = 2.15; eR = 1.8; sL = sR = 0.45; lean -= 0.46; drop += 1.6; hz += 0.22; twist *= 0.35;
     } else if (cower > 0) {                                                                  // korkuyla sinme
       const tr = Math.sin(t * 31 + id) * 0.03 * cower;
       aL = aL * (1 - cower) + 2.1 * cower; eL = eL * (1 - cower) + 2.2 * cower; aR = aR * (1 - cower) + 2.0 * cower; eR = eR * (1 - cower) + 2.25 * cower;
@@ -1527,6 +1552,7 @@ const M3 = (function () {
     }
     if (guard && !walk) { lean += 0.04; hy = Math.sin(t * 0.35 + id) * 0.55 * (Math.sin(t * 0.9 + id) > -0.5 ? 1 : 0.4); }
     else if (!walk && !working && !seated && !cower && !can) hy += Math.sin(t * 0.45 + id * 1.3) * 0.28 + (Math.sin(t * 0.17 + id) > 0.7 ? 0.5 : 0);
+    if (limp && walk) { lean -= 0.14; drop += Math.max(0, s) * 0.7; hx = Math.max(0, s) * 0.08; }
     if (sick) { hz -= 0.25; aL = aL * 0.5 + 0.5; eL = eL * 0.5 + 0.7; }
     if (can) { hx = Math.sin(t * 0.9 + id) * 0.18; hz += 0.1 + Math.sin(t * 5 + id) * 0.04; }
     else if (p.tilt) hx = p.tilt * 0.5;
@@ -1547,10 +1573,10 @@ const M3 = (function () {
       const Sx = walk * (3.4 + spr * 2.6 - snk * 1.1) * (k > 0.05 ? 0.4 : 1);
       torso.position.set(0, hipY, 0);
       for (let i = 0; i < 2; i++) {
-        const L = Lg[i], p2 = ph + (i ? PI : 0), sn = Math.sin(p2), cs = Math.cos(p2), lift = walk * Math.max(0, cs) * (2.0 + spr * 2.6 + snk * 0.6);
+        const L = Lg[i], p2 = ph + (i ? PI : 0), sn = Math.sin(p2), cs = Math.cos(p2), lift = walk * Math.max(0, cs) * (2.0 + spr * 2.6 + snk * 0.6) * (limp && i === (h & 1) ? 0.3 : 1);
         const stand = (1 - walk) * ((i ? -0.6 : 0.8) + guard * (i ? -0.3 : 0.3) + k * (i ? -2.6 : 3.6) + cower * (i ? -0.8 : 1.0));
         L.th.rotation.x = L.s * -(0.03 + guard * 0.04 + snk * 0.06);
-        legIK(L, 0, hipY, sn * Sx + stand + (can ? 1.2 : 0), lift0 + lift, walk * Math.max(0, -cs) * sn * -0.4 + lift * 0.06);
+        legIK(L, 0, hipY, sn * Sx * (limp && i === (h & 1) ? 0.55 : 1) + stand + (can ? 1.2 : 0), lift0 + lift, walk * Math.max(0, -cs) * sn * -0.4 + lift * 0.06);
       }
     }
     // yük altında yalpalama: adımla yana sallanma + yükün ters yanına eğilme
