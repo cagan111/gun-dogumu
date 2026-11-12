@@ -16,13 +16,13 @@ const $ = id => document.getElementById(id);
 function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 
 // ---- Türkçe ek uyumu
-function lastV(w) { const m = w.toLocaleLowerCase('tr').match(/[aeıioöuü](?=[^aeıioöuü]*$)/); return m ? m[0] : 'e'; }
+function lastV(w) { const m = w.toLocaleLowerCase('tr').replace(/â/g, 'a').replace(/î/g, 'i').replace(/û/g, 'u').match(/[aeıioöuü](?=[^aeıioöuü]*$)/); return m ? m[0] : 'e'; }
 function harm(w) { const v = lastV(w); return 'aı'.includes(v) ? 'ı' : 'ei'.includes(v) ? 'i' : 'ou'.includes(v) ? 'u' : 'ü'; }
 const endsV = w => /[aeıioöuü]$/i.test(w);
-const gen = w => w + "'" + (endsV(w) ? 'n' : '') + harm(w) + 'n';
-const acc = w => w + "'" + (endsV(w) ? 'y' : '') + harm(w);
-const cop = w => w + "'s" + harm(w) + 'n';
-const dat = w => w + "'" + (endsV(w) ? 'y' : '') + ('aıou'.includes(lastV(w)) ? 'a' : 'e');
+const gen = w => w === 'Sen' ? 'senin' : w + "'" + (endsV(w) ? 'n' : '') + harm(w) + 'n';
+const acc = w => w === 'Sen' ? 'seni' : w + "'" + (endsV(w) ? 'y' : '') + harm(w);
+const cop = w => w === 'Sen' ? 'sensin' : w + "'s" + harm(w) + 'n';
+const dat = w => w === 'Sen' ? 'sana' : w + "'" + (endsV(w) ? 'y' : '') + ('aıou'.includes(lastV(w)) ? 'a' : 'e');
 const cap1 = s => s[0].toLocaleUpperCase('tr') + s.slice(1);
 function compass(a) { const d = ['doğu', 'güneydoğu', 'güney', 'güneybatı', 'batı', 'kuzeybatı', 'kuzey', 'kuzeydoğu']; return d[Math.round((((a % TAU) + TAU) % TAU) / (TAU / 8)) % 8]; }
 

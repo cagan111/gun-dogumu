@@ -43,11 +43,10 @@ WebGL için: `chromium.launch({args:['--use-gl=swiftshader','--enable-unsafe-swi
 - 2 saatte bir otomatik tur (Claude). Kayıt anahtarı `sonAtesKayit4`, sürüm 4.
 
 ## Bitenler (özet)
-Ada dünyası, 3B birinci şahıs, mağara içi, eylem menüsü, zimmet/yatak, aşamalı üretim ve yemek, mevsimler + bölgesel kar + donan göller, koku takibi (rüzgâr, iz yaşı, yağmurun iz yıkaması), yırtıcı yuvaları + av dengesi, Bozkır Atı, 15 hayvanın yeni modeli (Codex), ayrıntılı ağaçlar + rüzgârda yaprak, hedef göstergesi (gün/200, enkaz, halat, bez), ses (adım, nefes, ortam, rüzgâr, uzaktan büyük hayvan; N sessiz), ortak doğum kapısı `admitDino` (tüm doğumlar normal/olay bütçesinden geçer), donmuş gölde yürüme (`walkSurfaceH`, çözülünce kıyıya tahliye), Bozkır Atı doğumu gevşetildi (çayır yakınında 40 denemede 39), kar tonu düzeltmesi (Codex, `aSnow` maskesi).
+Ada dünyası, 3B birinci şahıs, mağara içi, eylem menüsü, zimmet/yatak, aşamalı üretim ve yemek, mevsimler + bölgesel kar + donan göller, koku takibi (rüzgâr, iz yaşı, yağmurun iz yıkaması), yırtıcı yuvaları + av dengesi, Bozkır Atı, 15 hayvanın yeni modeli (Codex), ayrıntılı ağaçlar + rüzgârda yaprak, hedef göstergesi (gün/200, enkaz, halat, bez), ses (adım, nefes, ortam, rüzgâr, uzaktan büyük hayvan; N sessiz), ortak doğum kapısı `admitDino` (tüm doğumlar normal/olay bütçesinden geçer), donmuş gölde yürüme (`walkSurfaceH`, çözülünce kıyıya tahliye), Bozkır Atı doğumu gevşetildi (çayır yakınında 40 denemede 39), kar tonu düzeltmesi (Codex, `aSnow` maskesi), Türkçe ek düzeltmesi (â/î/û ünlüleri, lider için senin/seni/sana; "Alp'ın" zaten doğruydu).
 
 ## Açık işler (sırayla)
 1. Gerçek bilgisayar/iPhone performansı ölçülmedi (~628k üçgen).
-2. Türkçe ek hataları ("Alp'ın").
 
 ## Şu an kim neyde
 - (boş)
