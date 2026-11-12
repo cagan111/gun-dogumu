@@ -2443,10 +2443,18 @@ function realStart() {
   const done = () => { if (--left === 0) { REAL.ready = Object.keys(REAL.M).length > 0; U3.instX = 1e9; } };
   for (const n of names) loader.load(REAL.base + n + '.glb', g => { try { realPrep(n, g.scene); } catch (e) { console.warn('varlık', n, e); } done(); }, undefined, () => done());
 }
+// quantize (Int16/Int8 normalize) öznitelikleri float'a aç: matrisle pişirmeden önce şart
+function realFloat(g) {
+  for (const k of Object.keys(g.attributes)) { const a = g.attributes[k]; if (a.array instanceof Float32Array && !a.isInterleavedBufferAttribute) continue;
+    const n = a.count, s = a.itemSize, f = new Float32Array(n * s);
+    for (let i = 0; i < n; i++) { f[i * s] = a.getX(i); if (s > 1) f[i * s + 1] = a.getY(i); if (s > 2) f[i * s + 2] = a.getZ(i); if (s > 3) f[i * s + 3] = a.getW(i); }
+    g.setAttribute(k, new THREE.BufferAttribute(f, s)); }
+  return g;
+}
 function realPrep(name, scene) {
   scene.updateMatrixWorld(true);
   const parts = []; const box = new THREE.Box3();
-  scene.traverse(o => { if (!o.isMesh) return; if (REAL_SET.tree.includes(name) && (o.material.name || '') === name) return; const g = o.geometry.clone(); g.applyMatrix4(o.matrixWorld); g.computeBoundingBox(); box.union(g.boundingBox); parts.push({ g, m: o.material }); });
+  scene.traverse(o => { if (!o.isMesh) return; if (REAL_SET.tree.includes(name) && (o.material.name || '') === name) return; const g = realFloat(o.geometry.clone()); g.applyMatrix4(o.matrixWorld); g.computeBoundingBox(); box.union(g.boundingBox); parts.push({ g, m: o.material }); });
   if (!parts.length) return;
   // ağaç modellerinin altındaki düz toprak plakasını at (oyunun kendi zemini var)
   if (REAL_SET.tree.includes(name)) { const H = box.max.y - box.min.y; for (let i = parts.length - 1; i >= 0; i--) { const bb = parts[i].g.boundingBox; if (bb.max.y - bb.min.y < H * 0.04 || (parts[i].m.name || '') === name) parts.splice(i, 1); } box.makeEmpty(); for (const q of parts) box.union(q.g.boundingBox); }
