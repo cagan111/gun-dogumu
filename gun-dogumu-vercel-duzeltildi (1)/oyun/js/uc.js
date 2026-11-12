@@ -2447,6 +2447,8 @@ function realPrep(name, scene) {
   const parts = []; const box = new THREE.Box3();
   scene.traverse(o => { if (!o.isMesh) return; const g = o.geometry.clone(); g.applyMatrix4(o.matrixWorld); g.computeBoundingBox(); box.union(g.boundingBox); parts.push({ g, m: o.material }); });
   if (!parts.length) return;
+  // ağaç modellerinin altındaki düz toprak plakasını at (oyunun kendi zemini var)
+  if (REAL_SET.tree.includes(name)) { const H = box.max.y - box.min.y; for (let i = parts.length - 1; i >= 0; i--) { const bb = parts[i].g.boundingBox; if (bb.max.y - bb.min.y < H * 0.04) parts.splice(i, 1); } box.makeEmpty(); for (const q of parts) box.union(q.g.boundingBox); }
   const h0 = Math.max(0.01, box.max.y - box.min.y), w0 = Math.max(box.max.x - box.min.x, box.max.z - box.min.z, 0.01), cx = (box.min.x + box.max.x) / 2, cz = (box.min.z + box.max.z) / 2;
   const cap = REAL_SET.tree.includes(name) ? (REAL.low ? 10 : 40) : (REAL.low ? 24 : 64);
   const meshes = parts.map(({ g, m }) => {
