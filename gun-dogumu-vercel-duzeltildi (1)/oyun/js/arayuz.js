@@ -452,7 +452,7 @@ function cavPlacePanel() {
   let el = $('cavPlaceBar');
   if (!el) {
     el = document.createElement('div'); el.id = 'cavPlaceBar';
-    el.style.cssText = 'position:fixed;z-index:35;bottom:12px;left:50%;transform:translateX(-50%);width:min(430px,calc(100vw - 260px));min-width:180px;padding:8px;background:#17130eeb;border:1px solid #9b835b;border-radius:8px;color:#eadcc0;pointer-events:auto;font:13px Georgia';
+    el.style.cssText = 'position:fixed;z-index:35;bottom:calc(8px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);width:min(460px,calc(100vw - 16px));box-sizing:border-box;padding:6px;background:#17130eeb;border:1px solid #9b835b;border-radius:8px;color:#eadcc0;pointer-events:auto;font:13px Georgia';
     document.body.appendChild(el);
     el.addEventListener('pointerdown', e => e.stopPropagation());
     el.addEventListener('change', e => { if (e.target.id === 'cavRecipe') { CAV_PLACE.recipe = e.target.value; cavPlaceAim(); } });
@@ -471,16 +471,17 @@ function cavPlacePanel() {
       cavPlacePanel();
     });
   }
+  el.style.maxWidth = innerWidth >= 640 ? 'calc(100vw - 280px)' : 'calc(100vw - 16px)';
   const active = playing() && G.inside && G.inside.b.type === 'magara' && !G.sleep && !G.paused && !G.modal;
   el.style.display = active ? 'block' : 'none';
   if (!active) { cavPlaceStop(); UI.cavCancel = null; return; }
   if (CAV_PLACE.recipe) cavPlaceAim();
-  const S = CAV_PLACE, f = cavPendingLook(), button = (a,t) => `<button data-cav3="${a}" style="min-height:44px;min-width:44px;margin:2px;background:#3d3325;color:#eadcc0;border:1px solid #9b835b;border-radius:4px">${t}</button>`;
+  const S = CAV_PLACE, f = cavPendingLook(), button = (a,t) => `<button data-cav3="${a}" style="height:44px;min-width:44px;flex:0 0 auto;padding:0 8px;white-space:nowrap;background:#3d3325;color:#eadcc0;border:1px solid #9b835b;border-radius:4px">${t}</button>`;
   if (!f || f.id !== UI.cavCancel) UI.cavCancel = null;
   let h;
   if (S.recipe) {
     const def = CAV_FURN_RECIPES[S.recipe];
-    h = `<label>Eşya <select id="cavRecipe" style="min-height:44px;max-width:100%">${Object.entries(CAV_UI_NAMES).map(([k,n])=>`<option value="${k}" ${k===S.recipe?'selected':''}>${n}</option>`).join('')}</select></label><div>${costTxt(def.cost)} · ${def.work} sn</div><div id="cav3Status">${S.valid?'Konum uygun':'Çakışıyor / sınır dışında'} · ${Math.round(S.ang*180/Math.PI)}°</div>${button('rotate','Döndür (R)')}${button('place','Koy')}${button('stop','✕')}<div>Bak / yürü · Tık / E ile koy</div>`;
+    h = `<div style="display:flex;align-items:center;gap:4px"><select id="cavRecipe" aria-label="Yerleştirilecek eşya" style="height:44px;min-width:0;flex:1 1 0;width:100%;font-size:13px" title="Eşya seç">${Object.entries(CAV_UI_NAMES).map(([k,n])=>`<option value="${k}" ${k===S.recipe?'selected':''}>${n}</option>`).join('')}</select>${button('rotate','Döndür')}${button('place','Koy')}${button('stop','✕')}</div><div id="cav3Status" style="font-size:11px;line-height:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="Bak / yürü · R / tekerlek: döndür · Tık / E: koy · Esc: vazgeç">${costTxt(def.cost)} · ${def.work} sn · ${S.valid?'Uygun':'Çakışıyor'} · ${Math.round(S.ang*180/Math.PI)}°</div>`;
   } else if (UI.cavCancel) {
     const refund = cavFurnitureRefund(f);
     h = `<div>${cavUiName(f)} · %${Math.floor((f.prog||0)*100)}<br>İade: ${refund&&Object.keys(refund).length?costTxt(refund):'yok'}</div>${button('cancel','Planı iptal et')}${button('stop','Vazgeç')}`;
