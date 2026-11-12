@@ -75,7 +75,8 @@ function updLeader(dt) {
     p.moving = m > 0.1; p.sprinting = false; p.stam = clamp(p.stam + 16 * dt, 0, 100);
     if (p.moving) { inMove(mx / m, my / m, 110 * Math.min(1, m) * (p.sneak ? 0.5 : 1), dt); p.anim += dt * 9; }
     { const I = G.inside, rm = inRooms(b).find(r => r.t === 'sifa' && I.x >= r.x && I.x <= r.x + r.w && I.y >= r.y && I.y <= r.y + r.h);
-      if (rm) leaderHeal(dt, 5); else G.healT = 0; }
+      const care = b.type === 'magara' ? inFurn(b).some(f => f.k === 'herbs' && Math.hypot(I.x - f.x, I.y - f.y) < 90) : !!rm;
+      if (care) leaderHeal(dt, 5); else G.healT = 0; }
     p.x = b.x; p.y = b.y; p.insideB = b; p.ang = G.yaw; p.atkCd -= dt; p.swing = Math.max(0, p.swing - dt);
     G.interact = findInteract(); G.lookP = G.interact && G.interact.kind === 'person' ? G.interact.o : null; G.actT = 0; G.actProg = 0;
     return;

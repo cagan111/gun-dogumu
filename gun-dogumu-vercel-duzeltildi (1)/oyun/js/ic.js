@@ -43,6 +43,21 @@ function inLegacyFurn(b) {
 }
 // Geçiş şeması: oda iş mantığı bu ilk parçada korunur, eşya konumları artık kaydedilir.
 const CAV_FURN_KINDS = new Set(['bed', 'mat', 'crate', 'hearth', 'table', 'bench', 'block', 'rack', 'healbed', 'herbs']);
+// İş süreleri simülasyon saniyesi; malzeme ilk iş adımında bir kez ödenir.
+const CAV_FURN_RECIPES = {
+  mat: { k: 'mat', t: 'yatak', cost: { hide: 1, herb: 3 }, work: 10 },
+  bed: { k: 'bed', t: 'yatak', cost: { wood: 8, hide: 2 }, work: 24 },
+  crate: { k: 'crate', t: 'depo', cost: { wood: 6 }, work: 18 },
+  rack: { k: 'rack', t: 'depo', cost: { wood: 5 }, work: 16 },
+  hearth: { k: 'hearth', t: 'mutfak', cost: { stone: 8, wood: 3 }, work: 22 },
+  table: { k: 'table', t: 'mutfak', cost: { wood: 8 }, work: 20 },
+  bench: { k: 'bench', t: 'atolye', cost: { wood: 10, stone: 3 }, work: 30 },
+  bowbench: { k: 'bench', t: 'okcu', cost: { wood: 8, bone: 3 }, work: 28 },
+  tannery: { k: 'bench', t: 'tabak', cost: { wood: 6, hide: 3 }, work: 24 },
+  healbed: { k: 'healbed', t: 'sifa', cost: { wood: 8, hide: 3, herb: 2 }, work: 26 },
+  herbs: { k: 'herbs', t: 'sifa', cost: { wood: 5, herb: 5 }, work: 20 },
+  block: { k: 'block', t: 'kasap', cost: { wood: 6, stone: 2 }, work: 22 }
+};
 function cavFurnitureSync(b) {
   if (!b || b.type !== 'magara') return null;
   const signature = JSON.stringify(b.rooms || []);
@@ -56,13 +71,13 @@ function cavFurnitureSync(b) {
       return Object.assign({}, f, { id: 'legacy-' + i, k: legacyBed ? 'bed' : f.k,
         legacyBed, built: true, prog: 1, source: 'legacy' });
     });
-    data.items = projected.concat(placed); data.rooms = signature;
+    data.items = projected.concat(placed); data.rooms = signature; data.rev = (data.rev || 0) + 1;
   }
   return data;
 }
 function cavFurnitureSave(b) {
   const data = cavFurnitureSync(b);
-  return data ? { v: 1, rooms: data.rooms, items: data.items.map(f => Object.assign({}, f)) } : undefined;
+  return data ? { v: 1, rooms: data.rooms, next: data.next || 1, items: data.items.map(f => Object.assign({}, f, { worker: 0 })) } : undefined;
 }
 function cavFurnitureRestore(b, data) {
   if (!data || data.v !== 1 || !Array.isArray(data.items) || b.type !== 'magara') return;
@@ -75,9 +90,67 @@ function cavFurnitureRestore(b, data) {
     items.push({ id, k: f.k, x: clamp(f.x, 14, D.w - 14), y: clamp(f.y, 14, D.h - 14),
       ang: Number.isFinite(f.ang) ? f.ang : 0, room: Number.isInteger(f.room) ? f.room : -1,
       t: typeof f.t === 'string' ? f.t : 'bos', main: !!f.main, legacyBed: !!f.legacyBed,
+      recipe: Object.hasOwn(CAV_FURN_RECIPES, f.recipe) ? f.recipe : undefined, paid: !!f.paid, worker: 0,
       built: f.built !== false, prog: clamp(+f.prog || 0, 0, 1), source: f.source === 'legacy' ? 'legacy' : 'placed' });
   }
-  b.furniture = { v: 1, rooms: typeof data.rooms === 'string' ? data.rooms : null, items };
+  b.furniture = { v: 1, rooms: typeof data.rooms === 'string' ? data.rooms : null, next: Number.isInteger(data.next) && data.next > 0 ? data.next : 1, items };
+}
+function cavFurnitureCount(b, kind) {
+  const data = cavFurnitureSync(b);
+  return data ? data.items.filter(f => f.built && f.k === kind).length : 0;
+}
+function cavFurnitureRoomCount(b, type) {
+  const data = cavFurnitureSync(b); if (!data) return 0;
+  let n = 0;
+  for (const f of data.items) {
+    if (!f.built) continue;
+    if (type === 'yatak' && (f.k === 'bed' || f.k === 'mat')) n += f.legacyBed ? .25 : .5;
+    else if (type === 'depo' && f.t === 'depo' && (f.k === 'crate' || f.k === 'rack')) n++;
+    else if (type === 'sifa' && f.k === 'herbs') n++;
+    else if (type === 'mutfak' && f.k === 'hearth' && !f.main) n++;
+    else if (type === 'kasap' && f.k === 'block') n++;
+    else if ((type === 'atolye' || type === 'okcu' || type === 'tabak') && f.k === 'bench' && f.t === type) n++;
+  }
+  return type === 'depo' ? n / 5 : n;
+}
+function cavFurnitureQueue(b, recipe, x, y, ang = 0) {
+  const def = Object.hasOwn(CAV_FURN_RECIPES, recipe) ? CAV_FURN_RECIPES[recipe] : null;
+  if (!def || !b || !b.built || b.dead || !G.builds.includes(b) || b.type !== 'magara' || !Number.isFinite(x) || !Number.isFinite(y)) return null;
+  const D = inDims(b), data = cavFurnitureSync(b);
+  if (x < 25 || y < 25 || x > D.w - 25 || y > D.h - 50 || data.items.some(f => Math.hypot(f.x - x, f.y - y) < 48)) return null;
+  if (typeof inWall === 'function' && inWall(b, x, y)) return null;
+  if (typeof inSolids === 'function' && inSolids(b).some(o => Math.hypot(o.x - x, o.y - y) < o.r + 20)) return null;
+  let next = data.next || 1; while (data.items.some(f => f.id === 'furn-' + next)) next++;
+  const f = { id: 'furn-' + next, recipe, k: def.k, t: def.t, x, y, ang: Number.isFinite(ang) ? ang : 0,
+    room: -1, built: false, prog: 0, paid: false, worker: 0, source: 'placed' };
+  data.next = next + 1; data.items.push(f); data.rev = (data.rev || 0) + 1; G.uiDirty = true;
+  return f;
+}
+function cavFurnitureWork(p, dt) {
+  if (p.group !== 'mimar' || !(dt > 0)) return false;
+  let job = null, best = 1600;
+  for (const b of G.builds) {
+    if (b.type !== 'magara' || !b.built || b.dead) continue;
+    for (const f of cavFurnitureSync(b).items) {
+      const def = Object.hasOwn(CAV_FURN_RECIPES, f.recipe) ? CAV_FURN_RECIPES[f.recipe] : null; if (f.built || !def || (!f.paid && !canAfford(def.cost))) continue;
+      if (f.worker && f.worker !== p.id && G.people.some(q => q.id === f.worker && q.group === 'mimar' && !q.dead && !q.downed && !q.bed && !q.grabbed && !q.injury && !q.desert && !q.carrying && !q.carryOrder && !q.bedRes && !q.inHut && !q.wasDowned)) continue;
+      const d = dist(p, b); if (d < best) { job = { b, f, def }; best = d; }
+    }
+  }
+  if (!job) return false;
+  const { b, f, def } = job; f.worker = p.id;
+  if (!atStation(p, b, dt)) return true;
+  if (!f.paid) { if (!canAfford(def.cost)) { f.worker = 0; return false; } pay(def.cost); f.paid = true; }
+  p.work = 1; p.stageAd = 'Mağara eşyası inşa ediyor';
+  const rate = skillMul(lvl(p, 'insaat')) * grpMul('mimar') * (p.sick ? .5 : 1);
+  f.prog = Math.min(1, f.prog + dt * rate / def.work); addXP(p, 'insaat', dt * .6);
+  if (f.prog >= 1) {
+    f.built = true; f.worker = 0; const data = cavFurnitureSync(b);
+    // Tedavi slotları bitiş sırasıyla eklenir: yavaş kalan bir plan mevcut hastanın indeksini kaydırmaz.
+    if (f.k === 'healbed') { data.items.splice(data.items.indexOf(f), 1); data.items.push(f); }
+    data.rev = (data.rev || 0) + 1; G.uiDirty = true; msg('Mağara eşyası tamamlandı.', '#cfe', 3);
+  }
+  return true;
 }
 function inFurn(b) {
   if (b.type !== 'magara') return inLegacyFurn(b);
@@ -104,7 +177,9 @@ function inPeople(b) {
       if (p === L) return;
       let x = r.x + r.w * (0.3 + 0.4 * ((j * 0.37) % 1)), y = r.y + r.h * (0.35 + 0.4 * ((j * 0.61) % 1)), ang = Math.PI / 2, pose = 'stand';
       const beds = f.filter(q => q.k === 'bed' || q.k === 'mat' || q.k === 'healbed');
-      if ((p.inHut === b || (p.bed && p.bed.s === b)) && beds.length) { const q = beds[j % beds.length]; x = q.x + (j >= beds.length ? 12 : 0); y = q.y; ang = 0; pose = 'sleep'; }
+      const patientBed = p.bed && p.bed.s === b ? furn.filter(q => q.k === 'healbed')[p.bed.i] : null;
+      if (patientBed) { x = patientBed.x; y = patientBed.y; ang = patientBed.ang; pose = 'sleep'; }
+      else if ((p.inHut === b || (p.bed && p.bed.s === b)) && beds.length) { const q = beds[j % beds.length]; x = q.x + (j >= beds.length ? 12 : 0); y = q.y; ang = 0; pose = 'sleep'; }
       else if (r.t === 'mutfak') {
         const tb = f.find(q => q.k === 'table'), hz = f.find(q => q.k === 'hearth');
         if (p.group === 'asci' && hz && !(G.meal && p.ate)) { x = hz.x + 22; y = hz.y + 6; ang = Math.PI; pose = 'work'; }

@@ -242,7 +242,7 @@ function deposit(p, mult = 1) {
 // malzemeler ilgili depoya taşınır: en yakın depo odalı yapı (kapısı), yoksa ateşin yanı
 function depotOf(p) {
   let best = null, bd = 1e9;
-  for (const b of G.builds) { if (!b.built || b.dead || !isRoomy(b) || roomCount(b, 'depo') < 1) continue; const d = dist(b, p); if (d < bd) { bd = d; best = b; } }
+  for (const b of G.builds) { if (!b.built || b.dead || !isRoomy(b) || roomCount(b, 'depo') <= 0) continue; const d = dist(b, p); if (d < bd) { bd = d; best = b; } }
   if (!best) return G.fire;
   if (!best._dp) best._dp = { x: best.x, y: best.y + best.r * 0.85 + 30 };
   return best._dp;
@@ -265,7 +265,7 @@ function nearestThreat(p, range) {
 }
 
 // ---- haneler: çadır = 1 hane; mağara/kulübe yatakhanesi = 2 hane
-const roomCount = (b, t) => (b.rooms || []).filter(r => r === t).length;
+const roomCount = (b, t) => b.type === 'magara' && typeof cavFurnitureRoomCount === 'function' ? cavFurnitureRoomCount(b, t) : (b.rooms || []).filter(r => r === t).length;
 const homeBuildings = () => G.builds.filter(b => b.built && !b.dead && (b.type === 'cadir' || roomCount(b, 'yatak') > 0));
 const tents = homeBuildings;
 const homeCap = b => b.type === 'cadir' ? 1 : roomCount(b, 'yatak') * 2;
@@ -314,7 +314,7 @@ const homelessCount = () => G.people.filter(p => !p.leader && !homeOf(p)).length
 // ---- istasyonlar: bağımsız yapı ya da mağara/kulübe odası
 const STN = { kasap: 'kasaphane', atolye: 'atolye', okcu: 'oktezgah', tabak: 'tabakhane', sifa: 'sifahane', mutfak: '' };
 const isRoomy = b => b.type === 'magara' || b.type === 'kulube';
-function stations(type) { return G.builds.filter(b => b.built && !b.dead && (b.type === STN[type] || (b.rooms && b.rooms.includes(type)))); }
+function stations(type) { return G.builds.filter(b => b.built && !b.dead && (b.type === STN[type] || roomCount(b, type) > 0)); }
 function station(type, from) { const S = stations(type); if (!S.length) return null; const f = from || G.fire; return S.sort((a, b) => dist(a, f) - dist(b, f))[0]; }
 const stnPos = b => isRoomy(b) ? { x: b.x, y: b.y + b.r * 0.85 } : { x: b.x, y: b.y + (b.r || 30) + 8 };
 function atStation(p, b, dt) {
@@ -373,7 +373,7 @@ function needsCare(q) {
   if (q.injury) { if (q.injury.type === 'enfeksiyon') return (G.stock.ilac || 0) > 0; if (q.injury.type === 'kirik') return !q.injury.set; return true; }
   return false;
 }
-function bedCount(b) { return b.type === 'sifahane' ? 4 : roomCount(b, 'sifa') * 2; }
+function bedCount(b) { return b.type === 'sifahane' ? 4 : b.type === 'magara' && typeof cavFurnitureCount === 'function' ? cavFurnitureCount(b, 'healbed') : roomCount(b, 'sifa') * 2; }
 // Kayıt geri yükleme ve yatak ayırma aynı güncel kapasiteyi doğrular.
 function healBedFor(s, i, person) {
   if (!s || !s.built || s.dead || !Number.isInteger(i) || i < 0 || i >= bedCount(s)) return null;
@@ -1057,6 +1057,7 @@ function blueprintFor(p) {
   return best;
 }
 function updBuilder(p, dt, any) {
+  if (typeof cavFurnitureWork === 'function' && cavFurnitureWork(p, dt)) return true;
   const b = blueprintFor(p); if (!b) return false;
   if (p.group !== 'mimar' && !any && dist(b, G.fire) > 900 && !abilOn('mimar')) return false;
   if (dist(p, b) > b.r + 16) { steer(p, b.x + Math.cos(p.seat) * (b.r + 10), b.y + Math.sin(p.seat) * (b.r + 10), pSpeed(p), dt, false); p.anim += dt * 9; return true; }

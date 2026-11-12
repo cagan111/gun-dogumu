@@ -2192,7 +2192,8 @@ function interiorExit() {
 }
 function render3DInterior(dt, t, yaw, pitch, bobY, sh) {
   const I = G.inside, b = I.b, cam = U3.cam;
-  const key = b.type + '|' + (b.rooms || []).join() + '|' + Math.round(b.x) + ',' + Math.round(b.y);
+  const furnitureRev = b.type === 'magara' && typeof cavFurnitureSync === 'function' ? cavFurnitureSync(b).rev || 0 : 0;
+  const key = b.type + '|' + (b.rooms || []).join() + '|' + Math.round(b.x) + ',' + Math.round(b.y) + '|' + furnitureRev;
   if (IN.b !== b || IN.key !== key) { if (IN.root) { IN.scene.remove(IN.root); inDispose(); } inBuild(b); IN.key = key; }
   if (cam.parent !== IN.scene) IN.scene.add(cam);
   const D = IN.D;
