@@ -1115,8 +1115,9 @@ function killPerson(p, src, silent) {
     // Yeni liderin bıraktığı meslek boş kaldıysa en kalabalık gruptan biri devralır (ateş/odun gibi hayati işler sahipsiz kalmasın)
     if (oldG && GROUPS[oldG] && !G.people.some(q => q.group === oldG && !q.dead)) {
       const cnt = {}; for (const q of G.people) if (q.group && !q.leader && !q.child) cnt[q.group] = (cnt[q.group] || 0) + 1;
-      const big = Object.keys(cnt).filter(g => g !== oldG && cnt[g] >= 2).sort((a, b) => cnt[b] - cnt[a])[0] || (oldG === 'odun' ? ['tas', 'yiyecek'].find(g => cnt[g] >= 1) : null);
-      const w = big && G.people.find(q => q.group === big && !q.leader && !q.child && G.managers[big] !== q.id);
+      const cand = Object.keys(cnt).filter(g => g !== oldG && cnt[g] >= 2).sort((a, b) => cnt[b] - cnt[a]).concat(oldG === 'odun' ? ['tas', 'yiyecek'].filter(g => cnt[g] >= 1) : []);
+      let big = null, w = null;
+      for (const g of cand) { w = G.people.find(q => q.group === g && !q.leader && !q.child && G.managers[g] !== q.id); if (w) { big = g; break; } }
       if (w) { setGroup(w, oldG, true); msg(`${GROUPS[oldG].ad} kalmamıştı; ${w.name} ${GROUPS[big].ad.toLocaleLowerCase('tr')} işini bırakıp ${GROUPS[oldG].ad.toLocaleLowerCase('tr')} oldu.`, '#fd9', 7); }
       else msg(`⚠ Artık hiç ${GROUPS[oldG].ad.toLocaleLowerCase('tr')} yok! Halkın kartından birini görevlendir.`, '#fb7', 8);
     }
