@@ -7460,8 +7460,11 @@ const M3 = (function () {
       for (const s of [-1, 1]) {
         pb.ball(0.15, 3.5, s * 2.95, 0.6, 0.95, 0.35, Sd, { d: 0 });                        // kulak
         pb.ball(2.72, 4.1, s * 1.2, 0.29, 0.25, 0.47, '#bcb4a2', { d: 0 });                 // göz akı
-        pb.ball(2.96, 4.08, s * 1.2, 0.15, 0.20, 0.24, '#30281f', { d: 0 });                 // göz bebeği
+        pb.ball(2.62, 4.08, s * 1.2, 0.42, 0.42, 0.62, shd(skin, -0.38), { d: 0 });         // göz çukuru gölgesi
+        pb.ball(2.74, 4.1, s * 1.2, 0.31, 0.27, 0.5, '#c9c0ae', { d: 0 });                  // göz akı
+        pb.ball(2.98, 4.08, s * 1.2, 0.19, 0.24, 0.3, '#1c150f', { d: 0 });                  // göz bebeği (iri, uzaktan seçilsin)
         pb.ball(2.55, 4.55, s * 1.2, 0.5, 0.25, 0.7, Sd, { d: 0 });                         // göz kapağı
+        pb.box(2.86, 4.9, s * 1.2, 0.34, 0.24, 0.92, shd(skin, -0.62));                     // kaş (koyu, belirgin)
       }
       pb.box(3.08, 2.05, 0, 0.24, 0.15, 1.25, Lip);
       pb.ball(2.72, 1.18, 0, 0.65, 0.42, 1.05, S, { d: 0 }); // çene ucu
@@ -7563,7 +7566,10 @@ const M3 = (function () {
     if (p.child) return '#b89a6a';
     const GR = typeof GROUPS !== 'undefined' ? GROUPS : null;
     const c = (GR && (GR[p.group] || GR.bos) || { col: '#6a5a48' }).col;
-    return c === '#555' ? '#6a5a48' : c;                          // boşta: ham deri
+    const base = c === '#555' ? '#6a5a48' : c;                   // boşta: ham deri
+    // topraksı ton: grup rengi yalnız hafif bir boya izi; çoğu deri/post/kil
+    const H = hashId(p.id || 0), HIDES = ['#6b5038', '#7a5c3e', '#5e4a36', '#806446', '#574533', '#6f5a40'];
+    return '#' + mix(HIDES[H % HIDES.length], base, 0.22 + ((H >>> 4) % 5) * 0.03).getHexString();
   }
   function toolOf(p, working) {
     const eq = p.eq || {};
