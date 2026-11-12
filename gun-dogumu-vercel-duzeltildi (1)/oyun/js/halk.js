@@ -1128,6 +1128,7 @@ function killPerson(p, src, silent) {
     const oldG = nl.group;
     nl.leader = true; nl.group = null; nl.maxhp = 100; nl.hp = Math.max(nl.hp, 60); nl.fear = 0; nl.downed = 0; nl.child = false; nl.r = 11;
     L = nl;
+    if (G.inside) { G.inside = null; if (typeof closeInterior === 'function') closeInterior(); }   // eski liderin iç mekânı yeni lidere geçmesin
     msg(`Liderin öldü... Halk ${gen(nl.name)} etrafında toplandı. Artık sen ${cop(nl.name)}.`, '#ffb', 8);
     // Yeni liderin bıraktığı meslek boş kaldıysa en kalabalık gruptan biri devralır (ateş/odun gibi hayati işler sahipsiz kalmasın)
     if (oldG && GROUPS[oldG] && !G.people.some(q => q.group === oldG && !q.dead)) {
