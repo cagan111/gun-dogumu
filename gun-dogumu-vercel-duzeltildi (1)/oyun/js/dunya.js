@@ -48,6 +48,27 @@ function blobT(b, x, y) {
 const HC = 50; let HN = Math.round(WORLD / HC), HW = HN + 1;
 function islandGridReset() { HN = Math.round(WORLD / HC); HW = HN + 1; }
 let HM = null, TMUL = null;
+// Sürüm1 yalnız yeni oyunlarda: eski v4 kayıtlarının arazisi değişmez.
+function cavSiteReserved(x,y,margin=0) {
+  if (G.caveTerrain!==1) return false;
+  const dx=x-CAMP.x,dy=y-CAMP.y;
+  return Math.hypot(dx,dy+430)<200+margin || (Math.abs(dx)<60+margin&&dy>-430-margin&&dy<40+margin);
+}
+function cavSiteHeight(x,y) {
+  const dx=x-CAMP.x,dy=y-CAMP.y;
+  if (Math.abs(dx)>700||dy>180||dy<-1350) return 0;
+  const ramp=128*sstep(40,300,-dy)*(1-sstep(180,420,Math.abs(dx)))*(1-sstep(650,1100,-dy));
+  const ridge=320*(1-sstep(0,1,Math.hypot(dx/550,(dy+790)/510)));
+  return Math.max(ramp,ridge);
+}
+function cavSiteRocks() {
+  if (G.caveTerrain!==1) return;
+  const R=mulberry32(G.seed^0x51ac), points=[[-83,-300,48],[83,-300,48],[-145,-450,64],[145,-450,64],[-74,-580,60],[74,-580,60]];
+  for (const [dx,dy,r] of points) {
+    const v=[];for(let i=0;i<8;i++){const a=i/8*TAU;v.push([Math.cos(a)*r*(.85+R()*.2),Math.sin(a)*r*(.85+R()*.2)])}
+    const o={x:CAMP.x+dx,y:CAMP.y+dy,r,kind:'rock',res:'stone',amt:28,v,shade:.95+R()*.1,i:G.rocks.length,shelter:true};G.rocks.push(o);gAdd(o);
+  }
+}
 function rawH(x, y) {
   const c = landness(x, y);
   if (c < 0) return Math.max(-190, -2 + c * 0.22);   // deniz tabanı
@@ -76,6 +97,7 @@ function rawH(x, y) {
   }
   const dc = Math.hypot(x - CAMP.x, y - CAMP.y);
   if (dc < 1500) h = 8 + (h - 8) * sstep(700, 1500, dc);       // kamp düzlüğü
+  if (G.caveTerrain===1) h+=cavSiteHeight(x,y);
   return Math.max(h, 1.2);
 }
 function groundH(x, y) {
@@ -188,6 +210,7 @@ function genWorld(seed) {
   HM = new Float32Array(HW * HW);
   for (let j = 0; j < HW; j++) for (let i = 0; i < HW; i++) HM[j * HW + i] = rawH(i * HC, j * HC);
   flattenH(G.rift.x, G.rift.y, 160, 260, groundH(G.rift.x, G.rift.y));
+  if (G.caveTerrain===1) flattenH(CAMP.x,CAMP.y-430,110,70,136);
   // biyom haritası
   G.bmap = new Uint8Array(MAPN * MAPN);
   for (let j = 0; j < MAPN; j++) for (let i = 0; i < MAPN; i++) G.bmap[j * MAPN + i] = biomeAt((i + 0.5) * MAPC, (j + 0.5) * MAPC);
@@ -236,7 +259,7 @@ function genWorld(seed) {
       huts: [0, 1, 2].map(i => { const a = i / 3 * TAU + sr(-0.3, 0.3); return [Math.cos(a) * sr(55, 75), Math.sin(a) * sr(55, 75)]; }) });
   }
   for (const w of G.wrecks) flattenH(w.x, w.y, 70, 90, Math.max(1.5, groundH(w.x, w.y)));
-  const free = (x, y, m) => land(x, y) && !G.lakes.some(l => Math.hypot(l.x - x, l.y - y) < l.r + m) && Math.hypot(x - G.rift.x, y - G.rift.y) > 120
+  const free = (x, y, m) => !cavSiteReserved(x,y,m) && land(x, y) && !G.lakes.some(l => Math.hypot(l.x - x, l.y - y) < l.r + m) && Math.hypot(x - G.rift.x, y - G.rift.y) > 120
     && !G.ccamps.some(c => Math.hypot(c.x - x, c.y - y) < 150) && !G.wrecks.some(c => Math.hypot(c.x - x, c.y - y) < 130) && Math.hypot(x - G.harbor.x, y - G.harbor.y) > 160;
   for (const b of G.blobs) if (b.k === 2) for (let i = 0, n = Math.round(10 * (b.r / 650) ** 2); i < n; i++) {
     const a = sr(0, TAU), rr = sr(0, b.r * 0.8), x = b.x + Math.cos(a) * rr, y = b.y + Math.sin(a) * rr;
@@ -277,7 +300,7 @@ function genWorld(seed) {
   for (let i = 0; i < Math.round(6000 * ISLK * ISLK); i++) { const x = rx(), y = ry(); if (S() < TP[B(x, y)]) addTree(x, y); }
 
   // ---- kayalar (dağda yoğun, kumsalda sürüklenmiş taşlar) ve kristaller (≤ 2500)
-  const ROCK_MAX = 2500;
+  const ROCK_MAX = G.caveTerrain===1?2494:2500;
   function addRock(x, y) {
     if (G.rocks.length >= ROCK_MAX || !free(x, y, 30) || nearCamp(x, y, 220) || inPool(x, y, 20)) return;
     if (gQuery(x, y, 50).some(o => (o.kind === 'tree' || o.kind === 'rock' || o.kind === 'crystal') && Math.hypot(o.x - x, o.y - y) < 46)) return;
@@ -330,6 +353,7 @@ function genWorld(seed) {
       : b === 4 ? (u < 0.8 ? 'grass' : u < 0.92 ? 'fern' : 'bone') : (u < 0.5 ? 'drift' : u < 0.85 ? 'pebble' : 'bone');
     G.deco.push({ x, y, t, a: sr(0, TAU), s: sr(0.7, 1.3) });
   }
+  cavSiteRocks();
   makeBiomeTint();
   function coastR0(a) { let r = 4000 * ISLK; while (r < 8000 * ISLK && landness(CAMP.x + Math.cos(a) * r, CAMP.y + Math.sin(a) * r) > 0) r += 40; return r; }
 }
