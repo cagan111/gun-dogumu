@@ -379,7 +379,7 @@ function itemBlock(id) {
   const best = crafters(it.by).reduce((m, p) => Math.max(m, lvl(p, it.by)), 0);
   if (!best) return `${it.by === 'sifa' ? '🌿 Şifacı' : '🔨 Zanaatkâr'} grubunda kimse yok`;
   if (best < it.lvl) return `${SKILLS[it.by].ad} ${it.lvl}. seviye gerekir (en iyi: ${best})`;
-  if (it.by === 'zanaat' && !station(it.stn || 'atolye')) { const r = ROOMS[it.stn || 'atolye']; return `önce bir ${r.ic} ${r.ad} kur (yapı ya da oda)`; }
+  if (it.by === 'zanaat' && !craftStation(id)) { if (FIRE_CRAFT.has(id)) return 'önce kamp ateşini yak veya uygun tezgâh kur'; const r = ROOMS[it.stn || 'atolye']; return `önce bir ${r.ic} ${r.ad} kur (yapı ya da oda)`; }
   return '';
 }
 function addOrder(id, n, byId) {

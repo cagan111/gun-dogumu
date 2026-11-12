@@ -340,16 +340,17 @@ function renderCraft() {
     h += `<div class="cat">Emirler</div>`;
     for (const o of G.orders) {
       const it = ITEMS[o.item], w = o.worker && G.people.find(p => p.id === o.worker), who = o.by && G.people.find(p => p.id === o.by);
-      const wait = !w ? (!o.paid && !canAfford(it.cost) ? 'malzeme bekliyor' : itemBlock(o.item) || 'usta bekliyor') : `${w.name}: ${o.trips > 0 ? 'malzeme getiriyor' : (o.stageAd || 'çalışıyor')}`;
+      const wait = it.by==='zanaat'&&!craftStation(o.item) ? itemBlock(o.item) : !w ? (!o.paid && !canAfford(it.cost) ? 'malzeme bekliyor' : itemBlock(o.item) || 'usta bekliyor') : `${w.name}: ${o.trips > 0 ? 'malzeme getiriyor' : (o.stageAd || 'çalışıyor')}`;
       h += `<div class="card"><div>${it.ic} <b>${it.ad}</b> ×${o.left >= 999 ? '∞' : o.left}${who ? ' · <small>' + who.name + '</small>' : ''}<div class="bar" style="margin-top:4px"><i style="width:${Math.round(o.prog / it.work * 100)}%;background:#d9a94a"></i></div><small>${wait}</small></div><button data-x2="${o.id}">✕</button></div>`;
     }
   }
-  h += `<div class="cat">${by === 'zanaat' ? 'Atölye ürünleri' : 'Şifa ürünleri'}</div>`;
+  h += `<div class="cat">${by === 'zanaat' ? 'Zanaat ürünleri' : 'Şifa ürünleri'}</div>`;
+  if (by==='zanaat') h += '<p class="hint" style="padding:0 12px">İlk taş aletler (balta, kazma, mızrak), sepet ve el meşalesi yanan kamp ateşinde de yapılır. Malzeme ve çalışma süresi aynıdır; ileri ürünler uygun tezgâh ister.</p>';
   for (const k of IORDER) {
     const it = ITEMS[k]; if (it.by !== by) continue;
     const block = itemBlock(k), who = UI.craftBy[k] ? G.people.find(p => p.id === UI.craftBy[k]) : null;
     const cost = Object.entries(it.cost).map(([r, v]) => `<span class="${(G.stock[r] || 0) >= v ? '' : 'bad'}">${v}${icOf(r)}</span>`).join(' ');
-    h += `<div class="card ${block ? 'locked' : ''}"><div><b>${it.ic} ${it.ad}</b> <small>stok ${G.stock[k] || 0} · ${SKILLS[it.by].ic}${it.lvl} · ${cost}</small><br><small>${it.desc}</small>${block ? `<br><small class="bad">🔒 ${block}</small>` : ''}</div>
+    h += `<div class="card ${block ? 'locked' : ''}"><div><b>${it.ic} ${it.ad}</b> <small>stok ${G.stock[k] || 0} · ${SKILLS[it.by].ic}${it.lvl} · ${cost}</small><br><small>${it.desc}${FIRE_CRAFT.has(k) ? ' · Yanan ateş / tezgâh' : ''}</small>${block ? `<br><small class="bad">🔒 ${block}</small>` : ''}</div>
       <div class="obtns"><button data-who="${k}" title="Kim yapsın?">${who ? who.name : 'Herkes'}</button><button data-o="${k}:1">+1</button><button data-o="${k}:5">+5</button><button data-o="${k}:999" title="Sürekli üret">∞</button></div></div>`;
   }
   $('craftBox').innerHTML = h + '</div>';

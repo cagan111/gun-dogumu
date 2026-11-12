@@ -1678,6 +1678,13 @@ const STN = { kasap: 'kasaphane', atolye: 'atolye', okcu: 'oktezgah', tabak: 'ta
 const isRoomy = b => b.type === 'magara' || b.type === 'kulube';
 function stations(type) { return G.builds.filter(b => b.built && !b.dead && (b.type === STN[type] || roomCount(b, type) > 0)); }
 function station(type, from) { const S = stations(type); if (!S.length) return null; const f = from || G.fire; return S.sort((a, b) => dist(a, f) - dist(b, f))[0]; }
+// Yalnız ilk taş aletler: genel stations() listesine ateş ekleyip ileri tarifleri açma.
+const FIRE_CRAFT = new Set(['balta','kazma','mizrak','sepet','mesale']);
+function craftFireReady() { const f=G.fire;return !!f&&!f.out&&f.fuel>0&&Number.isFinite(f.x)&&Number.isFinite(f.y); }
+function craftStation(id,from) {
+  const it=ITEMS[id];if(!it||it.by!=='zanaat')return null;
+  return station(it.stn||'atolye',from)||(FIRE_CRAFT.has(id)&&craftFireReady()?G.fire:null);
+}
 const stnPos = b => isRoomy(b) ? { x: b.x, y: b.y + b.r * 0.85 } : { x: b.x, y: b.y + (b.r || 30) + 8 };
 function atStation(p, b, dt) {
   const sp = stnPos(b), tx = sp.x + Math.cos(p.seat) * (isRoomy(b) ? 14 : 10), ty = sp.y;
@@ -2358,9 +2365,9 @@ function canDoOrder(p, o) {
   return true;
 }
 function workOrder(p, dt, by, stn) {
-  const o = G.orders.find(o => ITEMS[o.item].by === by && canDoOrder(p, o) && (o.paid || canAfford(ITEMS[o.item].cost)) && (by !== 'zanaat' || station(ITEMS[o.item].stn || 'atolye', p)));
+  const o = G.orders.find(o => ITEMS[o.item].by === by && canDoOrder(p, o) && (o.paid || canAfford(ITEMS[o.item].cost)) && (by !== 'zanaat' || craftStation(o.item,p)));
   if (!o) return false;
-  if (by === 'zanaat') stn = station(ITEMS[o.item].stn || 'atolye', p);
+  if (by === 'zanaat') stn = craftStation(o.item,p);
   o.worker = p.id;
   const it0 = ITEMS[o.item];
   if (!o.paid && o.trips === undefined) { o.trips = Math.min(3, Math.max(1, Object.keys(it0.cost).length)); o.leg = 'get'; }
@@ -2404,12 +2411,11 @@ function workOrder(p, dt, by, stn) {
 }
 function updCrafter(p, dt) {
   if (goHome()) return homeBehavior(p, dt);
-  const st = station('atolye', p) || station('okcu', p) || station('tabak', p);
-  if (!st) {
-    if (!G.flags.noAtolye && G.orders.some(o => ITEMS[o.item].by === 'zanaat')) { G.flags.noAtolye = 1; msg('Zanaatkârların çalışması için bir 🔨 Atölye inşa et.', '#e99', 5); }
-    return altJob(p, dt);
+  if (workOrder(p,dt,'zanaat',null)) return;
+  if (!G.flags.noAtolye && G.orders.some(o => ITEMS[o.item].by==='zanaat'&&!FIRE_CRAFT.has(o.item)&&!craftStation(o.item,p))) {
+    G.flags.noAtolye=1;msg('İleri zanaat için uygun tezgâh kur. İlk taş aletler yanan ateş başında yapılabilir.','#e99',5);
   }
-  if (!workOrder(p, dt, 'zanaat', st)) altJob(p, dt);
+  altJob(p,dt);
 }
 // ---- mimar / inşaat
 function blueprintFor(p) {
@@ -4520,7 +4526,7 @@ function itemBlock(id) {
   const best = crafters(it.by).reduce((m, p) => Math.max(m, lvl(p, it.by)), 0);
   if (!best) return `${it.by === 'sifa' ? '🌿 Şifacı' : '🔨 Zanaatkâr'} grubunda kimse yok`;
   if (best < it.lvl) return `${SKILLS[it.by].ad} ${it.lvl}. seviye gerekir (en iyi: ${best})`;
-  if (it.by === 'zanaat' && !station(it.stn || 'atolye')) { const r = ROOMS[it.stn || 'atolye']; return `önce bir ${r.ic} ${r.ad} kur (yapı ya da oda)`; }
+  if (it.by === 'zanaat' && !craftStation(id)) { if (FIRE_CRAFT.has(id)) return 'önce kamp ateşini yak veya uygun tezgâh kur'; const r = ROOMS[it.stn || 'atolye']; return `önce bir ${r.ic} ${r.ad} kur (yapı ya da oda)`; }
   return '';
 }
 function addOrder(id, n, byId) {
@@ -11124,16 +11130,17 @@ function renderCraft() {
     h += `<div class="cat">Emirler</div>`;
     for (const o of G.orders) {
       const it = ITEMS[o.item], w = o.worker && G.people.find(p => p.id === o.worker), who = o.by && G.people.find(p => p.id === o.by);
-      const wait = !w ? (!o.paid && !canAfford(it.cost) ? 'malzeme bekliyor' : itemBlock(o.item) || 'usta bekliyor') : `${w.name}: ${o.trips > 0 ? 'malzeme getiriyor' : (o.stageAd || 'çalışıyor')}`;
+      const wait = it.by==='zanaat'&&!craftStation(o.item) ? itemBlock(o.item) : !w ? (!o.paid && !canAfford(it.cost) ? 'malzeme bekliyor' : itemBlock(o.item) || 'usta bekliyor') : `${w.name}: ${o.trips > 0 ? 'malzeme getiriyor' : (o.stageAd || 'çalışıyor')}`;
       h += `<div class="card"><div>${it.ic} <b>${it.ad}</b> ×${o.left >= 999 ? '∞' : o.left}${who ? ' · <small>' + who.name + '</small>' : ''}<div class="bar" style="margin-top:4px"><i style="width:${Math.round(o.prog / it.work * 100)}%;background:#d9a94a"></i></div><small>${wait}</small></div><button data-x2="${o.id}">✕</button></div>`;
     }
   }
-  h += `<div class="cat">${by === 'zanaat' ? 'Atölye ürünleri' : 'Şifa ürünleri'}</div>`;
+  h += `<div class="cat">${by === 'zanaat' ? 'Zanaat ürünleri' : 'Şifa ürünleri'}</div>`;
+  if (by==='zanaat') h += '<p class="hint" style="padding:0 12px">İlk taş aletler (balta, kazma, mızrak), sepet ve el meşalesi yanan kamp ateşinde de yapılır. Malzeme ve çalışma süresi aynıdır; ileri ürünler uygun tezgâh ister.</p>';
   for (const k of IORDER) {
     const it = ITEMS[k]; if (it.by !== by) continue;
     const block = itemBlock(k), who = UI.craftBy[k] ? G.people.find(p => p.id === UI.craftBy[k]) : null;
     const cost = Object.entries(it.cost).map(([r, v]) => `<span class="${(G.stock[r] || 0) >= v ? '' : 'bad'}">${v}${icOf(r)}</span>`).join(' ');
-    h += `<div class="card ${block ? 'locked' : ''}"><div><b>${it.ic} ${it.ad}</b> <small>stok ${G.stock[k] || 0} · ${SKILLS[it.by].ic}${it.lvl} · ${cost}</small><br><small>${it.desc}</small>${block ? `<br><small class="bad">🔒 ${block}</small>` : ''}</div>
+    h += `<div class="card ${block ? 'locked' : ''}"><div><b>${it.ic} ${it.ad}</b> <small>stok ${G.stock[k] || 0} · ${SKILLS[it.by].ic}${it.lvl} · ${cost}</small><br><small>${it.desc}${FIRE_CRAFT.has(k) ? ' · Yanan ateş / tezgâh' : ''}</small>${block ? `<br><small class="bad">🔒 ${block}</small>` : ''}</div>
       <div class="obtns"><button data-who="${k}" title="Kim yapsın?">${who ? who.name : 'Herkes'}</button><button data-o="${k}:1">+1</button><button data-o="${k}:5">+5</button><button data-o="${k}:999" title="Sürekli üret">∞</button></div></div>`;
   }
   $('craftBox').innerHTML = h + '</div>';

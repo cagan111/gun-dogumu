@@ -316,6 +316,13 @@ const STN = { kasap: 'kasaphane', atolye: 'atolye', okcu: 'oktezgah', tabak: 'ta
 const isRoomy = b => b.type === 'magara' || b.type === 'kulube';
 function stations(type) { return G.builds.filter(b => b.built && !b.dead && (b.type === STN[type] || roomCount(b, type) > 0)); }
 function station(type, from) { const S = stations(type); if (!S.length) return null; const f = from || G.fire; return S.sort((a, b) => dist(a, f) - dist(b, f))[0]; }
+// Yalnız ilk taş aletler: genel stations() listesine ateş ekleyip ileri tarifleri açma.
+const FIRE_CRAFT = new Set(['balta','kazma','mizrak','sepet','mesale']);
+function craftFireReady() { const f=G.fire;return !!f&&!f.out&&f.fuel>0&&Number.isFinite(f.x)&&Number.isFinite(f.y); }
+function craftStation(id,from) {
+  const it=ITEMS[id];if(!it||it.by!=='zanaat')return null;
+  return station(it.stn||'atolye',from)||(FIRE_CRAFT.has(id)&&craftFireReady()?G.fire:null);
+}
 const stnPos = b => isRoomy(b) ? { x: b.x, y: b.y + b.r * 0.85 } : { x: b.x, y: b.y + (b.r || 30) + 8 };
 function atStation(p, b, dt) {
   const sp = stnPos(b), tx = sp.x + Math.cos(p.seat) * (isRoomy(b) ? 14 : 10), ty = sp.y;
@@ -996,9 +1003,9 @@ function canDoOrder(p, o) {
   return true;
 }
 function workOrder(p, dt, by, stn) {
-  const o = G.orders.find(o => ITEMS[o.item].by === by && canDoOrder(p, o) && (o.paid || canAfford(ITEMS[o.item].cost)) && (by !== 'zanaat' || station(ITEMS[o.item].stn || 'atolye', p)));
+  const o = G.orders.find(o => ITEMS[o.item].by === by && canDoOrder(p, o) && (o.paid || canAfford(ITEMS[o.item].cost)) && (by !== 'zanaat' || craftStation(o.item,p)));
   if (!o) return false;
-  if (by === 'zanaat') stn = station(ITEMS[o.item].stn || 'atolye', p);
+  if (by === 'zanaat') stn = craftStation(o.item,p);
   o.worker = p.id;
   const it0 = ITEMS[o.item];
   if (!o.paid && o.trips === undefined) { o.trips = Math.min(3, Math.max(1, Object.keys(it0.cost).length)); o.leg = 'get'; }
@@ -1042,12 +1049,11 @@ function workOrder(p, dt, by, stn) {
 }
 function updCrafter(p, dt) {
   if (goHome()) return homeBehavior(p, dt);
-  const st = station('atolye', p) || station('okcu', p) || station('tabak', p);
-  if (!st) {
-    if (!G.flags.noAtolye && G.orders.some(o => ITEMS[o.item].by === 'zanaat')) { G.flags.noAtolye = 1; msg('Zanaatkârların çalışması için bir 🔨 Atölye inşa et.', '#e99', 5); }
-    return altJob(p, dt);
+  if (workOrder(p,dt,'zanaat',null)) return;
+  if (!G.flags.noAtolye && G.orders.some(o => ITEMS[o.item].by==='zanaat'&&!FIRE_CRAFT.has(o.item)&&!craftStation(o.item,p))) {
+    G.flags.noAtolye=1;msg('İleri zanaat için uygun tezgâh kur. İlk taş aletler yanan ateş başında yapılabilir.','#e99',5);
   }
-  if (!workOrder(p, dt, 'zanaat', st)) altJob(p, dt);
+  altJob(p,dt);
 }
 // ---- mimar / inşaat
 function blueprintFor(p) {
