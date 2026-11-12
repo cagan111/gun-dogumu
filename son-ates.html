@@ -6120,7 +6120,7 @@ function drawMini() {
   for (const c2 of G.ccamps) if (c2.found) { dot(c2.x, c2.y, 4, c2.alive ? '#d22' : '#633'); if (c2.alive) { g.fillStyle = '#fff'; g.font = `${9 * DPR}px serif`; g.textAlign = 'center'; g.fillText('☠', X(c2.x), Y(c2.y) + 3 * DPR); } }
   if (G.zone.kasif) { g.strokeStyle = '#ffd27a'; g.lineWidth = 1.5 * DPR; g.beginPath(); g.arc(X(G.zone.kasif.x), Y(G.zone.kasif.y), 7 * DPR, 0, TAU); g.stroke(); }
   for (const p of G.people) if (!p.inHut && !p.insideB && p !== L && !(p.grabbed && !(p.grabT > 0))) dot(p.x, p.y, 1.4, p.downed > 0 || p.grabbed ? '#f44' : '#e8dcc0');
-  for (const d of G.dinos) { if (d.tamed) dot(d.x, d.y, 2, '#8f8'); else if ((d.scouted > 0 || visible(d.x, d.y)) && hostile(d)) dot(d.x, d.y, 2, '#f33'); else if (visible(d.x, d.y) && DINO[d.type].herb) dot(d.x, d.y, 1.8, '#dc8'); }
+  for (const d of G.dinos) { if (d.tamed) dot(d.x, d.y, 2, '#8f8'); else if (d.type !== 'yamyam' && (d.scouted > 0 || visible(d.x, d.y)) && hostile(d)) dot(d.x, d.y, 2, '#f33'); /* yamyamlar haritada hiç görünmez */ else if (visible(d.x, d.y) && DINO[d.type].herb) dot(d.x, d.y, 1.8, '#dc8'); }
   if (G.hunt && G.hunt.t && !G.hunt.t.dead) { g.strokeStyle = '#f63'; g.lineWidth = 1.5 * DPR; g.beginPath(); g.arc(X(G.hunt.t.x), Y(G.hunt.t.y), 5 * DPR, 0, TAU); g.stroke(); }
   if (G.rescue) dot(G.rescue.x, G.rescue.y, 3, '#5cf');
   // oyuncu: bakış konisi + yön oku
