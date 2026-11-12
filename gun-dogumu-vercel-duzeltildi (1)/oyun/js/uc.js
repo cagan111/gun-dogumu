@@ -1820,7 +1820,11 @@ function inInit() {
   MAT.caveFloor = triPatch(new THREE.MeshLambertMaterial({ vertexColors: true }), 0.07, 0.45);
   MAT.inV = triPatch(new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }), 0.11, 0.3);
   MAT.inVD = triPatch(new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, side: THREE.DoubleSide }), 0.11, 0.3);
-  TEX.paint = paintTex(); TEX.hide = hideTex(); TEX.outside = canvasTex(64, (g, S) => { const gr = g.createLinearGradient(0, 0, 0, S); gr.addColorStop(0, '#ffffff'); gr.addColorStop(0.55, '#e8eef4'); gr.addColorStop(0.62, '#a8b890'); gr.addColorStop(1, '#6a7a50'); g.fillStyle = gr; g.fillRect(0, 0, S, S); });
+  TEX.paint = paintTex(); TEX.paint.premultiplyAlpha = true;
+  { const c = TEX.paint.image, g = c.getContext('2d'), d = g.getImageData(0, 0, c.width, c.height), a = d.data;   // çok soluk pikselleri temizle
+    for (let i = 3; i < a.length; i += 4) if (a[i] < 28) a[i - 3] = a[i - 2] = a[i - 1] = a[i] = 0;
+    g.putImageData(d, 0, 0); TEX.paint.needsUpdate = true; }   // telefonda düşük saydamlıklı püskürtme noktaları renkli kumlanmaya dönmesin
+  TEX.hide = hideTex(); TEX.outside = canvasTex(64, (g, S) => { const gr = g.createLinearGradient(0, 0, 0, S); gr.addColorStop(0, '#ffffff'); gr.addColorStop(0.55, '#e8eef4'); gr.addColorStop(0.62, '#a8b890'); gr.addColorStop(1, '#6a7a50'); g.fillStyle = gr; g.fillRect(0, 0, S, S); });
   MAT.hide = new THREE.MeshLambertMaterial({ map: TEX.hide, transparent: true, alphaTest: 0.4, side: THREE.DoubleSide });
 }
 // ---- mağara resimleri: aşı boyası hayvanlar, el izleri, avcılar
@@ -2178,7 +2182,7 @@ function inBuild(b) {
     { const pw = W * 0.8, ph = 120, nx = 24, ny = 8, pg = new THREE.PlaneGeometry(pw, ph, nx, ny), pp = pg.attributes.position;
       for (let i = 0; i < pp.count; i++) { const x = W / 2 + pp.getX(i), y = 62 + pp.getY(i), h = inRay([shell], x, y, H * 0.4, 0, 0, -1, 900); pp.setXYZ(i, x, y, h ? h.point.z + 3.2 : 0); }
       pg.computeVertexNormals();
-      const m = new THREE.Mesh(pg, new THREE.MeshLambertMaterial({ map: TEX.paint, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 })); root.add(m);
+      const m = new THREE.Mesh(pg, new THREE.MeshLambertMaterial({ map: TEX.paint, transparent: true, premultipliedAlpha: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 })); root.add(m);
       X.lights.push({ x: W / 2, y: 70, z: 70, col: 0xffa860, int: 1.1, dist: 300, pri: 3, fl: 1 }); }
   } else if (st === 'hut') {
     const wh = D.wallH, lg = '#6a4a2a', lg2 = '#5a3e22';
