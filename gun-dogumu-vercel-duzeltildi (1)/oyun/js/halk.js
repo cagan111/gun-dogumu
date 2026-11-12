@@ -138,6 +138,7 @@ function setGroup(p, g, quiet) {
   if (p.tgt && p.tgt.claim === p) p.tgt.claim = null;
   if (p.post) { p.post.guard = null; p.post = null; }
   for (const o of G.orders) if (o.worker === p.id) o.worker = 0;
+  if (!quiet && g !== 'takip') { p.rtBase = null; p.prevG = null; }   // oyuncunun kalıcı seçimi: şafakta geri alınmaz
   if (p.carrying) dropCarried(p);
   p.tgt = null; p.st = p.carry > 0 ? 'return' : 'idle'; p.group = g; p.stgt = null;
   if (p.inHut && (g === 'muhafiz' || g === 'takip')) leaveHut(p);
@@ -519,6 +520,7 @@ function updPerson(p, dt, LS) {
   // yaralı çalışmaz: kırığı olan yerinde bekler (taşınır), diğerleri mağaraya/ateşe çekilip dinlenir; şifacı yanına gelir
   if (!p.carrying && (p.injury || p.hp < p.maxhp * 0.4) && !(p.fear > 60)) {
     p.work = 0; p.sneak = false; if (p.tgt && p.tgt.claim === p) p.tgt.claim = null; p.tgt = null; p.carryOrder = 0;
+    for (const o of G.orders) if (o.worker === p.id) o.worker = 0;   // yaralının üstündeki iş başkasını kilitlemesin
     if (!members('sifaci').length && !G.flags.noHealer) { G.flags.noHealer = 1; msg(`🩹 ${p.name} yaralı ve çalışamıyor. Şifacın yok: birini 🌿 Şifacı yap ya da yanına gidip kendin sar.`, '#f99', 6); }
     const broken = p.injury && p.injury.type === 'kirik';
     if (broken || p.wasDowned) { p.moving = false; p.stageAd = 'Yaralı — taşınmayı bekliyor'; return; }
@@ -626,7 +628,7 @@ function applyRoutine(p) {
   const ph = phase(), slot = ph < 0.16 ? 'sabah' : ph < 0.31 ? 'ogle' : ph < 0.46 ? 'ikindi' : null;
   if (!slot) return;
   const g = p.routine[slot];
-  if (g && p.group !== g) setGroup(p, g, true);
+  if (g && p.group !== g) { if (!p.rtBase) p.rtBase = p.group; setGroup(p, g, true); }
 }
 function altJob(p, dt) {
   const a = p.alt || 'yiyecek';
@@ -1118,7 +1120,7 @@ function killPerson(p, src, silent) {
       const cand = Object.keys(cnt).filter(g => g !== oldG && cnt[g] >= 2).sort((a, b) => cnt[b] - cnt[a]).concat(oldG === 'odun' ? ['tas', 'yiyecek'].filter(g => cnt[g] >= 1) : []);
       let big = null, w = null;
       for (const g of cand) { w = G.people.find(q => q.group === g && !q.leader && !q.child && G.managers[g] !== q.id); if (w) { big = g; break; } }
-      if (w) { setGroup(w, oldG, true); msg(`${GROUPS[oldG].ad} kalmamıştı; ${w.name} ${GROUPS[big].ad.toLocaleLowerCase('tr')} işini bırakıp ${GROUPS[oldG].ad.toLocaleLowerCase('tr')} oldu.`, '#fd9', 7); }
+      if (w) { setGroup(w, oldG, true); w.rtBase = null; w.prevG = null; msg(`${GROUPS[oldG].ad} kalmamıştı; ${w.name} ${GROUPS[big].ad.toLocaleLowerCase('tr')} işini bırakıp ${GROUPS[oldG].ad.toLocaleLowerCase('tr')} oldu.`, '#fd9', 7); }
       else msg(`⚠ Artık hiç ${GROUPS[oldG].ad.toLocaleLowerCase('tr')} yok! Halkın kartından birini görevlendir.`, '#fb7', 8);
     }
     SFX.sting();
@@ -1128,6 +1130,16 @@ function killPerson(p, src, silent) {
 
 // ---- şafak
 function halkDawn() {
+  // geçici işler (beni izle, rutin, kilitli üretim emri, biten av) sabah biter; herkes kendi mesleğine döner
+  for (const o of G.orders) o.worker = 0;
+  if (G.hunt && G.hunt.t && (G.hunt.t.dead || G.hunt.t.tamed)) G.hunt = null;
+  for (const p of G.people) {
+    if (p.leader || p.child) continue;
+    const back = p.rtBase || (p.group === 'takip' && p.prevG !== 'takip' ? p.prevG : null);
+    p.rtBase = null; p.prevG = null;
+    if (back && GROUPS[back] && back !== p.group) setGroup(p, back, true);
+  }
+  G.uiDirty = true;
   let tired = 0;
   for (const p of G.people) { p.tired = !!p.watched && !tr(p, 'uykusuz'); p.watched = false; if (p.tired) tired++; }
   if (tired && G.day % 5 === 2) msg(`${tired} muhafız gece nöbetinden yorgun: bugün yavaşlar. İkinci bir muhafız nöbeti paylaşır.`, '#bbb', 4);
