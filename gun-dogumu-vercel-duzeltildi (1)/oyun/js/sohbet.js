@@ -95,7 +95,7 @@ function updGather(dt) {
   if (g.sayT <= 0) {
     g.sayT = rand(2.6, 4.5);
     const sat = G.people.filter(q => q.gSeat && !q.say);
-    if (sat.length) { const q = pick(sat), pool = chatPool(q); if (pool.length) sayLine(q, pool[Math.floor(Math.random() * pool.length)]); }
+    if (sat.length && G.people.filter(q => q.say).length < 2) { const q = pick(sat), pool = chatPool(q); if (pool.length) sayLine(q, pool[Math.floor(Math.random() * pool.length)]); }
   }
 }
 function endGather(why) {
@@ -112,7 +112,7 @@ function gatherStep(p, dt) {
   p.tgt = null; p.work = 0;
   if (p.carry > 0 && dist(p, depotOf(p)) < 900) { if (dist(p, depotOf(p)) < 80) deposit(p); else { steer(p, depotOf(p).x, depotOf(p).y, pSpeed(p), dt, false); p.anim += dt * 9; return; } }
   if (Math.hypot(p.x - sx, p.y - sy) > 12) { p.gSeat = false; p.pose = null; steer(p, sx, sy, pSpeed(p) * 1.05, dt, false); p.anim += dt * 9; p.stageAd = 'Muhabbete geliyor'; return; }
-  p.moving = false; p.ang = angTo(p, G.fire); p.gSeat = true; p.pose = 'sit'; p.stageAd = p.drank === G.day ? '🍵 Muhabbet ediyor' : 'Muhabbet ediyor';
+  p.moving = false; p.ang = angTo(p, G.fire); p.gSeat = true; p.pose = 'sit'; p.stageAd = p.say ? null : p.drank === G.day ? '🍵' : '';
   p.fear = Math.max(0, p.fear - 3 * dt);
   if (p.drank !== G.day && (G.stock.icki || 0) >= 1 && Math.random() < dt * 0.25) {
     G.stock.icki -= 1; p.drank = G.day; g.drunk++;

@@ -220,6 +220,7 @@ function drawLabelsIn() {
   }
   ctx.globalAlpha = 1;
 }
+const _BUB = [];
 // konuşma balonu (akşam muhabbeti): sarılmış metin, küçük kuyruk
 function sayBubble(x, y, t, a) {
   if (a <= 0.02) return;
@@ -227,7 +228,10 @@ function sayBubble(x, y, t, a) {
   const maxW = Math.min(220, VW * 0.42), words = t.split(' '), lines = []; let cur = '';
   for (const w of words) { const tt = cur ? cur + ' ' + w : w; if (ctx.measureText(tt).width > maxW && cur) { lines.push(cur); cur = w; } else cur = tt; }
   if (cur) lines.push(cur);
-  const lh = 15, w = Math.max(...lines.map(l => ctx.measureText(l).width)) + 16, h = lines.length * lh + 8, bx = clamp(x - w / 2, 4, VW - w - 4), by = y - h - 8;
+  const lh = 15, w = Math.max(...lines.map(l => ctx.measureText(l).width)) + 16, h = lines.length * lh + 8, bx = clamp(x - w / 2, 4, VW - w - 4);
+  let by = y - h - 8;
+  for (let k = 0; k < 4; k++) { const o = _BUB.find(r => bx < r.x + r.w && bx + w > r.x && by < r.y + r.h + 4 && by + h + 4 > r.y); if (!o) break; by = o.y - h - 6; }
+  _BUB.push({ x: bx, y: by, w, h });
   ctx.fillStyle = 'rgba(28,22,14,.86)'; ctx.strokeStyle = 'rgba(255,214,150,.55)'; ctx.lineWidth = 1;
   ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(bx, by, w, h, 7); else ctx.rect(bx, by, w, h); ctx.fill(); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(x - 5, by + h); ctx.lineTo(x, by + h + 7); ctx.lineTo(x + 5, by + h); ctx.fill();
@@ -235,6 +239,7 @@ function sayBubble(x, y, t, a) {
   ctx.restore();
 }
 function drawLabels3D(LS, dk) {
+  _BUB.length = 0;
   ctx.textAlign = 'center';
   const label = (s, text, col, ic) => {
     const k = clamp(260 / Math.max(120, s.z), 0.75, 1.35), fs = Math.round(11 * k);
