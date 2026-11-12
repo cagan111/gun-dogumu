@@ -634,7 +634,7 @@ function startScreen() {
   const achList = Object.entries(ACH).map(([k, a]) => `<div class="${ACHSET.has(k) ? 'got' : ''}">${ACHSET.has(k) ? '🏆' : '🔒'} <b>${a.ad}</b> — ${a.desc}</div>`).join('');
   const best = +(store.get('sonAtesRekor') || 0);
   $('screenBox').innerHTML = `<h1>SON ATEŞ</h1>
-  <p class="story">Bir fırtına. Kör edici bir ışık. Uyandığınızda gökyüzünde tanımadığınız kanatlar,<br>ormanda tanımadığınız sesler vardı. Dokuz kişisiniz. Bir mağaranız, bir ateşiniz var.<br>Geminiz kayalıklarda parçalandı; enkazı adanın kıyılarına dağıldı.<br><b>Ve gece yaklaşıyor.</b></p>
+  <p class="story">Bir fırtına. Kör edici bir ışık. Uyandığınızda gökyüzünde tanımadığınız kanatlar,<br>ormanda tanımadığınız sesler vardı. Dokuz kişisiniz. Erzak ve aletiniz yok. Bir ateş, yamaçta boş bir mağara var.<br>Geminiz kayalıklarda parçalandı; enkazı adanın kıyılarına dağıldı.<br><b>Ve gece yaklaşıyor.</b></p>
   ${sv ? `<button id="cont" class="big">DEVAM ET <small>(${sv.day}. gün · ${DIFF[sv.diff] ? DIFF[sv.diff].ad : ''})</small></button><br>` : ''}
   <div class="diffs">${Object.entries(DIFF).map(([k, d]) => `<button data-d="${k}" class="${UI.diff === k ? 'on' : ''}">${d.ad}</button>`).join('')}</div>
   <p class="ddesc" id="ddesc">${DIFF[UI.diff].desc}</p>
@@ -646,7 +646,7 @@ function startScreen() {
   <b>Yiyecek</b>: asıl kaynak avcılık. 🎯 ile bir hayvan seç; avcılar mesafeyi koruyarak avlar. Leşi 🔪 Et Ustası temizlemezse çiğ et salgın getirebilir. Tarlalar da ekilebilir.<br>
   <b>Mağara ve odalar</b>: halk mağarada başlar. <b>I</b> ile mağaranın, kulübenin ve diğer yapıların içini gör, odalara görev ver (yatakhane, depo, mutfak, şifa, et temizleme, atölye), içeriden karakter seç.<br>
   <b>Yemek</b>: leş → taşıyıcılar → 🔪 et ustası temizler → 🍲 aşçı pişirir. Öğle ve akşam yemek vakti herkes masaya gelir. Çiğ et hastalık getirebilir.<br>
-  <b>Barınma</b>: her tek kişi ya da çift bir yerde yaşar (çadır = 1 hane, yatakhane odası = 2 hane). Yer yoksa yeni insanlar gelmez. Çitsiz evler nadiren saldırıya uğrar.<br>
+  <b>Barınma</b>: her tek kişi ya da çift bir yerde yaşar (çadır = 1 hane; mağarada yer yatağı veya yatak planlayarak yer açarsın). Yer yoksa yeni insanlar gelmez. Çitsiz evler nadiren saldırıya uğrar.<br>
   <b>Sağlık</b>: yaralılar şifahaneye taşınır, günlerce tedavi görür. Salgınlar nadiren öldürür ama yayılır.<br>
   <b>Bilinmezlik</b>: sadece halkının gördüğünü görürsün. Geceler çoğu zaman sessizdir... ama her zaman değil. Yüzü tanıdık gelen her şeye güvenme.<br>
   <b>Hedef</b>: adada en az 200 gün hayatta kal, kıyılardaki 3 gemi enkazını bul, halat ve yelken bezi ürettir, usta bir mimarla kıyıya ⛵ Gemi kur ve halkınla eve dön.</div></details>

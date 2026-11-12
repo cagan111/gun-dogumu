@@ -27,10 +27,11 @@ function resetState(diff) {
 function newGame(diff, tutOn) {
   setIslandScale(1.5); resetState(diff);
   G.caveTerrain=1;
+  for (const key of Object.keys(G.stock)) G.stock[key]=0;
   G.seed = Math.floor(Math.random() * 1e9);
   genWorld(G.seed);
   L = mkPerson(CAMP.x, CAMP.y + 70, 'Sen', true); G.people.push(L);
-  ['odun', 'avci', 'kasap', 'asci', 'yiyecek', 'mimar', 'muhafiz', 'zanaat'].forEach((g, i) => {
+  ['odun', 'tas', 'yiyecek', 'asci', 'yiyecek', 'mimar', 'muhafiz', 'zanaat'].forEach((g, i) => {
     const a = i / 8 * TAU + 0.5, p = mkPerson(CAMP.x + Math.cos(a) * 80, CAMP.y + Math.sin(a) * 80, freshName(), false);
     p.group = g; G.people.push(p);
     if (g === 'mimar' && lvl(p, 'insaat') < 2) p.sk.insaat = XPL[1] + 1;
@@ -38,9 +39,10 @@ function newGame(diff, tutOn) {
   });
   G.cave = makeBuild('magara', CAMP.x, CAMP.y - 430, 0); finishBuild(G.cave, true);
   G.cave.rooms = BUILD.magara.rooms.slice();
-  msg('Halkın bir mağarada yaşıyor. Ağzından yürüyerek içeri gir; içeride dolaş, insanlara bakıp E ile emir ver.', '#cfe', 9);
+  G.cave.furniture={v:1,rooms:'',next:1,rev:1,items:[]};
+  msg('Erzak ve alet yok. Oduncu, taşçı ve toplayıcılar ilk malzemeleri getirsin. Yamaçtaki boş mağaraya yürüyerek gir; I ile eşya planla.', '#cfe', 9);
   assignHomes(); autoDistribute(); assignEquip();
-  msg('Kimsenin yatağı yok; herkes yerde yatıyor. Zanaatkâra 🛏️ Yatak ürettir ve kişilere ver.', '#cde', 9);
+  msg('İlk balta ve kazmayı yanan ateşte ürettir (C). Mağara boş: ilk sandık ve ocak için malzeme topla.', '#cde', 9);
   G.tut = { on: !!tutOn, step: 0 };
   msg('Ateşi canlı tut. Halkını besle. Gece geldiğinde... ışıktan ayrılma.', '#ffd9a0', 8);
   if (!tutOn) msg('Halkını sağdaki panelden gruplara ayır, yöneticiler ata.', '#bbb', 8);
