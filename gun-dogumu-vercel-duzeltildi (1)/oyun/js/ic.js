@@ -32,13 +32,67 @@ const IN_FURN = {
   tabak: [['bench', .45, .45, 0], ['rack', .8, .7, 0]],
   bos: [],
 };
-function inFurn(b) {
+function inLegacyFurn(b) {
   const D = inDims(b), out = [];
   // yatak: yalnızca burada oturanlara zimmetli yatak kadar; kalanı yer yatağı (mat)
   let beds = 0; for (const q of G.people) if (q.own && q.own.yatak && typeof homeOf === 'function' && homeOf(q) === b) beds++;
   for (const r of inRooms(b)) for (const f of (IN_FURN[r.t] || [])) { let k = f[0]; if (k === 'bed') { if (beds > 0) beds--; else k = 'mat'; } out.push({ k, x: r.x + r.w * f[1], y: r.y + r.h * f[2], ang: f[3], room: r.i, t: r.t }); }
   out.push({ k: 'door', x: D.w / 2, y: D.h, ang: 0, room: -1 });
   if (b.type === 'magara') { out.push({ k: 'hearth', x: D.w / 2, y: D.h * 0.62, ang: 0, room: -1, main: 1 }); out.push({ k: 'paint', x: D.w * 0.5, y: 2, ang: 0, room: -1 }); out.push({ k: 'torch', x: D.w * 0.3, y: D.h - 6, ang: 0, room: -1 }); out.push({ k: 'torch', x: D.w * 0.7, y: D.h - 6, ang: 0, room: -1 }); }
+  return out;
+}
+// Geçiş şeması: oda iş mantığı bu ilk parçada korunur, eşya konumları artık kaydedilir.
+const CAV_FURN_KINDS = new Set(['bed', 'mat', 'crate', 'hearth', 'table', 'bench', 'block', 'rack', 'healbed', 'herbs']);
+function cavFurnitureSync(b) {
+  if (!b || b.type !== 'magara') return null;
+  const signature = JSON.stringify(b.rooms || []);
+  if (!b.furniture || b.furniture.v !== 1) b.furniture = { v: 1, rooms: null, items: [] };
+  const data = b.furniture;
+  if (data.rooms !== signature) {
+    // Eski oda menüsü değişirse yalnız otomatik oda izdüşümü yenilenir; ayrı eşyalar korunur.
+    const placed = data.items.filter(f => f.source !== 'legacy');
+    const projected = inLegacyFurn(b).filter(f => CAV_FURN_KINDS.has(f.k)).map((f, i) => {
+      const legacyBed = f.t === 'yatak' && (f.k === 'bed' || f.k === 'mat');
+      return Object.assign({}, f, { id: 'legacy-' + i, k: legacyBed ? 'bed' : f.k,
+        legacyBed, built: true, prog: 1, source: 'legacy' });
+    });
+    data.items = projected.concat(placed); data.rooms = signature;
+  }
+  return data;
+}
+function cavFurnitureSave(b) {
+  const data = cavFurnitureSync(b);
+  return data ? { v: 1, rooms: data.rooms, items: data.items.map(f => Object.assign({}, f)) } : undefined;
+}
+function cavFurnitureRestore(b, data) {
+  if (!data || data.v !== 1 || !Array.isArray(data.items) || b.type !== 'magara') return;
+  const D = inDims(b), ids = new Set(), items = [];
+  for (const f of data.items) {
+    if (!f || !CAV_FURN_KINDS.has(f.k) || !Number.isFinite(f.x) || !Number.isFinite(f.y)) continue;
+    let id = typeof f.id === 'string' ? f.id : 'item-' + items.length;
+    if (ids.has(id)) { let n = 1; while (ids.has(id + '-' + n)) n++; id += '-' + n; }
+    ids.add(id);
+    items.push({ id, k: f.k, x: clamp(f.x, 14, D.w - 14), y: clamp(f.y, 14, D.h - 14),
+      ang: Number.isFinite(f.ang) ? f.ang : 0, room: Number.isInteger(f.room) ? f.room : -1,
+      t: typeof f.t === 'string' ? f.t : 'bos', main: !!f.main, legacyBed: !!f.legacyBed,
+      built: f.built !== false, prog: clamp(+f.prog || 0, 0, 1), source: f.source === 'legacy' ? 'legacy' : 'placed' });
+  }
+  b.furniture = { v: 1, rooms: typeof data.rooms === 'string' ? data.rooms : null, items };
+}
+function inFurn(b) {
+  if (b.type !== 'magara') return inLegacyFurn(b);
+  let beds = 0;
+  for (const q of G.people) if (q.own && q.own.yatak && homeOf(q) === b) beds++;
+  const out = cavFurnitureSync(b).items.filter(f => f.built).map(f => {
+    const view = Object.assign({}, f);
+    if (f.legacyBed) { view.k = beds > 0 ? 'bed' : 'mat'; if (beds > 0) beds--; }
+    return view;
+  });
+  // Kapı/duvar resmi/meşaleler mimari: taşınabilir eşya envanterine girmez.
+  const D = inDims(b);
+  out.push({ k: 'door', x: D.w / 2, y: D.h, ang: 0, room: -1 });
+  out.push({ k: 'paint', x: D.w * .5, y: 2, ang: 0, room: -1 });
+  for (const x of [.3, .7]) out.push({ k: 'torch', x: D.w * x, y: D.h - 6, ang: 0, room: -1 });
   return out;
 }
 function inPeople(b) {

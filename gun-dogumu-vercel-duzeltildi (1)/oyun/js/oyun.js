@@ -694,7 +694,7 @@ function serialize() {
     flags: G.flags, leaveDone: G.leaveDone, devDone: G.devDone, tut: G.tut.on ? G.tut.step : -1,
     trees: G.trees.map(o => o.amt), rocks: G.rocks.map(o => o.dead ? 0 : o.amt), crystals: G.crystals.map(o => o.dead ? 0 : o.amt),
     bushes: G.bushes.map(o => o.amt), herbs: G.herbs.map(o => o.amt), poisons: G.poisons.map(o => o.amt), nests: G.nests.map(n => n.eggs),
-    builds: G.builds.map(b => ({ type: b.type, x: b.x, y: b.y, hp: b.hp, uses: b.uses, ang: b.ang, built: b.built, prog: b.prog, planted: b.planted, g: b.g, rooms: b.rooms, crop: b.crop, cur: b.cur })),
+    builds: G.builds.map(b => ({ type: b.type, x: b.x, y: b.y, hp: b.hp, uses: b.uses, ang: b.ang, built: b.built, prog: b.prog, planted: b.planted, g: b.g, rooms: b.rooms, furniture: cavFurnitureSave(b), crop: b.crop, cur: b.cur })),
     people: G.people.filter(p => !p.grabbed).map(p => { const o = {}; for (const k of pf) o[k] = p[k]; o.inHut = p.inHut ? G.builds.indexOf(p.inHut) : -1; o.homeT = p.homeT ? G.builds.indexOf(p.homeT) : -1; o.bed = p.bed ? [G.builds.indexOf(p.bed.s), p.bed.i] : null; return o; }),
     dinos: G.dinos.filter(d => d.tamed).map(d => ({ type: d.type, x: d.x, y: d.y, hp: d.hp, maxhp: d.maxhp, pet: !!d.pet, growth: d.growth || 0, r: d.r, mounted: G.mount === d })),
     explored: ex,
@@ -730,7 +730,7 @@ function loadGame(s) {
   for (const [arr, src] of [[G.rocks, D.rocks], [G.crystals, D.crystals]]) src.forEach((a, i) => { const o = arr[i]; if (!o) return; o.amt = a; if (a <= 0) { o.dead = true; gDel(o); } });
   for (const [arr, src] of [[G.bushes, D.bushes], [G.herbs, D.herbs], [G.poisons, D.poisons]]) src.forEach((a, i) => { if (arr[i]) arr[i].amt = a; });
   D.nests.forEach((e, i) => { if (G.nests[i]) G.nests[i].eggs = e; });
-  for (const b of D.builds) { if (!BUILD[b.type]) continue; const o = makeBuild(b.type, b.x, b.y, b.ang); o.hp = b.hp; o.uses = b.uses; o.prog = b.prog || 0; o.planted = !!b.planted; o.g = b.g || 0; if (b.type === 'tarla') { o.crop = CROPS[b.crop] ? b.crop : 'cali'; o.cur = CROPS[b.cur] ? b.cur : o.planted ? 'cali' : null; } if (b.rooms) o.rooms = b.rooms.slice(); if (b.type === 'magara') G.cave = o; if (b.built !== false) finishBuild(o, true); }
+  for (const b of D.builds) { if (!BUILD[b.type]) continue; const o = makeBuild(b.type, b.x, b.y, b.ang); o.hp = b.hp; o.uses = b.uses; o.prog = b.prog || 0; o.planted = !!b.planted; o.g = b.g || 0; if (b.type === 'tarla') { o.crop = CROPS[b.crop] ? b.crop : 'cali'; o.cur = CROPS[b.cur] ? b.cur : o.planted ? 'cali' : null; } if (b.rooms) o.rooms = b.rooms.slice(); cavFurnitureRestore(o, b.furniture); if (b.type === 'magara') G.cave = o; if (b.built !== false) finishBuild(o, true); }
   for (const s2 of D.people) {
     const p = mkPerson(s2.x, s2.y, s2.name, s2.leader, s2.child);
     Object.assign(p, s2); p.inHut = null; p.homeT = null; p.bed = null; p.eq = {}; p.sk = Object.assign({}, p.sk || {});
