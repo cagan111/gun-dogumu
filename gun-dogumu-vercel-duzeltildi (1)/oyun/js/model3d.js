@@ -1130,6 +1130,37 @@ const M3 = (function () {
     P.cthigh = geo('p_cthigh', pb => { pb.tube([0, 0.6, 0], [0, -7.6, 0], 1.8, 1.35, ASH, { n: 6 }); pb.ball(0, -7.6, 0, 1.3, 1.3, 1.3, ASH, { d: 0 }); pb.box(0.6, -3.5, 0, 2.4, 0.6, 3.0, '#7a1a12'); });
     P.cshin = geo('p_cshin', pb => { pb.tube([0, 0.2, 0], [0, -6.5, 0], 1.3, 0.95, ASH, { n: 6 }); pb.tube([0, -5.0, 0], [0, -5.8, 0], 1.1, 1.05, '#2a1e16', { n: 6 }); });
     P.cfoot = geo('p_cfoot', pb => { pb.wedge(-1.2, 3.0, -1.3, 0.3, -1.3, -0.4, 1.1, 0.95, '#8a8074'); pb.ball(0, 0, 0, 1.0, 0.9, 1.0, '#8a8074', { d: 0 }); });
+    // --- yamyam (eski görünüm: yarısı böyle)
+    const ASH0 = '#b9b0a2';
+    P.ctorso0 = geo('p_ctorso0', pb => {
+      pb.tube([0, 0.5, 0], [0, 11.6, 0], 2.5, 2.9, ASH0, { n: 6, wz: 1.55 });
+      pb.ball(0, 11.4, 0, 2.8, 1.5, 5.3, ASH0, { d: 0 });
+      pb.tube([0, -5.0, 0], [0, 1.2, 0], 3.5, 2.8, '#2a1e16', { n: 6, wz: 1.35 });
+      for (let j = 0; j < 5; j++) { const z = (j - 2) * 1.5; pb.tri([2.9, -5.0, z - 0.9], [2.9, -5.0, z + 0.9], [3.1, -7.4, z], '#3a2a1c'); }
+      for (let i = 0; i < 4; i++) pb.box(2.75, 4.2 + i * 1.6, 0, 0.5, 0.45, 6.4 - i * 0.5, '#2a2220');           // kömürle çizilmiş kaburgalar
+      pb.box(2.9, 7.0, 0, 0.5, 7.0, 0.6, '#2a2220');
+      for (let i = -2; i <= 2; i++) pb.cone([2.9, 11.2 - Math.abs(i) * 0.5, i * 1.25], [3.5, 9.0 - Math.abs(i) * 0.5, i * 1.3], 0.42, BONE, { n: 3 }); // diş kolye
+      pb.box(-2.6, 8.4, 2.0, 0.5, 2.6, 2.0, '#8a1a12', 0.2); pb.box(-2.6, 6.0, -1.8, 0.5, 2.0, 1.8, '#8a1a12', -0.2);
+    });
+    P.chead0 = geo('p_chead0', pb => {
+      pb.tube([0, -1.0, 0], [0, 1.2, 0], 1.3, 1.2, ASH0, { n: 5 });
+      pb.ball(0, 3.5, 0, 3.1, 3.4, 3.0, '#a69c8e');
+      pb.ball(-0.8, 4.6, 0, 3.2, 3.0, 3.3, '#15100c');                                                      // keçeleşmiş saç
+      for (let i = 0; i < 5; i++) pb.cone([-2.4, 4 + (i % 2), (i - 2) * 1.2], [-4.6, 0.4 - (i % 3), (i - 2) * 1.6], 0.7, '#15100c', { n: 3 });
+      pb.wedge(2.2, 3.7, 1.6, 7.0, 2.4, 6.4, 2.7, 2.3, BONE);                                                // kemik maske
+      pb.wedge(2.6, 4.2, -2.6, 1.8, -2.0, 2.4, 1.9, 1.3, '#dcd2ba');
+      pb.wedge(3.5, 4.6, -3.2, -1.2, -2.8, -1.6, 1.0, 0.7, '#cfc4a8');
+      for (const s of [-1, 1]) {
+        pb.ball(3.55, 4.5, s * 1.25, 0.5, 0.95, 0.8, '#050404', { d: 0 });
+        pb.tube([2.6, 6.6, s * 1.9], [1.6, 9.6, s * 3.6], 0.55, 0.35, '#cfc4a8', { n: 4 }); pb.cone([1.6, 9.6, s * 3.6], [2.6, 12.0, s * 3.0], 0.35, BONE);
+        pb.box(3.72, 5.9, s * 1.3, 0.2, 0.9, 0.45, '#b02020');
+        for (let i = 0; i < 3; i++) pb.cone([4.0, -2.9 + i * 0.1, s * (0.25 + i * 0.3)], [4.1, -4.2, s * (0.25 + i * 0.3)], 0.2, BONE, { n: 3 });
+      }
+      pb.box(4.15, 0.6, 0, 0.2, 3.2, 0.4, '#b02020'); pb.ball(4.1, 0.9, 0, 0.3, 0.7, 0.5, '#050404', { d: 0 });
+    });
+    P.cthigh0 = geo('p_cthigh0', pb => { pb.tube([0, 0.6, 0], [0, -7.6, 0], 1.8, 1.35, ASH0, { n: 6 }); pb.ball(0, -7.6, 0, 1.3, 1.3, 1.3, ASH0, { d: 0 }); pb.box(0.6, -3.5, 0, 2.4, 0.6, 3.0, '#7a1a12'); });
+    P.cshin0 = geo('p_cshin0', pb => { pb.tube([0, 0.2, 0], [0, -6.5, 0], 1.3, 0.95, ASH0, { n: 6 }); pb.tube([0, -5.0, 0], [0, -5.8, 0], 1.1, 1.05, '#2a1e16', { n: 6 }); });
+    P.cfoot0 = geo('p_cfoot0', pb => { pb.wedge(-1.2, 3.0, -1.3, 0.3, -1.3, -0.4, 1.1, 0.95, '#8a8074'); pb.ball(0, 0, 0, 1.0, 0.9, 1.0, '#8a8074', { d: 0 }); });
     return P;
   }
   // --- renk işlenmiş vücut parçaları
@@ -1300,14 +1331,14 @@ const M3 = (function () {
   function person(p) {
     p = p || {};
     const PG = pgeo(), g = new T3.Group(), root = grp(g), ud = g.userData;
-    ud.kind = 'person'; ud.root = root; ud.can = !!p.cannibal; ud.lt = -1; ud.thr = 0; ud.J = new Float32Array(16); ud.Jok = false; ud.lyMode = -1;
+    ud.kind = 'person'; ud.root = root; ud.can = !!p.cannibal; ud.cv = p.cannibal && ((p.id | 0) & 1) ? '0' : ''; ud.lt = -1; ud.thr = 0; ud.J = new Float32Array(16); ud.Jok = false; ud.lyMode = -1;
     const h = hashId(p.id || 0); ud.h = h;
     ud.torso = mesh(PG.ctorso, VC, root, 0, 15.5, 0);
     ud.skirt = mesh(PG.foot, VC, root, 0, 15.5, 0);
     ud.headG = grp(ud.torso, 0, 12.2, 0);
     ud.head = mesh(PG.chead, VC, ud.headG);
     if (!ud.can) ud.hair = mesh(hairG(0, 0), VC, ud.headG);
-    else ud.ceyes = mesh(geo('p_ceyes', pb => { for (const s of [-1, 1]) pb.ball(3.85, 4.45, s * 1.25, 0.16, 0.2, 0.16, '#ff2a10', { d: 0 }); }), glow('#ff2a10'), ud.headG);   // karanlık çukurda kızıl, iğne ucu bebekler
+    else if (!ud.cv) ud.ceyes = mesh(geo('p_ceyes', pb => { for (const s of [-1, 1]) pb.ball(3.85, 4.45, s * 1.25, 0.16, 0.2, 0.16, '#ff2a10', { d: 0 }); }), glow('#ff2a10'), ud.headG);   // karanlık çukurda kızıl, iğne ucu bebekler
     ud.arms = []; ud.legs = [];
     for (const s of [-1, 1]) {
       const u = mesh(PG.shin, VC, ud.torso, 0, 10.9, s * 5.75), f = mesh(PG.shin, VC, u, 0, -6.2, 0);
@@ -1321,17 +1352,17 @@ const M3 = (function () {
   }
   function look(ud, p, working) {
     const PG = PGEO, can = ud.can, h = ud.h;
-    const skin = can ? '#7d766c' : (typeof p.skin === 'string' ? p.skin : '#d8a47a'), hair = typeof p.hair === 'string' ? p.hair : '#2a1a10', tun = can ? '#2a1e16' : tunicOf(p), hurt = p.hurtT > 0;
+    const skin = can ? (ud.cv ? '#b9b0a2' : '#7d766c') : (typeof p.skin === 'string' ? p.skin : '#d8a47a'), hair = typeof p.hair === 'string' ? p.hair : '#2a1a10', tun = can ? '#2a1e16' : tunicOf(p), hurt = p.hurtT > 0;
     const adult = !p.child, grey = hair === '#bbb';
     const st = h % HAIRN, beard = !adult || can ? 0 : ((h >>> 5) % 4 === 0 || (grey && h & 1)) ? 2 : (h >>> 5) % 4 === 1 ? 1 : 0;
     const key = skin + hair + tun + (hurt ? 1 : 0) + st + beard;
     if (ud.lk !== key) {
       ud.lk = key;
       ud.skirt.visible = !can;
-      if (can) { ud.torso.geometry = PG.ctorso; ud.head.geometry = PG.chead; }
+      if (can) { ud.torso.geometry = PG['ctorso' + ud.cv]; ud.head.geometry = PG['chead' + ud.cv]; }
       else { ud.skirt.geometry = skirtG(tun); ud.torso.geometry = torsoG(tun); ud.head.geometry = headG(skin); ud.hair.geometry = hairG(st, beard); }
       for (const A of ud.arms) { A.u.geometry = uarmG(can ? skin : tun, skin); A.f.geometry = farmG(skin); }
-      for (const L of ud.legs) { L.th.geometry = can ? PG.cthigh : thighG(tun); L.sh.geometry = can ? PG.cshin : PG.shin; L.ft.geometry = can ? PG.cfoot : PG.foot; }
+      for (const L of ud.legs) { L.th.geometry = can ? PG['cthigh' + ud.cv] : thighG(tun); L.sh.geometry = can ? PG['cshin' + ud.cv] : PG.shin; L.ft.geometry = can ? PG['cfoot' + ud.cv] : PG.foot; }
       const m = hurt ? FLASH : VC;
       ud.torso.material = ud.head.material = ud.skirt.material = m; if (ud.hair) ud.hair.material = hurt ? FLASH : tint(hair);
       for (const A of ud.arms) A.u.material = A.f.material = m;
@@ -1445,7 +1476,7 @@ const M3 = (function () {
     const sprint = mvB && (p.sprinting || ud.spd > 150 || da / Math.max(dt, 1e-3) > 12.5) ? 1 : 0, sneak = mvB && p.sneak ? 1 : 0;
     ud.spr = (ud.spr || 0) + (sprint - (ud.spr || 0)) * Math.min(1, dt * 5);
     ud.snk = (ud.snk || 0) + (sneak - (ud.snk || 0)) * Math.min(1, dt * 5);
-    const hv0 = HAULW[ud.hkK] || 0, sc0 = p.child ? 0.6 : can ? 1.1 : 1, stride = (13 + ud.spr * 7 - ud.snk * 4) * sc0 * (1 + hv0 * 0.14);
+    const hv0 = HAULW[ud.hkK] || 0, sc0 = p.child ? 0.6 : can ? (ud.cv ? 1.04 : 1.1) : 1, stride = (13 + ud.spr * 7 - ud.snk * 4) * sc0 * (1 + hv0 * 0.14);
     let w = moved > 1e-3 ? moved / stride * TAU2 : (p.moving ? da : 0); w = Math.min(w, (14 + ud.spr * 6) * dt); ud.ph += w;
     const ph = ud.ph, s = Math.sin(ph), c = Math.cos(ph), mv = ud.mv;
     const lying = p.downed > 0 || !!p.bed || !!p.carriedBy || !!p.dead || !!p.grabbed || pose === 1;
