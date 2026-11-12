@@ -1,0 +1,236 @@
+diff --git a/gun-dogumu-vercel-duzeltildi (1)/oyun/js/yaratik.js b/gun-dogumu-vercel-duzeltildi (1)/oyun/js/yaratik.js
+index b8822cb..949549f 100644
+--- a/gun-dogumu-vercel-duzeltildi (1)/oyun/js/yaratik.js	
++++ b/gun-dogumu-vercel-duzeltildi (1)/oyun/js/yaratik.js	
+@@ -50,18 +50,106 @@ function steer(e, tx, ty, spd, dt, isDino) {
+   if (d < 3) { e.moving = false; return true; }
+   if (isDino && e.type !== 'batakci' && biomeFast(e.x, e.y) === 2) spd *= 0.75;
+   dx /= d; dy /= d;
+-  if (e.detour) { const px = -dy * e.detour, py = dx * e.detour; dx = dx * 0.4 + px; dy = dy * 0.4 + py; const m = Math.hypot(dx, dy); dx /= m; dy /= m; }
++  const nav = isDino && !e.fly;
++  if (nav) { const a = navDir(e, tx, ty, d, spd, dt); dx = Math.cos(a); dy = Math.sin(a); }
++  else if (e.detour) { const px = -dy * e.detour, py = dx * e.detour; dx = dx * 0.4 + px; dy = dy * 0.4 + py; const m = Math.hypot(dx, dy); dx /= m; dy /= m; }
+   const s = Math.min(spd * dt, d), ox = e.x, oy = e.y;
+   e.x += dx * s; e.y += dy * s;
+   const bl = pushOut(e, isDino); if (isDino) e.bash = bl;
+-  const moved = Math.hypot(e.x - ox, e.y - oy);
+-  if (moved < s * 0.3 && !bl) { e.stuck += dt; if (e.stuck > 0.25) { e.detour = Math.random() < 0.5 ? 1 : -1; e.stuck = -0.7; } }
+-  else if (e.stuck < 0) { e.stuck += dt; if (e.stuck >= 0) e.detour = 0; }
+-  else e.stuck = Math.max(0, e.stuck - dt);
++  if (nav) {                                            // çarpma: istenen yolun çok azı alındıysa hemen sapma noktası seç
++    const N = e.nav, moved = Math.hypot(e.x - ox, e.y - oy);
++    if (moved < s * 0.3 && !(bl && N.bash > 0)) { N.bump += dt; if (N.bump > 0.3) navBump(e, tx, ty); }
++    else N.bump = Math.max(0, N.bump - dt * 0.5);
++  } else {
++    const moved = Math.hypot(e.x - ox, e.y - oy);
++    if (moved < s * 0.3 && !bl) { e.stuck += dt; if (e.stuck > 0.25) { e.detour = Math.random() < 0.5 ? 1 : -1; e.stuck = -0.7; } }
++    else if (e.stuck < 0) { e.stuck += dt; if (e.stuck >= 0) e.detour = 0; }
++    else e.stuck = Math.max(0, e.stuck - dt);
++  }
+   e.ang = angLerp(e.ang, Math.atan2(dy, dx), Math.min(1, dt * 10));
+   e.moving = true;
+   return d < 8;
+ }
++// ---- yaratık yol bulma: ucuz yerel kaçınma (küresel yol arama yok)
++// Bıyık sondaları deniz/çözük göl/kaya/ağaç/yapıya bakar; engelde bir yana bağlanıp duvarı izler.
++// Takılma algılayıcı 2 sn'lik pencerelerle çalışır: önce yan değiştirip sapma noktası seçer,
++// sonra yapıları kırmaya izin verir, en sonunda e.navFail ile çağırana "vazgeç" der.
++function navSolid(e, x, y, solidB) {
++  if (x < 40 || y < 40 || x > WORLD - 40 || y > WORLD - 40) return true;
++  if (HM && groundH(x, y) < 0.8 && !frozenLakeAt(x, y)) return true;
++  const r = e.r * 0.7, x0 = Math.floor((x - r) / CELL), x1 = Math.floor((x + r) / CELL), y0 = Math.floor((y - r) / CELL), y1 = Math.floor((y + r) / CELL);
++  for (let cx = x0; cx <= x1; cx++) for (let cy = y0; cy <= y1; cy++) {
++    const a = grid.get(cx * 10007 + cy); if (!a) continue;
++    for (const o of a) {
++      if (o.dead) continue;
++      if (o.kind === 'lake') { if (o.frozen) continue; }
++      else if (o.kind === 'tree') { if (e.r >= 55) continue; }
++      else if (o.kind === 'build') { if (!solidB) continue; }
++      const dx = x - o.x, dy = y - o.y, m = o.r + r;
++      if (dx * dx + dy * dy < m * m) return true;
++    }
++  }
++  return false;
++}
++function navRayClear(e, a, len, solidB) {
++  const c = Math.cos(a), s = Math.sin(a);
++  const n0 = Math.min(len, e.r * 0.6 + 6);
++  if (navSolid(e, e.x + c * n0, e.y + s * n0, solidB)) return false;
++  for (const k of [0.4, 0.7, 1]) if (len * k > n0 && navSolid(e, e.x + c * len * k, e.y + s * len * k, solidB)) return false;
++  return true;
++}
++function navEscape(e, gx, gy, side, solidB) {
++  const a0 = Math.atan2(gy - e.y, gx - e.x);
++  for (const off of [1.2, 1.7, 0.7, 2.3, 2.9]) for (const sd of [side, -side]) {
++    const a = a0 + sd * off, len = 200 + Math.random() * 160;
++    if (navRayClear(e, a, len, solidB)) return { x: e.x + Math.cos(a) * len, y: e.y + Math.sin(a) * len, side: sd };
++  }
++  const a = Math.random() * TAU; return { x: e.x + Math.cos(a) * 250, y: e.y + Math.sin(a) * 250, side: -side };
++}
++function navBump(e, tx, ty) {
++  const N = e.nav; N.bump = 0; N.fails += 0.5; N.side = -N.side; N.follow = 0;
++  N.wp = navEscape(e, tx, ty, N.side, !(N.bash > 0)); N.side = N.wp.side; N.wpT = 1 + Math.random() * 0.6; N.t = 0;
++}
++function navDir(e, tx, ty, dist, spd, dt) {
++  let N = e.nav;
++  if (!N) N = e.nav = { gx: tx, gy: ty, a: Math.atan2(ty - e.y, tx - e.x), t: 0, side: e.orbit || 1, follow: 0, wp: null, wpT: 0, fails: 0, bash: 0, wT: 0, wx: e.x, wy: e.y, wgx: tx, wgy: ty, wd: dist, last: G.now, bump: 0 };
++  const gap = G.now - N.last; N.last = G.now;
++  if (gap > 0.3 || Math.hypot(tx - N.gx, ty - N.gy) > 260) { N.wT = 0; N.wx = e.x; N.wy = e.y; N.wgx = tx; N.wgy = ty; N.wd = dist; if (gap > 0.3) N.t = 0; if (Math.hypot(tx - N.gx, ty - N.gy) > 260) { N.wp = null; N.fails = Math.max(0, N.fails - 1); } }
++  N.gx = tx; N.gy = ty;
++  if (N.bash > 0) N.bash -= dt;
++  // takılma penceresi: az yer değiştirme ya da (hedef dururken) hiç yaklaşmama
++  N.wT += dt;
++  if (N.wT >= 1.6) {
++    const mv = Math.hypot(e.x - N.wx, e.y - N.wy), gmv = Math.hypot(tx - N.wgx, ty - N.wgy), gain = N.wd - dist;
++    const bad = dist > e.r + 45 && (mv < spd * N.wT * 0.25 || (gmv < 60 && gain < spd * N.wT * 0.2));
++    if (bad) {
++      N.fails++; N.side = -N.side; N.follow = 0;
++      const solid = !(N.fails >= 2);
++      N.wp = navEscape(e, tx, ty, N.side, solid); N.side = N.wp.side; N.wpT = 1.6 + Math.random() * 0.8; N.t = 0;
++      if (N.fails >= 2) N.bash = 5;                          // çit/duvar halkası: kırarak geç
++      if (N.fails >= 5) { e.navFail = (e.navFail || 0) + 1; N.fails = 2; }
++    } else if (gain > spd * N.wT * 0.4 || mv > spd * N.wT * 0.6) N.fails = Math.max(0, N.fails - 1);
++    N.wT = 0; N.wx = e.x; N.wy = e.y; N.wgx = tx; N.wgy = ty; N.wd = dist;
++  }
++  if (N.wp) { N.wpT -= dt; if (N.wpT <= 0 || Math.hypot(N.wp.x - e.x, N.wp.y - e.y) < 30) { N.wp = null; N.t = 0; } }
++  N.t -= dt;
++  if (N.t > 0) return N.a;
++  N.t = 0.14 + Math.random() * 0.08;
++  const gx = N.wp ? N.wp.x : tx, gy = N.wp ? N.wp.y : ty, gd = Math.hypot(gx - e.x, gy - e.y);
++  const a0 = Math.atan2(gy - e.y, gx - e.x), solid = !(N.bash > 0);
++  const len = Math.max(20, Math.min(gd - 4, clamp(e.r * 2.2 + 45, 70, 190)));
++  if (navRayClear(e, a0, len, solid)) { N.follow = Math.max(0, N.follow - 0.5); N.a = a0; return a0; }
++  // engel: önce bağlı olunan yan, sonra öbürü; ilk açık açı (duvar izleme)
++  if (N.follow <= 0) {
++    let l = 0, r = 0;
++    for (let k = 1; k <= 4; k++) { if (!l && navRayClear(e, a0 - k * 0.4, len, solid)) l = k; if (!r && navRayClear(e, a0 + k * 0.4, len, solid)) r = k; if (l || r) break; }
++    N.side = l && (!r || l < r) ? -1 : r ? 1 : N.side;
++  }
++  N.follow = 2.5;
++  for (let k = 1; k <= 8; k++) { const a = a0 + N.side * k * 0.38; if (navRayClear(e, a, len, solid)) { N.a = a; return a; } }
++  for (let k = 1; k <= 8; k++) { const a = a0 - N.side * k * 0.38; if (navRayClear(e, a, len * 0.6, solid)) { N.a = a; return a; } }
++  N.a = a0; return a0;
++}
+ function flyTo(d, tx, ty, spd, dt) {
+   const dx = tx - d.x, dy = ty - d.y, dd = Math.hypot(dx, dy);
+   if (dd < 2) { d.moving = false; return; }
+@@ -451,26 +539,45 @@ function updPred(d, dt, prey, zones) {
+   }
+   // hedef seçimi
+   d.think -= dt;
+-  const bold = isBold(d);
++  const bold = isBold(d), packy = PACK_T.includes(d.type);
++  if (d.lockT > 0) d.lockT -= dt;
++  if (d.commit > 0) d.commit -= dt;
++  if (d.commitCd > 0) d.commitCd -= dt;
++  if (d.recover > 0) d.recover -= dt;
++  if (d.tgt && d.lockT === undefined) d.lockT = 10;          // pusu/anne gibi dışarıdan verilen hedef de kilitlidir
++  // ağır yaralı sürü avcısı bir kez geri çekilir, toparlanıp döner; çok ağırsa bırakıp gider
++  if (packy && !d.mother && !d.finale && d.hp < d.maxhp * 0.35) {
++    if (d.hp < d.maxhp * 0.18) { d.leave = true; return; }
++    if (!d.fled) { d.fled = true; d.retreat = rand(2.5, 4); d.lockT = 14; d.lunge = 0; return; }
++  }
+   if (d.think <= 0) {
+     d.think = rand(0.35, 0.7);
+     let sense = night ? def.nsense : def.sense;
+     if (G.weather.type === 'sis') sense *= 0.7;
+     if (d.mother || d.finale) sense = 2000;
++    const cur = !t_dead(d.tgt) ? d.tgt : null;
+     let best = null, bs = 1e9;
+     if (d.mother && G.carryEgg && L) best = L;
+     else for (const t of prey) {
+-      const dd = dist(d, t); if (dd > sense) continue;
++      if (t === d.ignore && G.now < d.ignoreT) continue;
++      const dd = dist(d, t), held = t === cur && d.lockT > 0;
++      if (dd > (held ? sense * 1.7 : sense)) continue;
+       // sessiz yürüyeni duymaz; ama önündeyse görür
+       if (!t.type && !t.isRescue && d.tgt !== t && !(d.rush > 0) && !d.finale && !predNotices(d, t, dd, sense)) continue;
+-      // bölgesel yırtıcı kendi topraklarından çıkmaz
+-      if (d.terr && !(d.rush > 0) && Math.hypot(t.x - d.terr.x, t.y - d.terr.y) > d.terr.r) continue;
++      // bölgesel yırtıcı kendi topraklarından çıkmaz (kilitlendiği avı biraz daha kovalar)
++      if (d.terr && !(d.rush > 0) && Math.hypot(t.x - d.terr.x, t.y - d.terr.y) > d.terr.r * (held ? 1.6 : 1)) continue;
+       // küçükler ürkektir: yalnız gecede tek kalanı ya da yaralıyı kollar
+       if (d.type === 'kucuk' && !bold && !t.type && !(t.downed > 0) && !(night && alliesNear(t, 220) === 0)) continue;
+       let s = dd; if (!bold && inSafe(t.x, t.y, zones)) s += 500; if (t.tamed && d.type === 'kucuk') s += 800;
+       if ((d.type === 'kucuk' || d.type === 'tukurgec') && !bold && (dist(t, G.fire) < 450 || alliesNear(t, 160) >= 2)) continue;
+       if (t.leader) s += 40;
+       if (t.downed > 0) s -= 120;
++      if (packy && !t.type) {                                   // sürü tek kalanı ve yaralıyı seçer, kalabalıktan kaçınır
++        const al = alliesNear(t, 180); s += al ? al * 70 : -110;
++        if (t.hp < t.maxhp * 0.5) s -= 90;
++      }
++      if (t === cur) s -= 120;                                  // kovaladığı avı kolay kolay bırakmaz
++      if (packy) for (const o of G.dinos) if (o !== d && o.type === d.type && o.tgt === t && !o.leave && dist(o, d) < 520) { s -= 140; break; }
+       if (s < bs) { bs = s; best = t; }
+     }
+     if (!best && d.type === 'dev' && bold) for (const b of G.builds) if (b.type === 'cadir' && b.occ.length) { const s = dist(d, b); if (s < sense) { best = b; break; } }
+@@ -479,17 +586,29 @@ function updPred(d, dt, prey, zones) {
+       if (!d.silent)
+       if (L && dist(d, L) < 1000) { const v = clamp(1 - dist(d, L) / 1000, 0.1, 0.8); if (d.type === 'yirtici') SFX.screech(v, panOf(d.x)); else if (d.type === 'kucuk') SFX.chirp(v, panOf(d.x)); }
+     }
++    if (best && best !== cur) { d.lockT = 12; d.feint = 0; d.flankT = 0; }
++    else if (best && dist(d, best) < sense) d.lockT = Math.max(d.lockT || 0, 8);
++    if (!best && cur && d.lockT > 0) d.lk = { x: cur.x, y: cur.y, t: G.now };   // izini kaybetti: son görüldüğü yere koşar
+     d.tgt = best;
++    if (best && packy) {                                        // sürüdeki rol: en küçük kimlik oyalar, öbürleri arkadan dolanır
++      let n = 1, rank = 0;
++      for (const o of G.dinos) if (o !== d && o.type === d.type && !o.dead && !o.leave && !o.carry && o.tgt === best && dist(o, d) < 520) { n++; if (o.id < d.id) rank++; }
++      d.packN = n; d.role = rank;
++    }
+     d.scent = best ? null : scentTrailFor(d, sense * 0.9);
+     if (!d.terr && d.type === 'yirtici' && night && G.day >= 3 && Math.random() < 0.004 / DAYK * G.day * DIFF[G.diff].spawn) d.rush = rand(2, 4);
+     if (d.type === 'dev' && night && G.day >= 4 && Math.random() < 0.01) d.rush = rand(5, 9);
+   }
+-  if (d.terr && d.tgt && !(d.rush > 0) && Math.hypot(d.tgt.x - d.terr.x, d.tgt.y - d.terr.y) > d.terr.r * 1.25) { d.tgt = null; d.engaged = false; }
++  if (d.terr && d.tgt && !(d.rush > 0) && Math.hypot(d.tgt.x - d.terr.x, d.tgt.y - d.terr.y) > d.terr.r * (d.lockT > 0 ? 1.8 : 1.25)) { d.tgt = null; d.engaged = false; }
+   const t = !t_dead(d.tgt) ? d.tgt : null;
+   let tx, ty, spd = def.spd * (d.mother ? 1.15 : 1);
+   if (t) {
+-    const tSafe = !bold && inSafe(t.x, t.y, zones);
++    d.lk = null;
++    let tSafe = !bold && !(d.commit > 0) && inSafe(t.x, t.y, zones);
++    // ışığın kenarına kaçan avın peşinden bir an daha atılır (kapı nöbetçisi ve bina içi yine güvenli)
++    if (tSafe && packy && d.engaged && !(d.commitCd > 0) && dist(d, t) < 150) { d.commit = 1.6; d.commitCd = 7; tSafe = null; }
+     if (tSafe) {
++      d.lunge = 0;
+       const z = tSafe, a0 = Math.atan2(d.y - z.y, d.x - z.x) + d.orbit * dt * (d.type === 'dev' ? 0.12 : 0.35);
+       const rr = z.r + d.r + 40 + Math.sin(G.now * 0.7 + d.id) * 25;
+       tx = z.x + Math.cos(a0) * rr; ty = z.y + Math.sin(a0) * rr; spd = def.spd * 0.45;
+@@ -497,10 +616,12 @@ function updPred(d, dt, prey, zones) {
+       if (d.type === 'yirtici' && Math.random() < dt * 0.04 && L && dist(d, L) < 800) SFX.screech(0.15, panOf(d.x));
+     } else {
+       tx = t.x; ty = t.y;
+-      if (d.type === 'yirtici') { const side = (d.id % 3 - 1) * 0.6, dd = dist(d, t); if (dd > 120) { const a = angTo(t, d) + side; tx = t.x + Math.cos(a) * dd * 0.5; ty = t.y + Math.sin(a) * dd * 0.5; } }
+       const reach = d.r + bodyR(t) + 8, dd = dist(d, t);
+       d.spitCd = (d.spitCd || 0) - dt;
+-      if (d.type === 'tukurgec' && dd > 70 && dd < 240 && d.spitCd <= 0) {
++      if (packy) {
++        const g = packStep(d, t, dd, reach, dt, def);
++        if (g) { tx = g.x; ty = g.y; spd = g.spd; } else tx = undefined;
++      } else if (d.type === 'tukurgec' && dd > 70 && dd < 240 && d.spitCd <= 0) {
+         d.spitCd = rand(2.5, 4); d.frill = 0.7; d.ang = angTo(d, t);
+         const a = angTo(d, t); G.eproj.push({ x: d.x + Math.cos(a) * d.r, y: d.y + Math.sin(a) * d.r, vx: Math.cos(a) * 330, vy: Math.sin(a) * 330, dmg: 5, life: 0.9, src: d });
+         SFX.spit(volOf(d, 700) + 0.05, panOf(d.x)); tx = undefined; d.moving = false;
+@@ -510,6 +631,8 @@ function updPred(d, dt, prey, zones) {
+         tx = undefined;
+       }
+     }
++  } else if (d.lk && G.now - d.lk.t < 6 && Math.hypot(d.lk.x - d.x, d.lk.y - d.y) > 30) {
++    tx = d.lk.x; ty = d.lk.y; spd = def.spd * 0.85;            // son görüldüğü yere
+   } else if (d.scent && d.scent.age < 24 && d.scent.src && !d.scent.src.dead && !guardSafe(d.scent.src) && Math.hypot(d.scent.x - d.x, d.scent.y - d.y) > 18) {
+     tx = d.scent.x; ty = d.scent.y; spd = def.spd * (0.3 + 0.25 * clamp(1 - d.scent.age / 24, 0, 1));   // koku izini takip (Codex)
+   } else {
+@@ -527,7 +650,12 @@ function updPred(d, dt, prey, zones) {
+   if (tx !== undefined) {
+     d.spdNow = spd;
+     steer(d, tx, ty, spd, dt, true); d.anim += dt * spd / 22;
+-    for (const z of zones) { if (bold && !z.guard) continue; const dx = d.x - z.x, dy = d.y - z.y, dd = Math.hypot(dx, dy) || 1; if (dd < z.r) { d.x = z.x + dx / dd * z.r; d.y = z.y + dy / dd * z.r; } }
++    if (d.navFail) {                                   // yol yok: hedeften vazgeç, bir süre ona takılma, yuvaya/dolaşmaya dön
++      d.navFail = 0;
++      if (t) { d.ignore = t; d.ignoreT = G.now + 12; d.tgt = null; d.engaged = false; d.lockT = 0; d.lk = null; }
++      d.wt = 0; d.scent = null;
++    }
++    for (const z of zones) { if ((bold || d.commit > 0) && !z.guard) continue; const dx = d.x - z.x, dy = d.y - z.y, dd = Math.hypot(dx, dy) || 1; if (dd < z.r) { d.x = z.x + dx / dd * z.r; d.y = z.y + dy / dd * z.r; } }
+     if (d.bash && d.atkCd <= 0 && ((t && !inSafe(t.x, t.y, zones)) || d.type === 'dev' || bold)) { const b = d.bash; d.atkCd = def.cd; b.hp -= def.dmg * (d.type === 'dev' ? 2 : 1); b.hit = 0.2; SFX.hit(L ? clamp(1 - dist(b, L) / 700, 0, 0.5) : 0.2); if (b.hp <= 0) destroyBuild(b); }
+   }
+   checkTraps(d);
