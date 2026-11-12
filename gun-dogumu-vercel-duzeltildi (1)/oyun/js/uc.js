@@ -881,6 +881,7 @@ function reserveTreeFar(key, required) {
 function rebuildTreeInst(cx, cy, writeShadows) {
   const I = U3.inst, TS = U3.tsh;
   for (const k of ['trunk', 'cone', 'blob', 'moss', 'frond', 'trunkFar', 'coneFar', 'blobFar']) I[k].count = 0;
+  realStart(); realReset('tree');
   if (U3.cam) {
     U3.cam.getWorldDirection(TREE_DIR); U3.instView = TREE_DIR.clone(); U3.instRotation = U3.cam.quaternion.clone();
     U3.instCamY = U3.cam.position.y; U3.instPX = U3.cam.projectionMatrix.elements[0]; U3.instPY = U3.cam.projectionMatrix.elements[5];
@@ -906,12 +907,14 @@ function rebuildTreeInst(cx, cy, writeShadows) {
     const far = treeFarLOD(t, distance2), T = far ? F : I;
     if (t.stump) {
       if (!treeInView(t.x, y0 + 5, t.y, 16, distance)) { stats.culled++; continue; }
+      if (realPut('stump', t.sw, t.x, y0 + 1, t.y, 0, 26, t.sw, distance)) { stats.near++; continue; }
       instAdd(T.trunk, t.x, y0, t.y, 9, 8.5, 9, t.sw, stumpC); stats[far ? 'far' : 'near']++; continue;
     }
     const b = t.b === undefined ? bioAt(t.x, t.y) : t.b, C = treeCols(b, t.tone), k = (t.cr - 36) / 26, H = (125 + k * 120 + ((t.tone * 37) % 1) * 30) * (t.dark ? 1.35 : 1), cr = t.cr, r2 = (t.tone * 13) % 1;
     if (writeShadows) TS.push([t.x, t.y, cr * (b === 5 ? 0.9 : 1.05), b === 5 ? H * 0.7 : H * 0.55]);
     if (!treeInView(t.x, y0 + H * 0.5, t.y, Math.hypot(H * 0.65, cr * 2) + 16, distance)) { stats.culled++; continue; }
     stats[far ? 'far' : 'near']++;
+    if (b !== 5 && !(b === 2 && r2 < 0.65) && realPut('tree', t.tone + t.sw, t.x, y0 + 1, t.y, H * 1.05, 0, t.sw, distance)) continue;   // gerçek model
     if (b === 5) {                                       // palmiye: kıvrık gövde + taç yaprakları
       let x = t.x, y = y0, z = t.y; const seg = 5, L = (H * 0.75) / seg, lean = 0.25 + r2 * 0.35;
       for (let i = 0; i < seg; i++) { const rz = lean * (i + 1) / seg, w = 5.2 - i * 0.55; instAdd(T.trunk, x, y, z, w, L * 1.06, w, t.sw, C.t, 0, rz); x += -Math.sin(rz) * Math.cos(t.sw) * L; y += Math.cos(rz) * L; z += Math.sin(rz) * Math.sin(t.sw) * L; }
@@ -940,6 +943,7 @@ function rebuildTreeInst(cx, cy, writeShadows) {
     }
   }
   if (!writeShadows) for (const k of ['trunk', 'cone', 'blob', 'moss', 'frond', 'trunkFar', 'coneFar', 'blobFar']) instDone(I[k]);
+  realDone('tree');
 }
 function rebuildInst(cx, cy) {
   const I = U3.inst; for (const k in I) I[k].count = 0;
@@ -948,9 +952,11 @@ function rebuildInst(cx, cy) {
   const near = (o, R) => { const dx = o.x - cx, dy = o.y - cy; return dx * dx + dy * dy < R * R; };
   const stumpC = c3('#8a6a44'), col = _col, snowC = c3('#e8eef2'), mossC = c3('#7d8c5a'), deadC = c3('#4e4740');
   rebuildTreeInst(cx, cy, true);
+  realReset('rock');
   for (const r of G.rocks) {
     if (r.dead || !near(r, ROCK_R)) continue;
     const g = (112 * r.shade) / 255, b = bioAt(r.x, r.y), mtn = b === 1, h = hash2(r.x, r.y), y0 = gh(r.x, r.y);
+    if (realPut('rock', h, r.x, y0 - r.r * 0.12, r.y, 0, r.r * 2.4, h * 6, Math.hypot(r.x - cx, r.y - cy))) { TS.push([r.x, r.y, r.r * 1.35, r.r * 0.6]); continue; }
     col.setRGB(g + 0.05, g + 0.03, g); if (b === 5) col.lerp(c3('#b0a080'), 0.4); else if (!mtn && h > 0.5) col.lerp(c3('#5a7a3a'), 0.25);
     instAdd(I.rock, r.x, y0 + r.r * 0.15, r.y, r.r * 1.15, r.r * (mtn ? 1.3 + h * 1.4 : 0.75 + h * 0.5), r.r * 1.1, h * 6, col, h * 0.4, 0);
     TS.push([r.x, r.y, r.r * 1.35, r.r * (mtn ? 1.0 + h : 0.5)]);
@@ -980,6 +986,7 @@ function rebuildInst(cx, cy) {
   for (const d of G.deco) {
     if (!near(d, DECO_R)) continue;
     const s = d.s, y0 = gh(d.x, d.y);
+    if ((d.t === 'fern' || d.t === 'deadtree') && realPut(d.t === 'fern' ? 'fern' : 'dead', d.a, d.x, y0, d.y, d.t === 'fern' ? 0 : 0, d.t === 'fern' ? 34 * s : 90 * s, d.a, Math.hypot(d.x - cx, d.y - cy))) continue;
     if (d.t === 'fern') { col.set('#356a2a').multiplyScalar(0.8 + ((d.a * 3) % 1) * 0.5); instAdd(I.fern, d.x, y0, d.y, 16 * s, 15 * s, 16 * s, d.a, col); }
     else if (d.t === 'bone') { instAdd(I.box, d.x, y0 + 1.2, d.y, 15 * s, 2.2, 2.6, -d.a, c3('#d8d0ba')); instAdd(I.box, d.x + Math.cos(d.a) * 4, y0 + 1.6, d.y + Math.sin(d.a) * 4, 2.2, 2.2, 9 * s, -d.a + 0.5, c3('#cfc6ae')); }
     else if (d.t === 'reed') { for (let i = -1; i <= 1; i++) instAdd(I.reed, d.x + i * 4, y0, d.y + (i * i) * 3, 1.3, (20 + i * 4) * s, 1.3, 0, c3(i ? '#6a7a3a' : '#7a8a44'), 0, i * 0.08); }
@@ -996,6 +1003,7 @@ function rebuildInst(cx, cy) {
     for (let i = 0; i < 4; i++) { col.setHSL(c.hue / 360, 0.8, 0.5 + i * 0.06); const a = c.x + i * 1.9; instAdd(I.crystal, c.x + Math.cos(a) * 4, y0, c.y + Math.sin(a) * 4, 4.2 - i * 0.5, 30 - Math.abs(i - 1.5) * 8, 4.2 - i * 0.5, a, col, Math.sin(a) * 0.3, Math.cos(a) * 0.3); }
   }
   for (const k in I) instDone(I[k]);
+  realDone('rock');
   U3.shK = null; fillTreeShadows();
 }
 
@@ -2413,4 +2421,70 @@ function cav3Render() {
   const m = CAV3.ghost; m.visible = !G.modal && !G.paused && !G.sleep;
   m.position.set(q.x,inFloorY(q.x,q.y),q.y); m.rotation.y = -S.ang;
   m.material.color.setHex(S.valid?0x65ee8b:0xff5148);
+}
+
+// =============================================================
+//  GERÇEKÇİ VARLIKLAR (pilot, 7g): Poly Haven CC0 modelleri (assets/ph).
+//  Oyuncuya yakın ağaç/kaya/kütük/eğrelti gerçek modelle çizilir; uzakta eski
+//  kodla üretilmiş görünüm sürer. Yüklenemezse (dosya yok, file://) hiçbir şey değişmez.
+// =============================================================
+const REAL = { started: false, ready: false, base: 'assets/ph/', M: {}, low: typeof window !== 'undefined' && ('ontouchstart' in window), cnt: {} };
+const REAL_SET = {
+  tree: ['island_tree_01', 'island_tree_02', 'island_tree_03'],
+  rock: ['rock_moss_set_01', 'rock_moss_set_02', 'boulder_01', 'namaqualand_boulder_02'],
+  stump: ['tree_stump_01'], fern: ['fern_02'], dead: ['dead_tree_trunk_02']
+};
+function realR(kind) { return kind === 'tree' ? (REAL.low ? 220 : 480) : kind === 'rock' ? (REAL.low ? 300 : 800) : (REAL.low ? 200 : 520); }
+function realStart() {
+  if (REAL.started || typeof THREE.GLTFLoader !== 'function' || (typeof location !== 'undefined' && location.protocol === 'file:')) return;
+  REAL.started = true;
+  const loader = new THREE.GLTFLoader(), names = [].concat(...Object.values(REAL_SET)); let left = names.length;
+  const done = () => { if (--left === 0) { REAL.ready = Object.keys(REAL.M).length > 0; U3.instX = 1e9; } };
+  for (const n of names) loader.load(REAL.base + n + '.glb', g => { try { realPrep(n, g.scene); } catch (e) { console.warn('varlık', n, e); } done(); }, undefined, () => done());
+}
+function realPrep(name, scene) {
+  scene.updateMatrixWorld(true);
+  const parts = []; const box = new THREE.Box3();
+  scene.traverse(o => { if (!o.isMesh) return; const g = o.geometry.clone(); g.applyMatrix4(o.matrixWorld); g.computeBoundingBox(); box.union(g.boundingBox); parts.push({ g, m: o.material }); });
+  if (!parts.length) return;
+  const h0 = Math.max(0.01, box.max.y - box.min.y), w0 = Math.max(box.max.x - box.min.x, box.max.z - box.min.z, 0.01), cx = (box.min.x + box.max.x) / 2, cz = (box.min.z + box.max.z) / 2;
+  const cap = REAL_SET.tree.includes(name) ? (REAL.low ? 10 : 40) : (REAL.low ? 24 : 64);
+  const meshes = parts.map(({ g, m }) => {
+    g.translate(-cx, -box.min.y, -cz);
+    for (const k of ['map', 'emissiveMap']) if (m[k]) { m[k].encoding = THREE.LinearEncoding; m[k].needsUpdate = true; }
+    const leafy = /leaves|leaf|fern|shrub/i.test((m.name || '') + name) && !/branches|trunk/i.test(m.name || '');
+    if (leafy || m.transparent) { m.transparent = false; m.alphaTest = 0.5; m.side = THREE.DoubleSide; }
+    if (leafy) realWind(m);
+    m.needsUpdate = true;
+    const im = new THREE.InstancedMesh(g, m, cap); im.count = 0; im.frustumCulled = false; im.userData.max = cap; im.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    U3.scene.add(im); return im;
+  });
+  REAL.M[name] = { meshes, h0, w0 };
+}
+// yaprak salınımı: yükseklikle artan, örneğin konumuna göre fazı kayan hafif rüzgâr
+function realWind(m) {
+  m.onBeforeCompile = sh => {
+    sh.uniforms.uTime = U3.uTime;
+    sh.vertexShader = 'uniform float uTime;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
+      { float ph = instanceMatrix[3].x * 0.013 + instanceMatrix[3].z * 0.017; float k = max(0.0, position.y) * 0.035;
+        transformed.x += sin(uTime * 1.6 + ph + position.y * 0.7) * k; transformed.z += cos(uTime * 1.3 + ph * 1.3 + position.x) * k * 0.7; }`);
+  };
+  m.customProgramCacheKey = () => 'realWind';
+}
+const _rm = new THREE.Matrix4(), _rq = new THREE.Quaternion(), _rp = new THREE.Vector3(), _rs = new THREE.Vector3(), _ry = new THREE.Vector3(0, 1, 0);
+function realReset(kind) { for (const n of REAL_SET[kind]) { const M = REAL.M[n]; if (M) for (const im of M.meshes) im.count = 0; } if (kind === 'rock') for (const k of ['stump', 'fern', 'dead']) realReset(k); }
+function realDone(kind) {
+  const ks = kind === 'rock' ? ['rock', 'stump', 'fern', 'dead'] : [kind];
+  for (const k of ks) for (const n of REAL_SET[k]) { const M = REAL.M[n]; if (M) for (const im of M.meshes) im.instanceMatrix.needsUpdate = true; }
+}
+// tür içinden kararlı seçim; height verilirse yüksekliğe, yoksa genişliğe göre ölçeklenir
+function realPut(kind, key, x, y, z, height, width, ang, dist) {
+  if (!REAL.ready || dist > realR(kind)) return false;
+  const list = REAL_SET[kind].filter(n => REAL.M[n]); if (!list.length) return false;
+  const M = REAL.M[list[Math.floor(((key * 9.73) % 1 + 1) % 1 * list.length) % list.length]];
+  if (M.meshes[0].count >= M.meshes[0].userData.max) return false;
+  const s = height ? height / M.h0 : width / M.w0;
+  _rq.setFromAxisAngle(_ry, ang); _rm.compose(_rp.set(x, y, z), _rq, _rs.set(s, s, s));
+  for (const im of M.meshes) { im.setMatrixAt(im.count, _rm); im.count++; }
+  return true;
 }
