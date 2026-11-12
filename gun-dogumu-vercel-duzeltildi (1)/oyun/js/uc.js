@@ -915,9 +915,9 @@ function rebuildTreeInst(cx, cy, writeShadows) {
     if (!treeInView(t.x, y0 + H * 0.5, t.y, Math.hypot(H * 0.65, cr * 2) + 16, distance)) { stats.culled++; continue; }
     stats[far ? 'far' : 'near']++;
     if (b !== 5 && !(b === 2 && r2 < 0.65)) { const con = b === 1 || b === 3 || (b === 0 && r2 < 0.55);   // gerçek model: iğne yapraklı göknar / geniş yapraklı ada ağacı
-      const rk = con ? 'conifer' : 'tree', rh = H * (con ? 1.15 : 0.9);
-      if (realPut(rk, t.tone + t.sw, t.x, y0 + 1, t.y, rh, 0, t.sw, distance)) continue;
-      if (distance > realR(rk) && realFar(rk, t.tone + t.sw, t.x, y0 + 1, t.y, rh)) continue; }
+      const rk = con ? 'conifer' : 'tree', rh = H * (con ? 1.0 : 0.85), ys = con ? 1.7 : 1.6;   // uzun gövde, taç yukarıda (altında rahat yürünür)
+      if (realPut(rk, t.tone + t.sw, t.x, y0 + 1, t.y, rh, 0, t.sw, distance, ys)) continue;
+      if (distance > realR(rk) && realFar(rk, t.tone + t.sw, t.x, y0 + 1, t.y, rh, ys)) continue; }
     if (b === 5) {                                       // palmiye: kıvrık gövde + taç yaprakları
       let x = t.x, y = y0, z = t.y; const seg = 5, L = (H * 0.75) / seg, lean = 0.25 + r2 * 0.35;
       for (let i = 0; i < seg; i++) { const rz = lean * (i + 1) / seg, w = 5.2 - i * 0.55; instAdd(T.trunk, x, y, z, w, L * 1.06, w, t.sw, C.t, 0, rz); x += -Math.sin(rz) * Math.cos(t.sw) * L; y += Math.cos(rz) * L; z += Math.sin(rz) * Math.sin(t.sw) * L; }
@@ -2433,7 +2433,7 @@ function cav3Render() {
 // =============================================================
 const REAL = { started: false, ready: false, base: 'assets/ph/', M: {}, low: typeof window !== 'undefined' && ('ontouchstart' in window), cnt: {} };
 const REAL_SET = {
-  tree: ['island_tree_01', 'island_tree_02', 'island_tree_03'], conifer: ['fir_tree_01_a', 'fir_tree_01_b'],
+  tree: ['island_tree_01', 'island_tree_02', 'island_tree_03'], conifer: ['fir_tree_01_b'],
   rock: ['rock_moss_set_01', 'rock_moss_set_02', 'boulder_01', 'namaqualand_boulder_02'],
   stump: ['tree_stump_01'], fern: ['fern_02'], dead: ['dead_tree_trunk_02']
 };
@@ -2495,13 +2495,13 @@ function realDone(kind) {
   for (const k of ks) for (const n of REAL_SET[k]) { const M = REAL.M[n]; if (M) for (const im of M.meshes) im.instanceMatrix.needsUpdate = true; }
 }
 // tür içinden kararlı seçim; height verilirse yüksekliğe, yoksa genişliğe göre ölçeklenir
-function realPut(kind, key, x, y, z, height, width, ang, dist) {
+function realPut(kind, key, x, y, z, height, width, ang, dist, ys = 1) {
   if (!REAL.ready || dist > realR(kind)) return false;
   const list = REAL_SET[kind].filter(n => REAL.M[n]); if (!list.length) return false;
   const M = REAL.M[list[Math.floor(((key * 9.73) % 1 + 1) % 1 * list.length) % list.length]];
   if (M.meshes[0].count >= M.meshes[0].userData.max) return false;
   const s = height ? height / M.h0 : width / M.w0;
-  _rq.setFromAxisAngle(_ry, ang); _rm.compose(_rp.set(x, y, z), _rq, _rs.set(s, s, s));
+  _rq.setFromAxisAngle(_ry, ang); _rm.compose(_rp.set(x, y, z), _rq, _rs.set(s, s * ys, s));
   for (const im of M.meshes) { im.setMatrixAt(im.count, _rm); im.count++; }
   return true;
 }
@@ -2530,13 +2530,13 @@ function realImpostor(name) {
   U3.scene.add(ib); M.imp = { ib, rt, mat };
 }
 // uzakta kart koy: realPut ile aynı model seçimi (yakın/uzak geçişte tür değişmez)
-function realFar(kind, key, x, y, z, height) {
+function realFar(kind, key, x, y, z, height, ys = 1) {
   if (!REAL.ready) return false;
   const list = REAL_SET[kind].filter(n => REAL.M[n]); if (!list.length) return false;
   const name = list[Math.floor(((key * 9.73) % 1 + 1) % 1 * list.length) % list.length], M = REAL.M[name];
   if (!M.imp) realImpostor(name);
   const ib = M.imp && M.imp.ib; if (!ib || ib.count >= ib.userData.max) return false;
-  const s = height / M.h0; _rm.makeScale(M.w0 * s, height, 1); _rm.setPosition(x, y, z);
+  const s = height / M.h0; _rm.makeScale(M.w0 * s, height * ys, 1); _rm.setPosition(x, y, z);
   ib.setMatrixAt(ib.count++, _rm); return true;
 }
 function realFarReset() { for (const k of ['tree', 'conifer']) for (const n of REAL_SET[k]) { const M = REAL.M[n]; if (M && M.imp) M.imp.ib.count = 0; } }
