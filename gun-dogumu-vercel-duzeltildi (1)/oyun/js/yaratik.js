@@ -140,7 +140,7 @@ function separate(list) {
     if (a.inHut || b.inHut || a.grabbed || b.grabbed || a.fly || b.fly || a.hidden || b.hidden || a.mounted || b.mounted) continue;
     const dx = b.x - a.x, dy = b.y - a.y, m = a.r + b.r; if (Math.abs(dx) > m || Math.abs(dy) > m) continue;
     const d = Math.hypot(dx, dy) || 0.01;
-    if (d < m) { const k = (m - d) / d * 0.5, wa = b.r / m, wb = a.r / m; a.x -= dx * k * wa; a.y -= dy * k * wa; b.x += dx * k * wb; b.y += dy * k * wb; }
+    if (d < m) { const k = (m - d) / d * 0.5, la = a === L, lb = b === L, wa = la ? 0 : lb ? 2 : b.r / m, wb = lb ? 0 : la ? 2 : a.r / m; /* lideri itme, öbürü çekilsin */ a.x -= dx * k * wa; a.y -= dy * k * wa; b.x += dx * k * wb; b.y += dy * k * wb; }
   }
 }
 const bodyR = t => (t === L && G.mount) ? G.mount.r : (t.r || 11);

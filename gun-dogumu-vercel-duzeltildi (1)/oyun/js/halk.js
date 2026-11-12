@@ -860,9 +860,12 @@ function updFollow(p, dt) {
   if (!foe) for (const d of G.dinos) { if (!hostile(d)) continue; const dd = dist(d, L); if (dd < fd) { fd = dd; foe = d; } }
   if (foe && !((foe.type === 'dev' || foe.type === 'yelken') && p.fear > 50 && !hc)) return rangedOrMelee(p, foe, dt);
   const ring = p.fidx < 6 ? 0 : 1, n = ring ? 10 : 6, i = p.fidx % n;
-  const off = (i / n) * TAU, rr = (G.mount ? 70 : 45) + ring * 32;
+  const off = (i / n) * TAU, rr = (G.mount ? 76 : 56) + ring * 34;
   const tx = L.x + Math.cos(off + L.ang + Math.PI) * rr, ty = L.y + Math.sin(off + L.ang + Math.PI) * rr;
   if (Math.hypot(p.x - tx, p.y - ty) > 16) { steer(p, tx, ty, dist(p, L) > 160 ? pSpeed(p) * 1.7 : pSpeed(p) * 1.35, dt, false); p.anim += dt * 10; } else p.moving = false;
+  // liderden ~2 adım (≈45 birim) uzak dur, içine girme; lider geri gelirse geri çekil
+  const ld = dist(p, L), gap = G.mount ? 70 : 45;
+  if (ld < gap && ld > 0.01) { const k = Math.min(gap - ld, pSpeed(p) * 1.5 * dt); p.x += (p.x - L.x) / ld * k; p.y += (p.y - L.y) / ld * k; pushOut(p, false); }
 }
 // ---- avcı: hedefi kuşatır, mesafeyi korur, saldırıya uğrayınca geri çekilir
 function huntTarget(p) {
