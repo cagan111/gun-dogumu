@@ -33,8 +33,8 @@ function landness(x, y) {
   if (!ISL) return 1e4;
   const P = ISL, dx = x - CAMP.x, dy = y - CAMP.y, r = Math.hypot(dx, dy), a = Math.atan2(dy, dx);
   let R = P.R0 + P.a2 * Math.sin(2 * a + P.p2) + P.a3 * Math.sin(3 * a + P.p3) + P.a5 * Math.sin(5 * a + P.p5) + P.a9 * Math.sin(9 * a + P.p9);
-  R += (fbm(x / 2600 + 31.7, y / 2600 - 12.1, 4) - 0.5) * 2600 + (vnoise(x / 700 - 4.4, y / 700 + 2.7) - 0.5) * 260;
-  return clamp(R, 6000, 7500) - r;
+  R += (fbm(x / (2600 * ISLK) + 31.7, y / (2600 * ISLK) - 12.1, 4) - 0.5) * 2600 * ISLK + (vnoise(x / 700 - 4.4, y / 700 + 2.7) - 0.5) * 260;
+  return clamp(R, 6000 * ISLK, 7500 * ISLK) - r;
 }
 // biyom lekesi: 1 merkezde, 0 kenarda, dışarıda negatif (−0.5'e kadar; daha uzaksa −1)
 function blobT(b, x, y) {
@@ -45,7 +45,8 @@ function blobT(b, x, y) {
 }
 
 // ---- yükseklik haritası (HC birimlik ızgara, çift doğrusal örnekleme)
-const HC = 50, HN = Math.round(WORLD / HC), HW = HN + 1;
+const HC = 50; let HN = Math.round(WORLD / HC), HW = HN + 1;
+function islandGridReset() { HN = Math.round(WORLD / HC); HW = HN + 1; }
 let HM = null, TMUL = null;
 function rawH(x, y) {
   const c = landness(x, y);
@@ -148,7 +149,7 @@ function genWorld(seed) {
   grid = new Map();
   Object.assign(G, { ccamps: [], trees: [], rocks: [], crystals: [], bushes: [], herbs: [], poisons: [], nests: [], lakes: [], pools: [], deco: [], blobs: [], wrecks: [], harbor: null });
   nzSeed = (seed * 2654435761) | 0; HM = null; TMUL = null;
-  ISL = { R0: sr(6750, 6950), a2: sr(120, 260), p2: sr(0, TAU), a3: sr(100, 220), p3: sr(0, TAU), a5: sr(60, 140), p5: sr(0, TAU), a9: sr(30, 70), p9: sr(0, TAU) };
+  ISL = { R0: sr(6750, 6950) * ISLK, a2: sr(120, 260), p2: sr(0, TAU), a3: sr(100, 220), p3: sr(0, TAU), a5: sr(60, 140), p5: sr(0, TAU), a9: sr(30, 70), p9: sr(0, TAU) };
   const dC = (x, y) => Math.hypot(x - CAMP.x, y - CAMP.y);
   const nearCamp = (x, y, m) => dC(x, y) < m;
   const inW = (x, y, m = 80) => x > m && y > m && x < WORLD - m && y < WORLD - m;
@@ -166,21 +167,21 @@ function genWorld(seed) {
   }
   // sisli vadiler; en uzaktaki yarığı taşır
   const riftA = sr(0, TAU);
-  { const r = sr(650, 800), d = Math.min(sr(4500, 5200), coastR0(riftA) - r - 500), p = polar(riftA, d); G.blobs.push({ k: 3, x: p.x, y: p.y, r, p: sr(0, 9), q: sr(0, 9) }); }
+  { const r = sr(650, 800), d = Math.min(sr(4500, 5200) * ISLK, coastR0(riftA) - r - 500), p = polar(riftA, d); G.blobs.push({ k: 3, x: p.x, y: p.y, r, p: sr(0, 9), q: sr(0, 9) }); }
   G.rift = { x: G.blobs[0].x, y: G.blobs[0].y, r: 50, found: false };
-  for (let i = 0; i < 2; i++) placeBlob(3, 550, 800, 3000, 5600, 2400, 1.1);
+  for (let i = 0; i < Math.round(2 * ISLK * ISLK); i++) placeBlob(3, 550, 800, 3000 * ISLK, 5600 * ISLK, 2400, 1.1);
   // dağ sıraları: kavisli zincirler
-  for (let m = 0; m < 5; m++) {
-    let a = sr(0, TAU), d = sr(2900, 5400), dir = sr(0, TAU), n = sri(4, 6), x = CAMP.x + Math.cos(a) * d, y = CAMP.y + Math.sin(a) * d;
+  for (let m = 0; m < Math.round(5 * ISLK * ISLK); m++) {
+    let a = sr(0, TAU), d = sr(2900, 5400 * ISLK), dir = sr(0, TAU), n = sri(4, 6), x = CAMP.x + Math.cos(a) * d, y = CAMP.y + Math.sin(a) * d;
     for (let i = 0; i < n; i++) {
       const r = sr(380, 660);
       if (dC(x, y) - r * 1.26 > 2300 && landness(x, y) > r * 0.3 && Math.hypot(x - G.rift.x, y - G.rift.y) > r + 900) G.blobs.push({ k: 1, x, y, r, p: sr(0, 9), q: sr(0, 9) });
       dir += sr(-0.5, 0.5); x += Math.cos(dir) * r * 1.05; y += Math.sin(dir) * r * 1.05;
     }
   }
-  for (let i = 0; i < 4; i++) placeBlob(2, 550, 900, 2600, 5600, 2100, 1.0);
+  for (let i = 0; i < Math.round(4 * ISLK * ISLK); i++) placeBlob(2, 550, 900, 2600 * ISLK, 5600 * ISLK, 2100, 1.0);
   placeBlob(4, 700, 950, 2300, 2900, 1500, 0.9);              // kampa en yakın ova
-  for (let i = 0; i < 7; i++) placeBlob(4, 700, 1250, 2500, 6000, 1600, 0.9);
+  for (let i = 0; i < Math.round(7 * ISLK * ISLK); i++) placeBlob(4, 700, 1250, 2500, 6000 * ISLK, 1600, 0.9);
 
   // ---- yükseklik haritası
   HM = new Float32Array(HW * HW);
@@ -204,8 +205,8 @@ function genWorld(seed) {
         const a = a0 + i * TAU / 3 + (t ? sr(-0.55, 0.55) : 0), r = coastR(a);
         let rr = r - 10; while (rr > r - 200 && groundH(CAMP.x + Math.cos(a) * rr, CAMP.y + Math.sin(a) * rr) < 1.2) rr -= 5;
         const p = polar(a, rr - 25);
-        if (dC(p.x, p.y) < 4600 || !inW(p.x, p.y, 200)) continue;
-        if (Math.hypot(p.x - G.harbor.x, p.y - G.harbor.y) < 2500 || G.wrecks.some(w => Math.hypot(w.x - p.x, w.y - p.y) < 4000)) continue;
+        if (dC(p.x, p.y) < 4600 * ISLK || !inW(p.x, p.y, 200)) continue;
+        if (Math.hypot(p.x - G.harbor.x, p.y - G.harbor.y) < 2500 * ISLK || G.wrecks.some(w => Math.hypot(w.x - p.x, w.y - p.y) < 4000 * ISLK)) continue;
         if (t < 12 && B(p.x, p.y) !== 5) continue;
         best = { x: p.x, y: p.y, r: 60, found: false, i, a };
       }
@@ -214,9 +215,9 @@ function genWorld(seed) {
   }
 
   // ---- göller (katı) ve bataklık havuzları (sığ)
-  for (let i = 0; i < 28; i++) {
+  for (let i = 0; i < Math.round(28 * ISLK * ISLK); i++) {
     let x, y, r, k = 0;
-    do { x = sr(CAMP.x - 7000, CAMP.x + 7000); y = sr(CAMP.y - 7000, CAMP.y + 7000); r = sr(110, 240); }
+    do { x = sr(CAMP.x - 7000 * ISLK, CAMP.x + 7000 * ISLK); y = sr(CAMP.y - 7000 * ISLK, CAMP.y + 7000 * ISLK); r = sr(110, 240); }
     while ((nearCamp(x, y, r + 550) || ![0, 4].includes(B(x, y)) || landness(x, y) < r + 350 || groundH(x, y) > 260 || Math.hypot(x - G.rift.x, y - G.rift.y) < 600 || G.lakes.some(l => Math.hypot(l.x - x, l.y - y) < l.r + r + 400)) && k++ < 80);
     if (k >= 80) continue;
     const o = { x, y, r, kind: 'lake', h: Math.max(2, groundH(x, y) - 4) }; G.lakes.push(o); gAdd(o);
@@ -225,9 +226,9 @@ function genWorld(seed) {
   // ---- yamyam kampları: 3–4, kamptan çok uzakta
   const nCC = sri(3, 4);
   for (let k = 0; k < 400 && G.ccamps.length < nCC; k++) {
-    const p = polar(sr(0, TAU), sr(3300, 5800)), b = B(p.x, p.y);
+    const p = polar(sr(0, TAU), sr(3300 * ISLK, 5800 * ISLK)), b = B(p.x, p.y);
     if (b === 1 || b === 5 || b === B_SEA || landness(p.x, p.y) < 500 || groundH(p.x, p.y) > 300) continue;
-    if (Math.hypot(p.x - G.rift.x, p.y - G.rift.y) < 1000 || G.ccamps.some(c => Math.hypot(c.x - p.x, c.y - p.y) < 2800)) continue;
+    if (Math.hypot(p.x - G.rift.x, p.y - G.rift.y) < 1000 || G.ccamps.some(c => Math.hypot(c.x - p.x, c.y - p.y) < 2800 * ISLK)) continue;
     if (G.lakes.some(l => Math.hypot(l.x - p.x, l.y - p.y) < l.r + 250)) continue;
     flattenH(p.x, p.y, 170, 160, groundH(p.x, p.y));
     G.ccamps.push({ x: p.x, y: p.y, r: 90, totem: 250, alive: true, found: false, captives: [], spawned: false, i: G.ccamps.length,
@@ -244,7 +245,7 @@ function genWorld(seed) {
   }
   buildTMul();
   const inPool = (x, y, m) => G.pools.some(p => Math.hypot(p.x - x, p.y - y) < p.r + m);
-  const BX0 = CAMP.x - 7500, BX1 = CAMP.x + 7500, BY0 = CAMP.y - 7500, BY1 = CAMP.y + 7500;
+  const BX0 = CAMP.x - 7500 * ISLK, BX1 = CAMP.x + 7500 * ISLK, BY0 = CAMP.y - 7500 * ISLK, BY1 = CAMP.y + 7500 * ISLK;
   const rx = () => sr(BX0, BX1), ry = () => sr(BY0, BY1);
 
   // ---- ağaçlar (≤ 9000)
@@ -259,7 +260,7 @@ function genWorld(seed) {
     G.trees.push(t); gAdd(t);
   }
   for (let i = 0; i < 20; i++) { const a = sr(0, TAU), r = sr(270, 560); addTree(CAMP.x + Math.cos(a) * r, CAMP.y + Math.sin(a) * r); }
-  for (let c = 0; c < 1150; c++) {
+  for (let c = 0; c < Math.round(1150 * ISLK * ISLK); c++) {
     const cx = rx(), cy = ry(), b = B(cx, cy); if (b === B_SEA) continue;
     const far = dC(cx, cy) > 3200;
     let n = sri(12, 30), rad = 280;
@@ -272,7 +273,7 @@ function genWorld(seed) {
     for (let i = 0; i < n; i++) { const a = sr(0, TAU), rr = Math.abs(sg()) * rad; addTree(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr); }
   }
   const TP = [1, 0.15, 0.6, 0.5, 0.22, 0.12, 0];
-  for (let i = 0; i < 6000; i++) { const x = rx(), y = ry(); if (S() < TP[B(x, y)]) addTree(x, y); }
+  for (let i = 0; i < Math.round(6000 * ISLK * ISLK); i++) { const x = rx(), y = ry(); if (S() < TP[B(x, y)]) addTree(x, y); }
 
   // ---- kayalar (dağda yoğun, kumsalda sürüklenmiş taşlar) ve kristaller (≤ 2500)
   const ROCK_MAX = 2500;
@@ -285,7 +286,7 @@ function genWorld(seed) {
   }
   for (let i = 0; i < 7; i++) { const a = sr(0, TAU), r = sr(300, 600); addRock(CAMP.x + Math.cos(a) * r, CAMP.y + Math.sin(a) * r); }
   for (const b of G.blobs) if (b.k === 1) for (let i = 0, n = Math.round(80 * (b.r / 560) ** 2); i < n; i++) { const a = sr(0, TAU), rr = sr(0, b.r * 1.1), x = b.x + Math.cos(a) * rr, y = b.y + Math.sin(a) * rr; if (B(x, y) === 1) addRock(x, y); }
-  for (let c = 0; c < 1000; c++) {
+  for (let c = 0; c < Math.round(1000 * ISLK * ISLK); c++) {
     const cx = rx(), cy = ry(), b = B(cx, cy); if (b === B_SEA) continue;
     const n = b === 4 ? sri(0, 2) : b === 5 ? sri(1, 3) : sri(1, 4), sp = b === 5 ? 120 : 70;
     for (let i = 0; i < n; i++) addRock(cx + sr(-sp, sp), cy + sr(-sp, sp));
@@ -303,9 +304,9 @@ function genWorld(seed) {
     G.bushes.push({ x, y, r: 16, res: 'meyve', amt: 5, max: 5, berries: Array.from({ length: 7 }, () => [sr(-11, 11), sr(-11, 11)]), col: spick(['#b3243a', '#6a2a8a', '#c4382a']) });
   }
   for (let i = 0; i < 12; i++) { const a = sr(0, TAU), r = sr(200, 480); addBush(CAMP.x + Math.cos(a) * r, CAMP.y + Math.sin(a) * r); }
-  for (let i = 0; i < 3600; i++) addBush(rx(), ry());
+  for (let i = 0; i < Math.round(3600 * ISLK * ISLK); i++) addBush(rx(), ry());
   for (let i = 0; i < 6; i++) { const a = sr(0, TAU), r = sr(350, 650), x = CAMP.x + Math.cos(a) * r, y = CAMP.y + Math.sin(a) * r; if (free(x, y, 15)) G.herbs.push({ x, y, r: 10, res: 'herb', amt: 3, max: 3 }); }
-  for (let i = 0; i < 4000 && G.herbs.length < 380; i++) {
+  for (let i = 0; i < 4000 * ISLK * ISLK && G.herbs.length < 380 * ISLK * ISLK; i++) {
     const x = rx(), y = ry(), b = B(x, y);
     if ((b === 0 || b === 2 || b === 4) && free(x, y, 15) && !nearCamp(x, y, 300) && !inPool(x, y, 10)) G.herbs.push({ x, y, r: 10, res: 'herb', amt: 3, max: 3 });
   }
@@ -319,7 +320,7 @@ function genWorld(seed) {
     if (free(x, y, 30)) G.nests.push({ x, y, r: 20, eggs: sri(1, 3), found: false });
   }
   // ---- süsleme (≤ 7000): ova uzun otları, kumsal sürüklenmiş odunlar
-  for (let i = 0; i < 15000 && G.deco.length < 7000; i++) {
+  for (let i = 0; i < 15000 * ISLK * ISLK && G.deco.length < 7000 * ISLK * ISLK; i++) {
     const x = rx(), y = ry(), b = B(x, y);
     if (b === B_SEA || !free(x, y, 5) || nearCamp(x, y, 140)) continue;
     const u = S();
@@ -329,7 +330,7 @@ function genWorld(seed) {
     G.deco.push({ x, y, t, a: sr(0, TAU), s: sr(0.7, 1.3) });
   }
   makeBiomeTint();
-  function coastR0(a) { let r = 4000; while (r < 8000 && landness(CAMP.x + Math.cos(a) * r, CAMP.y + Math.sin(a) * r) > 0) r += 40; return r; }
+  function coastR0(a) { let r = 4000 * ISLK; while (r < 8000 * ISLK && landness(CAMP.x + Math.cos(a) * r, CAMP.y + Math.sin(a) * r) > 0) r += 40; return r; }
 }
 
 let biomeTint = null, biomeMini = null;

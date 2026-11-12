@@ -25,7 +25,7 @@ function resetState(diff) {
   for (const g of GORDER) { G.managers[g] = null; G.zone[g] = null; G.abil[g] = { cd: 0, act: 0 }; }
 }
 function newGame(diff, tutOn) {
-  resetState(diff);
+  setIslandScale(1.5); resetState(diff);
   G.seed = Math.floor(Math.random() * 1e9);
   genWorld(G.seed);
   L = mkPerson(CAMP.x, CAMP.y + 70, 'Sen', true); G.people.push(L);
@@ -689,7 +689,7 @@ function serialize() {
   const pf = ['id', 'name', 'x', 'y', 'leader', 'child', 'age', 'traits', 'story', 'group', 'hp', 'maxhp', 'fear', 'skin', 'hair', 'injury', 'downed', 'tired', 'watched', 'partner', 'parentA', 'parentB', 'stam', 'seat', 'r', 'sk', 'sick', 'wasDowned', 'bedUntil', 'routine', 'alt', 'hunger', 'own', 'joinHunt', 'bag', 'carry', 'cookGot', 'batch', 'prevG', 'rtBase', 'planHunt', 'planHuntPrev'];
   let ex = ''; for (let i = 0; i < G.explored.length; i++) ex += G.explored[i] ? '1' : '0';
   return JSON.stringify({
-    v: 4, wrecks: (G.wrecks || []).map(w => !!w.found), inside: G.inside ? G.builds.indexOf(G.inside.b) : -1, seed: G.seed, diff: G.diff, t: G.t, cyc: CYCLE, day: G.day, stock: G.stock, fuel: G.fire.fuel, morale: G.morale, orders: G.orders.map(o => Object.assign({}, o, { worker: 0 })), oid: G.oid, unclean: G.unclean, planToday: G.planToday, planNext: G.planNext, seeds: G.seeds, seedSeen: G.seedSeen,
+    v: 4, isl: ISLK, wrecks: (G.wrecks || []).map(w => !!w.found), inside: G.inside ? G.builds.indexOf(G.inside.b) : -1, seed: G.seed, diff: G.diff, t: G.t, cyc: CYCLE, day: G.day, stock: G.stock, fuel: G.fire.fuel, morale: G.morale, orders: G.orders.map(o => Object.assign({}, o, { worker: 0 })), oid: G.oid, unclean: G.unclean, planToday: G.planToday, planNext: G.planNext, seeds: G.seeds, seedSeen: G.seedSeen,
     carcs: G.carcs.filter(c => !c.dead).map(c => ({ x: c.x, y: c.y, r: c.r, type: c.type, ang: c.ang, meat: c.meat, bone: c.bone, hide: c.hide, age: c.age, rotten: c.rotten })),
     managers: G.managers, zone: G.zone, newGroup: G.newGroup, autoEq: !!G.autoEq, torchFuel: G.torchFuel, nightPlan: G.nightPlan, nightWeather: G.nightWeather, weather: G.weather,
     eggs: G.eggs, usedNames: [...G.usedNames], stats: G.stats, idc: G.idc, kills: G.kills, deaths: G.deaths, lost: G.lost,
@@ -714,7 +714,7 @@ function saveGame(kind) {
 }
 function loadGame(s) {
   const D = JSON.parse(s);
-  resetState(D.diff);
+  setIslandScale(D.isl || 1); resetState(D.diff);
   G.seed = D.seed; genWorld(G.seed);
   Object.assign(G, { t: D.t * CYCLE / (D.cyc || 300), day: D.day, morale: D.morale, newGroup: D.newGroup || 'bos', torchFuel: D.torchFuel || 0, nightPlan: D.nightPlan || [], nightWeather: D.nightWeather || 'acik',
     weather: D.weather || { type: 'acik', t: 0 }, eggs: D.eggs || [], stats: Object.assign(G.stats, D.stats || {}), idc: D.idc, kills: D.kills, deaths: D.deaths, lost: D.lost,

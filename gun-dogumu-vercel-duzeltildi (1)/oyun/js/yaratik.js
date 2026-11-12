@@ -332,13 +332,14 @@ function updScent(dt) {
   if (G.scents.length > 200) G.scents.splice(0, G.scents.length - 200);
 }
 // Pozitif "along": hayvan rüzgâr altında; negatif: rüzgâr üstünde.
+const SCENTK = 2.5;   // sahip kararı: koku menzili ×2.5 (yırtıcı uzaktan alır, görünmeden gelir)
 function scentReach(d, src, base, power) {
   if (!G.wind || !src || guardSafe(src)) return 0;
   const dx = d.x - src.x, dy = d.y - src.y, dd = Math.hypot(dx, dy) || 1;
   const wx = Math.cos(G.wind.a), wy = Math.sin(G.wind.a);
   const down = clamp((dx * wx + dy * wy) / dd, -1, 1);
   const cross = Math.abs(dx * wy - dy * wx);
-  const plume = base * (0.42 + G.wind.s * 0.38) * (down > 0 ? 1 + down * 1.25 : 1 + down * 0.55) * (power || 1);
+  const plume = SCENTK * base * (0.42 + G.wind.s * 0.38) * (down > 0 ? 1 + down * 1.25 : 1 + down * 0.55) * (power || 1);
   if (cross > plume * (0.3 + Math.max(0, down) * 0.55)) return 0;
   return plume;
 }

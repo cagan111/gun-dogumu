@@ -27,8 +27,14 @@ const cap1 = s => s[0].toLocaleUpperCase('tr') + s.slice(1);
 function compass(a) { const d = ['doğu', 'güneydoğu', 'güney', 'güneybatı', 'batı', 'kuzeybatı', 'kuzey', 'kuzeydoğu']; return d[Math.round((((a % TAU) + TAU) % TAU) / (TAU / 8)) % 8]; }
 
 // ---- dünya sabitleri
-const WORLD = 16000, CAMP = { x: 8000, y: 8000 }, DAYK = 2, CYCLE = 300 * DAYK;   // DAYK: gün uzunluğu çarpanı (gün başına etkisi sabit kalması gereken saniyelik oranlar DAYK'ya bölünür)
-const MAPN = 200, MAPC = WORLD / MAPN;
+let ISLK = 1.5, WORLD = 16000 * ISLK; const CAMP = { x: WORLD / 2, y: WORLD / 2 }, DAYK = 2, CYCLE = 300 * DAYK;   // DAYK: gün uzunluğu çarpanı (gün başına etkisi sabit kalması gereken saniyelik oranlar DAYK'ya bölünür)
+let MAPN = Math.round(200 * ISLK), MAPC = WORLD / MAPN;
+// ada ölçeği: yeni oyun 1.5, eski kayıtlar (isl alanı yok) 1 ile açılır
+function setIslandScale(k) {
+  ISLK = k; WORLD = 16000 * k; CAMP.x = CAMP.y = WORLD / 2; MAPN = Math.round(200 * k); MAPC = WORLD / MAPN;
+  if (typeof islandGridReset === 'function') islandGridReset();
+  if (typeof fogC !== 'undefined') { fogC = null; miniBase = null; miniKey = null; }
+}
 
 const NAMES = ['Arda','Ece','Toprak','Deniz','Kaya','Ilgın','Bora','Su','Tan','Yağmur','Doruk','Nehir','Çınar','Defne','Alp','Elif','Umut','Ay','Bulut','Duru','Ege','Lale','Oğuz','Selin','Yiğit','Mert','Zeynep','Kuzey','Asya','Poyraz','Rüzgar','Sema','Ozan','Ada','Kartal','Pınar','Barış','Cemre','Dilan','Eren','Feride','Gökay','Hazal','İlkay','Jale','Kerem','Leyla','Melis','Nazlı','Orhan','Pelin','Reşat','Sarp','Şule','Tuna','Ufuk','Vedat','Yasemin','Zafer','Aslı','Berk','Ceren','Dağhan','Esin','Fırat','Gizem','Harun','Irmak','Koray','Mira','Nil','Okan','Serra','Tolga','Volkan','Yaren','Ahu','Batu','Cansu','Demir','Ebru','Filiz','Gökhan','Hande','Işıl','Kaan','Lara','Meltem','Nur','Onur','Pars','Rana','Sevgi','Tamer','Ülkü','Yavuz','Zerrin','Atlas','Bengü','Cihan','Derin','Emre','Funda','Gül','Hakan','İpek','Kıvanç','Mavi','Nehir Su','Özge','Rüya','Selim','Tuğçe','Uğur','Yonca'];
 const STORIES = [

@@ -275,8 +275,14 @@ const cap1 = s => s[0].toLocaleUpperCase('tr') + s.slice(1);
 function compass(a) { const d = ['doğu', 'güneydoğu', 'güney', 'güneybatı', 'batı', 'kuzeybatı', 'kuzey', 'kuzeydoğu']; return d[Math.round((((a % TAU) + TAU) % TAU) / (TAU / 8)) % 8]; }
 
 // ---- dünya sabitleri
-const WORLD = 16000, CAMP = { x: 8000, y: 8000 }, DAYK = 2, CYCLE = 300 * DAYK;   // DAYK: gün uzunluğu çarpanı (gün başına etkisi sabit kalması gereken saniyelik oranlar DAYK'ya bölünür)
-const MAPN = 200, MAPC = WORLD / MAPN;
+let ISLK = 1.5, WORLD = 16000 * ISLK; const CAMP = { x: WORLD / 2, y: WORLD / 2 }, DAYK = 2, CYCLE = 300 * DAYK;   // DAYK: gün uzunluğu çarpanı (gün başına etkisi sabit kalması gereken saniyelik oranlar DAYK'ya bölünür)
+let MAPN = Math.round(200 * ISLK), MAPC = WORLD / MAPN;
+// ada ölçeği: yeni oyun 1.5, eski kayıtlar (isl alanı yok) 1 ile açılır
+function setIslandScale(k) {
+  ISLK = k; WORLD = 16000 * k; CAMP.x = CAMP.y = WORLD / 2; MAPN = Math.round(200 * k); MAPC = WORLD / MAPN;
+  if (typeof islandGridReset === 'function') islandGridReset();
+  if (typeof fogC !== 'undefined') { fogC = null; miniBase = null; miniKey = null; }
+}
 
 const NAMES = ['Arda','Ece','Toprak','Deniz','Kaya','Ilgın','Bora','Su','Tan','Yağmur','Doruk','Nehir','Çınar','Defne','Alp','Elif','Umut','Ay','Bulut','Duru','Ege','Lale','Oğuz','Selin','Yiğit','Mert','Zeynep','Kuzey','Asya','Poyraz','Rüzgar','Sema','Ozan','Ada','Kartal','Pınar','Barış','Cemre','Dilan','Eren','Feride','Gökay','Hazal','İlkay','Jale','Kerem','Leyla','Melis','Nazlı','Orhan','Pelin','Reşat','Sarp','Şule','Tuna','Ufuk','Vedat','Yasemin','Zafer','Aslı','Berk','Ceren','Dağhan','Esin','Fırat','Gizem','Harun','Irmak','Koray','Mira','Nil','Okan','Serra','Tolga','Volkan','Yaren','Ahu','Batu','Cansu','Demir','Ebru','Filiz','Gökhan','Hande','Işıl','Kaan','Lara','Meltem','Nur','Onur','Pars','Rana','Sevgi','Tamer','Ülkü','Yavuz','Zerrin','Atlas','Bengü','Cihan','Derin','Emre','Funda','Gül','Hakan','İpek','Kıvanç','Mavi','Nehir Su','Özge','Rüya','Selim','Tuğçe','Uğur','Yonca'];
 const STORIES = [
@@ -787,8 +793,8 @@ function landness(x, y) {
   if (!ISL) return 1e4;
   const P = ISL, dx = x - CAMP.x, dy = y - CAMP.y, r = Math.hypot(dx, dy), a = Math.atan2(dy, dx);
   let R = P.R0 + P.a2 * Math.sin(2 * a + P.p2) + P.a3 * Math.sin(3 * a + P.p3) + P.a5 * Math.sin(5 * a + P.p5) + P.a9 * Math.sin(9 * a + P.p9);
-  R += (fbm(x / 2600 + 31.7, y / 2600 - 12.1, 4) - 0.5) * 2600 + (vnoise(x / 700 - 4.4, y / 700 + 2.7) - 0.5) * 260;
-  return clamp(R, 6000, 7500) - r;
+  R += (fbm(x / (2600 * ISLK) + 31.7, y / (2600 * ISLK) - 12.1, 4) - 0.5) * 2600 * ISLK + (vnoise(x / 700 - 4.4, y / 700 + 2.7) - 0.5) * 260;
+  return clamp(R, 6000 * ISLK, 7500 * ISLK) - r;
 }
 // biyom lekesi: 1 merkezde, 0 kenarda, dışarıda negatif (−0.5'e kadar; daha uzaksa −1)
 function blobT(b, x, y) {
@@ -799,7 +805,8 @@ function blobT(b, x, y) {
 }
 
 // ---- yükseklik haritası (HC birimlik ızgara, çift doğrusal örnekleme)
-const HC = 50, HN = Math.round(WORLD / HC), HW = HN + 1;
+const HC = 50; let HN = Math.round(WORLD / HC), HW = HN + 1;
+function islandGridReset() { HN = Math.round(WORLD / HC); HW = HN + 1; }
 let HM = null, TMUL = null;
 function rawH(x, y) {
   const c = landness(x, y);
@@ -902,7 +909,7 @@ function genWorld(seed) {
   grid = new Map();
   Object.assign(G, { ccamps: [], trees: [], rocks: [], crystals: [], bushes: [], herbs: [], poisons: [], nests: [], lakes: [], pools: [], deco: [], blobs: [], wrecks: [], harbor: null });
   nzSeed = (seed * 2654435761) | 0; HM = null; TMUL = null;
-  ISL = { R0: sr(6750, 6950), a2: sr(120, 260), p2: sr(0, TAU), a3: sr(100, 220), p3: sr(0, TAU), a5: sr(60, 140), p5: sr(0, TAU), a9: sr(30, 70), p9: sr(0, TAU) };
+  ISL = { R0: sr(6750, 6950) * ISLK, a2: sr(120, 260), p2: sr(0, TAU), a3: sr(100, 220), p3: sr(0, TAU), a5: sr(60, 140), p5: sr(0, TAU), a9: sr(30, 70), p9: sr(0, TAU) };
   const dC = (x, y) => Math.hypot(x - CAMP.x, y - CAMP.y);
   const nearCamp = (x, y, m) => dC(x, y) < m;
   const inW = (x, y, m = 80) => x > m && y > m && x < WORLD - m && y < WORLD - m;
@@ -920,21 +927,21 @@ function genWorld(seed) {
   }
   // sisli vadiler; en uzaktaki yarığı taşır
   const riftA = sr(0, TAU);
-  { const r = sr(650, 800), d = Math.min(sr(4500, 5200), coastR0(riftA) - r - 500), p = polar(riftA, d); G.blobs.push({ k: 3, x: p.x, y: p.y, r, p: sr(0, 9), q: sr(0, 9) }); }
+  { const r = sr(650, 800), d = Math.min(sr(4500, 5200) * ISLK, coastR0(riftA) - r - 500), p = polar(riftA, d); G.blobs.push({ k: 3, x: p.x, y: p.y, r, p: sr(0, 9), q: sr(0, 9) }); }
   G.rift = { x: G.blobs[0].x, y: G.blobs[0].y, r: 50, found: false };
-  for (let i = 0; i < 2; i++) placeBlob(3, 550, 800, 3000, 5600, 2400, 1.1);
+  for (let i = 0; i < Math.round(2 * ISLK * ISLK); i++) placeBlob(3, 550, 800, 3000 * ISLK, 5600 * ISLK, 2400, 1.1);
   // dağ sıraları: kavisli zincirler
-  for (let m = 0; m < 5; m++) {
-    let a = sr(0, TAU), d = sr(2900, 5400), dir = sr(0, TAU), n = sri(4, 6), x = CAMP.x + Math.cos(a) * d, y = CAMP.y + Math.sin(a) * d;
+  for (let m = 0; m < Math.round(5 * ISLK * ISLK); m++) {
+    let a = sr(0, TAU), d = sr(2900, 5400 * ISLK), dir = sr(0, TAU), n = sri(4, 6), x = CAMP.x + Math.cos(a) * d, y = CAMP.y + Math.sin(a) * d;
     for (let i = 0; i < n; i++) {
       const r = sr(380, 660);
       if (dC(x, y) - r * 1.26 > 2300 && landness(x, y) > r * 0.3 && Math.hypot(x - G.rift.x, y - G.rift.y) > r + 900) G.blobs.push({ k: 1, x, y, r, p: sr(0, 9), q: sr(0, 9) });
       dir += sr(-0.5, 0.5); x += Math.cos(dir) * r * 1.05; y += Math.sin(dir) * r * 1.05;
     }
   }
-  for (let i = 0; i < 4; i++) placeBlob(2, 550, 900, 2600, 5600, 2100, 1.0);
+  for (let i = 0; i < Math.round(4 * ISLK * ISLK); i++) placeBlob(2, 550, 900, 2600 * ISLK, 5600 * ISLK, 2100, 1.0);
   placeBlob(4, 700, 950, 2300, 2900, 1500, 0.9);              // kampa en yakın ova
-  for (let i = 0; i < 7; i++) placeBlob(4, 700, 1250, 2500, 6000, 1600, 0.9);
+  for (let i = 0; i < Math.round(7 * ISLK * ISLK); i++) placeBlob(4, 700, 1250, 2500, 6000 * ISLK, 1600, 0.9);
 
   // ---- yükseklik haritası
   HM = new Float32Array(HW * HW);
@@ -958,8 +965,8 @@ function genWorld(seed) {
         const a = a0 + i * TAU / 3 + (t ? sr(-0.55, 0.55) : 0), r = coastR(a);
         let rr = r - 10; while (rr > r - 200 && groundH(CAMP.x + Math.cos(a) * rr, CAMP.y + Math.sin(a) * rr) < 1.2) rr -= 5;
         const p = polar(a, rr - 25);
-        if (dC(p.x, p.y) < 4600 || !inW(p.x, p.y, 200)) continue;
-        if (Math.hypot(p.x - G.harbor.x, p.y - G.harbor.y) < 2500 || G.wrecks.some(w => Math.hypot(w.x - p.x, w.y - p.y) < 4000)) continue;
+        if (dC(p.x, p.y) < 4600 * ISLK || !inW(p.x, p.y, 200)) continue;
+        if (Math.hypot(p.x - G.harbor.x, p.y - G.harbor.y) < 2500 * ISLK || G.wrecks.some(w => Math.hypot(w.x - p.x, w.y - p.y) < 4000 * ISLK)) continue;
         if (t < 12 && B(p.x, p.y) !== 5) continue;
         best = { x: p.x, y: p.y, r: 60, found: false, i, a };
       }
@@ -968,9 +975,9 @@ function genWorld(seed) {
   }
 
   // ---- göller (katı) ve bataklık havuzları (sığ)
-  for (let i = 0; i < 28; i++) {
+  for (let i = 0; i < Math.round(28 * ISLK * ISLK); i++) {
     let x, y, r, k = 0;
-    do { x = sr(CAMP.x - 7000, CAMP.x + 7000); y = sr(CAMP.y - 7000, CAMP.y + 7000); r = sr(110, 240); }
+    do { x = sr(CAMP.x - 7000 * ISLK, CAMP.x + 7000 * ISLK); y = sr(CAMP.y - 7000 * ISLK, CAMP.y + 7000 * ISLK); r = sr(110, 240); }
     while ((nearCamp(x, y, r + 550) || ![0, 4].includes(B(x, y)) || landness(x, y) < r + 350 || groundH(x, y) > 260 || Math.hypot(x - G.rift.x, y - G.rift.y) < 600 || G.lakes.some(l => Math.hypot(l.x - x, l.y - y) < l.r + r + 400)) && k++ < 80);
     if (k >= 80) continue;
     const o = { x, y, r, kind: 'lake', h: Math.max(2, groundH(x, y) - 4) }; G.lakes.push(o); gAdd(o);
@@ -979,9 +986,9 @@ function genWorld(seed) {
   // ---- yamyam kampları: 3–4, kamptan çok uzakta
   const nCC = sri(3, 4);
   for (let k = 0; k < 400 && G.ccamps.length < nCC; k++) {
-    const p = polar(sr(0, TAU), sr(3300, 5800)), b = B(p.x, p.y);
+    const p = polar(sr(0, TAU), sr(3300 * ISLK, 5800 * ISLK)), b = B(p.x, p.y);
     if (b === 1 || b === 5 || b === B_SEA || landness(p.x, p.y) < 500 || groundH(p.x, p.y) > 300) continue;
-    if (Math.hypot(p.x - G.rift.x, p.y - G.rift.y) < 1000 || G.ccamps.some(c => Math.hypot(c.x - p.x, c.y - p.y) < 2800)) continue;
+    if (Math.hypot(p.x - G.rift.x, p.y - G.rift.y) < 1000 || G.ccamps.some(c => Math.hypot(c.x - p.x, c.y - p.y) < 2800 * ISLK)) continue;
     if (G.lakes.some(l => Math.hypot(l.x - p.x, l.y - p.y) < l.r + 250)) continue;
     flattenH(p.x, p.y, 170, 160, groundH(p.x, p.y));
     G.ccamps.push({ x: p.x, y: p.y, r: 90, totem: 250, alive: true, found: false, captives: [], spawned: false, i: G.ccamps.length,
@@ -998,7 +1005,7 @@ function genWorld(seed) {
   }
   buildTMul();
   const inPool = (x, y, m) => G.pools.some(p => Math.hypot(p.x - x, p.y - y) < p.r + m);
-  const BX0 = CAMP.x - 7500, BX1 = CAMP.x + 7500, BY0 = CAMP.y - 7500, BY1 = CAMP.y + 7500;
+  const BX0 = CAMP.x - 7500 * ISLK, BX1 = CAMP.x + 7500 * ISLK, BY0 = CAMP.y - 7500 * ISLK, BY1 = CAMP.y + 7500 * ISLK;
   const rx = () => sr(BX0, BX1), ry = () => sr(BY0, BY1);
 
   // ---- ağaçlar (≤ 9000)
@@ -1013,7 +1020,7 @@ function genWorld(seed) {
     G.trees.push(t); gAdd(t);
   }
   for (let i = 0; i < 20; i++) { const a = sr(0, TAU), r = sr(270, 560); addTree(CAMP.x + Math.cos(a) * r, CAMP.y + Math.sin(a) * r); }
-  for (let c = 0; c < 1150; c++) {
+  for (let c = 0; c < Math.round(1150 * ISLK * ISLK); c++) {
     const cx = rx(), cy = ry(), b = B(cx, cy); if (b === B_SEA) continue;
     const far = dC(cx, cy) > 3200;
     let n = sri(12, 30), rad = 280;
@@ -1026,7 +1033,7 @@ function genWorld(seed) {
     for (let i = 0; i < n; i++) { const a = sr(0, TAU), rr = Math.abs(sg()) * rad; addTree(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr); }
   }
   const TP = [1, 0.15, 0.6, 0.5, 0.22, 0.12, 0];
-  for (let i = 0; i < 6000; i++) { const x = rx(), y = ry(); if (S() < TP[B(x, y)]) addTree(x, y); }
+  for (let i = 0; i < Math.round(6000 * ISLK * ISLK); i++) { const x = rx(), y = ry(); if (S() < TP[B(x, y)]) addTree(x, y); }
 
   // ---- kayalar (dağda yoğun, kumsalda sürüklenmiş taşlar) ve kristaller (≤ 2500)
   const ROCK_MAX = 2500;
@@ -1039,7 +1046,7 @@ function genWorld(seed) {
   }
   for (let i = 0; i < 7; i++) { const a = sr(0, TAU), r = sr(300, 600); addRock(CAMP.x + Math.cos(a) * r, CAMP.y + Math.sin(a) * r); }
   for (const b of G.blobs) if (b.k === 1) for (let i = 0, n = Math.round(80 * (b.r / 560) ** 2); i < n; i++) { const a = sr(0, TAU), rr = sr(0, b.r * 1.1), x = b.x + Math.cos(a) * rr, y = b.y + Math.sin(a) * rr; if (B(x, y) === 1) addRock(x, y); }
-  for (let c = 0; c < 1000; c++) {
+  for (let c = 0; c < Math.round(1000 * ISLK * ISLK); c++) {
     const cx = rx(), cy = ry(), b = B(cx, cy); if (b === B_SEA) continue;
     const n = b === 4 ? sri(0, 2) : b === 5 ? sri(1, 3) : sri(1, 4), sp = b === 5 ? 120 : 70;
     for (let i = 0; i < n; i++) addRock(cx + sr(-sp, sp), cy + sr(-sp, sp));
@@ -1057,9 +1064,9 @@ function genWorld(seed) {
     G.bushes.push({ x, y, r: 16, res: 'meyve', amt: 5, max: 5, berries: Array.from({ length: 7 }, () => [sr(-11, 11), sr(-11, 11)]), col: spick(['#b3243a', '#6a2a8a', '#c4382a']) });
   }
   for (let i = 0; i < 12; i++) { const a = sr(0, TAU), r = sr(200, 480); addBush(CAMP.x + Math.cos(a) * r, CAMP.y + Math.sin(a) * r); }
-  for (let i = 0; i < 3600; i++) addBush(rx(), ry());
+  for (let i = 0; i < Math.round(3600 * ISLK * ISLK); i++) addBush(rx(), ry());
   for (let i = 0; i < 6; i++) { const a = sr(0, TAU), r = sr(350, 650), x = CAMP.x + Math.cos(a) * r, y = CAMP.y + Math.sin(a) * r; if (free(x, y, 15)) G.herbs.push({ x, y, r: 10, res: 'herb', amt: 3, max: 3 }); }
-  for (let i = 0; i < 4000 && G.herbs.length < 380; i++) {
+  for (let i = 0; i < 4000 * ISLK * ISLK && G.herbs.length < 380 * ISLK * ISLK; i++) {
     const x = rx(), y = ry(), b = B(x, y);
     if ((b === 0 || b === 2 || b === 4) && free(x, y, 15) && !nearCamp(x, y, 300) && !inPool(x, y, 10)) G.herbs.push({ x, y, r: 10, res: 'herb', amt: 3, max: 3 });
   }
@@ -1073,7 +1080,7 @@ function genWorld(seed) {
     if (free(x, y, 30)) G.nests.push({ x, y, r: 20, eggs: sri(1, 3), found: false });
   }
   // ---- süsleme (≤ 7000): ova uzun otları, kumsal sürüklenmiş odunlar
-  for (let i = 0; i < 15000 && G.deco.length < 7000; i++) {
+  for (let i = 0; i < 15000 * ISLK * ISLK && G.deco.length < 7000 * ISLK * ISLK; i++) {
     const x = rx(), y = ry(), b = B(x, y);
     if (b === B_SEA || !free(x, y, 5) || nearCamp(x, y, 140)) continue;
     const u = S();
@@ -1083,7 +1090,7 @@ function genWorld(seed) {
     G.deco.push({ x, y, t, a: sr(0, TAU), s: sr(0.7, 1.3) });
   }
   makeBiomeTint();
-  function coastR0(a) { let r = 4000; while (r < 8000 && landness(CAMP.x + Math.cos(a) * r, CAMP.y + Math.sin(a) * r) > 0) r += 40; return r; }
+  function coastR0(a) { let r = 4000 * ISLK; while (r < 8000 * ISLK && landness(CAMP.x + Math.cos(a) * r, CAMP.y + Math.sin(a) * r) > 0) r += 40; return r; }
 }
 
 let biomeTint = null, biomeMini = null;
@@ -2963,13 +2970,14 @@ function updScent(dt) {
   if (G.scents.length > 200) G.scents.splice(0, G.scents.length - 200);
 }
 // Pozitif "along": hayvan rüzgâr altında; negatif: rüzgâr üstünde.
+const SCENTK = 2.5;   // sahip kararı: koku menzili ×2.5 (yırtıcı uzaktan alır, görünmeden gelir)
 function scentReach(d, src, base, power) {
   if (!G.wind || !src || guardSafe(src)) return 0;
   const dx = d.x - src.x, dy = d.y - src.y, dd = Math.hypot(dx, dy) || 1;
   const wx = Math.cos(G.wind.a), wy = Math.sin(G.wind.a);
   const down = clamp((dx * wx + dy * wy) / dd, -1, 1);
   const cross = Math.abs(dx * wy - dy * wx);
-  const plume = base * (0.42 + G.wind.s * 0.38) * (down > 0 ? 1 + down * 1.25 : 1 + down * 0.55) * (power || 1);
+  const plume = SCENTK * base * (0.42 + G.wind.s * 0.38) * (down > 0 ? 1 + down * 1.25 : 1 + down * 0.55) * (power || 1);
   if (cross > plume * (0.3 + Math.max(0, down) * 0.55)) return 0;
   return plume;
 }
@@ -4064,7 +4072,7 @@ function resetState(diff) {
   for (const g of GORDER) { G.managers[g] = null; G.zone[g] = null; G.abil[g] = { cd: 0, act: 0 }; }
 }
 function newGame(diff, tutOn) {
-  resetState(diff);
+  setIslandScale(1.5); resetState(diff);
   G.seed = Math.floor(Math.random() * 1e9);
   genWorld(G.seed);
   L = mkPerson(CAMP.x, CAMP.y + 70, 'Sen', true); G.people.push(L);
@@ -4728,7 +4736,7 @@ function serialize() {
   const pf = ['id', 'name', 'x', 'y', 'leader', 'child', 'age', 'traits', 'story', 'group', 'hp', 'maxhp', 'fear', 'skin', 'hair', 'injury', 'downed', 'tired', 'watched', 'partner', 'parentA', 'parentB', 'stam', 'seat', 'r', 'sk', 'sick', 'wasDowned', 'bedUntil', 'routine', 'alt', 'hunger', 'own', 'joinHunt', 'bag', 'carry', 'cookGot', 'batch', 'prevG', 'rtBase', 'planHunt', 'planHuntPrev'];
   let ex = ''; for (let i = 0; i < G.explored.length; i++) ex += G.explored[i] ? '1' : '0';
   return JSON.stringify({
-    v: 4, wrecks: (G.wrecks || []).map(w => !!w.found), inside: G.inside ? G.builds.indexOf(G.inside.b) : -1, seed: G.seed, diff: G.diff, t: G.t, cyc: CYCLE, day: G.day, stock: G.stock, fuel: G.fire.fuel, morale: G.morale, orders: G.orders.map(o => Object.assign({}, o, { worker: 0 })), oid: G.oid, unclean: G.unclean, planToday: G.planToday, planNext: G.planNext, seeds: G.seeds, seedSeen: G.seedSeen,
+    v: 4, isl: ISLK, wrecks: (G.wrecks || []).map(w => !!w.found), inside: G.inside ? G.builds.indexOf(G.inside.b) : -1, seed: G.seed, diff: G.diff, t: G.t, cyc: CYCLE, day: G.day, stock: G.stock, fuel: G.fire.fuel, morale: G.morale, orders: G.orders.map(o => Object.assign({}, o, { worker: 0 })), oid: G.oid, unclean: G.unclean, planToday: G.planToday, planNext: G.planNext, seeds: G.seeds, seedSeen: G.seedSeen,
     carcs: G.carcs.filter(c => !c.dead).map(c => ({ x: c.x, y: c.y, r: c.r, type: c.type, ang: c.ang, meat: c.meat, bone: c.bone, hide: c.hide, age: c.age, rotten: c.rotten })),
     managers: G.managers, zone: G.zone, newGroup: G.newGroup, autoEq: !!G.autoEq, torchFuel: G.torchFuel, nightPlan: G.nightPlan, nightWeather: G.nightWeather, weather: G.weather,
     eggs: G.eggs, usedNames: [...G.usedNames], stats: G.stats, idc: G.idc, kills: G.kills, deaths: G.deaths, lost: G.lost,
@@ -4753,7 +4761,7 @@ function saveGame(kind) {
 }
 function loadGame(s) {
   const D = JSON.parse(s);
-  resetState(D.diff);
+  setIslandScale(D.isl || 1); resetState(D.diff);
   G.seed = D.seed; genWorld(G.seed);
   Object.assign(G, { t: D.t * CYCLE / (D.cyc || 300), day: D.day, morale: D.morale, newGroup: D.newGroup || 'bos', torchFuel: D.torchFuel || 0, nightPlan: D.nightPlan || [], nightWeather: D.nightWeather || 'acik',
     weather: D.weather || { type: 'acik', t: 0 }, eggs: D.eggs || [], stats: Object.assign(G.stats, D.stats || {}), idc: D.idc, kills: D.kills, deaths: D.deaths, lost: D.lost,
