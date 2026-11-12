@@ -10845,7 +10845,9 @@ function realStart() {
   REAL.started = true;
   const loader = new THREE.GLTFLoader(), names = [].concat(...Object.values(REAL_SET)); let left = names.length;
   const done = () => { if (--left === 0) { REAL.ready = Object.keys(REAL.M).length > 0; U3.instX = 1e9; } };
-  for (const n of names) loader.load(REAL.base + n + '.glb', g => { try { realPrep(n, g.scene); } catch (e) { console.warn('varlık', n, e); } done(); }, undefined, () => done());
+  // .glb yoksa aynı ikili dosya .wasm adıyla da aranır (artifact yalnız bilinen türleri sunar)
+  const ok = n => g => { try { realPrep(n, g.scene); } catch (e) { console.warn('varlık', n, e); } done(); };
+  for (const n of names) loader.load(REAL.base + n + '.glb', ok(n), undefined, () => loader.load(REAL.base + n + '.wasm', ok(n), undefined, () => done()));
 }
 // quantize (Int16/Int8 normalize) öznitelikleri float'a aç: matrisle pişirmeden önce şart
 function realFloat(g) {
