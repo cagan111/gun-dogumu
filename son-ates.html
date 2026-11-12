@@ -10882,7 +10882,7 @@ function cavRenderPlanner(b) {
   for (const {f,i} of pending) { const refund = cavFurnitureRefund(f), recipe = CAV_FURN_RECIPES[f.recipe]; const status = f.paid ? `İnşa: %${Math.floor(f.prog * 100)}` : recipe && !canAfford(recipe.cost) ? 'Malzeme bekliyor' : 'Mimar bekliyor'; h += `<div style="margin:6px 0;padding:6px;border:1px solid #66543d"><b>${cavUiName(f)}</b> — ${status}<br><button data-cav-cancel="${i}" style="min-height:44px">Planı iptal et</button> <small>İade: ${refund && Object.keys(refund).length ? costTxt(refund) : 'yok'}</small></div>`; }
   const counts = {}; for (const f of data.items.filter(f=>f.built)) { const name = cavUiName(f); counts[name] = (counts[name] || 0) + 1; }
   h += `<details><summary>Tamamlanan eşyalar (${data.items.filter(f=>f.built).length})</summary><p>${Object.entries(counts).map(([name,n])=>`${name}: ${n}`).join(' · ')}</p></details><p class="hint">İptalde yalnız kullanılmamış malzeme iade edilir. Tamamlanmış eşyalar bu ekrandan sökülmez.</p></div>`;
-  $('inInfo').innerHTML = h;
+  const box = $('inInfo'); if (box._cavH !== h) { box._cavH = h; box.innerHTML = h; }   // yalnız içerik değişince: tıklama/odak kaybolmasın
 }
 $('inM').addEventListener('change', e => { if (e.target.id === 'cavRecipe' && UI.inB && UI.inB.type === 'magara') { UI.cavRecipe = e.target.value; cavRenderPlanner(UI.inB); } });
 $('inM').addEventListener('click', e => {
