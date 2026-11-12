@@ -1224,6 +1224,7 @@ function syncBuilds(dk) {
     let e = M.get(b); const sig = buildSig(b);
     if (!e || e.sig !== sig) { if (e) { U3.scene.remove(e.g); disposeTree(e.g, true); } e = { g: buildMesh(b), sig }; e.g.position.set(b.x, buildY(b), b.y); U3.scene.add(e.g); M.set(b, e); }
     e.f = f;
+    if (b.type === 'magara') e.g.rotation.y = -(b.ang || 0);   // ağız yönü (cavMouth/portal ile aynı dönüş)
     if (!(BUILD[b.type] || {}).flat && b.type !== 'gemi') { const br = b.type === 'magara' ? b.r * 1.05 : b.type === 'cit' || b.type === 'duvar' ? b.r * 0.7 : b.type === 'mesale' ? 9 : b.r * 0.95; blobShadow(b.x, buildY(b), b.y, br * 1.1, br, 0, b.type === 'kule' ? 120 : b.type === 'mesale' ? 40 : br * 0.8); }
     if (e.g.userData.glow) e.g.userData.glow.material.opacity = clamp(Math.max(dk * 1.1, (b.occ || []).length ? 0.35 : 0) * (0.75 + Math.sin(G.now * 5) * 0.08), 0, 0.85);
   }

@@ -4174,10 +4174,11 @@ function resetState(diff) {
 function newGame(diff, tutOn) {
   setIslandScale(1.5); resetState(diff);
   G.caveTerrain=1;
+  for (const key of Object.keys(G.stock)) G.stock[key]=0;
   G.seed = Math.floor(Math.random() * 1e9);
   genWorld(G.seed);
   L = mkPerson(CAMP.x, CAMP.y + 70, 'Sen', true); G.people.push(L);
-  ['odun', 'avci', 'kasap', 'asci', 'yiyecek', 'mimar', 'muhafiz', 'zanaat'].forEach((g, i) => {
+  ['odun', 'tas', 'yiyecek', 'asci', 'yiyecek', 'mimar', 'muhafiz', 'zanaat'].forEach((g, i) => {
     const a = i / 8 * TAU + 0.5, p = mkPerson(CAMP.x + Math.cos(a) * 80, CAMP.y + Math.sin(a) * 80, freshName(), false);
     p.group = g; G.people.push(p);
     if (g === 'mimar' && lvl(p, 'insaat') < 2) p.sk.insaat = XPL[1] + 1;
@@ -4185,9 +4186,10 @@ function newGame(diff, tutOn) {
   });
   G.cave = makeBuild('magara', CAMP.x, CAMP.y - 430, 0); finishBuild(G.cave, true);
   G.cave.rooms = BUILD.magara.rooms.slice();
-  msg('Halkın bir mağarada yaşıyor. Ağzından yürüyerek içeri gir; içeride dolaş, insanlara bakıp E ile emir ver.', '#cfe', 9);
+  G.cave.furniture={v:1,rooms:'',next:1,rev:1,items:[]};
+  msg('Erzak ve alet yok. Oduncu, taşçı ve toplayıcılar ilk malzemeleri getirsin. Yamaçtaki boş mağaraya yürüyerek gir; I ile eşya planla.', '#cfe', 9);
   assignHomes(); autoDistribute(); assignEquip();
-  msg('Kimsenin yatağı yok; herkes yerde yatıyor. Zanaatkâra 🛏️ Yatak ürettir ve kişilere ver.', '#cde', 9);
+  msg('İlk balta ve kazmayı yanan ateşte ürettir (C). Mağara boş: ilk sandık ve ocak için malzeme topla.', '#cde', 9);
   G.tut = { on: !!tutOn, step: 0 };
   msg('Ateşi canlı tut. Halkını besle. Gece geldiğinde... ışıktan ayrılma.', '#ffd9a0', 8);
   if (!tutOn) msg('Halkını sağdaki panelden gruplara ayır, yöneticiler ata.', '#bbb', 8);
@@ -9614,6 +9616,7 @@ function syncBuilds(dk) {
     let e = M.get(b); const sig = buildSig(b);
     if (!e || e.sig !== sig) { if (e) { U3.scene.remove(e.g); disposeTree(e.g, true); } e = { g: buildMesh(b), sig }; e.g.position.set(b.x, buildY(b), b.y); U3.scene.add(e.g); M.set(b, e); }
     e.f = f;
+    if (b.type === 'magara') e.g.rotation.y = -(b.ang || 0);   // ağız yönü (cavMouth/portal ile aynı dönüş)
     if (!(BUILD[b.type] || {}).flat && b.type !== 'gemi') { const br = b.type === 'magara' ? b.r * 1.05 : b.type === 'cit' || b.type === 'duvar' ? b.r * 0.7 : b.type === 'mesale' ? 9 : b.r * 0.95; blobShadow(b.x, buildY(b), b.y, br * 1.1, br, 0, b.type === 'kule' ? 120 : b.type === 'mesale' ? 40 : br * 0.8); }
     if (e.g.userData.glow) e.g.userData.glow.material.opacity = clamp(Math.max(dk * 1.1, (b.occ || []).length ? 0.35 : 0) * (0.75 + Math.sin(G.now * 5) * 0.08), 0, 0.85);
   }
@@ -11442,7 +11445,7 @@ function startScreen() {
   const achList = Object.entries(ACH).map(([k, a]) => `<div class="${ACHSET.has(k) ? 'got' : ''}">${ACHSET.has(k) ? '🏆' : '🔒'} <b>${a.ad}</b> — ${a.desc}</div>`).join('');
   const best = +(store.get('sonAtesRekor') || 0);
   $('screenBox').innerHTML = `<h1>SON ATEŞ</h1>
-  <p class="story">Bir fırtına. Kör edici bir ışık. Uyandığınızda gökyüzünde tanımadığınız kanatlar,<br>ormanda tanımadığınız sesler vardı. Dokuz kişisiniz. Bir mağaranız, bir ateşiniz var.<br>Geminiz kayalıklarda parçalandı; enkazı adanın kıyılarına dağıldı.<br><b>Ve gece yaklaşıyor.</b></p>
+  <p class="story">Bir fırtına. Kör edici bir ışık. Uyandığınızda gökyüzünde tanımadığınız kanatlar,<br>ormanda tanımadığınız sesler vardı. Dokuz kişisiniz. Erzak ve aletiniz yok. Bir ateş, yamaçta boş bir mağara var.<br>Geminiz kayalıklarda parçalandı; enkazı adanın kıyılarına dağıldı.<br><b>Ve gece yaklaşıyor.</b></p>
   ${sv ? `<button id="cont" class="big">DEVAM ET <small>(${sv.day}. gün · ${DIFF[sv.diff] ? DIFF[sv.diff].ad : ''})</small></button><br>` : ''}
   <div class="diffs">${Object.entries(DIFF).map(([k, d]) => `<button data-d="${k}" class="${UI.diff === k ? 'on' : ''}">${d.ad}</button>`).join('')}</div>
   <p class="ddesc" id="ddesc">${DIFF[UI.diff].desc}</p>
@@ -11454,7 +11457,7 @@ function startScreen() {
   <b>Yiyecek</b>: asıl kaynak avcılık. 🎯 ile bir hayvan seç; avcılar mesafeyi koruyarak avlar. Leşi 🔪 Et Ustası temizlemezse çiğ et salgın getirebilir. Tarlalar da ekilebilir.<br>
   <b>Mağara ve odalar</b>: halk mağarada başlar. <b>I</b> ile mağaranın, kulübenin ve diğer yapıların içini gör, odalara görev ver (yatakhane, depo, mutfak, şifa, et temizleme, atölye), içeriden karakter seç.<br>
   <b>Yemek</b>: leş → taşıyıcılar → 🔪 et ustası temizler → 🍲 aşçı pişirir. Öğle ve akşam yemek vakti herkes masaya gelir. Çiğ et hastalık getirebilir.<br>
-  <b>Barınma</b>: her tek kişi ya da çift bir yerde yaşar (çadır = 1 hane, yatakhane odası = 2 hane). Yer yoksa yeni insanlar gelmez. Çitsiz evler nadiren saldırıya uğrar.<br>
+  <b>Barınma</b>: her tek kişi ya da çift bir yerde yaşar (çadır = 1 hane; mağarada yer yatağı veya yatak planlayarak yer açarsın). Yer yoksa yeni insanlar gelmez. Çitsiz evler nadiren saldırıya uğrar.<br>
   <b>Sağlık</b>: yaralılar şifahaneye taşınır, günlerce tedavi görür. Salgınlar nadiren öldürür ama yayılır.<br>
   <b>Bilinmezlik</b>: sadece halkının gördüğünü görürsün. Geceler çoğu zaman sessizdir... ama her zaman değil. Yüzü tanıdık gelen her şeye güvenme.<br>
   <b>Hedef</b>: adada en az 200 gün hayatta kal, kıyılardaki 3 gemi enkazını bul, halat ve yelken bezi ürettir, usta bir mimarla kıyıya ⛵ Gemi kur ve halkınla eve dön.</div></details>
