@@ -38,13 +38,20 @@ Simülasyon 2B'dir (dünya x,y); çizim (x, yükseklik, y) olarak 3B'ye taşır.
 Playwright ile başsız: `index.html`'i aç, `#go`'ya tıkla, `window.__G` (durum), `__getL()` (lider), `update(0.05)` (simülasyonu ilerlet).
 WebGL için: `chromium.launch({args:['--use-gl=swiftshader','--enable-unsafe-swiftshader','--ignore-gpu-blocklist']})`.
 
+## Çalışma düzeni
+- Claude kodu uygular, test eder, gönderir ve yayınlar; Codex PR #1'de inceleme yapar ve `### DOSYA / #### BUL / #### YERİNE` parçaları yazar.
+- 2 saatte bir otomatik tur (Claude). Kayıt anahtarı `sonAtesKayit4`, sürüm 4.
+
+## Bitenler (özet)
+Ada dünyası, 3B birinci şahıs, mağara içi, eylem menüsü, zimmet/yatak, aşamalı üretim ve yemek, mevsimler + bölgesel kar + donan göller, koku takibi (rüzgâr, iz yaşı, yağmurun iz yıkaması), yırtıcı yuvaları + av dengesi, Bozkır Atı, 15 hayvanın yeni modeli (Codex), ayrıntılı ağaçlar + rüzgârda yaprak, hedef göstergesi (gün/200, enkaz, halat, bez).
+
 ## Açık işler (sırayla)
-1. Dinozor modelleri: yeniden modelleme yarıda kaldı — 16 türün hepsi önden/yandan kontrol edilmeli (özellikle `dev`).
-2. Odun taşıma duruşu: eller kütüğü tutmalı, ağır/sendeleyen yürüyüş (`p.haul === 'wood'`) — doğrulanmadı.
-3. Gölge lekeleri eklendi; gece/iç mekânda sönmesi doğrulanmadı.
-4. Gerçek iPhone'da performans ölçülmedi.
-5. Hedef göstergesi (gün X/200, enkaz, halat), ses (adım, nefes), mevsimler — henüz yok.
-6. Türkçe ek hataları ("Alp'ın").
+1. Ortak doğum kapısı + olay ek nüfus bütçesi (pusu yırtıcı sınırını aşıyor) — Codex'te (`yaratik.js`, gerekirse `oyun.js`).
+2. Ses: adım, nefes, ortam, rüzgâr, uzaktan büyük hayvan adımı — Claude alt ajanı (`ses.js` + `arayuz.js` döngü kancası).
+3. Bozkır Atı doğum yeri eğim kontrolü çok sıkı (22 denemede 1).
+4. Gerçek bilgisayar/iPhone performansı ölçülmedi (~628k üçgen).
+5. Kar biraz gri; donmuş gölde yürünemiyor; Türkçe ek hataları ("Alp'ın").
 
 ## Şu an kim neyde
-- (boş)
+- Codex: `yaratik.js` (+ `oyun.js` runEvent) — doğum kapısı.
+- Claude alt ajanı: `ses.js`, `arayuz.js` (yalnız döngü kancası).
