@@ -10843,13 +10843,15 @@ const REAL_SET = {
 };
 function realR(kind) { return kind === 'tree' || kind === 'conifer' ? (REAL.low ? 200 : 420) : kind === 'rock' ? (REAL.low ? 300 : 800) : (REAL.low ? 200 : 520); }
 function realStart() {
-  if (REAL.started || typeof THREE.GLTFLoader !== 'function' || (typeof location !== 'undefined' && location.protocol === 'file:')) return;
+  if (REAL.started) return;
+  if (typeof THREE.GLTFLoader !== 'function' || (typeof location !== 'undefined' && location.protocol === 'file:')) { REAL.started = true; REAL.why = typeof THREE.GLTFLoader !== 'function' ? 'yükleyici yok' : 'dosyadan açıldı'; return; }
   REAL.started = true;
   const loader = new THREE.GLTFLoader(), names = [].concat(...Object.values(REAL_SET)); let left = names.length;
-  const done = () => { if (--left === 0) { REAL.ready = Object.keys(REAL.M).length > 0; U3.instX = 1e9; } };
+  const done = () => { if (--left === 0) { const n = Object.keys(REAL.M).length; REAL.ready = n > 0; U3.instX = 1e9;
+    if (typeof msg === 'function') msg(n ? `🌲 Gerçekçi modeller yüklendi (${n}/${names.length})` : `🌲 Gerçekçi modeller yüklenemedi (${REAL.err || '?'} · ${location.protocol})`, n ? '#9e9' : '#e99', 6); } };
   // .glb yoksa aynı ikili dosya .wasm adıyla da aranır (artifact yalnız bilinen türleri sunar)
   const ok = n => g => { try { realPrep(n, g.scene); } catch (e) { console.warn('varlık', n, e); } done(); };
-  for (const n of names) loader.load(REAL.base + n + '.glb', ok(n), undefined, () => loader.load(REAL.base + n + '.wasm', ok(n), undefined, () => done()));
+  for (const n of names) loader.load(REAL.base + n + '.glb', ok(n), undefined, () => loader.load(REAL.base + n + '.wasm', ok(n), undefined, e => { REAL.err = String((e && (e.message || e.type)) || e).slice(0, 60); done(); }));
 }
 // quantize (Int16/Int8 normalize) öznitelikleri float'a aç: matrisle pişirmeden önce şart
 function realFloat(g) {
