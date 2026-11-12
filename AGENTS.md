@@ -59,4 +59,5 @@ Ada dünyası, 3B birinci şahıs, mağara içi, eylem menüsü, zimmet/yatak, a
 9. Gerçek cihaz performansı ölçülmedi.
 
 ## Şu an kim neyde
-- Codex: model3d.js (karakterler).
+- Codex: model3d.js (karakterler); sonra yaratik.js (madde 2).
+- Claude alt ajanı: madde 3–5 (başlangıç, mağara eşyaları, gece/uyku) → oyun.js, ic.js, halk.js, temel.js, arayuz.js, sohbet.js, cizim.js, dunya.js(yalnız başlangıç konumu). Bu dosyalara girmeyin.
