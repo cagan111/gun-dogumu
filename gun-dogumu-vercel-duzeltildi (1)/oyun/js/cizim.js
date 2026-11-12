@@ -258,6 +258,14 @@ function drawLabels3D(LS, dk) {
     if ((p.hp < p.maxhp * 0.75 || p.hurtT > 0) && s.z < 380) hpBar(s.x, s.y + 4, p.hp / p.maxhp, 26);
     if (p.say && s.z < 460) sayBubble(s.x, s.y - 26, p.say.t, clamp(p.say.life * 1.5, 0, 1) * clamp((460 - s.z) / 120, 0, 1));
   }
+  // tarlalar: ekin adı, büyüme ya da "tohum yok"
+  if (typeof CROPS !== 'undefined') for (const b of G.builds) {
+    if (b.type !== 'tarla' || !b.built || b.dead || Math.abs(b.x - L.x) > 480 || Math.abs(b.y - L.y) > 480) continue;
+    if (lightLevel(b.x, b.y, LS) < 0.3) continue;
+    const s = w2s(b.x, b.y, 14); if (!s || !s.on || s.z > 480) continue;
+    const C = CROPS[cropOf(b)], sel = CROPS[CROPS[b.crop] ? b.crop : 'cali'];
+    label(s, b.planted ? `${C.ad} %${Math.round(b.g * 100)}${b.g < 1 && cropGrow(b) <= 0 ? ' · büyümüyor' : ''}` : b.noSeed ? `${sel.ad} — tohum yok` : `${sel.ad} — ekim bekliyor`, b.noSeed && !b.planted ? '#f0a0a0' : '#d8e8b0', b.planted ? C.ic : sel.ic);
+  }
   for (const d of G.dinos) {
     if (d.hidden || d.dead || Math.abs(d.x - L.x) > 700 || Math.abs(d.y - L.y) > 700) continue;
     if (!(d.tamed || visible(d.x, d.y, d.r))) continue;

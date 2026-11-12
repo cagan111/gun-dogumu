@@ -20,7 +20,7 @@ function resetState(diff) {
     nightPlan: [], nightWeather: 'acik', eproj: [], raid: null, scare: 0, vis: null, campT: 0, weather: { type: 'acik', t: 0 }, mimic: null, finale: null, dayRainAt: -1, snowB: [0, 0, 0, 0, 0, 0], season: null, coldMsgDay: -9,
     explored: new Uint8Array(MAPN * MAPN), stats: { fireNights: 0, noLoss: 0, tamed: 0, hunts: 0 }, lossToday: false, fireOutTonight: false,
     tut: { on: false, step: 0 }, idc: 0, devDone: false, leaveDone: false, scoutCd: 0, silent: false, devSeenEver: false, riftHint: false,
-    tutMoved: 0, tutWood: 0, tutFire: 0, tutGroup: false, gather: null, seated: null, planToday: null, planNext: null, planHuntT: 0, uiDirty: true, toolsDirty: true, msgDirty: true, shootCd: 0
+    tutMoved: 0, tutWood: 0, tutFire: 0, tutGroup: false, gather: null, seated: null, planToday: null, planNext: null, planHuntT: 0, uiDirty: true, toolsDirty: true, msgDirty: true, shootCd: 0, seeds: { tahil: 3, ot: 2 }, seedSeen: { tahil: 1, ot: 1 }
   });
   for (const g of GORDER) { G.managers[g] = null; G.zone[g] = null; G.abil[g] = { cd: 0, act: 0 }; }
 }
@@ -143,7 +143,7 @@ function updLeader(dt) {
   G.interact = findInteract();
   const act = keys.KeyE || touch.act;
   const it = G.interact;
-  if (act && it && it.kind !== 'mount' && it.kind !== 'info' && it.kind !== 'carry' && it.kind !== 'drop' && it.kind !== 'person' && it.kind !== 'ship' && it.kind !== 'meal' && it.kind !== 'chat') {
+  if (act && it && it.kind !== 'mount' && it.kind !== 'info' && it.kind !== 'carry' && it.kind !== 'drop' && it.kind !== 'person' && it.kind !== 'ship' && it.kind !== 'meal' && it.kind !== 'chat' && it.kind !== 'field') {
     G.actT += dt;
     const rate = { fire: 0.18, tame: 2.0, tameLong: 2.0, tameFly: 1.5, rescue: 0.6, free: 1.2, revive: 1.5, treat: 1.5, egg: 1.0, rift: 1.5, carc: 0.35, build: 0.25, wreck: 2.5 }[it.kind] || 0.4;
     G.actProg = clamp(G.actT / rate, 0, 1);
@@ -189,6 +189,7 @@ function onActPress() {
   if (it && it.kind === 'store') { openInterior(G.inside.b); return true; }
   if (it && it.kind === 'ship') { setSail(it.o); return true; }
   if (it && it.kind === 'meal') { sitAtTable(); return true; }
+  if (it && it.kind === 'field') { openCrop(it.o); return true; }
   if (it && it.kind === 'chat') { joinChat(); return true; }
   if (it && it.kind === 'carry') { G.lcarry = it.o; it.o.carriedBy = -1; if (it.o.inHut) leaveHut(it.o); msg(`${acc(it.o.name)} sırtladın. ${it.o.bedRes ? 'Şifahaneye götür.' : 'Boş yatak yok!'}`, '#9fd', 3); return true; }
   return false;
@@ -216,6 +217,7 @@ function findInteract() {
   if (!G.carryEgg) for (const n of G.nests) if (n.eggs > 0) { const dd = dist(n, p) - n.r; if (dd < 30) consider(n, 'egg', dd - 10, 'Yumurta çal (anneler gelir!)'); }
   for (const c of G.carcs) { if (c.dead) continue; const dd = dist(c, p) - c.r; if (dd < 20) consider(c, 'carc', dd + 5, c.meat > 0 ? `Leşten çiğ et kes (${c.meat}) — et ustasına götürülmeli` : 'Leşten deri/kemik al'); }
   for (const b of G.builds) if (b.built && (isRoomy(b) || b.type === 'cadir' || BUILD[b.type].rooms || ['sifahane', 'kasaphane', 'atolye'].includes(b.type))) { const dd = dist(b, p) - b.r; if (dd < 30) consider(b, 'info', dd + 15, enterable(b) ? `${BUILD[b.type].ic} ${BUILD[b.type].ad} — içeri gir` : `${BUILD[b.type].ic} ${BUILD[b.type].ad} — içini gör [I]`); }
+  for (const b of G.builds) if (b.built && b.type === 'tarla' && !b.dead) { const dd = dist(b, p) - b.r; if (dd < 20) { const k = cropOf(b); consider(b, 'field', dd + 20, `🌾 Tarla: ${CROPS[CROPS[b.crop] ? b.crop : k].ic} ${CROPS[CROPS[b.crop] ? b.crop : k].ad}${b.planted ? ' %' + Math.round(b.g * 100) : b.noSeed ? ' (tohum yok)' : ''} — ekini seç`); } }
   for (const b of G.builds) if (!b.built) { const dd = dist(b, p) - b.r; if (dd < 24) consider(b, 'build', dd, `${BUILD[b.type].ad} inşasına yardım et (${Math.floor(b.prog / b.need * 100)}%)`); }
   for (const w of G.wrecks || []) if (!w.found) { const dd = dist(w, p) - w.r; if (dd < 40) consider(w, 'wreck', dd - 30, 'Enkazı ara — basılı tut'); }
   for (const b of G.builds) if (b.type === 'gemi' && b.built) { const dd = dist(b, p) - b.r; if (dd < 60) consider(b, 'ship', dd - 60, 'Yelken aç — eve dönüş'); }
@@ -251,7 +253,7 @@ function doInteract(it) {
       for (let i = 0; i < 4; i++) G.parts.push({ x: o.x, y: o.y, vx: rand(-30, 30), vy: rand(-120, -50), life: rand(0.4, 1), col: '#ffb040', s: 2 });
     }
   } else if (it.kind === 'gather') {
-    const r = takeRes(o); addStock(r, 1, o.x, o.y);
+    const r = takeRes(o); addStock(r, 1, o.x, o.y); if (r === 'meyve') seedFind(L, o);
     if (r === 'wood') { SFX.chop(); o.shake = 0.2; G.tutWood++; } else if (r === 'stone' || r === 'crystal') SFX.rock(); else SFX.pickup();
   } else if (it.kind === 'carc') {
     if (o.meat > 0) { o.meat--; addStock('cigEt', 1, o.x, o.y); if (o.rotten) G.unclean = (G.unclean || 0) + 2; }
@@ -684,7 +686,7 @@ function serialize() {
   const pf = ['id', 'name', 'x', 'y', 'leader', 'child', 'age', 'traits', 'story', 'group', 'hp', 'maxhp', 'fear', 'skin', 'hair', 'injury', 'downed', 'tired', 'watched', 'partner', 'parentA', 'parentB', 'stam', 'seat', 'r', 'sk', 'sick', 'wasDowned', 'bedUntil', 'routine', 'alt', 'hunger', 'own', 'joinHunt', 'bag', 'carry', 'cookGot', 'batch', 'prevG', 'rtBase', 'planHunt', 'planHuntPrev'];
   let ex = ''; for (let i = 0; i < G.explored.length; i++) ex += G.explored[i] ? '1' : '0';
   return JSON.stringify({
-    v: 4, wrecks: (G.wrecks || []).map(w => !!w.found), inside: G.inside ? G.builds.indexOf(G.inside.b) : -1, seed: G.seed, diff: G.diff, t: G.t, cyc: CYCLE, day: G.day, stock: G.stock, fuel: G.fire.fuel, morale: G.morale, orders: G.orders.map(o => Object.assign({}, o, { worker: 0 })), oid: G.oid, unclean: G.unclean, planToday: G.planToday, planNext: G.planNext,
+    v: 4, wrecks: (G.wrecks || []).map(w => !!w.found), inside: G.inside ? G.builds.indexOf(G.inside.b) : -1, seed: G.seed, diff: G.diff, t: G.t, cyc: CYCLE, day: G.day, stock: G.stock, fuel: G.fire.fuel, morale: G.morale, orders: G.orders.map(o => Object.assign({}, o, { worker: 0 })), oid: G.oid, unclean: G.unclean, planToday: G.planToday, planNext: G.planNext, seeds: G.seeds, seedSeen: G.seedSeen,
     carcs: G.carcs.filter(c => !c.dead).map(c => ({ x: c.x, y: c.y, r: c.r, type: c.type, ang: c.ang, meat: c.meat, bone: c.bone, hide: c.hide, age: c.age, rotten: c.rotten })),
     managers: G.managers, zone: G.zone, newGroup: G.newGroup, autoEq: !!G.autoEq, torchFuel: G.torchFuel, nightPlan: G.nightPlan, nightWeather: G.nightWeather, weather: G.weather,
     eggs: G.eggs, usedNames: [...G.usedNames], stats: G.stats, idc: G.idc, kills: G.kills, deaths: G.deaths, lost: G.lost,
@@ -692,7 +694,7 @@ function serialize() {
     flags: G.flags, leaveDone: G.leaveDone, devDone: G.devDone, tut: G.tut.on ? G.tut.step : -1,
     trees: G.trees.map(o => o.amt), rocks: G.rocks.map(o => o.dead ? 0 : o.amt), crystals: G.crystals.map(o => o.dead ? 0 : o.amt),
     bushes: G.bushes.map(o => o.amt), herbs: G.herbs.map(o => o.amt), poisons: G.poisons.map(o => o.amt), nests: G.nests.map(n => n.eggs),
-    builds: G.builds.map(b => ({ type: b.type, x: b.x, y: b.y, hp: b.hp, uses: b.uses, ang: b.ang, built: b.built, prog: b.prog, planted: b.planted, g: b.g, rooms: b.rooms })),
+    builds: G.builds.map(b => ({ type: b.type, x: b.x, y: b.y, hp: b.hp, uses: b.uses, ang: b.ang, built: b.built, prog: b.prog, planted: b.planted, g: b.g, rooms: b.rooms, crop: b.crop, cur: b.cur })),
     people: G.people.filter(p => !p.grabbed).map(p => { const o = {}; for (const k of pf) o[k] = p[k]; o.inHut = p.inHut ? G.builds.indexOf(p.inHut) : -1; o.homeT = p.homeT ? G.builds.indexOf(p.homeT) : -1; o.bed = p.bed ? [G.builds.indexOf(p.bed.s), p.bed.i] : null; return o; }),
     dinos: G.dinos.filter(d => d.tamed).map(d => ({ type: d.type, x: d.x, y: d.y, hp: d.hp, maxhp: d.maxhp, pet: !!d.pet, growth: d.growth || 0, r: d.r, mounted: G.mount === d })),
     explored: ex,
@@ -714,6 +716,7 @@ function loadGame(s) {
   Object.assign(G, { t: D.t * CYCLE / (D.cyc || 300), day: D.day, morale: D.morale, newGroup: D.newGroup || 'bos', torchFuel: D.torchFuel || 0, nightPlan: D.nightPlan || [], nightWeather: D.nightWeather || 'acik',
     weather: D.weather || { type: 'acik', t: 0 }, eggs: D.eggs || [], stats: Object.assign(G.stats, D.stats || {}), idc: D.idc, kills: D.kills, deaths: D.deaths, lost: D.lost,
     devSeenEver: D.devSeenEver, riftHint: D.riftHint, rescueAt: -1, dayRainAt: D.dayRainAt || -1, flags: D.flags || {}, leaveDone: D.leaveDone, devDone: D.devDone, planToday: PLANS[D.planToday] ? D.planToday : null, planNext: PLANS[D.planNext] ? D.planNext : null });
+  if (D.seeds && typeof D.seeds === 'object') { G.seeds = {}; for (const k in CROPS) if (+D.seeds[k] > 0) G.seeds[k] = Math.floor(+D.seeds[k]); } if (D.seedSeen) G.seedSeen = Object.assign({}, D.seedSeen);
   G.autoEq = !!D.autoEq;
   G.snowB = Array.isArray(D.snowB) ? SNOW_H.map((_, i) => clamp(+D.snowB[i] || 0, 0, 1.5)) : SNOW_H.map(() => 0);
   (D.lakesF || []).forEach((f, i) => { if (G.lakes[i]) G.lakes[i].frozen = !!f; });
@@ -727,7 +730,7 @@ function loadGame(s) {
   for (const [arr, src] of [[G.rocks, D.rocks], [G.crystals, D.crystals]]) src.forEach((a, i) => { const o = arr[i]; if (!o) return; o.amt = a; if (a <= 0) { o.dead = true; gDel(o); } });
   for (const [arr, src] of [[G.bushes, D.bushes], [G.herbs, D.herbs], [G.poisons, D.poisons]]) src.forEach((a, i) => { if (arr[i]) arr[i].amt = a; });
   D.nests.forEach((e, i) => { if (G.nests[i]) G.nests[i].eggs = e; });
-  for (const b of D.builds) { if (!BUILD[b.type]) continue; const o = makeBuild(b.type, b.x, b.y, b.ang); o.hp = b.hp; o.uses = b.uses; o.prog = b.prog || 0; o.planted = !!b.planted; o.g = b.g || 0; if (b.rooms) o.rooms = b.rooms.slice(); if (b.type === 'magara') G.cave = o; if (b.built !== false) finishBuild(o, true); }
+  for (const b of D.builds) { if (!BUILD[b.type]) continue; const o = makeBuild(b.type, b.x, b.y, b.ang); o.hp = b.hp; o.uses = b.uses; o.prog = b.prog || 0; o.planted = !!b.planted; o.g = b.g || 0; if (b.type === 'tarla') { o.crop = CROPS[b.crop] ? b.crop : 'cali'; o.cur = CROPS[b.cur] ? b.cur : o.planted ? 'cali' : null; } if (b.rooms) o.rooms = b.rooms.slice(); if (b.type === 'magara') G.cave = o; if (b.built !== false) finishBuild(o, true); }
   for (const s2 of D.people) {
     const p = mkPerson(s2.x, s2.y, s2.name, s2.leader, s2.child);
     Object.assign(p, s2); p.inHut = null; p.homeT = null; p.bed = null; p.eq = {}; p.sk = Object.assign({}, p.sk || {});
@@ -838,7 +841,7 @@ function update(dt) {
   G.vis = visionSources();
   G.eqT -= dt; if (G.eqT <= 0) { G.eqT = 1; assignEquip(); }
   G.homeT2 -= dt; if (G.homeT2 <= 0) { G.homeT2 = 2; assignHomes(); assignBeds(); }
-  for (const b of G.builds) if (b.type === 'tarla' && b.built && b.planted && b.g < 1) { b.g = Math.min(1, b.g + dt / (CYCLE * 1.6) * (wt === 'yagmur' || wt === 'firtina' ? 1.4 : wt === 'kar' ? 0 : 1) * seasonVal(s => s.grow)); b.tendT = (b.tendT || 0) - dt; }
+  for (const b of G.builds) if (b.type === 'tarla' && b.built && b.planted && b.g < 1) { b.g = Math.min(1, b.g + dt / (CYCLE * 1.6) * (wt === 'yagmur' || wt === 'firtina' ? 1.4 : wt === 'kar' ? 0 : 1) * cropGrow(b)); b.tendT = (b.tendT || 0) - dt; }
   for (const c of G.carcs) { c.age += dt; if (!c.rotten && c.age > CYCLE * 1.2 && !G.builds.some(b => b.type === 'raf' && b.built && dist(b, c) < 300)) { c.rotten = true; } if (c.age > CYCLE * 2.5) c.dead = true; }
   G.carcs = G.carcs.filter(c => !c.dead);
   if (isNight() && G.carcs.length && Math.random() < dt * 0.02 / DAYK) { const c = pick(G.carcs); if (dist(c, G.fire) > 900) spawnPack('kucuk', ri(2, 4), { x: c.x + rand(-200, 200), y: c.y + rand(-200, 200) }, 'carcass'); }

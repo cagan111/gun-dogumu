@@ -162,6 +162,7 @@ function openTalk(v, txt) {
 }
 function closeTalk() { $('talkM').style.display = 'none'; G.modal = !!UI.char || $('craft').style.display === 'flex' || !!UI.inB; }
 function renderTalk() {
+  if (TALK.v === 'crop') return renderCrop();
   const g = G.gather;
   if (!g) { closeTalk(); return; }
   const sat = G.people.filter(q => q.gSeat), B = (c, v, t, sub, off) => `<button data-t="${c}" data-v="${v || ''}" class="${off ? 'no' : ''}">${t}${sub ? `<br><small>${sub}</small>` : ''}</button>`;
@@ -183,6 +184,8 @@ function renderTalk() {
   $('talkBox').innerHTML = h + '</div>';
 }
 function talkAct(c, v) {
+  if (c === 'close') return closeTalk();
+  if (c === 'crop') return cropAct(v);
   const g = G.gather; if (!g) return closeTalk();
   const sat = G.people.filter(q => q.gSeat && !q.child);
   if (c === 'close') return closeTalk();
@@ -291,7 +294,7 @@ $('talkM').addEventListener('pointerdown', e => {
 function brewWanted() {
   const S = G.stock, ph = phase(), n = G.people.length;
   if ((S.icki || 0) >= Math.ceil(n * 0.7) || ph < 0.24 || ph > 0.44) return false;
-  if (!((S.herb || 0) >= 3 || (S.meyve || 0) >= 4)) return false;
+  if (!((S.balotu || 0) >= 1 || (S.herb || 0) >= 3 || (S.meyve || 0) >= 4)) return false;
   return (S.food || 0) >= n * 0.8 || (S.meyve || 0) >= 10;
 }
 function brewStep(p, dt, k) {
@@ -301,7 +304,8 @@ function brewStep(p, dt, k) {
   const f = p.brewT / 6; stageSay(p, f < 0.35 ? 'Su kaynatılıyor' : f < 0.75 ? 'Otlar demleniyor' : 'Tasa dolduruluyor');
   if (p.brewT >= 6) {
     p.brewT = 0; const S = G.stock;
-    if ((S.herb || 0) >= 3) { S.herb -= 1; const m = (S.meyve || 0) >= 1 ? 1 : 0; S.meyve -= m; addStock('icki', 4 + m, p.x, p.y); }   // ot çayı (meyveyle tatlandırılır)
+    if ((S.balotu || 0) >= 1) { S.balotu -= 1; addStock('icki', 5, p.x, p.y); }   // balotu çayı
+    else if ((S.herb || 0) >= 3) { S.herb -= 1; const m = (S.meyve || 0) >= 1 ? 1 : 0; S.meyve -= m; addStock('icki', 4 + m, p.x, p.y); }   // ot çayı (meyveyle tatlandırılır)
     else if ((S.meyve || 0) >= 4) { S.meyve -= 3; addStock('icki', 3, p.x, p.y); }   // meyve şerbeti
     addXP(p, 'asci', 2); G.uiDirty = true;
   }

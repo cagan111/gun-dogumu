@@ -754,6 +754,7 @@ function updGather(p, dt, g, thr, isAlt) {
   if (p.work >= 1.1) {
     p.work = 0.01;
     const r = takeRes(o); p.bag[r] = (p.bag[r] || 0) + 1; p.carry++;
+    if (r === 'meyve' && typeof seedFind === 'function') seedFind(p, o);
     addXP(p, g === 'sifaci' ? 'sifa' : 'toplama', 1);
     if (L && dist(p, L) < 500) { if (r === 'wood') SFX.chop(); else if (r === 'stone' || r === 'crystal') SFX.rock(); }
     if (o.kind === 'tree') o.shake = 0.2;
@@ -950,7 +951,7 @@ function updFarmer(p, dt) {
     p.anim += dt * 9; return;
   }
   const F = G.builds.filter(b => b.type === 'tarla' && b.built && !b.dead);
-  const jobOf = b => b.planted && b.g >= 1 ? 3 : !b.planted ? 2 : (b.tendT || 0) <= 0 ? 1 : 0;
+  const jobOf = b => b.planted && b.g >= 1 ? 3 : !b.planted ? ((b.noSeed = !hasSeed(CROPS[b.crop] ? b.crop : 'cali')) ? 0 : 2) : (b.tendT || 0) <= 0 && cropGrow(b) > 0 ? 1 : 0;
   let f = p.tgt && p.tgt.type === 'tarla' && !p.tgt.dead ? p.tgt : null;
   if (!f || jobOf(f) === 0) {
     let best = null, bs = -1e9;
@@ -969,8 +970,8 @@ function updFarmer(p, dt) {
   const need = job === 3 ? 6 : job === 2 ? 5 : 4;
   if (p.work >= need) {
     p.work = 0.01; f.claim = null; p.tgt = null;
-    if (job === 3) { const n = Math.round(14 * skillMul(lvl(p, 'tarim'))); p.bag.meyve = (p.bag.meyve || 0) + n; p.carry += n; f.planted = false; f.g = 0; p.st = 'return'; addXP(p, 'tarim', 8); ftext(f.x, f.y - 20, 'Hasat!', '#ffe08a'); }
-    else if (job === 2) { f.planted = true; f.g = 0; addXP(p, 'tarim', 3); }
+    if (job === 3) { cropHarvest(p, f); p.st = 'return'; addXP(p, 'tarim', 8); }
+    else if (job === 2) { if (cropPlant(f)) addXP(p, 'tarim', 3); }
     else { f.g = Math.min(1, f.g + 0.06 * skillMul(lvl(p, 'tarim'))); f.tendT = 30; addXP(p, 'tarim', 2); }
   }
 }
