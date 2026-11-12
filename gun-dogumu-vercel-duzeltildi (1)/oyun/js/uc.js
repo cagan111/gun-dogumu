@@ -2435,7 +2435,7 @@ const REAL_SET = {
   rock: ['rock_moss_set_01', 'rock_moss_set_02', 'boulder_01', 'namaqualand_boulder_02'],
   stump: ['tree_stump_01'], fern: ['fern_02'], dead: ['dead_tree_trunk_02']
 };
-function realR(kind) { return kind === 'tree' || kind === 'conifer' ? (REAL.low ? 220 : 480) : kind === 'rock' ? (REAL.low ? 300 : 800) : (REAL.low ? 200 : 520); }
+function realR(kind) { return kind === 'tree' || kind === 'conifer' ? (REAL.low ? 200 : 420) : kind === 'rock' ? (REAL.low ? 300 : 800) : (REAL.low ? 200 : 520); }
 function realStart() {
   if (REAL.started || typeof THREE.GLTFLoader !== 'function' || (typeof location !== 'undefined' && location.protocol === 'file:')) return;
   REAL.started = true;
