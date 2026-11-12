@@ -69,6 +69,36 @@ function separate(list) {
 const bodyR = t => (t === L && G.mount) ? G.mount.r : (t.r || 11);
 
 // ---- oluşturma
+// Ortak doğum kabul kapısı (Codex 6811360397). birthSource geçicidir; v4 yalnız evcilleri saklar.
+const BIRTH_NORMAL_SRC = ['normal', 'den', 'herd', 'camp'];
+function birthLimits(type) {
+  const night = isNight(), sm = DIFF[G.diff].spawn;
+  const normals = { kucuk: night ? 3 : 2, yirtici: Math.ceil((night ? 4 : 3) * sm), geceavcisi: Math.ceil(Math.min(2 + G.day / 4, 5) * sm), tukurgec: G.day >= 6 ? 2 : 1,
+    kesici: 1, yelken: 1, dev: 0, ordek: 12, gurleyen: 7, boynuzlu: 4, zirhli: 3, uzunboyun: 1, kanatli: 3, batakci: 5, bozkirat: 6,
+    taklitci: 0, yamyam: 6 * (G.ccamps || []).filter(c => c.alive).length };
+  const extra = { yirtici: G.finale ? 6 : 2, kucuk: G.finale ? 4 : 2, dev: 1, taklitci: 1, yamyam: 8 };
+  return { normal: Math.max(0, normals[type] || 0), event: extra[type] || 0 };
+}
+function birthIsEvent(d) {
+  if (d.birthSource) return !BIRTH_NORMAL_SRC.includes(d.birthSource);
+  return !!(d.watcher || d.mother || d.raid || d.finale || d.hitrun || d.siege || d.engaged);
+}
+function birthPopulation(type) {
+  let normal = 0, event = 0;
+  for (const d of G.dinos) { if (d.dead || d.tamed || d.type !== type) continue; if (birthIsEvent(d)) event++; else normal++; }
+  return { normal, event, total: normal + event };
+}
+function birthRoom(type, source) {
+  const lim = birthLimits(type), pop = birthPopulation(type), ev = !BIRTH_NORMAL_SRC.includes(source || 'normal');
+  return Math.max(0, Math.min(ev ? lim.event - pop.event : lim.normal - pop.normal, lim.normal + lim.event - pop.total));
+}
+function admitDino(d, source) {
+  if (!d || d.dead || !DINO[d.type] || G.dinos.includes(d)) return false;
+  if (!Number.isFinite(d.x) || !Number.isFinite(d.y)) return false;
+  source = source || 'normal';
+  if (!d.tamed && source !== 'pet' && source !== 'restore' && birthRoom(d.type, source) < 1) return false;
+  d.birthSource = source; G.dinos.push(d); return true;
+}
 function mkDino(type, x, y) {
   const d = DINO[type];
   return { type, x, y, r: d.r, hp: d.hp, maxhp: d.hp, ang: rand(0, TAU), anim: rand(0, 9), atkCd: 0, think: 0, tgt: null, wx: x, wy: y, wt: 0,
@@ -728,14 +758,19 @@ function updPet(d, dt) {
 
 // ---- yumurta
 function takeEgg(n) {
+  if (!n || !(n.eggs > 0)) return;
   n.eggs--; G.carryEgg = true;
-  const cnt = 2 + (G.day >= 4 ? 1 : 0);
-  for (let i = 0; i < cnt; i++) {
+  const count = 2 + (G.day >= 4 ? 1 : 0), guards = [];
+  const existing = G.dinos.filter(d => d.type === 'yirtici' && !d.dead && !d.tamed && !d.carry && !d.siege && !d.finale && !d.mounted).sort((a, b) => dist(a, n) - dist(b, n));
+  for (const d of existing.slice(0, count)) { if (!d.birthSource) d.birthSource = birthIsEvent(d) ? 'legacy-event' : 'normal'; d.mother = true; d.motherT = 80; d.tgt = L; d.leave = false; d.watcher = 0; d.retreat = 0; d.hitrun = false; d.rush = 80; d.engaged = true; guards.push(d); }
+  for (let i = guards.length; i < count; i++) {
+    if (birthRoom('yirtici', 'mother') < 1) break;
     const a = rand(0, TAU), d = mkDino('yirtici', n.x + Math.cos(a) * 320, n.y + Math.sin(a) * 320);
-    d.mother = true; d.motherT = 80; d.tgt = L; pushOut(d, true); G.dinos.push(d);
+    d.mother = true; d.motherT = 80; d.tgt = L; d.rush = 80; pushOut(d, true);
+    if (admitDino(d, 'mother')) guards.push(d);
   }
   SFX.screech(0.9, 0); setTimeout(() => SFX.screech(0.7, 0.5), 400);
-  msg('Yumurtayı aldın! Anneler çığlık atıyor — kampa koş!', '#ffcf6a', 5);
+  msg(guards.length ? 'Yumurtayı aldın! Anneler çığlık atıyor — kampa koş!' : 'Yumurtayı aldın. Ormandaki çığlıklar ürkütücü biçimde yaklaşıyor.', '#ffcf6a', 5);
 }
 
 // ---- doğurma
@@ -839,46 +874,34 @@ function spawnPosBiome(bs, minR, maxR) {
   for (let k = 0; k < 12; k++) { const p = spawnPos(minR, maxR); if (p && bs.includes(biomeFast(p.x, p.y))) return p; }
   return null;
 }
-function spawnPack(type, n, pos) {
+function spawnPack(type, n, pos, source = 'normal') {
   if (pos === undefined) pos = spawnPos();
-  if (!pos) return [];
-  const out = [];
-  for (let i = 0; i < n; i++) { const d = mkDino(type, pos.x + rand(-60, 60), pos.y + rand(-60, 60)); pushOut(d, true); G.dinos.push(d); out.push(d); d.herdL = out[0]; }
+  if (!pos || !Number.isFinite(n)) return [];
+  const out = [], count = Math.max(0, Math.min(Math.floor(n), birthRoom(type, source)));
+  for (let i = 0; i < count; i++) { const d = mkDino(type, pos.x + rand(-60, 60), pos.y + rand(-60, 60)); pushOut(d, true); if (!admitDino(d, source)) continue; d.herdL = out[0] || d; out.push(d); }
   return out;
 }
 function spawnFlyer(pos) {
-  const d = mkDino('kanatli', pos.x, pos.y); d.home = { x: pos.x, y: pos.y }; d.alt = 1; d.st = 'fly'; d.flyT = rand(5, 20); G.dinos.push(d); return d;
+  const d = mkDino('kanatli', pos.x, pos.y); d.home = { x: pos.x, y: pos.y }; d.alt = 1; d.st = 'fly'; d.flyT = rand(5, 20); return admitDino(d, 'normal') ? d : null;
 }
 function ambush(v, n, type, text) {
-  const a = dist(v, G.fire) > 60 ? angTo(G.fire, v) + rand(-1.3, 1.3) : rand(0, TAU), out = [];
-  for (let i = 0; i < n; i++) {
-    const aa = a + rand(-0.7, 0.7), r = rand(160, 250), d = mkDino(type || 'yirtici', v.x + Math.cos(aa) * r, v.y + Math.sin(aa) * r);
-    pushOut(d, true); d.rush = 6; d.tgt = v; d.engaged = true; d.silent = true; G.dinos.push(d); out.push(d);
-  }
-  jumpAt(v.x, v.y, text || 'PUSU!');
-  SFX.screech(L ? clamp(1 - dist(v, L) / 1000, 0.2, 1) : 0.4, panOf(v.x));
+  type = type || 'yirtici';
+  if (!v || !Number.isFinite(n)) return [];
+  const count = Math.max(0, Math.min(Math.floor(n), birthRoom(type, 'ambush'))), out = [];
+  if (!count) return out;
+  const a = dist(v, G.fire) > 60 ? angTo(G.fire, v) + rand(-1.3, 1.3) : rand(0, TAU);
+  for (let i = 0; i < count; i++) { const aa = a + rand(-0.7, 0.7), r = rand(160, 250), d = mkDino(type, v.x + Math.cos(aa) * r, v.y + Math.sin(aa) * r); pushOut(d, true); d.rush = 6; d.tgt = v; d.engaged = true; d.silent = true; if (admitDino(d, 'ambush')) out.push(d); }
+  if (out.length) { jumpAt(v.x, v.y, text || 'PUSU!'); SFX.screech(L ? clamp(1 - dist(v, L) / 1000, 0.2, 1) : 0.4, panOf(v.x)); }
   return out;
 }
 // Yuva kaynaklı normal doğumlar: yerel kapasite ve bütün haritadaki tür sınırı.
 function denSpawnRoom(type, n, den) {
   if (!den || den.prey < 2 || !Number.isFinite(n) || n < 1) return 0;
-  const night = isNight(), sm = DIFF[G.diff].spawn;
-  let limit;
-  if (type === 'yirtici') limit = (night ? 4 : 3) * sm;
-  else if (type === 'geceavcisi') {
-    if (!night || G.day < 2) return 0;
-    limit = Math.min(2 + G.day / 4, 5) * sm;
-  } else if (type === 'kesici') {
-    if (G.day < 3) return 0;
-    limit = 1;
-  } else return 0;
-  let total = 0;
-  for (const d of G.dinos) {
-    if (d.type === type && !d.dead && !d.tamed && !d.leave &&
-        !d.watcher && d.campI === undefined) total++;
-  }
+  if (type === 'geceavcisi' && (!isNight() || G.day < 2)) return 0;
+  if (type === 'kesici' && G.day < 3) return 0;
+  if (!['yirtici', 'geceavcisi', 'kesici'].includes(type)) return 0;
   const local = Math.max(1, Math.floor(den.prey / 3)) - den.predators;
-  return Math.max(0, Math.min(Math.floor(n), local, Math.ceil(limit) - total));
+  return Math.max(0, Math.min(Math.floor(n), local, birthRoom(type, 'den')));
 }
 // Merkez doğru biyomda; beden çevresinden beş örnek karada kalsın.
 function denSpotOK(type, p, den) {
@@ -907,7 +930,8 @@ function spawnDenPack(type, n, den, minW) {
       const d = mkDino(type, p.x, p.y), blocked = pushOut(d, true);
       if (blocked || !denSpotOK(type, d, den) || wildness(d.x, d.y) < minW) continue;
       d.wx = d.x; d.wy = d.y; d.herdL = out[0] || d;
-      bindDen(d, den); G.dinos.push(d); out.push(d);
+      if (!admitDino(d, 'den')) { den.predators += out.length; return out; }
+      bindDen(d, den); out.push(d);
       break;
     }
   }
@@ -993,7 +1017,7 @@ function spawner() {
 
   if (day >= 4 && c('yelken') < 1 && R() < 0.0015 * sm) {
     const W = G.pools.concat(G.lakes).filter(w => { const d = Math.hypot(w.x - L.x, w.y - L.y); return d > 700 && d < 1500 && wildness(w.x, w.y) > 0.5; });
-    if (W.length) { const w = pick(W), a = rand(0, TAU), d = mkDino('yelken', w.x + Math.cos(a) * (w.r + 40), w.y + Math.sin(a) * (w.r + 40)); d.home = { x: w.x, y: w.y }; pushOut(d, true); G.dinos.push(d); }
+    if (W.length) { const w = pick(W), a = rand(0, TAU), d = mkDino('yelken', w.x + Math.cos(a) * (w.r + 40), w.y + Math.sin(a) * (w.r + 40)); d.home = { x: w.x, y: w.y }; pushOut(d, true); admitDino(d, 'normal'); }
   }
 
   const bd = denFor('batakci');
@@ -1001,8 +1025,8 @@ function spawner() {
       (!L || Math.hypot(bd.x - L.x, bd.y - L.y) < 1500) &&
       c('batakci') < 5 && R() < 0.3) {
     const pl = bd.pool, d = mkDino('batakci', pl.x, pl.y);
-    d.home = pl; pl.croc = d; d.hidden = true; d.st = 'hide';
-    bindDen(d, bd); G.dinos.push(d);
+    d.home = pl; d.hidden = true; d.st = 'hide';
+    if (admitDino(d, 'den')) { pl.croc = d; bindDen(d, bd); }
   }
   // nadir gündüz pususu: yalnızca vahşi topraklarda dolaşan birine
   if (!n && day >= 3 && R() < 0.004 * sm) {
@@ -1021,7 +1045,7 @@ function spawner() {
       const a = rand(0, TAU), r = Math.max(fireR(), 300) + rand(480, 700), x = G.fire.x + Math.cos(a) * r, y = G.fire.y + Math.sin(a) * r;
       if (!isSea(x, y)) {
         const kk = R() < 0.6 ? 2 : 1;
-        for (let i = 0; i < kk; i++) { const d = mkDino(R() < 0.7 ? 'yirtici' : 'kucuk', x + i * 40, y + i * 25); d.watcher = rand(20, 40); d.silent = true; d.engaged = true; pushOut(d, true); G.dinos.push(d); }
+        for (let i = 0; i < kk; i++) { const d = mkDino(R() < 0.7 ? 'yirtici' : 'kucuk', x + i * 40, y + i * 25); d.watcher = rand(20, 40); d.silent = true; d.engaged = true; pushOut(d, true); admitDino(d, 'watcher'); }
       }
     }
   }
@@ -1029,7 +1053,8 @@ function spawner() {
 function spawnDevEvent(sudden) {
   const pos = sudden ? spawnPos(480, 600, G.fire) : spawnPos(1100, 1300);
   if (!pos) return;
-  const d = spawnPack('dev', 1, pos)[0];
+  const d = spawnPack('dev', 1, pos, 'dev-event')[0];
+  if (!d) return;
   if (sudden) { d.rush = 5; jumpAt(d.x, d.y, 'DEV KAFA!'); SFX.roar(1, panOf(d.x)); }
   else { SFX.roar(0.5, panOf(pos.x)); msg(G.devSeenEver ? 'Yer titriyor. Dev Kafa geri döndü.' : 'Yer titriyor. Ağaçlar yarılıyor. Bu... ne?', '#ff7050', 7); }
   G.devSeenEver = true;
@@ -1058,17 +1083,18 @@ function updEProj(dt) {
 // =============================================================
 function spawnGuards(c) {
   const n = 3 + Math.min(3, Math.floor(G.day / 3));
-  for (let i = 0; i < n; i++) { const a = i / n * TAU, d = mkDino('yamyam', c.x + Math.cos(a) * 110, c.y + Math.sin(a) * 110); d.campI = c.i; d.pa = a; G.dinos.push(d); }
+  for (let i = 0; i < n; i++) { const a = i / n * TAU, d = mkDino('yamyam', c.x + Math.cos(a) * 110, c.y + Math.sin(a) * 110); d.campI = c.i; d.pa = a; admitDino(d, 'camp'); }
   c.spawned = true;
 }
 function startRaid() {
   const live = G.ccamps.filter(c => c.alive); if (!live.length) return false;
   const c = live.sort((a, b) => dist(a, G.fire) - dist(b, G.fire))[0];
   const a0 = angTo(G.fire, c), n = Math.min(8, 3 + Math.floor(G.day / 3));
+  if (birthRoom('yamyam', 'raid') < 1) return false;
   G.raid = { t: 0, charged: false, grabbed: 0, campI: c.i };
   for (let i = 0; i < n; i++) {
     const a = a0 + rand(-0.5, 0.5), r = rand(850, 1000), d = mkDino('yamyam', G.fire.x + Math.cos(a) * r, G.fire.y + Math.sin(a) * r);
-    d.campI = c.i; d.raid = true; d.raidT = 75; d.silent = true; pushOut(d, true); G.dinos.push(d);
+    d.campI = c.i; d.raid = true; d.raidT = 75; d.silent = true; pushOut(d, true); admitDino(d, 'raid');
   }
   if (Math.random() < 0.5) { SFX.drum(0.15, panOf(G.fire.x + Math.cos(a0) * 900)); msg('Uzaklardan... davul sesleri.', '#c98', 4); }
   return true;
@@ -1219,7 +1245,7 @@ function spawnBozkirat(n) {
     if (gQuery(d.x, d.y, d.r + 4).some(o => !o.dead && Math.hypot(d.x - o.x, d.y - o.y) < d.r + o.r)) continue;
     if (G.dinos.some(o => !o.dead && Math.hypot(d.x - o.x, d.y - o.y) < d.r + o.r + 4)) continue;
     d.terr = { x: center.x, y: center.y, r: 550 };
-    d.herdL = out[0] || d; G.dinos.push(d); out.push(d);
+    if (admitDino(d, 'normal')) { d.herdL = out[0] || d; out.push(d); }
   }
   return out;
 }
@@ -1275,7 +1301,7 @@ function spawnMimicCreature() {
   const v = pick(vs), pos = spawnPos(650, 800, G.fire); if (!pos) return null;
   const d = mkDino('taklitci', pos.x, pos.y);
   d.disguise = { name: v.name, skin: v.skin, hair: v.hair, group: v.group }; d.revealed = false; d.kills = 0;
-  G.dinos.push(d); return d;
+  return admitDino(d, 'mimic') ? d : null;
 }
 function updMimicC(d, dt, prey) {
   const def = DINO.taklitci;

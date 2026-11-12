@@ -432,7 +432,8 @@ function newDay() {
   for (const e of G.eggs) {
     if (e.hatch <= G.day) {
       const d = mkDino('yirtici', G.fire.x + rand(-40, 40), G.fire.y + rand(30, 50));
-      Object.assign(d, { tamed: true, pet: true, growth: 0, hp: 30, maxhp: 30, r: 9 }); G.dinos.push(d);
+      Object.assign(d, { tamed: true, pet: true, growth: 0, hp: 30, maxhp: 30, r: 9 });
+      if (!admitDino(d, 'pet')) continue;
       G.stats.tamed++; if (G.stats.tamed >= 3) unlock('evcil3');
       msg('Yumurta çatladı! Bir yırtıcı yavrusu seni annesi sandı. Peşinden gelecek, büyüdükçe güçlenecek.', '#ffe39a', 7); SFX.baby();
     } else keep.push(e);
@@ -499,7 +500,7 @@ function runEvent(e) {
   else if (e.k === 'sessiz') {
     const v = edgeVictim(); if (!v) return;
     const a = dist(v, G.fire) > 30 ? angTo(G.fire, v) : rand(0, TAU), d = mkDino('yirtici', v.x + Math.cos(a) * 170, v.y + Math.sin(a) * 170);
-    d.rush = 4; d.tgt = v; d.engaged = true; d.silent = true; d.hitrun = true; pushOut(d, true); G.dinos.push(d);
+    d.rush = 4; d.tgt = v; d.engaged = true; d.silent = true; d.hitrun = true; pushOut(d, true); if (!admitDino(d, 'night')) return;
     jumpAt(v.x, v.y, 'Karanlıktan bir şey atıldı!');
   } else if (e.k === 'kayip') {
     const occ = G.people.filter(q => q.inHut && !q.leader);
@@ -520,11 +521,13 @@ function runEvent(e) {
   } else if (e.k === 'yapi') {
     const U = unprotectedHomes(); if (!U.length) return;
     const b = pick(U), a = angTo(G.fire, b) + rand(-0.6, 0.6), n = ri(2, 3);
-    for (let i = 0; i < n; i++) { const d = mkDino('yirtici', b.x + Math.cos(a) * 600 + rand(-60, 60), b.y + Math.sin(a) * 600 + rand(-60, 60)); d.siege = b; d.silent = true; pushOut(d, true); G.dinos.push(d); }
+    let born = 0;
+    for (let i = 0; i < n; i++) { const d = mkDino('yirtici', b.x + Math.cos(a) * 600 + rand(-60, 60), b.y + Math.sin(a) * 600 + rand(-60, 60)); d.siege = b; d.silent = true; pushOut(d, true); if (admitDino(d, 'siege')) born++; }
+    if (!born) return;
     setTimeout(() => { if (!G.over && L && dist(L, b) < 900) jumpAt(b.x, b.y, `${BUILD[b.type].ad} saldırı altında!`); }, 9000);
   } else if (e.k === 'suru') {
     const pos = spawnPos(950, 1150, G.fire);
-    if (pos) { spawnPack('yirtici', ri(4, 5 + Math.floor(G.day / 6)), pos); SFX.screech(0.3, panOf(pos.x)); setTimeout(() => SFX.screech(0.25, panOf(pos.x) * -0.5), 700); }
+    if (pos && spawnPack('yirtici', ri(4, 5 + Math.floor(G.day / 6)), pos, 'night').length) { SFX.screech(0.3, panOf(pos.x)); setTimeout(() => SFX.screech(0.25, panOf(pos.x) * -0.5), 700); }
   }
 }
 function unprotectedHomes() {
@@ -584,7 +587,7 @@ function timeEvents() {
       G.rescue = { x: pos.x, y: pos.y, r: 11, name: freshName(), isRescue: true, hp: 60, maxhp: 60, ang: 0, anim: 0, skin: '#d0a078', hair: '#2a1a10', group: 'bos', hurtT: 0, traits: [], id: -1 };
       msg(`Uzaklardan bir çığlık! Biri yardım istiyor — işarete git (${G.rescue.name}).`, '#9cf', 7);
       SFX.scream(0.25, panOf(pos.x));
-      if (Math.random() < 0.7) { const a = rand(0, TAU); spawnPack('kucuk', ri(2, 3), { x: pos.x + Math.cos(a) * 380, y: pos.y + Math.sin(a) * 380 }); }
+      if (Math.random() < 0.7) { const a = rand(0, TAU); spawnPack('kucuk', ri(2, 3), { x: pos.x + Math.cos(a) * 380, y: pos.y + Math.sin(a) * 380 }, 'rescue'); }
     }
   }
   if (G.rescue && p > 0.6) { msg(`${gen(G.rescue.name)} sesi karanlıkta kayboldu...`, '#c88', 5); G.rescue = null; }
@@ -616,7 +619,7 @@ function updMimic(dt) {
   m.t -= dt; m.sT -= dt;
   if (m.sT <= 0) { m.sT = 6; SFX.mimic(volOf(m, 1500) * 0.8 + 0.08, panOf(m.x)); }
   if (dist(L, m) < 160) {
-    for (let i = 0; i < 3; i++) { const a = i / 3 * TAU + rand(-0.3, 0.3); const d = mkDino('yirtici', L.x + Math.cos(a) * 230, L.y + Math.sin(a) * 230); d.rush = 6; d.tgt = L; d.engaged = true; pushOut(d, true); G.dinos.push(d); }
+    for (let i = 0; i < 3; i++) { const a = i / 3 * TAU + rand(-0.3, 0.3); const d = mkDino('yirtici', L.x + Math.cos(a) * 230, L.y + Math.sin(a) * 230); d.rush = 6; d.tgt = L; d.engaged = true; pushOut(d, true); admitDino(d, 'night'); }
     msg('Bu... o değildi.', '#f66', 5); SFX.screech(0.9, 0); G.mimic = null;
   } else if (m.t <= 0) G.mimic = null;
 }
@@ -638,12 +641,14 @@ function updFinale(dt) {
     const n = ri(2, 3) + Math.floor((100 - F.t) / 30);
     for (let i = 0; i < n; i++) {
       const a = rand(0, TAU), d = mkDino(Math.random() < 0.25 ? 'kucuk' : 'yirtici', G.rift.x + Math.cos(a) * 560, G.rift.y + Math.sin(a) * 560);
-      d.finale = true; d.rush = 99; pushOut(d, true); G.dinos.push(d);
+      d.finale = true; d.rush = 99; pushOut(d, true); admitDino(d, 'finale');
     }
   }
   if (F.t < 60 && !F.devDone) {
     F.devDone = true; const a = rand(0, TAU), d = mkDino('dev', G.rift.x + Math.cos(a) * 700, G.rift.y + Math.sin(a) * 700);
-    d.finale = true; d.rush = 99; G.dinos.push(d); SFX.roar(1); msg('DEV KAFA YARIĞA KOŞUYOR!', '#f64', 5);
+    d.finale = true; d.rush = 99;
+    if (admitDino(d, 'finale')) { SFX.roar(1); msg('DEV KAFA YARIĞA KOŞUYOR!', '#f64', 5); }
+    else { const old = G.dinos.find(q => q.type === 'dev' && !q.dead && !q.tamed); if (old) { old.finale = true; old.rush = 99; old.leave = false; old.tgt = L; SFX.roar(0.8); msg('Dev Kafa yarığa yöneliyor!', '#f64', 5); } }
   }
   if (F.t <= 0) {
     if (L && dist(L, G.rift) < 450) victory();
@@ -729,7 +734,7 @@ function loadGame(s) {
     const d = mkDino(s2.type, s2.x, s2.y);
     Object.assign(d, { hp: s2.hp, maxhp: s2.maxhp, tamed: true, pet: s2.pet, growth: s2.growth, r: s2.r || d.r });
     if (d.fly) { d.alt = 1; d.home = { x: d.x, y: d.y }; }
-    G.dinos.push(d);
+    if (!admitDino(d, 'restore')) continue;
     if (s2.mounted) { G.mount = d; d.mounted = true; }
   }
   if (D.explored) for (let i = 0; i < D.explored.length && i < G.explored.length; i++) G.explored[i] = D.explored[i] === '1' ? 1 : 0;
@@ -828,7 +833,7 @@ function update(dt) {
   for (const b of G.builds) if (b.type === 'tarla' && b.built && b.planted && b.g < 1) { b.g = Math.min(1, b.g + dt / (CYCLE * 1.6) * (wt === 'yagmur' || wt === 'firtina' ? 1.4 : wt === 'kar' ? 0 : 1) * seasonVal(s => s.grow)); b.tendT = (b.tendT || 0) - dt; }
   for (const c of G.carcs) { c.age += dt; if (!c.rotten && c.age > CYCLE * 1.2 && !G.builds.some(b => b.type === 'raf' && b.built && dist(b, c) < 300)) { c.rotten = true; } if (c.age > CYCLE * 2.5) c.dead = true; }
   G.carcs = G.carcs.filter(c => !c.dead);
-  if (isNight() && G.carcs.length && Math.random() < dt * 0.02) { const c = pick(G.carcs); if (dist(c, G.fire) > 900) spawnPack('kucuk', ri(2, 4), { x: c.x + rand(-200, 200), y: c.y + rand(-200, 200) }); }
+  if (isNight() && G.carcs.length && Math.random() < dt * 0.02) { const c = pick(G.carcs); if (dist(c, G.fire) > 900) spawnPack('kucuk', ri(2, 4), { x: c.x + rand(-200, 200), y: c.y + rand(-200, 200) }, 'carcass'); }
   if (G.sleep) sleepTick(dt); else updLeader(dt);
   for (const q of G.people) kbStep(q, dt);
   for (const p of G.people.slice()) if (p !== L && !p.dead) {
