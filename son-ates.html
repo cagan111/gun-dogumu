@@ -13091,7 +13091,7 @@ function buildWorld() {
   I.fern = mkInst(GEO.fern, MAT.instD, G.deco.length + G.herbs.length + G.poisons.length + 8);
   I.box = mkInst(GEO.box, MAT.inst, G.deco.length * 2 + 8);
   I.reed = mkInst(GEO.cone, MAT.inst, 900);
-  I.tgrass = mkInst(GEO.blade, MAT.grass, G.deco.length * 3 + 8);
+  I.tgrass = mkInst(GEO.bladeReal || GEO.blade, MAT.grass, G.deco.length * 3 + 8);
   I.crystal = mkInst(GEO.cone4, MAT.crystal, G.crystals.length * 4 + 8);
   for (const k in I) W.add(I[k]);
   U3.instX = 1e9; U3.sig = '';
@@ -13216,7 +13216,7 @@ function reserveTreeFar(key, required) {
 function rebuildTreeInst(cx, cy, writeShadows) {
   const I = U3.inst, TS = U3.tsh;
   for (const k of ['trunk', 'cone', 'blob', 'moss', 'frond', 'trunkFar', 'coneFar', 'blobFar']) I[k].count = 0;
-  realStart(); realReset('tree'); realReset('conifer'); realFarReset();
+  realStart(); realReset('tree'); realReset('conifer'); realReset('litter'); realFarReset();
   if (U3.cam) {
     U3.cam.getWorldDirection(TREE_DIR); U3.instView = TREE_DIR.clone(); U3.instRotation = U3.cam.quaternion.clone();
     U3.instCamY = U3.cam.position.y; U3.instPX = U3.cam.projectionMatrix.elements[0]; U3.instPY = U3.cam.projectionMatrix.elements[5];
@@ -13253,7 +13253,10 @@ function rebuildTreeInst(cx, cy, writeShadows) {
       const rk = con ? 'conifer' : 'tree', rh = H * (con ? 1.0 : 1.05), ys = con ? 1.7 : 1.2;   // uzun gövde, taç yukarıda (altında rahat yürünür)
       // eğimde gövde havada kalmasın: çevredeki en alçak noktaya göre biraz gömülür
       const yb = Math.min(gh(t.x + 14, t.y), gh(t.x - 14, t.y), gh(t.x, t.y + 14), gh(t.x, t.y - 14), y0 + 1.5) - 3;
-      if (realPut(rk, t.tone + t.sw, t.x, yb, t.y, rh, 0, t.sw, distance, ys)) continue;
+      if (realPut(rk, t.tone + t.sw, t.x, yb, t.y, rh, 0, t.sw, distance, ys)) {
+        // gövde dibinde eğrelti öbekleri: zemine kesik çizgiyle değmesin
+        for (let q = 0; q < 3; q++) { const a = t.sw * 3 + q * 2.1, rr = 14 + q * 6; realPut('litter', t.tone + q, t.x + Math.cos(a) * rr, gh(t.x + Math.cos(a) * rr, t.y + Math.sin(a) * rr) - 1, t.y + Math.sin(a) * rr, 0, 30 + q * 8, a, distance); }
+        continue; }
       if (distance > realR(rk) && realFar(rk, t.tone + t.sw, t.x, yb - 2, t.y, rh, ys)) continue; }
     if (b === 5) {                                       // palmiye: kıvrık gövde + taç yaprakları
       let x = t.x, y = y0, z = t.y; const seg = 5, L = (H * 0.75) / seg, lean = 0.25 + r2 * 0.35;
@@ -13283,7 +13286,7 @@ function rebuildTreeInst(cx, cy, writeShadows) {
     }
   }
   if (!writeShadows) for (const k of ['trunk', 'cone', 'blob', 'moss', 'frond', 'trunkFar', 'coneFar', 'blobFar']) instDone(I[k]);
-  realDone('tree'); realDone('conifer'); realFarDone();
+  realDone('tree'); realDone('conifer'); realDone('litter'); realFarDone();
 }
 function rebuildInst(cx, cy) {
   const I = U3.inst; for (const k in I) I[k].count = 0;
@@ -13306,8 +13309,9 @@ function rebuildInst(cx, cy) {
     if (!near(b, BUSH_R)) continue;
     const h = hash2(b.x, b.y), y0 = gh(b.x, b.y);
     seaTint(col.set('#2f5a24').multiplyScalar(0.85 + h * 0.4), 2, h, snowCover(b.x, b.y, y0) * 0.6);
+    if (!realPut('bush', h, b.x, y0 - 1, b.y, 0, b.r * 3.0, h * 6, Math.hypot(b.x - cx, b.y - cy))) {   // gerçek çalı; meyveler aynen kalır
     instAdd(I.bush, b.x, y0 + b.r * 0.45, b.y, b.r * 1.15, b.r * 0.8, b.r * 1.15, h * 6, col);
-    instAdd(I.bush, b.x - 7, y0 + b.r * 0.4, b.y - 4, b.r * 0.75, b.r * 0.6, b.r * 0.75, h * 9, col);
+    instAdd(I.bush, b.x - 7, y0 + b.r * 0.4, b.y - 4, b.r * 0.75, b.r * 0.6, b.r * 0.75, h * 9, col); }
     if (near(b, 520)) { const n = Math.min(7, b.amt + Math.floor(b.amt / 2)), bc = c3(b.col); for (let i = 0; i < n; i++) { const q = b.berries[i], rr = (q[0] * q[0] + q[1] * q[1]) / (b.r * b.r * 1.3); instAdd(I.berry, b.x + q[0], y0 + b.r * 0.45 + Math.sqrt(Math.max(0.05, 1 - rr)) * b.r * 0.8, b.y + q[1], 2.3, 2.3, 2.3, i, bc); } }
   }
   for (const h of G.herbs) {
@@ -14772,7 +14776,7 @@ const REAL = { started: false, ready: false, base: 'assets/ph/', M: {}, low: typ
 const REAL_SET = {
   tree: ['tree_small_02', 'jacaranda_tree', 'tree_small_02'], conifer: ['fir_tree_01_b'],
   rock: ['rock_moss_set_01', 'rock_moss_set_02', 'boulder_01', 'namaqualand_boulder_02'],
-  stump: ['tree_stump_01'], fern: ['fern_02'], dead: ['dead_tree_trunk_02']
+  stump: ['tree_stump_01'], fern: ['fern_02'], dead: ['dead_tree_trunk_02'], litter: ['fern_02#b'], bush: ['shrub_04', 'shrub_02']
 };
 function realR(kind) { return kind === 'tree' || kind === 'conifer' ? (REAL.low ? 200 : 420) : kind === 'rock' ? (REAL.low ? 300 : 800) : (REAL.low ? 200 : 520); }
 function realStart() {
@@ -14782,10 +14786,11 @@ function realStart() {
   REAL.started = true;
   const loader = new THREE.GLTFLoader(), names = [...new Set([].concat(...Object.values(REAL_SET)))]; let left = names.length;
   const done = () => { if (--left === 0) { const n = Object.keys(REAL.M).length; REAL.ready = n > 0; U3.instX = 1e9; if (n) realShadows();
+    if (n) realGrass();
     if (typeof msg === 'function') msg(n ? `🌲 Gerçekçi modeller yüklendi (${n}/${names.length})` : `🌲 Gerçekçi modeller yüklenemedi (${REAL.err || '?'} · ${location.protocol})`, n ? '#9e9' : '#e99', 6); } };
   // .glb yoksa aynı ikili dosya .wasm adıyla da aranır (artifact yalnız bilinen türleri sunar)
   const ok = n => g => { try { realPrep(n, g.scene); } catch (e) { console.warn('varlık', n, e); } done(); };
-  for (const n of names) loader.load(REAL.base + n + '.glb', ok(n), undefined, () => loader.load(REAL.base + n + '.wasm', ok(n), undefined, e => { REAL.err = String((e && (e.message || e.type)) || e).slice(0, 60); done(); }));
+  for (const n of names) { const f = n.split('#')[0]; loader.load(REAL.base + f + '.glb', ok(n), undefined, () => loader.load(REAL.base + f + '.wasm', ok(n), undefined, e => { REAL.err = String((e && (e.message || e.type)) || e).slice(0, 60); done(); })); }
 }
 // quantize (Int16/Int8 normalize) öznitelikleri float'a aç: matrisle pişirmeden önce şart
 function realFloat(g) {
@@ -14803,7 +14808,7 @@ function realPrep(name, scene) {
   // ağaç modellerinin altındaki düz toprak plakasını at (oyunun kendi zemini var)
   if (REAL_SET.tree.includes(name)) { const H = box.max.y - box.min.y; for (let i = parts.length - 1; i >= 0; i--) { const bb = parts[i].g.boundingBox; if (bb.max.y - bb.min.y < H * 0.04 || (parts[i].m.name || '') === name) parts.splice(i, 1); } box.makeEmpty(); for (const q of parts) box.union(q.g.boundingBox); }
   const h0 = Math.max(0.01, box.max.y - box.min.y), w0 = Math.max(box.max.x - box.min.x, box.max.z - box.min.z, 0.01), cx = (box.min.x + box.max.x) / 2, cz = (box.min.z + box.max.z) / 2;
-  const cap = REAL_SET.tree.includes(name) || REAL_SET.conifer.includes(name) ? (REAL.low ? 10 : 40) : (REAL.low ? 24 : 64);
+  const cap = REAL_SET.tree.includes(name) || REAL_SET.conifer.includes(name) ? (REAL.low ? 10 : 40) : name.includes('#') ? (REAL.low ? 30 : 140) : (REAL.low ? 24 : 64);
   const meshes = parts.map(({ g, m }) => {
     g.translate(-cx, -box.min.y, -cz);
     for (const k of ['map', 'emissiveMap']) if (m[k]) { m[k].encoding = THREE.LinearEncoding; m[k].needsUpdate = true; }
@@ -14827,9 +14832,9 @@ function realWind(m) {
   m.customProgramCacheKey = () => 'realWind';
 }
 const _rm = new THREE.Matrix4(), _rq = new THREE.Quaternion(), _rp = new THREE.Vector3(), _rs = new THREE.Vector3(), _ry = new THREE.Vector3(0, 1, 0);
-function realReset(kind) { for (const n of REAL_SET[kind]) { const M = REAL.M[n]; if (M) for (const im of M.meshes) im.count = 0; } if (kind === 'rock') for (const k of ['stump', 'fern', 'dead']) realReset(k); }
+function realReset(kind) { for (const n of REAL_SET[kind]) { const M = REAL.M[n]; if (M) for (const im of M.meshes) im.count = 0; } if (kind === 'rock') for (const k of ['stump', 'fern', 'dead', 'bush']) realReset(k); }
 function realDone(kind) {
-  const ks = kind === 'rock' ? ['rock', 'stump', 'fern', 'dead'] : [kind];
+  const ks = kind === 'rock' ? ['rock', 'stump', 'fern', 'dead', 'bush'] : [kind];
   for (const k of ks) for (const n of REAL_SET[k]) { const M = REAL.M[n]; if (M) for (const im of M.meshes) im.instanceMatrix.needsUpdate = true; }
 }
 // tür içinden kararlı seçim; height verilirse yüksekliğe, yoksa genişliğe göre ölçeklenir
@@ -14891,6 +14896,31 @@ function realShadows() {
   const c = S.shadow.camera; c.left = c.bottom = -800; c.right = c.top = 800; c.near = 50; c.far = 2600; c.updateProjectionMatrix();
   U3.scene.traverse(o => { if (o.isMesh && (o.material === MAT.terrain)) o.receiveShadow = true; });
   REAL.recv = true;
+}
+
+// ---- gerçekçi ot: ince yapraklı çapraz kart öbeği (tuvalde çizilen doku), eski köşeli otun yerine
+function realGrassTex() {
+  return canvasTex(256, (g, S) => {
+    const R = mulberry32(77); g.clearRect(0, 0, S, S);
+    for (let i = 0; i < 95; i++) {
+      const x0 = S * (0.08 + R() * 0.84), h = S * (0.45 + R() * 0.53), lean = (R() - 0.5) * S * 0.35, w = 1.2 + R() * 2.6;
+      const gr = g.createLinearGradient(0, S, 0, S - h); const v = 0.55 + R() * 0.45;
+      gr.addColorStop(0, `rgba(${40 * v | 0},${62 * v | 0},${26 * v | 0},1)`); gr.addColorStop(0.5, `rgba(${120 * v | 0},${160 * v | 0},${70 * v | 0},1)`); gr.addColorStop(1, `rgba(${200 * v | 0},${215 * v | 0},${140 * v | 0},1)`);
+      g.fillStyle = gr; g.beginPath(); g.moveTo(x0 - w, S); g.quadraticCurveTo(x0 + lean * 0.3, S - h * 0.55, x0 + lean, S - h); g.quadraticCurveTo(x0 + lean * 0.3 + w * 0.4, S - h * 0.55, x0 + w, S); g.fill();
+    }
+  });
+}
+function realGrass() {
+  if (REAL.grass || !GEO.blade || !U3.grB) return; REAL.grass = true;
+  const tex = realGrassTex(); tex.encoding = THREE.LinearEncoding;
+  // üç çapraz kart, dipte tabana gömülü; yükseklik 1, genişlik 1.6
+  const p = [], uv = [], nr = [], idx = [];
+  for (let k = 0; k < 3; k++) { const a = k / 3 * Math.PI, c = Math.cos(a) * 0.8, s = Math.sin(a) * 0.8, o = p.length / 3;
+    p.push(-c, -0.05, -s, c, -0.05, s, c, 1, s, -c, 1, -s); uv.push(0, 0, 1, 0, 1, 1, 0, 1); for (let i = 0; i < 4; i++) nr.push(0, 1, 0);
+    idx.push(o, o + 1, o + 2, o, o + 2, o + 3); }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(p, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setAttribute('normal', new THREE.Float32BufferAttribute(nr, 3)); g.setIndex(idx);
+  const m = MAT.grass; m.map = tex; m.alphaTest = 0.45; m.vertexColors = false; m.needsUpdate = true;
+  GEO.bladeReal = g; U3.grB.geometry = g; if (U3.inst && U3.inst.tgrass) U3.inst.tgrass.geometry = g;
 }
 
 </script>
