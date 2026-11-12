@@ -3823,14 +3823,14 @@ function spawnBozkirat(n) {
   const count = G.dinos.filter(d => !d.dead && d.type === 'bozkirat').length;
   n = Math.min(Math.max(0, Math.floor(n) || 0), cap - count);
   if (!(n > 0)) return out;
-  const center = spawnPosBiome([4], 750, 1250);
+  const center = spawnPosBiome([4], 600, 1600);
   if (!center) return out;
   function valid(x, y) {
     if (!Number.isFinite(x) || !Number.isFinite(y) || x < 35 || y < 35 || x > WORLD - 35 || y > WORLD - 35) return false;
     if (biomeFast(x, y) !== 4 || isSea(x, y) || groundH(x, y) < 0.8 || Math.hypot(x - G.fire.x, y - G.fire.y) < 650) return false;
     if ([...G.pools, ...G.lakes].some(w => Math.hypot(x - w.x, y - w.y) < w.r + DINO.bozkirat.r + 8)) return false;
     const h = groundH(x, y);
-    return [[20, 0], [-20, 0], [0, 20], [0, -20]].every(v => Math.abs(groundH(x + v[0], y + v[1]) - h) < 6);
+    return [[20, 0], [-20, 0], [0, 20], [0, -20]].every(v => Math.abs(groundH(x + v[0], y + v[1]) - h) < 10);
   }
   for (let k = 0; k < 18 && out.length < n; k++) {
     const x = center.x + rand(-70, 70), y = center.y + rand(-70, 70);
