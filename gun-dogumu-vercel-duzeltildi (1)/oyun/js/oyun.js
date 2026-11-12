@@ -916,7 +916,7 @@ function update(dt) {
   for (const t of G.trees) if (t.shake > 0) t.shake -= dt;
   for (const b of G.builds) if (b.hit > 0) b.hit -= dt;
   if (G.meal) { G.meal.t -= dt; if (G.meal.t <= 0) endMeal(); }
-  updGather(dt);
+  updEvening(dt);
   for (const p of G.people) if (p.grabT > 0) p.grabT -= dt;
   G.routineT = (G.routineT || 0) - dt;
   G.shake *= Math.pow(0.02, dt); G.red = Math.max(0, G.red - dt); G.scare = Math.max(0, G.scare - dt);

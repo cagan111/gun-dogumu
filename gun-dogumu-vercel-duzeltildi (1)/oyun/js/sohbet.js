@@ -73,7 +73,7 @@ function chatPool(p) {
 }
 
 // ---- akşam toplanması: başlat / sürdür / dağıt (update'ten her kare)
-function updGather(dt) {
+function updEvening(dt) {
   for (const p of G.people) if (p.say) { p.say.life -= dt; if (p.say.life <= 0) p.say = null; }
   const ph = phase(), f = G.flags;
   planTick(dt, ph);
