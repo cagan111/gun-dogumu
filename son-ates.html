@@ -13251,8 +13251,10 @@ function rebuildTreeInst(cx, cy, writeShadows) {
     stats[far ? 'far' : 'near']++;
     if (b !== 5 && !(b === 2 && r2 < 0.65)) { const con = b === 1 || b === 3 || (b === 0 && r2 < 0.55);   // gerçek model: iğne yapraklı göknar / geniş yapraklı ada ağacı
       const rk = con ? 'conifer' : 'tree', rh = H * (con ? 1.0 : 1.05), ys = con ? 1.7 : 1.2;   // uzun gövde, taç yukarıda (altında rahat yürünür)
-      if (realPut(rk, t.tone + t.sw, t.x, y0 + 1, t.y, rh, 0, t.sw, distance, ys)) continue;
-      if (distance > realR(rk) && realFar(rk, t.tone + t.sw, t.x, y0 + 1, t.y, rh, ys)) continue; }
+      // eğimde gövde havada kalmasın: çevredeki en alçak noktaya göre biraz gömülür
+      const yb = Math.min(gh(t.x + 14, t.y), gh(t.x - 14, t.y), gh(t.x, t.y + 14), gh(t.x, t.y - 14), y0 + 1.5) - 3;
+      if (realPut(rk, t.tone + t.sw, t.x, yb, t.y, rh, 0, t.sw, distance, ys)) continue;
+      if (distance > realR(rk) && realFar(rk, t.tone + t.sw, t.x, yb - 2, t.y, rh, ys)) continue; }
     if (b === 5) {                                       // palmiye: kıvrık gövde + taç yaprakları
       let x = t.x, y = y0, z = t.y; const seg = 5, L = (H * 0.75) / seg, lean = 0.25 + r2 * 0.35;
       for (let i = 0; i < seg; i++) { const rz = lean * (i + 1) / seg, w = 5.2 - i * 0.55; instAdd(T.trunk, x, y, z, w, L * 1.06, w, t.sw, C.t, 0, rz); x += -Math.sin(rz) * Math.cos(t.sw) * L; y += Math.cos(rz) * L; z += Math.sin(rz) * Math.sin(t.sw) * L; }
