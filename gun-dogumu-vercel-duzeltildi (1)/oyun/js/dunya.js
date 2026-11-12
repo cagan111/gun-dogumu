@@ -48,11 +48,30 @@ function blobT(b, x, y) {
 const HC = 50; let HN = Math.round(WORLD / HC), HW = HN + 1;
 function islandGridReset() { HN = Math.round(WORLD / HC); HW = HN + 1; }
 let HM = null, TMUL = null;
-// Sürüm1 yalnız yeni oyunlarda: eski v4 kayıtlarının arazisi değişmez.
+// Arazi profili: 0 eski, 1 merkez yamaç, 2 kayıtlı kıyı. Eski v4 arazisi değişmez.
+function cavSiteEnabled() { return (G.caveTerrain===1||G.caveTerrain===2)&&!G.coastPlanning; }
+function selectCoastalHome(seed) {
+  const R=mulberry32(seed^0x73c4), offset=R()*TAU;
+  for(let i=0;i<96;i++) {
+    const a=offset+i*TAU/96,c=Math.cos(a),sn=Math.sin(a);let lo=0,hi=WORLD*.7;
+    if(landness(CAMP.x+c*hi,CAMP.y+sn*hi)>=0)continue;
+    for(let k=0;k<28;k++){const m=(lo+hi)/2;if(landness(CAMP.x+c*m,CAMP.y+sn*m)>0)lo=m;else hi=m}
+    const r=(lo+hi)/2,h={v:1,x:CAMP.x+c*(r-320),y:CAMP.y+sn*(r-320),ang:a-Math.PI/2};
+    const cave={x:h.x-c*430,y:h.y-sn*430},beach={x:h.x+c*180,y:h.y+sn*180};
+    if(h.x<1700||h.y<1700||h.x>WORLD-1700||h.y>WORLD-1700||biomeAt(beach.x,beach.y)!==5)continue;
+    if([h,cave].some(q=>groundH(q.x,q.y)<1||G.ccamps.some(o=>Math.hypot(q.x-o.x,q.y-o.y)<2500)))continue;
+    // Terrası biçimlendirmek mevcut su/enkaz/liman düzlemlerini değiştirmesin.
+    if(G.lakes.some(o=>Math.hypot(h.x-o.x,h.y-o.y)<o.r+1750))continue;
+    if([G.harbor,...G.wrecks].some(o=>Math.hypot(h.x-o.x,h.y-o.y)<1900||Math.hypot(cave.x-o.x,cave.y-o.y)<800))continue;
+    if(Math.hypot(h.x-G.rift.x,h.y-G.rift.y)<2000)continue;
+    return h;
+  }
+  return null;
+}
 function cavSiteReserved(x,y,margin=0) {
-  if (G.caveTerrain!==1) return false;
+  if (!cavSiteEnabled()) return false;
   const q=homeLocal(x,y),dx=q.x,dy=q.y;
-  return Math.hypot(dx,dy+430)<200+margin || (Math.abs(dx)<60+margin&&dy>-430-margin&&dy<40+margin);
+  return Math.hypot(dx,dy+430)<200+margin || (Math.abs(dx)<60+margin&&dy>-430-margin&&dy<(G.caveTerrain===2?240:40)+margin);
 }
 function cavSiteHeight(x,y) {
   const q=homeLocal(x,y),dx=q.x,dy=q.y;
@@ -62,7 +81,7 @@ function cavSiteHeight(x,y) {
   return Math.max(ramp,ridge);
 }
 function cavSiteRocks() {
-  if (G.caveTerrain!==1) return;
+  if (!cavSiteEnabled()) return;
   const R=mulberry32(G.seed^0x51ac), points=[[-83,-300,48],[83,-300,48],[-145,-450,64],[145,-450,64],[-74,-580,60],[74,-580,60]];
   for (const [dx,dy,r] of points) {
     const v=[];for(let i=0;i<8;i++){const a=i/8*TAU;v.push([Math.cos(a)*r*(.85+R()*.2),Math.sin(a)*r*(.85+R()*.2)])}
@@ -96,9 +115,13 @@ function rawH(x, y) {
     const pk = fbm(x / 1500 - 9.1, y / 1500 + 4.4, 2);
     h += Math.pow(mm, 1.35) * (330 + 330 * rg * rg + 260 * pk);
   }
-  const dc = Math.hypot(x - HOME.x, y - HOME.y);
-  if (dc < 1500) h = 8 + (h - 8) * sstep(700, 1500, dc);       // kamp düzlüğü
-  if (G.caveTerrain===1) h+=cavSiteHeight(x,y);
+  const dc = Math.hypot(x-HOME.x,y-HOME.y);
+  if(G.caveTerrain===2) {
+    const centre=Math.hypot(x-CAMP.x,y-CAMP.y);
+    if(centre<1500)h=8+(h-8)*sstep(700,1500,centre);
+    if(!G.coastPlanning&&Math.hypot(HOME.x-CAMP.x,HOME.y-CAMP.y)>1&&dc<1500)h=8+(h-8)*sstep(700,1500,dc);
+  } else if(dc<1500)h=8+(h-8)*sstep(700,1500,dc);
+  if(cavSiteEnabled())h+=cavSiteHeight(x,y);
   return Math.max(h, 1.2);
 }
 function groundH(x, y) {
@@ -166,7 +189,9 @@ function coastR(a, r0 = 4500 * ISLK) {
   return rMax;
 }
 
-function genWorld(seed) {
+function genWorld(seed,chooseHome=false) {
+  const coastal=G.caveTerrain===2,savedHome={v:1,x:HOME.x,y:HOME.y,ang:HOME.ang};
+  if(coastal){setHome(null);G.coastPlanning=true}
   const S = mulberry32(seed);
   const sr = (a, b) => a + S() * (b - a), sri = (a, b) => Math.floor(sr(a, b + 1)), spick = a => a[Math.floor(S() * a.length)];
   const sg = () => (S() + S() + S() - 1.5) / 1.5;
@@ -211,7 +236,7 @@ function genWorld(seed) {
   HM = new Float32Array(HW * HW);
   for (let j = 0; j < HW; j++) for (let i = 0; i < HW; i++) HM[j * HW + i] = rawH(i * HC, j * HC);
   flattenH(G.rift.x, G.rift.y, 160, 260, groundH(G.rift.x, G.rift.y));
-  if (G.caveTerrain===1) { const q=homeWorld(0,-430);flattenH(q.x,q.y,110,70,136); }
+  if (cavSiteEnabled()) { const q=homeWorld(0,-430);flattenH(q.x,q.y,110,70,136); }
   // biyom haritası
   G.bmap = new Uint8Array(MAPN * MAPN);
   for (let j = 0; j < MAPN; j++) for (let i = 0; i < MAPN; i++) G.bmap[j * MAPN + i] = biomeAt((i + 0.5) * MAPC, (j + 0.5) * MAPC);
@@ -260,6 +285,17 @@ function genWorld(seed) {
       huts: [0, 1, 2].map(i => { const a = i / 3 * TAU + sr(-0.3, 0.3); return [Math.cos(a) * sr(55, 75), Math.sin(a) * sr(55, 75)]; }) });
   }
   for (const w of G.wrecks) flattenH(w.x, w.y, 70, 90, Math.max(1.5, groundH(w.x, w.y)));
+  if(coastal) {
+    const chosen=chooseHome?selectCoastalHome(seed):savedHome;
+    if(!chosen||Math.hypot(chosen.x-CAMP.x,chosen.y-CAMP.y)<1){G.caveTerrain=1;G.coastPlanning=false;setHome(null);return genWorld(seed)}
+    setHome(chosen);G.coastPlanning=false;
+    // Kıyı/tehdit planı her yüklemede aynı merkezden üretilir; yalnız boş yerel alan yeniden örneklenir.
+    const i0=Math.max(0,Math.floor((HOME.x-1500)/HC)),i1=Math.min(HN,Math.ceil((HOME.x+1500)/HC)),j0=Math.max(0,Math.floor((HOME.y-1500)/HC)),j1=Math.min(HN,Math.ceil((HOME.y+1500)/HC));
+    for(let j=j0;j<=j1;j++)for(let i=i0;i<=i1;i++)if(Math.hypot(i*HC-HOME.x,j*HC-HOME.y)<1500)HM[j*HW+i]=rawH(i*HC,j*HC);
+    const q=homeWorld(0,-430);flattenH(q.x,q.y,110,70,136);
+    for(let j=0;j<MAPN;j++)for(let i=0;i<MAPN;i++)G.bmap[j*MAPN+i]=biomeAt((i+.5)*MAPC,(j+.5)*MAPC);
+    G.fire.x=HOME.x;G.fire.y=HOME.y;
+  }
   const free = (x, y, m) => !cavSiteReserved(x,y,m) && land(x, y) && !G.lakes.some(l => Math.hypot(l.x - x, l.y - y) < l.r + m) && Math.hypot(x - G.rift.x, y - G.rift.y) > 120
     && !G.ccamps.some(c => Math.hypot(c.x - x, c.y - y) < 150) && !G.wrecks.some(c => Math.hypot(c.x - x, c.y - y) < 130) && Math.hypot(x - G.harbor.x, y - G.harbor.y) > 160;
   for (const b of G.blobs) if (b.k === 2) for (let i = 0, n = Math.round(10 * (b.r / 650) ** 2); i < n; i++) {
@@ -301,7 +337,7 @@ function genWorld(seed) {
   for (let i = 0; i < Math.round(6000 * ISLK * ISLK); i++) { const x = rx(), y = ry(); if (S() < TP[B(x, y)]) addTree(x, y); }
 
   // ---- kayalar (dağda yoğun, kumsalda sürüklenmiş taşlar) ve kristaller (≤ 2500)
-  const ROCK_MAX = G.caveTerrain===1?2494:2500;
+  const ROCK_MAX = cavSiteEnabled()?2494:2500;
   function addRock(x, y) {
     if (G.rocks.length >= ROCK_MAX || !free(x, y, 30) || nearCamp(x, y, 220) || inPool(x, y, 20)) return;
     if (gQuery(x, y, 50).some(o => (o.kind === 'tree' || o.kind === 'rock' || o.kind === 'crystal') && Math.hypot(o.x - x, o.y - y) < 46)) return;
@@ -342,7 +378,7 @@ function genWorld(seed) {
   // ---- yuvalar (sis ve dağ)
   for (const b of G.blobs) if (b.k === 3 || b.k === 1) for (let i = 0; i < (b.k === 3 ? 4 : 1); i++) {
     const a = sr(0, TAU), rr = sr(100, b.r * 0.8), x = b.x + Math.cos(a) * rr, y = b.y + Math.sin(a) * rr;
-    if (free(x, y, 30)) G.nests.push({ x, y, r: 20, eggs: sri(1, 3), found: false });
+    if (free(x,y,30)&&(G.caveTerrain!==2||Math.hypot(x-HOME.x,y-HOME.y)>=1800)) G.nests.push({ x, y, r: 20, eggs: sri(1, 3), found: false });
   }
   // ---- süsleme (≤ 7000): ova uzun otları, kumsal sürüklenmiş odunlar
   for (let i = 0; i < 15000 * ISLK * ISLK && G.deco.length < 7000 * ISLK * ISLK; i++) {
