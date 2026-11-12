@@ -14,6 +14,7 @@ addEventListener('keydown', e => {
   audioInit();
   if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(e.code)) e.preventDefault();
   const first = !keys[e.code]; keys[e.code] = true;
+  if (e.code === 'KeyN' && first && typeof sesMute === 'function') sesMute();
   if (!playing()) return;
   if (G.sleep) { if (first) wakeUp('Uyandın.'); return; }
   if (e.code === 'KeyE' && first) onActPress();
@@ -626,6 +627,7 @@ function loop(now) {
     $('sleepV').style.display = G.sleep ? 'flex' : 'none';
     if (L) { render(); hudTick(dt); }
   }
+  if (typeof sesTick === 'function') sesTick(dt);
   requestAnimationFrame(loop);
 }
 makeGround();
