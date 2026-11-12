@@ -914,7 +914,7 @@ function rebuildTreeInst(cx, cy, writeShadows) {
     if (writeShadows) TS.push([t.x, t.y, cr * (b === 5 ? 0.9 : 1.05), b === 5 ? H * 0.7 : H * 0.55]);
     if (!treeInView(t.x, y0 + H * 0.5, t.y, Math.hypot(H * 0.65, cr * 2) + 16, distance)) { stats.culled++; continue; }
     stats[far ? 'far' : 'near']++;
-    if (b !== 5 && !(b === 2 && r2 < 0.65) && realPut('tree', t.tone + t.sw, t.x, y0 + 1, t.y, H * 1.05, 0, t.sw, distance)) continue;   // gerçek model
+    if (b !== 5 && !(b === 2 && r2 < 0.65) && realPut('tree', t.tone + t.sw, t.x, y0 + 1, t.y, H * 0.9, 0, t.sw, distance)) continue;   // gerçek model
     if (b === 5) {                                       // palmiye: kıvrık gövde + taç yaprakları
       let x = t.x, y = y0, z = t.y; const seg = 5, L = (H * 0.75) / seg, lean = 0.25 + r2 * 0.35;
       for (let i = 0; i < seg; i++) { const rz = lean * (i + 1) / seg, w = 5.2 - i * 0.55; instAdd(T.trunk, x, y, z, w, L * 1.06, w, t.sw, C.t, 0, rz); x += -Math.sin(rz) * Math.cos(t.sw) * L; y += Math.cos(rz) * L; z += Math.sin(rz) * Math.sin(t.sw) * L; }
@@ -2445,10 +2445,10 @@ function realStart() {
 function realPrep(name, scene) {
   scene.updateMatrixWorld(true);
   const parts = []; const box = new THREE.Box3();
-  scene.traverse(o => { if (!o.isMesh) return; const g = o.geometry.clone(); g.applyMatrix4(o.matrixWorld); g.computeBoundingBox(); box.union(g.boundingBox); parts.push({ g, m: o.material }); });
+  scene.traverse(o => { if (!o.isMesh) return; if (REAL_SET.tree.includes(name) && (o.material.name || '') === name) return; const g = o.geometry.clone(); g.applyMatrix4(o.matrixWorld); g.computeBoundingBox(); box.union(g.boundingBox); parts.push({ g, m: o.material }); });
   if (!parts.length) return;
   // ağaç modellerinin altındaki düz toprak plakasını at (oyunun kendi zemini var)
-  if (REAL_SET.tree.includes(name)) { const H = box.max.y - box.min.y; for (let i = parts.length - 1; i >= 0; i--) { const bb = parts[i].g.boundingBox; if (bb.max.y - bb.min.y < H * 0.04) parts.splice(i, 1); } box.makeEmpty(); for (const q of parts) box.union(q.g.boundingBox); }
+  if (REAL_SET.tree.includes(name)) { const H = box.max.y - box.min.y; for (let i = parts.length - 1; i >= 0; i--) { const bb = parts[i].g.boundingBox; if (bb.max.y - bb.min.y < H * 0.04 || (parts[i].m.name || '') === name) parts.splice(i, 1); } box.makeEmpty(); for (const q of parts) box.union(q.g.boundingBox); }
   const h0 = Math.max(0.01, box.max.y - box.min.y), w0 = Math.max(box.max.x - box.min.x, box.max.z - box.min.z, 0.01), cx = (box.min.x + box.max.x) / 2, cz = (box.min.z + box.max.z) / 2;
   const cap = REAL_SET.tree.includes(name) ? (REAL.low ? 10 : 40) : (REAL.low ? 24 : 64);
   const meshes = parts.map(({ g, m }) => {
