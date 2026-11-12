@@ -49,4 +49,4 @@ Ada dünyası, 3B birinci şahıs, mağara içi, eylem menüsü, zimmet/yatak, a
 1. Gerçek bilgisayar/iPhone performansı ölçülmedi. Ağaç LOD sonrası ~340k üçgen (önce ~628k); frustum ayıklama hazır ama kapalı (`U3.treeCulling=true; U3.instX=1e9` ile denenir).
 
 ## Şu an kim neyde
-- (boş)
+- Claude (alt ajan): gün ×2, yemek/akşam muhabbeti/plan, tohum seçimi — temel.js, dunya.js, halk.js, oyun.js, arayuz.js, cizim.js, ic.js
