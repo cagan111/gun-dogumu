@@ -43,12 +43,12 @@ WebGL için: `chromium.launch({args:['--use-gl=swiftshader','--enable-unsafe-swi
 - 2 saatte bir otomatik tur (Claude). Kayıt anahtarı `sonAtesKayit4`, sürüm 4.
 
 ## Bitenler (özet)
-Ada dünyası, 3B birinci şahıs, mağara içi, eylem menüsü, zimmet/yatak, aşamalı üretim ve yemek, mevsimler + bölgesel kar + donan göller, koku takibi (rüzgâr, iz yaşı, yağmurun iz yıkaması), yırtıcı yuvaları + av dengesi, Bozkır Atı, 15 hayvanın yeni modeli (Codex), ayrıntılı ağaçlar + rüzgârda yaprak, hedef göstergesi (gün/200, enkaz, halat, bez), ses (adım, nefes, ortam, rüzgâr, uzaktan büyük hayvan; N sessiz), ortak doğum kapısı `admitDino` (tüm doğumlar normal/olay bütçesinden geçer).
+Ada dünyası, 3B birinci şahıs, mağara içi, eylem menüsü, zimmet/yatak, aşamalı üretim ve yemek, mevsimler + bölgesel kar + donan göller, koku takibi (rüzgâr, iz yaşı, yağmurun iz yıkaması), yırtıcı yuvaları + av dengesi, Bozkır Atı, 15 hayvanın yeni modeli (Codex), ayrıntılı ağaçlar + rüzgârda yaprak, hedef göstergesi (gün/200, enkaz, halat, bez), ses (adım, nefes, ortam, rüzgâr, uzaktan büyük hayvan; N sessiz), ortak doğum kapısı `admitDino` (tüm doğumlar normal/olay bütçesinden geçer), donmuş gölde yürüme (`walkSurfaceH`, çözülünce kıyıya tahliye).
 
 ## Açık işler (sırayla)
 1. Bozkır Atı doğum yeri eğim kontrolü çok sıkı (22 denemede 1).
 2. Gerçek bilgisayar/iPhone performansı ölçülmedi (~628k üçgen).
-3. Kar biraz gri; donmuş gölde yürünemiyor; Türkçe ek hataları ("Alp'ın").
+3. Kar biraz gri; Türkçe ek hataları ("Alp'ın").
 
 ## Şu an kim neyde
 - (boş)

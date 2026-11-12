@@ -87,6 +87,12 @@ function groundH(x, y) {
   return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
 }
 function isSea(x, y) { return HM ? groundH(x, y) < 0 : false; }
+// Buz yüzeyi yalnız canlıların yürüyüş yüksekliğidir; arazi verisi değişmez. (Codex)
+function frozenLakeAt(x, y) {
+  for (const l of G.lakes || []) { if (!l.frozen || !Number.isFinite(l.h)) continue; const dx = x - l.x, dy = y - l.y; if (Math.abs(dx) <= l.r && Math.abs(dy) <= l.r && dx * dx + dy * dy <= l.r * l.r) return l; }
+  return null;
+}
+function walkSurfaceH(x, y) { const h = groundH(x, y), lake = frozenLakeAt(x, y); return lake ? Math.max(h, lake.h) : h; }
 // eğime göre yürüme hızı çarpanı: düzde 1, dik dağ yamacında ~0.55
 function terrainMul(x, y) {
   if (!TMUL) return 1;
@@ -560,7 +566,7 @@ function updSeasons(dt) {
   for (const l of G.lakes || []) {
     const T = tempAt(l.x, l.y);
     if (!l.frozen) { l.iceT = T < -2 ? (l.iceT || 0) + step : Math.max(0, (l.iceT || 0) - step); if (l.iceT > 90) { l.frozen = true; l.iceT = 0; if (dist(l, G.fire) < 3200) fz++; } }
-    else { l.iceT = T > 2 ? (l.iceT || 0) + step : Math.max(0, (l.iceT || 0) - step); if (l.iceT > 90) { l.frozen = false; l.iceT = 0; if (dist(l, G.fire) < 3200) th++; } }
+    else { l.iceT = T > 2 ? (l.iceT || 0) + step : Math.max(0, (l.iceT || 0) - step); if (l.iceT > 90) { l.frozen = false; l.iceT = 0; clearThawedLake(l); if (dist(l, G.fire) < 3200) th++; } }
   }
   if (fz) msg('🧊 Kampa yakın göl buz tuttu. Balıkçılar orada balık tutamaz.', '#cfe8ff', 5);
   if (th) msg('💧 Gölün buzu çözüldü. Balıkçılar yeniden ağ atabilir.', '#9cf', 4);

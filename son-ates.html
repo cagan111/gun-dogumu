@@ -832,6 +832,12 @@ function groundH(x, y) {
   return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
 }
 function isSea(x, y) { return HM ? groundH(x, y) < 0 : false; }
+// Buz yüzeyi yalnız canlıların yürüyüş yüksekliğidir; arazi verisi değişmez. (Codex)
+function frozenLakeAt(x, y) {
+  for (const l of G.lakes || []) { if (!l.frozen || !Number.isFinite(l.h)) continue; const dx = x - l.x, dy = y - l.y; if (Math.abs(dx) <= l.r && Math.abs(dy) <= l.r && dx * dx + dy * dy <= l.r * l.r) return l; }
+  return null;
+}
+function walkSurfaceH(x, y) { const h = groundH(x, y), lake = frozenLakeAt(x, y); return lake ? Math.max(h, lake.h) : h; }
 // eğime göre yürüme hızı çarpanı: düzde 1, dik dağ yamacında ~0.55
 function terrainMul(x, y) {
   if (!TMUL) return 1;
@@ -1305,7 +1311,7 @@ function updSeasons(dt) {
   for (const l of G.lakes || []) {
     const T = tempAt(l.x, l.y);
     if (!l.frozen) { l.iceT = T < -2 ? (l.iceT || 0) + step : Math.max(0, (l.iceT || 0) - step); if (l.iceT > 90) { l.frozen = true; l.iceT = 0; if (dist(l, G.fire) < 3200) fz++; } }
-    else { l.iceT = T > 2 ? (l.iceT || 0) + step : Math.max(0, (l.iceT || 0) - step); if (l.iceT > 90) { l.frozen = false; l.iceT = 0; if (dist(l, G.fire) < 3200) th++; } }
+    else { l.iceT = T > 2 ? (l.iceT || 0) + step : Math.max(0, (l.iceT || 0) - step); if (l.iceT > 90) { l.frozen = false; l.iceT = 0; clearThawedLake(l); if (dist(l, G.fire) < 3200) th++; } }
   }
   if (fz) msg('🧊 Kampa yakın göl buz tuttu. Balıkçılar orada balık tutamaz.', '#cfe8ff', 5);
   if (th) msg('💧 Gölün buzu çözüldü. Balıkçılar yeniden ağ atabilir.', '#9cf', 4);
@@ -2588,6 +2594,7 @@ function pushOut(e, isDino) {
   const q = gQuery(e.x, e.y, e.r + 4);
   for (const o of q) {
     if (o.dead) continue;
+    if (o.kind === 'lake' && o.frozen) continue;
     if (o.kind === 'build' && !isDino) continue;
     if (o.kind === 'tree' && e.r >= 55) {
       if (!o.stump && Math.hypot(e.x - o.x, e.y - o.y) < e.r) { o.shake = 0.3; if (e.moving && Math.random() < 0.012) { treeDown(o); o.amt = 0; SFX.crash(volOf(o, 1100) * 0.7 + 0.02, panOf(o.x)); } }
@@ -2597,8 +2604,19 @@ function pushOut(e, isDino) {
     if (d < m) { e.x = o.x + dx / d * m; e.y = o.y + dy / d * m; if (o.kind === 'build') blocked = o; }
   }
   e.x = clamp(e.x, 30, WORLD - 30); e.y = clamp(e.y, 30, WORLD - 30);
-  if (HM && groundH(e.x, e.y) < 0.6) seaPush(e);
+  if (HM && groundH(e.x, e.y) < 0.6 && !frozenLakeAt(e.x, e.y)) seaPush(e);
   return blocked;
+}
+// Çözülme anında duran lider/halk/hayvan da suyun içinde kalmasın. (Codex)
+function clearThawedLake(lake) {
+  for (const list of [G.people || [], G.dinos || []]) for (const e of list) {
+    if (e.dead || e.fly || e.inHut || e.insideB || e.grabbed || (e === L && G.mount)) continue;
+    const dx = e.x - lake.x, dy = e.y - lake.y, rr = lake.r + (e.r || 0);
+    if (dx * dx + dy * dy >= rr * rr) continue;
+    if (dx * dx + dy * dy < 0.000001) { const a = (e.id || 1) * 2.399963229728653; e.x += Math.cos(a) * 0.01; e.y += Math.sin(a) * 0.01; }
+    pushOut(e, !!e.type);
+  }
+  if (G.mount && L) { L.x = G.mount.x; L.y = G.mount.y; }
 }
 // yürüyenleri denizden karaya it: yükseklik eğimi boyunca yukarı (düzse kampa doğru)
 function seaPush(e) {
@@ -7867,7 +7885,7 @@ const U3 = {
 const EYE = 30, EYE_SNEAK = 18, MAXL = 5, TREE_R = 2000, ROCK_R = 1600, BUSH_R = 1000, DECO_R = 700, SEA_Y = 0, VIEW_FAR = 9000;
 // ---- arazi API'si (dunya.js): yoksa düz dünya
 function gh(x, y) { if (typeof groundH !== 'function') return 0; const h = groundH(x, y); return h === h && h < 1e5 && h > -1e5 ? h : 0; }
-const ghE = (x, y) => Math.max(gh(x, y), SEA_Y - 1);   // canlılar denizde yüzeyde kalsın
+const ghE = (x, y) => Math.max(typeof walkSurfaceH === 'function' ? walkSurfaceH(x, y) : gh(x, y), SEA_Y - 1); // buz üstünde/deniz yüzeyinde canlı yüksekliği (Codex)
 function bioAt(x, y) { if (typeof biomeFast !== 'function') return 0; const b = biomeFast(x, y); return b >= 0 && b < 8 ? b : 0; }
 function seaAt(x, y) { return typeof isSea === 'function' ? !!isSea(x, y) : gh(x, y) < 0; }
 // basit 2B/3B değer gürültüsü (tohumlu, sürekli)

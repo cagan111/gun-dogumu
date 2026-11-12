@@ -11,6 +11,7 @@ function pushOut(e, isDino) {
   const q = gQuery(e.x, e.y, e.r + 4);
   for (const o of q) {
     if (o.dead) continue;
+    if (o.kind === 'lake' && o.frozen) continue;
     if (o.kind === 'build' && !isDino) continue;
     if (o.kind === 'tree' && e.r >= 55) {
       if (!o.stump && Math.hypot(e.x - o.x, e.y - o.y) < e.r) { o.shake = 0.3; if (e.moving && Math.random() < 0.012) { treeDown(o); o.amt = 0; SFX.crash(volOf(o, 1100) * 0.7 + 0.02, panOf(o.x)); } }
@@ -20,8 +21,19 @@ function pushOut(e, isDino) {
     if (d < m) { e.x = o.x + dx / d * m; e.y = o.y + dy / d * m; if (o.kind === 'build') blocked = o; }
   }
   e.x = clamp(e.x, 30, WORLD - 30); e.y = clamp(e.y, 30, WORLD - 30);
-  if (HM && groundH(e.x, e.y) < 0.6) seaPush(e);
+  if (HM && groundH(e.x, e.y) < 0.6 && !frozenLakeAt(e.x, e.y)) seaPush(e);
   return blocked;
+}
+// Çözülme anında duran lider/halk/hayvan da suyun içinde kalmasın. (Codex)
+function clearThawedLake(lake) {
+  for (const list of [G.people || [], G.dinos || []]) for (const e of list) {
+    if (e.dead || e.fly || e.inHut || e.insideB || e.grabbed || (e === L && G.mount)) continue;
+    const dx = e.x - lake.x, dy = e.y - lake.y, rr = lake.r + (e.r || 0);
+    if (dx * dx + dy * dy >= rr * rr) continue;
+    if (dx * dx + dy * dy < 0.000001) { const a = (e.id || 1) * 2.399963229728653; e.x += Math.cos(a) * 0.01; e.y += Math.sin(a) * 0.01; }
+    pushOut(e, !!e.type);
+  }
+  if (G.mount && L) { L.x = G.mount.x; L.y = G.mount.y; }
 }
 // yürüyenleri denizden karaya it: yükseklik eğimi boyunca yukarı (düzse kampa doğru)
 function seaPush(e) {

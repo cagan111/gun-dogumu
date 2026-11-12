@@ -14,7 +14,7 @@ const U3 = {
 const EYE = 30, EYE_SNEAK = 18, MAXL = 5, TREE_R = 2000, ROCK_R = 1600, BUSH_R = 1000, DECO_R = 700, SEA_Y = 0, VIEW_FAR = 9000;
 // ---- arazi API'si (dunya.js): yoksa düz dünya
 function gh(x, y) { if (typeof groundH !== 'function') return 0; const h = groundH(x, y); return h === h && h < 1e5 && h > -1e5 ? h : 0; }
-const ghE = (x, y) => Math.max(gh(x, y), SEA_Y - 1);   // canlılar denizde yüzeyde kalsın
+const ghE = (x, y) => Math.max(typeof walkSurfaceH === 'function' ? walkSurfaceH(x, y) : gh(x, y), SEA_Y - 1); // buz üstünde/deniz yüzeyinde canlı yüksekliği (Codex)
 function bioAt(x, y) { if (typeof biomeFast !== 'function') return 0; const b = biomeFast(x, y); return b >= 0 && b < 8 ? b : 0; }
 function seaAt(x, y) { return typeof isSea === 'function' ? !!isSea(x, y) : gh(x, y) < 0; }
 // basit 2B/3B değer gürültüsü (tohumlu, sürekli)
