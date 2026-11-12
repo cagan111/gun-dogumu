@@ -12,10 +12,11 @@ const playing = () => G.started && !G.over && L;
 // ---- klavye / fare
 addEventListener('keydown', e => {
   audioInit();
+  if(arrivalPending()) { if(e.code==='Escape'){e.preventDefault();arrivalAdvance(true)}return; }
   if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(e.code)) e.preventDefault();
   const first = !keys[e.code]; keys[e.code] = true;
   if (e.code === 'KeyN' && first && typeof sesMute === 'function') sesMute();
-  if (!playing()) return;
+  if (!playing() || arrivalPending()) return;
   if (G.sleep) { if (first) wakeUp('Uyandın.'); return; }
   if (e.code === 'Escape' && CAV_PLACE.recipe) { cavPlaceStop(); return; }
   if (e.code === 'KeyR' && first && CAV_PLACE.recipe) { CAV_PLACE.ang = (CAV_PLACE.ang + Math.PI / 2) % TAU; e.preventDefault(); return; }
@@ -38,7 +39,7 @@ addEventListener('keydown', e => {
 });
 addEventListener('keyup', e => { keys[e.code] = false; });
 const locked = () => document.pointerLockElement === cv;
-function look(dx, dy, k) { if (!playing() || G.sleep) return; G.yaw = (G.yaw || 0) + dx * k; G.pitch = clamp((G.pitch || 0) - dy * k * 0.8, -1.1, 1.1); }
+function look(dx, dy, k) { if (arrivalPending() || !playing() || G.sleep) return; G.yaw = (G.yaw || 0) + dx * k; G.pitch = clamp((G.pitch || 0) - dy * k * 0.8, -1.1, 1.1); }
 function unlockPtr() { if (document.pointerLockElement) document.exitPointerLock(); mouse.down = mouse.right = false; }
 addEventListener('mousemove', e => { if (locked()) look(e.movementX || 0, e.movementY || 0, 0.0024); });
 document.addEventListener('pointerlockchange', () => { if (!locked()) mouse.down = mouse.right = false; $('lockHint').style.display = (!isTouch && playing() && !locked()) ? 'block' : 'none'; });
@@ -48,7 +49,7 @@ const lookEnd = e => { if (e.pointerId === lookT.id) lookT.id = null; };
 cv.addEventListener('pointerup', lookEnd); cv.addEventListener('pointercancel', lookEnd);
 cv.addEventListener('pointerdown', e => {
   audioInit();
-  if (!playing()) return;
+  if (!playing() || arrivalPending()) return;
   if (G.sleep) { wakeUp('Uyandın.'); return; }
   if (e.pointerType !== 'mouse') {
     if (lookT.id === null) { lookT.id = e.pointerId; lookT.x = e.clientX; lookT.y = e.clientY; try { cv.setPointerCapture(e.pointerId); } catch (_) {} }
@@ -64,7 +65,7 @@ cv.addEventListener('pointerdown', e => {
 addEventListener('mouseup', e => { if (e.button === 2) mouse.right = false; else mouse.down = false; });
 cv.addEventListener('contextmenu', e => e.preventDefault());
 document.addEventListener('visibilitychange', () => { if (document.hidden && playing()) { saveGame('auto'); if (!G.paused) togglePause(); } });
-function togglePause() { if (!playing()) return; unlockPtr(); G.paused = !G.paused; $('pause').style.display = G.paused ? 'flex' : 'none'; }
+function togglePause() { if (!playing() || arrivalPending()) return; unlockPtr(); G.paused = !G.paused; $('pause').style.display = G.paused ? 'flex' : 'none'; }
 
 // ---- av emri
 function toggleHunt() {
@@ -657,6 +658,38 @@ function startScreen() {
   $('go').onclick = () => { audioInit(); newGame(UI.diff, $('tutChk').checked); };
   if (sv) $('cont').onclick = () => { audioInit(); try { loadGame(sv.s); } catch (e) { console.error(e); store.del('sonAtesKayit4'); startScreen(); } };
 }
+// Statik metin + mevcut dünya: video/varlık indirmesi ve ek render geçişi yok.
+let arrivalPanel=null;
+function arrivalClearInput() {
+  for(const k of Object.keys(keys))keys[k]=false;
+  mouse.down=mouse.right=false;
+  touch.jx=touch.jy=0;touch.atk=touch.act=touch.run=touch.shoot=false;touch.id=null;
+  lookT.id=null;
+}
+function arrivalShow() {
+  arrivalClearInput();
+  if(!arrivalPending()) {
+    if(arrivalPanel){arrivalPanel.remove();arrivalPanel=null;}
+    return;
+  }
+  unlockPtr();G.paused=true;G.modal=true;
+  G.yaw=HOME.ang+(G.arrival.step===0?Math.PI/2:-Math.PI/2);G.pitch=0;
+  if(!arrivalPanel) {
+    arrivalPanel=document.createElement('div');arrivalPanel.id='arrivalIntro';
+    arrivalPanel.setAttribute('role','dialog');arrivalPanel.setAttribute('aria-modal','true');arrivalPanel.setAttribute('aria-labelledby','arrivalTitle');
+    arrivalPanel.style.cssText='position:fixed;inset:0;z-index:3000;display:flex;align-items:flex-end;justify-content:center;padding:12px;box-sizing:border-box;background:linear-gradient(transparent,rgba(5,10,9,.82));color:#f5e8cd';
+    document.body.appendChild(arrivalPanel);
+  }
+  const cards=[
+    [G.caveTerrain===2?'Kıyıya vurduk':'Yeni bir sığınak','Fırtına geride kaldı. Dokuz kişiyiz. Erzak sandıkları ve aletler denizde kayboldu. Şimdi birbirimize ihtiyacımız var.'],
+    ['Yamaçta bir ağız','Ateşin arkasındaki kayalıkta boş bir mağara var. Ağzına yürüyerek gir. Sığınak hazır; yatakları, sandıkları ve çalışma yerlerini biz yapacağız.'],
+    ['Son kor','Oduncu, taşçı ve toplayıcılar ilk malzemeleri getirsin. İlk aletleri yanan ateşte üret (C). Mağaranın içinde I ile eşya planla. Geceyi hazırlıksız karşılama.']
+  ],card=cards[G.arrival.step];
+  arrivalPanel.innerHTML=`<section style="width:min(620px,100%);max-height:85vh;overflow:auto;padding:18px;border:1px solid #75664b;border-radius:12px;background:rgba(12,20,16,.93);box-sizing:border-box"><small aria-live="polite">SON ATEŞ · ${G.arrival.step+1}/3</small><h2 id="arrivalTitle" style="margin:8px 0">${card[0]}</h2><p style="line-height:1.5;margin:8px 0 16px">${card[1]}</p><div style="display:flex;gap:10px;flex-wrap:wrap"><button id="arrivalNext" style="min-height:44px;background:#3c3324;color:#fff2d4;border:1px solid #ab9162;border-radius:6px;font:inherit;flex:1">${G.arrival.step===2?'BAŞLA':'DEVAM'}</button><button id="arrivalSkip" style="min-height:44px;background:#24352b;color:#fff2d4;border:1px solid #ab9162;border-radius:6px;font:inherit">Girişi atla</button></div></section>`;
+  $('arrivalNext').onclick=()=>arrivalAdvance();$('arrivalSkip').onclick=()=>arrivalAdvance(true);
+  arrivalPanel.onkeydown=e=>{if(e.key==='Tab'){e.preventDefault();(document.activeElement===$('arrivalNext')?$('arrivalSkip'):$('arrivalNext')).focus();}};
+  if(typeof $('arrivalNext').focus==='function')$('arrivalNext').focus();
+}
 function onGameStart() {
   $('screen').style.display = 'none'; $('hud').style.display = 'block'; $('pause').style.display = 'none';
   G.started = true; G.paused = false; G.modal = false; $('craft').style.display = 'none'; $('charM').style.display = 'none'; UI.char = 0; $('inM').style.display = 'none'; UI.inB = null;
@@ -664,6 +697,7 @@ function onGameStart() {
   if (innerWidth <= 700 || innerHeight <= 520) { toggleSide(false); $('miniBox').style.display = 'none'; } else { toggleSide(true); $('miniBox').style.display = 'block'; }
   $('miniBox').classList.remove('big');
   buildTools(); renderSide(); updateHUD(); UI.goalT = 0; updateShipGoalHUD();
+  arrivalShow();
 }
 function showGameOver() {
   const dawn = G.diff === 'kolay' && store.get('sonAtesSafak4');
