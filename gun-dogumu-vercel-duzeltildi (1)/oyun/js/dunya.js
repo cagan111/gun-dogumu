@@ -137,9 +137,10 @@ function biomeFast(x, y) {
   return G.bmap[j * MAPN + i];
 }
 // kıyıya kadar ışın: kamptan a yönünde ilk deniz noktasının yarıçapı
-function coastR(a, r0 = 4500) {
-  for (let r = r0; r < 8200; r += 20) if (groundH(CAMP.x + Math.cos(a) * r, CAMP.y + Math.sin(a) * r) < 0) return r;
-  return 8200;
+function coastR(a, r0 = 4500 * ISLK) {
+  const rMax = 8200 * ISLK;
+  for (let r = r0; r < rMax; r += 20) if (groundH(CAMP.x + Math.cos(a) * r, CAMP.y + Math.sin(a) * r) < 0) return r;
+  return rMax;
 }
 
 function genWorld(seed) {
