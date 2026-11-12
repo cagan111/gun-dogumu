@@ -2440,7 +2440,7 @@ const REAL_SET = {
 function realR(kind) { return kind === 'tree' || kind === 'conifer' ? (REAL.low ? 200 : 420) : kind === 'rock' ? (REAL.low ? 300 : 800) : (REAL.low ? 200 : 520); }
 function realStart() {
   if (REAL.started) return;
-  if (typeof THREE.GLTFLoader !== 'function' || (typeof location !== 'undefined' && location.protocol === 'file:')) { REAL.started = true; REAL.why = typeof THREE.GLTFLoader !== 'function' ? 'yükleyici yok' : 'dosyadan açıldı'; return; }
+  if (typeof THREE.GLTFLoader !== 'function' || (typeof location !== 'undefined' && location.protocol === 'file:')) { REAL.started = true; REAL.why = typeof THREE.GLTFLoader !== 'function' ? 'yükleyici yok' : 'dosyadan açıldı'; if (typeof msg === 'function') msg('🌲 Gerçekçi modeller kapalı (' + REAL.why + ')', '#e99', 6); return; }
   REAL.started = true;
   const loader = new THREE.GLTFLoader(), names = [].concat(...Object.values(REAL_SET)); let left = names.length;
   const done = () => { if (--left === 0) { const n = Object.keys(REAL.M).length; REAL.ready = n > 0; U3.instX = 1e9;
