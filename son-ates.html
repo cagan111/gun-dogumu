@@ -2645,6 +2645,8 @@ function updFisher(p, dt) {
 // =============================================================
 
 // ---- hareket ve çarpışma
+// çarpışma yarıçapı: hayvanın gövdesi gövde aralarından sıkışarak geçebilir (yalnız gövde/ince dal çarpar)
+function colR(o, e, isDino) { return o.kind === 'tree' && isDino ? o.r * 0.5 + e.r * 0.55 : o.r + e.r; }
 function pushOut(e, isDino) {
   if (e.fly) return null;
   let blocked = null;
@@ -2653,11 +2655,12 @@ function pushOut(e, isDino) {
     if (o.dead) continue;
     if (o.kind === 'lake' && o.frozen) continue;
     if (o.kind === 'build' && !isDino) continue;
+    if (o.kind === 'tree' && e.squeeze > 0) continue; // uzun süre sıkışan hayvan çalılığı yarıp geçer
     if (o.kind === 'tree' && e.r >= 55) {
       if (!o.stump && Math.hypot(e.x - o.x, e.y - o.y) < e.r) { o.shake = 0.3; if (e.moving && Math.random() < 0.012) { treeDown(o); o.amt = 0; SFX.crash(volOf(o, 1100) * 0.7 + 0.02, panOf(o.x)); } }
       continue;
     }
-    const dx = e.x - o.x, dy = e.y - o.y, d = Math.hypot(dx, dy) || 0.01, m = o.r + e.r;
+    const dx = e.x - o.x, dy = e.y - o.y, d = Math.hypot(dx, dy) || 0.01, m = colR(o, e, isDino);
     if (d < m) { e.x = o.x + dx / d * m; e.y = o.y + dy / d * m; if (o.kind === 'build') blocked = o; }
   }
   e.x = clamp(e.x, 30, WORLD - 30); e.y = clamp(e.y, 30, WORLD - 30);
@@ -2685,20 +2688,82 @@ function seaPush(e) {
     e.x += gx / m * st; e.y += gy / m * st;
   }
 }
+// önüne bakarak engelden kaçınma: yol üstündeki en yakın ağaç/kaya/göl için yan geçiş noktası (taraf kalıcı)
+function avBlocks(o, e, isDino) {
+  if (o.dead || o.kind === 'build' || o.kind === 'crystal') return false;
+  if (o.kind === 'lake' && o.frozen) return false;
+  if (o.kind === 'tree' && e.r >= 55) return false;
+  return o.kind === 'tree' || o.kind === 'rock' || o.kind === 'lake';
+}
+function avoidDir(e, dx, dy, d, tx, ty, spd, dt, isDino) {
+  if (e.fly) return null;
+  const look = Math.min(d, e.r * 2 + 45 + spd * 0.6);
+  if (e.avT > 0) e.avT -= dt;
+  const q = gQuery(e.x + dx * look * 0.5, e.y + dy * look * 0.5, look * 0.5 + e.r + 8);
+  let best = null, bt = Infinity, blat = 0;
+  for (const o of q) {
+    if (!avBlocks(o, e, isDino)) continue;
+    const R = colR(o, e, isDino) + 3;
+    if (Math.hypot(tx - o.x, ty - o.y) < R + 18) continue; // hedefin kendisi (kesilecek ağaç, kırılacak taş)
+    const rx = o.x - e.x, ry = o.y - e.y, t = rx * dx + ry * dy;
+    if (t < -o.r * 0.3 || t > look + o.r) continue;
+    const lat = -rx * dy + ry * dx; // + ise engel solda
+    if (Math.abs(lat) >= R) continue;
+    if (t < bt) { bt = t; best = o; blat = lat; }
+  }
+  let ax = dx, ay = dy;
+  if (best) {
+    // aynı engel kümesinde aynı yandan dolanmaya devam et; yeni engelde boş tarafa geç
+    if (!(e.avT > 0) || !e.avS) e.avS = Math.abs(blat) < 2 ? (((e.id | 0) & 1) ? 1 : -1) : (blat > 0 ? -1 : 1);
+    e.avT = 0.8;
+    const R = colR(best, e, isDino) + 10, nx = -dy * e.avS, ny = dx * e.avS;
+    const px = best.x + nx * R, py = best.y + ny * R;
+    let vx = px - e.x, vy = py - e.y; const m = Math.hypot(vx, vy) || 1; vx /= m; vy /= m;
+    // geçiş noktası arkada kaldıysa teğet yönde ilerle
+    if (vx * dx + vy * dy < 0.15) { vx = nx * 0.85 + dx * 0.35; vy = ny * 0.85 + dy * 0.35; const k = Math.hypot(vx, vy); vx /= k; vy /= k; }
+    ax = vx; ay = vy;
+  }
+  // deniz/sığ suya doğru yürüme: önü suysa yönü yavaşça çevir (hedef de sudaysa karışma)
+  if (HM && e.type !== 'batakci' && !e.swim) {
+    const la = Math.min(look, 70);
+    if (groundH(e.x + ax * la, e.y + ay * la) < 0.6 && !frozenLakeAt(e.x + ax * la, e.y + ay * la) && groundH(tx, ty) >= 0.6) {
+      const base = Math.atan2(ay, ax), sd = e.avS || 1;
+      for (const k of [0.45, -0.45, 0.9, -0.9, 1.4, -1.4]) {
+        const a = base + k * sd, cx = Math.cos(a), cy = Math.sin(a);
+        if (groundH(e.x + cx * la, e.y + cy * la) >= 0.6) { ax = cx; ay = cy; e.avS = k * sd > 0 ? 1 : -1; e.avT = 0.8; break; }
+      }
+    }
+  }
+  return best || ax !== dx ? [ax, ay] : null;
+}
 function steer(e, tx, ty, spd, dt, isDino) {
   let dx = tx - e.x, dy = ty - e.y; const d = Math.hypot(dx, dy);
   if (d < 3) { e.moving = false; return true; }
   if (isDino && e.type !== 'batakci' && biomeFast(e.x, e.y) === 2) spd *= 0.75;
   dx /= d; dy /= d;
-  if (e.detour) { const px = -dy * e.detour, py = dx * e.detour; dx = dx * 0.4 + px; dy = dy * 0.4 + py; const m = Math.hypot(dx, dy); dx /= m; dy /= m; }
+  if (e.squeeze > 0) e.squeeze -= dt;
+  const av = avoidDir(e, dx, dy, d, tx, ty, spd, dt, isDino);
+  if (av) { dx = av[0]; dy = av[1]; }
+  if (e.detour) { const px = -dy * e.detour, py = dx * e.detour; dx = dx * 0.35 + px; dy = dy * 0.35 + py; const m = Math.hypot(dx, dy); dx /= m; dy /= m; }
   const s = Math.min(spd * dt, d), ox = e.x, oy = e.y;
   e.x += dx * s; e.y += dy * s;
   const bl = pushOut(e, isDino); if (isDino) e.bash = bl;
   const moved = Math.hypot(e.x - ox, e.y - oy);
-  if (moved < s * 0.3 && !bl) { e.stuck += dt; if (e.stuck > 0.25) { e.detour = Math.random() < 0.5 ? 1 : -1; e.stuck = -0.7; } }
+  if (!(e.stuck === e.stuck)) e.stuck = 0;
+  if (moved < s * 0.3 && !bl) {
+    e.stuck += dt;
+    if (e.stuck > 0.25) {
+      // takıldı: her seferinde öbür yanı dene, süre uzasın; çok uzarsa dolanma tarafını da çevir
+      e.stk = (e.stk || 0) + 1;
+      e.detour = e.stk % 2 ? (e.avS || (Math.random() < 0.5 ? 1 : -1)) : -(e.avS || 1);
+      if (e.stk % 3 === 0) e.avS = -(e.avS || 1);
+      if (e.stk >= 6) e.squeeze = isDino ? 1.6 : 0.8;
+      e.stuck = -Math.min(2.2, 0.6 + e.stk * 0.3);
+    }
+  }
   else if (e.stuck < 0) { e.stuck += dt; if (e.stuck >= 0) e.detour = 0; }
-  else e.stuck = Math.max(0, e.stuck - dt);
-  e.ang = angLerp(e.ang, Math.atan2(dy, dx), Math.min(1, dt * 10));
+  else { e.stuck = Math.max(0, e.stuck - dt); if (e.stuck === 0 && moved > s * 0.8 && e.stk) e.stk = Math.max(0, e.stk - dt * 0.5); }
+  e.ang = angLerp(e.ang, Math.atan2(dy, dx), Math.min(1, dt * 8));
   e.moving = true;
   return d < 8;
 }
