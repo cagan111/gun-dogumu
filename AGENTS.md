@@ -31,7 +31,7 @@ Simülasyon 2B'dir (dünya x,y); çizim (x, yükseklik, y) olarak 3B'ye taşır.
 2. Küçük, tek konulu commit'ler; mesaj Türkçe. Başlamadan `git pull`, bitince hemen `git push`.
 3. Başka dosyanın çağırdığı fonksiyon adını/imzasını değiştirme (önce `grep`).
 4. Her değişiklikten sonra: `node --check js/*.js` ve sayfa açılışında konsol hatası olmadığını doğrula; sonra `son-ates.html`'i yeniden üret.
-5. Telefon (iPhone Safari, yatay) birinci hedef: gölge haritası yok, en fazla 6 nokta ışık, instancing.
+5. Grafikte PC kalitesi öncelikli (sahibi: "telefona ağır gelmesinde sorun yok"). `U3.quality` 'yuksek' (masaüstü: gölge haritası, yoğun bitki, post-process serbest) / 'dusuk' (dokunmatik: gölge haritası yok, ≤6 nokta ışık, instancing). Telefon yine oynanabilir kalmalı.
 6. Var olan bir oyunun adı/karakteri/görseli kopyalanmaz; her şey özgün ve kodla üretilir.
 
 ## Test
