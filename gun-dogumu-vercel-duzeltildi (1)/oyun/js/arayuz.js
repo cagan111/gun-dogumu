@@ -492,8 +492,58 @@ function updateHUD() {
   else $('tutBox').style.display = 'none';
 }
 $('tutBox').addEventListener('pointerdown', e => { if (e.target.id === 'tutSkip') { G.tut.on = false; store.set('sonAtesTutDone', '1'); } });
+// Eve dönüş hedefi; yalnız mevcut durumdan türetilir, kayda alan eklemez.
+function shipGoalInfo(g, build, level) {
+  const def = build || {}, cost = def.cost || {}, stock = g.stock || {};
+  const count = value => Math.max(0, Math.floor(Number.isFinite(value) ? value : 0));
+  const day = count(g.day), found = Math.min(3, (g.wrecks || []).filter(w => w && w.found).length);
+  const rope = count(stock.halat), cloth = count(stock.yelkenBezi);
+  const needRope = count(cost.halat), needCloth = count(cost.yelkenBezi);
+  const ship = (g.builds || []).find(b => b && !b.dead && b.type === 'gemi');
+  if (ship) {
+    const progress = ship.need > 0 ? Math.max(0, Math.min(100, Math.floor((ship.prog || 0) / ship.need * 100))) : 0;
+    return { text: ship.built ? '⛵ Gemi hazır — yanına git, eve dön.' : '⛵ Gemi inşa ediliyor: %' + progress,
+      title: 'Gemi planlanırken malzemeler stoktan ayrılır; azalan stok hedefi geri almaz.' };
+  }
+  const people = (g.people || []).length;
+  const lvl = count(level), needLevel = count(def.lvl);
+  let next;
+  if (day < 200) next = '200. güne kadar halkını hayatta tut.';
+  else if (found < 3) next = 'Kıyılardaki üç enkazı ara.';
+  else if (rope < needRope) next = 'Halat ürettir.';
+  else if (cloth < needCloth) next = 'Yelken bezi ürettir.';
+  else if (people < 15) next = 'Gemi için en az 15 kişi gerekiyor.';
+  else if (lvl < needLevel) next = needLevel + '. seviye inşaat ustası yetiştir.';
+  else if (Object.keys(cost).some(k => count(stock[k]) < count(cost[k]))) next = 'Gemi planındaki diğer malzemeleri tamamla.';
+  else next = 'Eylemler menüsünden kıyıya Gemi planla.';
+  return { text: '⛵ ' + day + '/200 gün · Enkaz ' + found + '/3 · Halat ' + rope + '/' + needRope + ' · Bez ' + cloth + '/' + needCloth,
+    title: 'Eve dönüş: ' + next + ' Enkaz sayacı bulunan enkazları, malzeme sayaçları kullanılabilir stoku gösterir.' };
+}
+function updateShipGoalHUD() {
+  const top = $('top'); if (!top) return;
+  let node = $('shipGoal');
+  if (!node) {
+    node = document.createElement('div'); node.id = 'shipGoal';
+    node.style.cssText = 'font-size:11px;line-height:1.4;max-width:100%;overflow-wrap:anywhere';
+    top.appendChild(node);
+    if (!$('shipGoalStyle')) {
+      const style = document.createElement('style'); style.id = 'shipGoalStyle';
+      style.textContent = '#miniBox:not(.big){top:var(--son-ates-map-top,150px)}';
+      document.head.appendChild(style);
+    }
+  }
+  const goal = shipGoalInfo(G, BUILD.gemi, bestLvl('insaat'));
+  if (node.textContent !== goal.text) node.textContent = goal.text;
+  if (node.title !== goal.title) node.title = goal.title;
+  const mini = $('miniBox');
+  if (mini && mini.style.display !== 'none' && !mini.classList.contains('big')) {
+    const y = Math.max(150, Math.ceil(top.getBoundingClientRect().bottom) + 8) + 'px';
+    if (mini.style.getPropertyValue('--son-ates-map-top') !== y) mini.style.setProperty('--son-ates-map-top', y);
+  }
+}
 function hudTick(dt) {
   UI.hudT -= dt; if (UI.hudT <= 0) { UI.hudT = 0.15; updateHUD(); renderMsgs(); }
+  UI.goalT = (UI.goalT || 0) - dt; if (UI.goalT <= 0) { UI.goalT = 1; updateShipGoalHUD(); }
   else if (G.msgDirty) renderMsgs();
   UI.sideT -= dt; if (UI.sideT <= 0 || (G.uiDirty && UI.sideT < 0.45)) { UI.sideT = 0.6; renderSide(); }
   UI.miniT -= dt; if (UI.miniT <= 0) { UI.miniT = 0.25; drawMini(); }
@@ -540,7 +590,7 @@ function onGameStart() {
   UI.sel.clear(); UI.filter = 'all';
   if (innerWidth <= 700 || innerHeight <= 520) { toggleSide(false); $('miniBox').style.display = 'none'; } else { toggleSide(true); $('miniBox').style.display = 'block'; }
   $('miniBox').classList.remove('big');
-  buildTools(); renderSide(); updateHUD();
+  buildTools(); renderSide(); updateHUD(); UI.goalT = 0; updateShipGoalHUD();
 }
 function showGameOver() {
   const dawn = G.diff === 'kolay' && store.get('sonAtesSafak4');
