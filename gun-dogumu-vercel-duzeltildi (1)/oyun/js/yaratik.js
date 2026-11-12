@@ -1102,7 +1102,7 @@ function spawnGuards(c) {
 function startRaid() {
   const live = G.ccamps.filter(c => c.alive); if (!live.length) return false;
   const c = live.sort((a, b) => dist(a, G.fire) - dist(b, G.fire))[0];
-  const a0 = angTo(G.fire, c), n = Math.min(8, 3 + Math.floor(G.day / 3));
+  const a0 = angTo(G.fire, c), n = Math.min(8, 4 + Math.floor(G.day / 3));   /* sahip: baskın en az 4 yamyam */
   if (birthRoom('yamyam', 'raid') < 1) return false;
   G.raid = { t: 0, charged: false, grabbed: 0, campI: c.i };
   for (let i = 0; i < n; i++) {
