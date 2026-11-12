@@ -133,12 +133,12 @@ function grpMul(g) { const m = mgr(g); return m ? 1.2 + (tr(m, 'onder') ? 0.25 :
 const abilOn = g => !!(G.abil[g] && G.abil[g].act > 0);
 const mgrScore = p => (tr(p, 'onder') ? 3 : 0) + (tr(p, 'yasli') ? 2 : 0) + lvl(p, GROUPS[p.group] && GROUPS[p.group].sk) * 0.8 + p.hp / 100;
 function setGroup(p, g, quiet) {
+  if (!quiet && g !== 'takip' && !p.leader && !p.child) { p.rtBase = null; p.prevG = null; }   // oyuncunun kalıcı seçimi (aynı grup olsa da): şafakta geri alınmaz
   if (p.leader || p.child || p.group === g) return;
   if (G.managers[p.group] === p.id) { G.managers[p.group] = null; if (!quiet) msg(`${GROUPS[p.group].ad} grubu yöneticisiz kaldı.`, '#ccc', 3); }
   if (p.tgt && p.tgt.claim === p) p.tgt.claim = null;
   if (p.post) { p.post.guard = null; p.post = null; }
   for (const o of G.orders) if (o.worker === p.id) o.worker = 0;
-  if (!quiet && g !== 'takip') { p.rtBase = null; p.prevG = null; }   // oyuncunun kalıcı seçimi: şafakta geri alınmaz
   if (p.carrying) dropCarried(p);
   p.tgt = null; p.st = p.carry > 0 ? 'return' : 'idle'; p.group = g; p.stgt = null;
   if (p.inHut && (g === 'muhafiz' || g === 'takip')) leaveHut(p);
@@ -1135,7 +1135,9 @@ function halkDawn() {
   if (G.hunt && G.hunt.t && (G.hunt.t.dead || G.hunt.t.tamed)) G.hunt = null;
   for (const p of G.people) {
     if (p.leader || p.child) continue;
-    const back = p.rtBase || (p.group === 'takip' && p.prevG !== 'takip' ? p.prevG : null);
+    let back = p.rtBase || (p.group === 'takip' ? 'takip' : null);
+    if (back === 'takip') back = p.prevG && p.prevG !== 'takip' ? p.prevG : null;   // takip geçicidir: asıl mesleğe çözümle
+    if (!back && p.group === 'takip') back = 'bos';
     p.rtBase = null; p.prevG = null;
     if (back && GROUPS[back] && back !== p.group) setGroup(p, back, true);
   }
