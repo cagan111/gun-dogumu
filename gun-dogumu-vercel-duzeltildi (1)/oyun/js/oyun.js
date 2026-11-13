@@ -35,6 +35,22 @@ function arrivalAdvance(skip=false) {
   else G.arrival.step++;
   if(typeof arrivalShow==='function')arrivalShow();
 }
+// Yalnız yeni oyunların ilk mağara kararı; eski v4 marker yoksa açılmaz.
+function caveChoiceRead(d) { return d&&d.v===1&&typeof d.done==='boolean'?{v:1,done:d.done,guard:Number.isInteger(d.guard)?d.guard:0,recipe:['crate','mat','hearth'].includes(d.recipe)?d.recipe:''}:null; }
+function caveChoicePending() { return !!(G.caveChoice&&G.caveChoice.v===1&&!G.caveChoice.done&&G.inside&&G.inside.b===G.cave); }
+function caveChoicePeople() { return G.people.filter(p=>p!==L&&!p.leader&&!p.child&&!p.dead&&!p.grabbed&&!p.downed&&!p.bed&&!p.carrying&&!p.carriedBy); }
+function caveChoiceApply(guard,recipe) {
+  if(!caveChoicePending())return false;
+  const p=guard?caveChoicePeople().find(p=>p.id===guard):null;
+  if(guard&&!p)return false;
+  if(recipe&&!['crate','mat','hearth'].includes(recipe))return false;
+  if(p)setGroup(p,'muhafiz');
+  Object.assign(G.caveChoice,{done:true,guard:guard||0,recipe:recipe||''});
+  G.modal=false;G.paused=false;
+  if(typeof caveChoiceShow==='function')caveChoiceShow();
+  if(recipe&&typeof cavPlaceStart==='function'){cavPlaceStart();CAV_PLACE.recipe=recipe;cavPlaceAim();cavPlacePanel();}
+  return true;
+}
 function newGame(diff, tutOn) {
   setIslandScale(1.5); resetState(diff);
   G.caveTerrain=2;
@@ -60,6 +76,7 @@ function newGame(diff, tutOn) {
   msg('Ateşi canlı tut. Halkını besle. Gece geldiğinde... ışıktan ayrılma.', '#ffd9a0', 8);
   if (!tutOn) msg('Halkını sağdaki panelden gruplara ayır, yöneticiler ata.', '#bbb', 8);
   G.arrival={v:1,step:0,done:false};
+  G.caveChoice={v:1,done:false,guard:0,recipe:''};
   markExplored(L.x, L.y, 500);
   onGameStart();
 }
@@ -708,7 +725,7 @@ function serialize() {
   const pf = ['id', 'name', 'x', 'y', 'leader', 'child', 'age', 'traits', 'story', 'group', 'hp', 'maxhp', 'fear', 'skin', 'hair', 'injury', 'downed', 'tired', 'watched', 'partner', 'parentA', 'parentB', 'stam', 'seat', 'r', 'sk', 'sick', 'wasDowned', 'bedUntil', 'routine', 'alt', 'hunger', 'own', 'joinHunt', 'bag', 'carry', 'cookGot', 'batch', 'prevG', 'rtBase', 'planHunt', 'planHuntPrev'];
   let ex = ''; for (let i = 0; i < G.explored.length; i++) ex += G.explored[i] ? '1' : '0';
   return JSON.stringify({
-    v: 4, arrival:arrivalRead(G.arrival), home:{v:1,x:HOME.x,y:HOME.y,ang:HOME.ang}, caveTerrain:G.caveTerrain===2?2:G.caveTerrain===1?1:0, isl: ISLK, wrecks: (G.wrecks || []).map(w => !!w.found), inside: G.inside ? G.builds.indexOf(G.inside.b) : -1, seed: G.seed, diff: G.diff, t: G.t, cyc: CYCLE, day: G.day, stock: G.stock, fuel: G.fire.fuel, morale: G.morale, orders: G.orders.map(o => Object.assign({}, o, { worker: 0 })), oid: G.oid, unclean: G.unclean, planToday: G.planToday, planNext: G.planNext, seeds: G.seeds, seedSeen: G.seedSeen,
+    v: 4, caveChoice:caveChoiceRead(G.caveChoice), arrival:arrivalRead(G.arrival), home:{v:1,x:HOME.x,y:HOME.y,ang:HOME.ang}, caveTerrain:G.caveTerrain===2?2:G.caveTerrain===1?1:0, isl: ISLK, wrecks: (G.wrecks || []).map(w => !!w.found), inside: G.inside ? G.builds.indexOf(G.inside.b) : -1, seed: G.seed, diff: G.diff, t: G.t, cyc: CYCLE, day: G.day, stock: G.stock, fuel: G.fire.fuel, morale: G.morale, orders: G.orders.map(o => Object.assign({}, o, { worker: 0 })), oid: G.oid, unclean: G.unclean, planToday: G.planToday, planNext: G.planNext, seeds: G.seeds, seedSeen: G.seedSeen,
     carcs: G.carcs.filter(c => !c.dead).map(c => ({ x: c.x, y: c.y, r: c.r, type: c.type, ang: c.ang, meat: c.meat, bone: c.bone, hide: c.hide, age: c.age, rotten: c.rotten })),
     managers: G.managers, zone: G.zone, newGroup: G.newGroup, autoEq: !!G.autoEq, torchFuel: G.torchFuel, nightPlan: G.nightPlan, nightWeather: G.nightWeather, weather: G.weather,
     eggs: G.eggs, usedNames: [...G.usedNames], stats: G.stats, idc: G.idc, kills: G.kills, deaths: G.deaths, lost: G.lost,
@@ -780,6 +797,7 @@ function loadGame(s) {
   G.tut = D.tut >= 0 ? { on: true, step: D.tut } : { on: false, step: 0 };
   { const ib = D.inside >= 0 ? G.builds[D.inside] : null; if (enterable(ib)) { enterBuilding(ib); L.x = ib.x; L.y = ib.y; L.insideB = ib; } }
   G.arrival=arrivalRead(D.arrival);
+  G.caveChoice=caveChoiceRead(D.caveChoice);
   msg(`Kayıt yüklendi: ${G.day}. gün.`, '#cfe', 4);
   onGameStart();
 }
@@ -837,7 +855,7 @@ function updTut() {
 //  ANA GÜNCELLEME
 // =============================================================
 function update(dt) {
-  if(arrivalPending())return;
+  if(arrivalPending()||caveChoicePending())return;
   G.now += dt; G.dt = dt;
   updScent(dt);
   const prevP = phase(); G.t += dt; if (phase() < prevP) newDay();

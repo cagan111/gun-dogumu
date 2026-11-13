@@ -12,11 +12,12 @@ const playing = () => G.started && !G.over && L;
 // ---- klavye / fare
 addEventListener('keydown', e => {
   audioInit();
+  if(caveChoicePending()){if(e.code==='Escape'){e.preventDefault();caveChoiceApply(0,'')}return;}
   if(arrivalPending()) { if(e.code==='Escape'){e.preventDefault();arrivalAdvance(true)}return; }
   if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(e.code)) e.preventDefault();
   const first = !keys[e.code]; keys[e.code] = true;
   if (e.code === 'KeyN' && first && typeof sesMute === 'function') sesMute();
-  if (!playing() || arrivalPending()) return;
+  if (!playing() || arrivalPending() || caveChoicePending()) return;
   if (G.sleep) { if (first) wakeUp('Uyandın.'); return; }
   if (e.code === 'Escape' && CAV_PLACE.recipe) { cavPlaceStop(); return; }
   if (e.code === 'KeyR' && first && CAV_PLACE.recipe) { CAV_PLACE.ang = (CAV_PLACE.ang + Math.PI / 2) % TAU; e.preventDefault(); return; }
@@ -39,7 +40,7 @@ addEventListener('keydown', e => {
 });
 addEventListener('keyup', e => { keys[e.code] = false; });
 const locked = () => document.pointerLockElement === cv;
-function look(dx, dy, k) { if (arrivalPending() || !playing() || G.sleep) return; G.yaw = (G.yaw || 0) + dx * k; G.pitch = clamp((G.pitch || 0) - dy * k * 0.8, -1.1, 1.1); }
+function look(dx, dy, k) { if (arrivalPending() || caveChoicePending() || !playing() || G.sleep) return; G.yaw = (G.yaw || 0) + dx * k; G.pitch = clamp((G.pitch || 0) - dy * k * 0.8, -1.1, 1.1); }
 function unlockPtr() { if (document.pointerLockElement) document.exitPointerLock(); mouse.down = mouse.right = false; }
 addEventListener('mousemove', e => { if (locked()) look(e.movementX || 0, e.movementY || 0, 0.0024); });
 document.addEventListener('pointerlockchange', () => { if (!locked()) mouse.down = mouse.right = false; $('lockHint').style.display = (!isTouch && playing() && !locked()) ? 'block' : 'none'; });
@@ -49,7 +50,7 @@ const lookEnd = e => { if (e.pointerId === lookT.id) lookT.id = null; };
 cv.addEventListener('pointerup', lookEnd); cv.addEventListener('pointercancel', lookEnd);
 cv.addEventListener('pointerdown', e => {
   audioInit();
-  if (!playing() || arrivalPending()) return;
+  if (!playing() || arrivalPending() || caveChoicePending()) return;
   if (G.sleep) { wakeUp('Uyandın.'); return; }
   if (e.pointerType !== 'mouse') {
     if (lookT.id === null) { lookT.id = e.pointerId; lookT.x = e.clientX; lookT.y = e.clientY; try { cv.setPointerCapture(e.pointerId); } catch (_) {} }
@@ -65,7 +66,7 @@ cv.addEventListener('pointerdown', e => {
 addEventListener('mouseup', e => { if (e.button === 2) mouse.right = false; else mouse.down = false; });
 cv.addEventListener('contextmenu', e => e.preventDefault());
 document.addEventListener('visibilitychange', () => { if (document.hidden && playing()) { saveGame('auto'); if (!G.paused) togglePause(); } });
-function togglePause() { if (!playing() || arrivalPending()) return; unlockPtr(); G.paused = !G.paused; $('pause').style.display = G.paused ? 'flex' : 'none'; }
+function togglePause() { if (!playing() || arrivalPending() || caveChoicePending()) return; unlockPtr(); G.paused = !G.paused; $('pause').style.display = G.paused ? 'flex' : 'none'; }
 
 // ---- av emri
 function toggleHunt() {
@@ -691,6 +692,22 @@ function arrivalShow() {
   arrivalPanel.onkeydown=e=>{if(e.key==='Tab'){e.preventDefault();(document.activeElement===$('arrivalNext')?$('arrivalSkip'):$('arrivalNext')).focus();}};
   if(typeof $('arrivalNext').focus==='function')$('arrivalNext').focus();
 }
+let caveChoicePanel=null;
+function caveChoiceShow() {
+  arrivalClearInput();
+  if(!caveChoicePending()){if(caveChoicePanel){caveChoicePanel.remove();caveChoicePanel=null;}return;}
+  unlockPtr();G.modal=true;G.paused=true;
+  if(!caveChoicePanel){caveChoicePanel=document.createElement('div');caveChoicePanel.id='caveChoice';caveChoicePanel.setAttribute('role','dialog');caveChoicePanel.setAttribute('aria-modal','true');caveChoicePanel.setAttribute('aria-labelledby','caveChoiceTitle');caveChoicePanel.style.cssText='position:fixed;inset:0;z-index:3100;background:#000b;display:flex;align-items:center;justify-content:center;padding:12px;box-sizing:border-box';document.body.appendChild(caveChoicePanel);}
+  caveChoicePanel.innerHTML='<section style="max-width:500px;max-height:85vh;overflow:auto;background:#17221b;color:#f3e8cf;border:1px solid #9b895e;border-radius:10px;padding:16px"><h2 id="caveChoiceTitle">İlk nöbet ve yerleşim</h2><p>Mevcut nöbet düzenini koruyabilir veya bir kişiyi muhafıza ekleyebilirsin.</p><label>Nöbetçi <select id="caveGuard" style="min-height:44px;max-width:100%"></select></label><p><label>İlk plan <select id="caveFirstPlan" style="min-height:44px;max-width:100%"><option value="">Şimdilik planlama</option><option value="crate">Sandık · 6 odun</option><option value="mat">Yer yatağı</option><option value="hearth">Ocak · 8 taş, 3 odun</option></select></label></p><p>Eşya hazır verilmez. Seçtiğin planı içeride bakarak yerleştir; malzeme ve işçilik gerekir. Sonra I ile diğer eşyaları planlayabilirsin.</p><button id="caveConfirm" style="min-height:44px">SEÇİMİ TAMAMLA</button></section>';
+  const sel=$('caveGuard'),opt=document.createElement('option');opt.value='0';opt.textContent='Mevcut düzeni koru';sel.appendChild(opt);
+  for(const p of caveChoicePeople()){const o=document.createElement('option');o.value=String(p.id);o.textContent=p.name+' · '+(GROUPS[p.group]||GROUPS.bos).ad;sel.appendChild(o);}
+  sel.value=String(caveChoicePeople().some(p=>p.id===G.caveChoice.guard)?G.caveChoice.guard:0);G.caveChoice.guard=Number(sel.value);
+  $('caveFirstPlan').value=G.caveChoice.recipe||'';
+  sel.onchange=()=>G.caveChoice.guard=Number(sel.value);$('caveFirstPlan').onchange=e=>G.caveChoice.recipe=e.target.value;
+  $('caveConfirm').onclick=()=>{if(!caveChoiceApply(Number(sel.value),$('caveFirstPlan').value)){caveChoiceShow();msg('Seçtiğin kişi artık görev alamıyor; yeniden seç.','#fba',4);}};
+  caveChoicePanel.onkeydown=e=>{if(e.key==='Tab'){const list=[$('caveGuard'),$('caveFirstPlan'),$('caveConfirm')],i=list.indexOf(document.activeElement);e.preventDefault();list[(i+(e.shiftKey?-1:1)+list.length)%list.length].focus();}};
+  if(typeof sel.focus==='function')sel.focus();
+}
 function onGameStart() {
   $('screen').style.display = 'none'; $('hud').style.display = 'block'; $('pause').style.display = 'none';
   G.started = true; G.paused = false; G.modal = false; $('craft').style.display = 'none'; $('charM').style.display = 'none'; UI.char = 0; $('inM').style.display = 'none'; UI.inB = null;
@@ -699,6 +716,7 @@ function onGameStart() {
   $('miniBox').classList.remove('big');
   buildTools(); renderSide(); updateHUD(); UI.goalT = 0; updateShipGoalHUD();
   arrivalShow();
+  caveChoiceShow();
 }
 function showGameOver() {
   const dawn = G.diff === 'kolay' && store.get('sonAtesSafak4');

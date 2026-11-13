@@ -248,6 +248,7 @@ function enterBuilding(b) {
   if (!enterable(b) || G.mount) return;
   const D = inDims(b); G.inside = { b, x: D.w / 2, y: D.h - 34 }; G.yaw = -Math.PI / 2; G.pitch = 0;
   if (G.placing) cancelPlace(); G.huntMode = false; G.tutIn = true; SFX.pickup && SFX.pickup();
+  if(typeof caveChoiceShow==='function')caveChoiceShow();
 }
 // Dış çizicideki ağız +yerel y yönünde, r*.92; yapı dönüşünü de izle.
 function cavMouth(b, side = 0, out = 0) {
