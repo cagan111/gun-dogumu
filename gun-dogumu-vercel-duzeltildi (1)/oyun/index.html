@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Son Ateş</title>
+<style>
+:root{--ink:#f1e6cf;--muted:#a89a80;--panel:rgba(14,12,10,.82);--line:rgba(241,230,207,.14);--fire:#ff8a2a;--bg:#050505}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--ink);font-family:Georgia,"Times New Roman",serif;user-select:none;-webkit-user-select:none;touch-action:none}
+canvas{display:block}
+#c3,#c{position:fixed;left:0;top:0;width:100%;height:100%}
+#c{touch-action:none}
+button{font-family:Georgia,serif;color:var(--ink);cursor:pointer}
+.bar{position:relative;height:7px;background:rgba(255,255,255,.1);border-radius:4px;overflow:hidden;flex:1;min-width:40px}
+.bar i{position:absolute;left:0;top:0;bottom:0;width:50%;background:#7c6;border-radius:4px;transition:width .15s}
+#hud{position:fixed;inset:0;pointer-events:none;display:none}
+#top{position:absolute;left:10px;top:10px;display:flex;flex-direction:column;gap:5px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 10px;min-width:220px;font-size:13px}
+#top.kapali{min-width:0;padding:6px 10px;cursor:pointer}#top.kapali>*{display:none!important}#top.kapali::after{content:"📊";font-size:18px}
+#top .row{display:flex;align-items:center;gap:8px}
+#res,#res2{display:flex;gap:9px;font-size:13px;flex-wrap:wrap}
+#res2{font-size:12px;color:#d8ccb4;gap:7px}
+#fireBar{background:linear-gradient(90deg,#c33,#f80,#fd4)}
+#morBar{background:linear-gradient(90deg,#a44,#cc5,#6c6)}
+#todBar{background:linear-gradient(90deg,#fd6,#88a)}
+#miniBox{position:absolute;left:10px;top:150px;pointer-events:auto;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#000;cursor:pointer}
+#miniBox.big{left:50%;top:50%;bottom:auto;transform:translate(-50%,-50%);z-index:3;box-shadow:0 0 40px #000;cursor:crosshair}
+#mapClose,#mapHint{display:none;position:absolute;background:rgba(0,0,0,.7);color:#ffd27a;font-size:14px;border-radius:6px}
+#mapClose{right:6px;top:6px;padding:4px 10px;cursor:pointer}
+#mapHint{left:6px;bottom:6px;padding:3px 8px;font-size:12px;pointer-events:none}
+#miniBox.big #mapClose,#miniBox.big #mapHint{display:block}
+#tutBox{position:absolute;left:50%;transform:translateX(-50%);bottom:150px;background:rgba(40,28,10,.92);border:1px solid #c88a40;border-radius:8px;padding:7px 12px;font-size:14px;max-width:min(92vw,560px);pointer-events:auto;display:none;text-align:center}
+#tutBox button{margin-left:8px;background:#3a2810;border:1px solid #7a5a30;border-radius:5px;font-size:12px;padding:2px 8px}
+#msgs{position:absolute;left:50%;top:12px;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:4px;width:min(58vw,560px)}
+#msgs div{background:rgba(0,0,0,.62);padding:5px 12px;border-radius:6px;font-size:14px;text-align:center}
+#toast{position:fixed;left:50%;top:40%;transform:translateX(-50%);display:flex;flex-direction:column;gap:6px;z-index:6;pointer-events:none}
+#toast div{background:rgba(50,36,8,.95);border:1px solid #e0b050;color:#ffe2a0;padding:8px 16px;border-radius:8px;font-size:14px;animation:tin .4s}
+@keyframes tin{from{opacity:0;transform:scale(.8)}to{opacity:1;transform:none}}
+#side{position:absolute;right:10px;top:10px;width:300px;background:var(--panel);border:1px solid var(--line);border-radius:10px;pointer-events:auto;font-size:12px;max-height:calc(100vh - 190px);display:flex;flex-direction:column}
+#sideHead{padding:7px 10px;border-bottom:1px solid var(--line);cursor:pointer;display:flex;justify-content:space-between;gap:10px;letter-spacing:.08em;flex:none}
+#sideBody{overflow:auto;flex:1;min-height:0}
+#side.closed #sideBody{display:none}
+#side.closed{width:auto}
+#tabs{display:flex;gap:4px;padding:6px 8px;border-bottom:1px solid var(--line);position:sticky;top:0;background:rgba(14,12,10,.97);z-index:1}
+#tabs button,.chips button,.bulk button,.gb button,.btns button{background:#2b2419;border:1px solid #5a4a30;border-radius:5px;font-size:12px;padding:3px 7px;line-height:1.2}
+#tabs button{flex:1;padding:5px}
+#tabs button.on,.chips button.on,.gb button.on,.btns button.on{border-color:var(--fire);background:#4a2a10}
+.gb button.no{opacity:.45}
+.grp{padding:6px 9px;border-bottom:1px solid rgba(255,255,255,.06)}
+.gh{display:flex;justify-content:space-between;margin-bottom:4px;font-size:13px}
+.gm{color:#ffd27a;font-size:12px}
+.gm i{color:var(--muted)}
+.gb{display:flex;gap:4px;flex-wrap:wrap;align-items:center}
+.gb button{min-width:30px}
+.gb .ab{flex:1;text-align:left}
+.hint{color:var(--muted);font-size:11px}
+.note{padding:6px 9px;color:#cbbd9f;font-size:12px;border-bottom:1px solid rgba(255,255,255,.06)}
+.chips,.bulk{display:flex;gap:3px;flex-wrap:wrap;padding:6px 8px;border-bottom:1px solid rgba(255,255,255,.06);align-items:center}
+.bulk span{font-size:11px;color:#ffd27a;margin:0 2px}
+.pr{display:grid;grid-template-columns:1fr auto;gap:3px 6px;padding:5px 9px;border-bottom:1px solid rgba(255,255,255,.05)}
+.pr.sel{background:rgba(255,160,60,.12)}
+.pr .nmw{cursor:pointer;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.pr .nm{font-weight:bold}
+.pr .trs{font-size:11px}
+.pr .btns{display:flex;gap:3px}
+.pr .bars{grid-column:1/3;display:flex;gap:4px}
+.pr .bars .bar{height:4px}
+.pr .fear i{background:linear-gradient(90deg,#6a6,#d33)}
+.pr .info{grid-column:1/3;font-size:11px;color:#d8ccb4;line-height:1.5;background:rgba(0,0,0,.25);padding:5px;border-radius:5px}
+#bottom{position:absolute;left:0;right:0;bottom:0;display:flex;flex-direction:column;align-items:center;gap:6px;padding:0 8px 8px}
+#prompt{font-size:14px;background:rgba(0,0,0,.6);padding:4px 12px;border-radius:6px}
+#prompt:empty{display:none}
+#bars{display:flex;gap:8px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:5px 10px;font-size:12px;width:min(420px,94vw)}
+#hpBar{background:linear-gradient(90deg,#922,#e44)}
+#stBar{background:linear-gradient(90deg,#aa7,#ee9)}
+#menuBtn{pointer-events:auto;background:var(--panel);border:1px solid #c88a40;border-radius:8px;font-size:13px;padding:6px 14px;color:inherit}
+#menuBtn.on{box-shadow:0 0 8px rgba(255,138,42,.5)}#menuBtn small{color:var(--muted)}
+#tools{display:none;position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(680px,94vw);max-height:84vh;overflow:auto;background:#15110c;border:1px solid #6a5030;border-radius:12px;padding:10px 12px 12px;pointer-events:auto;z-index:4;flex-direction:column;gap:4px}
+#tools.open{display:flex}
+#tools .mhead{display:flex;justify-content:space-between;align-items:center;font-size:16px}
+#tools .cat{margin-top:6px}
+#tools .mrow{display:flex;flex-wrap:wrap;gap:5px}
+#tools button{background:#2b2419;border:1px solid #5a4a30;border-radius:8px;font-size:12px;padding:6px 9px;line-height:1.3;color:inherit}
+#tools button small{color:var(--muted)}
+#tools button.on{border-color:var(--fire);box-shadow:0 0 8px rgba(255,138,42,.5)}
+#tools button.no{opacity:.45}
+#craft{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:4;pointer-events:auto}
+#craftBox{background:#15110c;border:1px solid #6a5030;border-radius:12px;width:min(640px,94vw);max-height:86vh;display:flex;flex-direction:column}
+.ch{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.ch .res{flex:1;font-size:12px;color:#d8ccb4}
+.ch button{background:#2b2419;border:1px solid #5a4a30;border-radius:6px;padding:3px 10px}
+.cl{overflow:auto;padding:6px 12px 12px;touch-action:pan-y}
+.cat{color:#ffb067;font-size:13px;letter-spacing:.1em;margin:10px 0 4px;text-transform:uppercase}
+.card{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:7px 9px;border:1px solid rgba(255,255,255,.08);border-radius:8px;margin-bottom:5px;font-size:13px}
+.card small{color:#cbbd9f}
+.card .bad{color:#f88}
+.card.done{opacity:.55}
+.card.locked{opacity:.6}
+.card button{background:#3a1d0b;border:1px solid #c66a25;border-radius:6px;padding:5px 12px;flex:none}
+.card button.no{opacity:.45}
+.card .ok{color:#9e9;font-size:18px}
+#sideBody{touch-action:pan-y}
+.modalw{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:4;pointer-events:auto}
+#inBox{background:#15110c;border:1px solid #6a5030;border-radius:12px;width:min(724px,96vw);max-height:92vh;overflow:auto;padding:10px 12px;font-size:13px}
+#inBox canvas{display:block;margin:0 auto;border-radius:8px;cursor:pointer}
+#inBox button{background:#2b2419;border:1px solid #5a4a30;border-radius:6px;padding:4px 9px;font-size:12px}
+#inBox .nav{position:absolute;top:50%;transform:translateY(-50%);font-size:16px;padding:6px 10px;opacity:.85}
+#inBox .nav.l{left:4px}#inBox .nav.r{right:4px}
+#charM{z-index:6}
+#talkM{z-index:6}
+#talkBox{background:#15110c;border:1px solid #6a5030;border-radius:12px;width:min(560px,94vw);max-height:86vh;max-height:86dvh;display:flex;flex-direction:column;font-size:13px}
+#talkBox .cl{overflow-y:auto;-webkit-overflow-scrolling:touch;touch-action:pan-y;overscroll-behavior:contain;min-height:0;flex:1}
+#talkBox button{background:#2b2419;border:1px solid #5a4a30;border-radius:8px;padding:8px 11px;font-size:13px;line-height:1.3;color:inherit;text-align:left}
+#talkBox button.no{opacity:.45}
+#talkBox .tsel{gap:6px}
+#talkBox .tsel button{flex:1 1 46%;min-height:44px}
+#talkBox button small{color:var(--muted)}
+#charBox{background:#15110c;border:1px solid #6a5030;border-radius:12px;width:min(520px,94vw);max-height:86vh;max-height:86dvh;display:flex;flex-direction:column;font-size:13px}
+#charBox .cl{overflow-y:auto;-webkit-overflow-scrolling:touch;touch-action:pan-y;overscroll-behavior:contain;min-height:0;flex:1;padding-bottom:28px}
+#charBox button,.ctabs button,.obtns button{background:#2b2419;border:1px solid #5a4a30;border-radius:6px;padding:4px 9px;font-size:12px}
+#charBox button.on,.ctabs button.on{border-color:var(--fire);background:#4a2a10}
+#charBox button.no{opacity:.45}
+.cgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px}
+.story2{font-style:italic;color:#c8b898;margin:8px 0 2px}
+.skills{display:grid;grid-template-columns:1fr 1fr;gap:4px 12px}
+.sk{display:grid;grid-template-columns:1fr auto;gap:2px 6px;font-size:12px}
+.sk .bar{grid-column:1/3;height:4px}
+.sk.cur span{color:#ffd27a}
+.gsel{display:flex;flex-wrap:wrap;gap:4px}
+button.wide{width:100%;margin-top:6px}
+.ctabs{display:flex;gap:6px;padding:8px 12px 0}
+.obtns{display:flex;gap:3px;flex:none;flex-wrap:wrap;justify-content:flex-end;max-width:46%}
+.card .obtns button{padding:4px 7px;background:#2b2419;border-color:#5a4a30}
+#sleepV{position:fixed;inset:0;display:none;align-items:center;justify-content:center;text-align:center;background:radial-gradient(ellipse at center,rgba(0,0,0,.93) 0%,#000 75%);color:#9a8f7a;font-size:20px;line-height:1.6;z-index:3;pointer-events:none}
+#lockHint{position:fixed;left:50%;top:38%;transform:translateX(-50%);background:rgba(0,0,0,.6);border:1px solid #5a4a30;border-radius:8px;padding:6px 14px;font-size:14px;color:#e8d4b0;display:none;pointer-events:none;z-index:2}
+#touch{display:none;position:fixed;inset:0;pointer-events:none}
+#joy{position:absolute;left:0;bottom:64px;width:50%;height:calc(62% - 64px);pointer-events:auto}
+body.sideOpen #tbtns{display:none}
+body.menuOpen #tbtns,body.menuOpen #joy{display:none}
+#knobBase{position:absolute;width:110px;height:110px;border-radius:50%;border:2px solid rgba(255,255,255,.18);display:none}
+#knob{position:absolute;width:48px;height:48px;border-radius:50%;background:rgba(255,255,255,.22);left:31px;top:31px}
+#tbtns{position:absolute;right:10px;bottom:120px;display:grid;grid-template-columns:repeat(3,58px);gap:8px;pointer-events:auto}
+#tbtns div{width:58px;height:58px;border-radius:50%;background:rgba(20,16,12,.72);border:2px solid rgba(255,200,140,.35);display:flex;align-items:center;justify-content:center;font-size:11px;text-align:center;line-height:1.1}
+#tbtns div.act{background:rgba(120,60,20,.82)}
+#pause{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.6);font-size:32px;z-index:4;letter-spacing:.2em}
+#screen{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at 50% 70%,#2a1408 0%,#050403 70%);z-index:5;padding:20px;overflow:auto;touch-action:pan-y}
+#screen .box{max-width:600px;text-align:center;margin:auto}
+#screen h1{font-size:clamp(44px,11vw,84px);margin:0;letter-spacing:.12em;color:#ffb067;text-shadow:0 0 30px rgba(255,100,20,.6),0 0 4px #000}
+#screen p{color:#d8c8a8;line-height:1.6;font-size:15px}
+#screen .story{font-style:italic;color:#bba98a}
+#screen button{margin-top:10px;background:#2a160a;color:#ffd2a0;border:1px solid #8a4a20;padding:8px 22px;font-size:15px;border-radius:8px;letter-spacing:.06em}
+#screen button.big{background:#3a1d0b;border-color:#c66a25;padding:12px 34px;font-size:19px;letter-spacing:.1em}
+#screen button:hover{background:#5a2a0e}
+.diffs{display:flex;gap:6px;justify-content:center;margin-top:14px}
+.diffs button.on{border-color:#ffb067!important;background:#5a2a0e!important}
+.ddesc{font-size:13px!important;color:#a89a80!important;margin:6px 0!important}
+.chk{font-size:14px;color:#d8c8a8}
+details{text-align:left;margin-top:12px;background:rgba(0,0,0,.25);border:1px solid var(--line);border-radius:8px;padding:6px 10px}
+summary{cursor:pointer;color:#e8d4b0}
+.keys{font-size:13px;color:#a89a80;line-height:1.7;margin-top:6px}
+.keys b{color:#e8d4b0}
+.achs{font-size:13px;color:#776;line-height:1.7}
+.achs .got{color:#ffe2a0}
+@media (max-width:700px){
+  #side{width:min(270px,64vw);font-size:11px;max-height:calc(100vh - 260px)}
+  #top{min-width:0;font-size:12px;padding:6px 8px;max-width:46vw}
+  #res{gap:6px;font-size:12px}#res2{font-size:11px}
+  #msgs{top:auto;bottom:250px;width:92vw}#msgs div{font-size:12px}
+  #miniBox{top:auto;bottom:250px}
+  #tutBox{bottom:auto;top:185px;left:8px;transform:none;max-width:46vw;font-size:12px;text-align:left}
+}
+@media (max-height:520px){
+  #top{font-size:11px;padding:5px 7px;min-width:0;max-width:40vw;gap:3px}
+  #res{gap:5px;font-size:11px}#res2{font-size:10px}
+  #miniBox{top:auto;bottom:66px;left:auto;right:8px}#miniBox canvas{width:84px!important;height:84px!important}
+  #side{width:min(300px,46vw);max-height:calc(100vh - 80px);font-size:11px}
+  #msgs{top:6px;width:min(44vw,420px)}#msgs div{font-size:11px}#msgs div:nth-child(n+3){display:none}
+  #tutBox{bottom:auto;top:auto;bottom:118px;font-size:11px;max-width:44vw;padding:4px 8px}
+  #tbtns{bottom:66px;grid-template-columns:repeat(3,50px);gap:6px}
+  #tbtns div{width:50px;height:50px;font-size:10px}
+  #bottom{gap:3px;padding:0 6px 4px}
+}
+</style>
+</head>
+<body>
+<canvas id="c3"></canvas>
+<canvas id="c"></canvas>
+
+<div id="hud">
+  <div id="top">
+    <div class="row"><b id="dayTxt">1. Gün</b><span id="todTxt">☀️</span><span id="seaTxt" style="font-size:11px;opacity:.85;white-space:nowrap">🌱</span><div class="bar"><i id="todBar"></i></div></div>
+    <div id="res"></div>
+    <div id="res2"></div>
+    <div class="row" title="Ateş">🔥<div class="bar"><i id="fireBar"></i></div></div>
+    <div class="row" title="Halkın morali">🙂<div class="bar"><i id="morBar"></i></div></div>
+  </div>
+  <div id="miniBox"><canvas id="mini"></canvas><div id="mapClose">✕</div><div id="mapHint">Dokun: 🧭 kâşifleri oraya gönder</div></div>
+  <div id="msgs"></div>
+  <div id="tutBox"></div>
+  <div id="side">
+    <div id="sideHead"><span>HALKIN <small id="popTxt"></small></span><span id="sideTog">▾</span></div>
+    <div id="sideBody">
+      <div id="tabs"><button data-tab="g" class="on">Gruplar</button><button data-tab="k">Kişiler</button></div>
+      <div id="tabG"></div>
+      <div id="tabK"></div>
+    </div>
+  </div>
+  <div id="bottom">
+    <div id="prompt"></div>
+    <div id="bars">❤<div class="bar"><i id="hpBar"></i></div>⚡<div class="bar"><i id="stBar"></i></div></div>
+    <button id="menuBtn">☰ Eylemler <small>[B]</small></button>
+  </div>
+  <div id="tools"></div>
+</div>
+
+<div id="craft"><div id="craftBox"></div></div>
+<div id="inM" class="modalw"><div id="inBox"><div style="position:relative"><canvas id="inC"></canvas><button data-nav="-1" class="nav l">◀</button><button data-nav="1" class="nav r">▶</button></div><div id="inInfo"></div></div></div>
+<div id="charM" class="modalw"><div id="charBox"></div></div>
+<div id="talkM" class="modalw"><div id="talkBox"></div></div>
+<div id="toast"></div>
+
+<div id="sleepV"><div>😴<br><b>Uyuyorsun…</b><br><small id="sleepTxt">uyanmak için dokun / bir tuşa bas</small></div></div>
+<div id="lockHint">Etrafa bakmak için ekrana tıkla · Esc: fareyi bırak</div>
+<div id="touch">
+  <div id="joy"><div id="knobBase"><div id="knob"></div></div></div>
+  <div id="tbtns">
+    <div id="tSneak">Eğil</div><div id="tTorch">Meşale</div><div id="tRun">Koş</div>
+    <div id="tMap" style="display:none"></div><div id="tShoot">Ok</div><div id="tAct">Topla<br>Kullan</div><div id="tAtk" class="act">Saldır</div>
+  </div>
+</div>
+
+<div id="pause">DURAKLATILDI</div>
+<div id="screen"><div class="box" id="screenBox"></div></div>
+
+<script src="js/three.min.js"></script>
+<script src="js/GLTFLoader.js"></script>
+<script src="js/temel.js"></script>
+<script src="js/ses.js"></script>
+<script src="js/dunya.js"></script>
+<script src="js/halk.js"></script>
+<script src="js/yaratik.js"></script>
+<script src="js/oyun.js"></script>
+<script src="js/cizim.js"></script>
+<script src="js/ic.js"></script>
+<script src="js/model3d.js"></script>
+<script src="js/uc.js"></script>
+<script src="js/deniz.js"></script>
+<script src="js/varlik.js"></script>
+<script src="js/arayuz.js"></script>
+<script src="js/sohbet.js"></script>
+<script src="js/tarim.js"></script>
+<script>
+(function(){const t=document.getElementById('top');try{if(localStorage.getItem('sonAtesTop')==='0')t.classList.add('kapali')}catch(e){}
+t.style.pointerEvents='auto';t.addEventListener('click',function(e){e.stopPropagation();t.classList.toggle('kapali');try{localStorage.setItem('sonAtesTop',t.classList.contains('kapali')?'0':'1')}catch(e){}});
+t.addEventListener('touchstart',function(e){e.stopPropagation()},{passive:true});})();
+</script>
+</body>
+</html>
