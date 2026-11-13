@@ -520,13 +520,17 @@ function planNight() {
   { const W = Math.random(), sw = k => seasonVal(s => s.wx[k]), a = sw(0), b = a + sw(1), c = b + sw(2);   // mevsime göre gece havası
     G.nightWeather = W < a ? 'acik' : W < b ? 'yagmur' : W < c ? 'firtina' : 'sis'; }
   if (d <= 2) { G.nightPlan = ev; return; }
+  // Baskın genel olay havuzuna bağlı değil: uygun gecelerde ortalama 11 gecede bir.
+  if(G.ccamps.some(c=>c.alive)&&Math.random()<1/11)ev.push({k:'yamyam',at:rand(.58,.86)});
   // çoğu gece sakin geçer; olaylar nadir ama ani
   let n = Math.random() < (d < 10 ? 0.8 : d < 40 ? 0.72 : 0.65) ? 0 : (d > 30 && Math.random() < 0.15 ? 2 : 1);
-  const pool = [['yapi', d >= 3 && unprotectedHomes().length ? 10 : 0], ['taklitci', d >= 4 ? 8 : 0], ['pusu', 30], ['dev', d >= 4 ? 5 : 0], ['yamyam', d >= 3 && G.ccamps.some(c => c.alive) ? 18 : 0], ['sessiz', 14], ['kayip', d >= 3 ? 8 : 0], ['taklit', 10], ['suru', d >= 4 ? 9 : 0]];
+  // Eski baskın ağırlığı boş gece payı kalır; diğer tehditlere dağıtılmaz.
+  const pool = [['yapi', d >= 3 && unprotectedHomes().length ? 10 : 0], ['taklitci', d >= 4 ? 8 : 0], ['pusu', 30], ['sessizgece', G.ccamps.some(c=>c.alive)?18:0], ['dev', d >= 4 ? 5 : 0], ['sessiz', 14], ['kayip', d >= 3 ? 8 : 0], ['taklit', 10], ['suru', d >= 4 ? 9 : 0]];
+  n=Math.min(n,2-ev.length);
   for (let i = 0; i < n; i++) {
     const avail = pool.filter(([k, w]) => w > 0 && !ev.some(e => e.k === k)), tot = avail.reduce((a, b) => a + b[1], 0);
     let s = Math.random() * tot;
-    for (const [k, w] of avail) { s -= w; if (s <= 0) { ev.push({ k, at: k === 'kayip' ? 0.9 : rand(0.58, 0.86) }); break; } }
+    for (const [k, w] of avail) { s -= w; if (s <= 0) { if(k!=='sessizgece')ev.push({ k, at: k === 'kayip' ? 0.9 : rand(0.58, 0.86) }); break; } }
   }
   for (const e of ev) { e.sign = Math.random() < 0.5; e.done = false; }
   G.nightPlan = ev;
