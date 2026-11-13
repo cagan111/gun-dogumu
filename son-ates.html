@@ -7823,7 +7823,7 @@ function updRaid(dt) {
 function captiveArrive(c, v) {
   removePerson(v); v.dead = false; v.grabbed = false; v.downed = 0;
   c.captives.push({ p: v, eatDay: phase() < 0.45 ? G.day : G.day + 1 });
-  c.found = true; moraleAdd(-8);
+  moraleAdd(-8);
   msg(`Yamyamlar ${acc(v.name)} kamplarına götürdü! ☠ Ertesi akşama kadar kurtarmazsan...`, '#ff6a4a', 8);
 }
 function freeCaptive(c, k) {
@@ -7840,15 +7840,21 @@ function destroyCamp(c) {
   moraleAdd(15); SFX.crash(0.8, 0); SFX.bell();
   msg('Yamyam totemi yıkıldı! Kamp dağıldı. Halkın bu gece biraz daha rahat uyuyacak.', '#ffd27a', 7);
 }
+// Yaklaşık 200 m: konum işareti yok, ses menzilde uzaklıkla sıfıra iner.
+function captiveCry(d,dt) {
+  if(!L||L.dead||!d.carry||d.insideB)return;
+  const distance=dist(d,L);if(distance>=3600)return;
+  if(Math.random()<dt*.4)SFX.scream(.5*(1-distance/3600),panOf(d.x));
+}
 function updCannibal(d, dt, prey) {
   const def = DINO.yamyam, c = G.ccamps[d.campI];
   d.swing = Math.max(0, (d.swing || 0) - dt);
   if (d.carry) {
     const v = d.carry;
     if (!c || !c.alive) { dropCarry(d, true); d.leave = true; return; }
-    steer(d, c.x, c.y, def.spd * 0.95, dt, true); d.anim += dt * 9;
+    steer(d, c.x, c.y, def.spd * 0.8, dt, true); d.anim += dt * 9;
     v.x = d.x - Math.cos(d.ang) * 12; v.y = d.y - Math.sin(d.ang) * 12;
-    if (Math.random() < dt * 0.4 && L) SFX.scream(clamp(1 - dist(d, L) / 1300, 0.05, 0.5), panOf(d.x));
+    captiveCry(d,dt);
     if (dist(d, c) < 60) { d.carry = null; captiveArrive(c, v); d.raid = false; d.charge = false; d.silent = false; }
     return;
   }
@@ -9340,7 +9346,6 @@ function drawOverlay3D() {
     if (G.rift.found || (G.riftHint && isNight())) edgeMarker(G.rift.x, G.rift.y, '🌀', true);
     if (G.hunt && G.hunt.t && !G.hunt.t.dead) edgeMarker(G.hunt.t.x, G.hunt.t.y, '🎯', true);
     for (const p of G.people) if ((p.grabbed && p.grabT > 0 && dist(p, L) < 1100) || p.desert > 0 || p.downed > 0) edgeMarker(p.x, p.y, p.downed > 0 ? '🩸' : '❗', true);
-    for (const c of G.ccamps) if (c.captives.length) edgeMarker(c.x, c.y, '⛓️', true);
     for (const w of G.wrecks || []) if (!w.found && dist(w, L) < 900) edgeMarker(w.x, w.y, '⚓', true);
   }
   // karartma, tehlike, hasar
@@ -9612,7 +9617,6 @@ function render2D() {
   if (G.rift.found || (G.riftHint && isNight())) edgeMarker(G.rift.x, G.rift.y, '🌀', true);
   if (G.hunt && G.hunt.t && !G.hunt.t.dead) edgeMarker(G.hunt.t.x, G.hunt.t.y, '🎯', true);
   for (const p of G.people) if ((p.grabbed && p.grabT > 0 && dist(p, L) < 1100) || p.desert > 0 || p.downed > 0) edgeMarker(p.x, p.y, p.downed > 0 ? '🩸' : '❗', true);
-  for (const c of G.ccamps) if (c.captives.length) edgeMarker(c.x, c.y, '⛓️', true);
   const fearV = Math.max(G.danger * 0.8, dk * 0.5);
   const vg = ctx.createRadialGradient(VW / 2, VH / 2, Math.min(VW, VH) * (0.42 - fearV * 0.15), VW / 2, VH / 2, Math.max(VW, VH) * 0.75);
   vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, `rgba(${Math.round(40 * G.danger)},0,0,${0.42 + fearV * 0.4})`);

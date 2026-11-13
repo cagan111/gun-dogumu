@@ -181,7 +181,6 @@ function drawOverlay3D() {
     if (G.rift.found || (G.riftHint && isNight())) edgeMarker(G.rift.x, G.rift.y, '🌀', true);
     if (G.hunt && G.hunt.t && !G.hunt.t.dead) edgeMarker(G.hunt.t.x, G.hunt.t.y, '🎯', true);
     for (const p of G.people) if ((p.grabbed && p.grabT > 0 && dist(p, L) < 1100) || p.desert > 0 || p.downed > 0) edgeMarker(p.x, p.y, p.downed > 0 ? '🩸' : '❗', true);
-    for (const c of G.ccamps) if (c.captives.length) edgeMarker(c.x, c.y, '⛓️', true);
     for (const w of G.wrecks || []) if (!w.found && dist(w, L) < 900) edgeMarker(w.x, w.y, '⚓', true);
   }
   // karartma, tehlike, hasar
@@ -453,7 +452,6 @@ function render2D() {
   if (G.rift.found || (G.riftHint && isNight())) edgeMarker(G.rift.x, G.rift.y, '🌀', true);
   if (G.hunt && G.hunt.t && !G.hunt.t.dead) edgeMarker(G.hunt.t.x, G.hunt.t.y, '🎯', true);
   for (const p of G.people) if ((p.grabbed && p.grabT > 0 && dist(p, L) < 1100) || p.desert > 0 || p.downed > 0) edgeMarker(p.x, p.y, p.downed > 0 ? '🩸' : '❗', true);
-  for (const c of G.ccamps) if (c.captives.length) edgeMarker(c.x, c.y, '⛓️', true);
   const fearV = Math.max(G.danger * 0.8, dk * 0.5);
   const vg = ctx.createRadialGradient(VW / 2, VH / 2, Math.min(VW, VH) * (0.42 - fearV * 0.15), VW / 2, VH / 2, Math.max(VW, VH) * 0.75);
   vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, `rgba(${Math.round(40 * G.danger)},0,0,${0.42 + fearV * 0.4})`);

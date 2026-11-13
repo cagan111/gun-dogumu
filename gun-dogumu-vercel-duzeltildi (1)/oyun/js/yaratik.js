@@ -1205,7 +1205,7 @@ function updRaid(dt) {
 function captiveArrive(c, v) {
   removePerson(v); v.dead = false; v.grabbed = false; v.downed = 0;
   c.captives.push({ p: v, eatDay: phase() < 0.45 ? G.day : G.day + 1 });
-  c.found = true; moraleAdd(-8);
+  moraleAdd(-8);
   msg(`Yamyamlar ${acc(v.name)} kamplarına götürdü! ☠ Ertesi akşama kadar kurtarmazsan...`, '#ff6a4a', 8);
 }
 function freeCaptive(c, k) {
@@ -1222,15 +1222,21 @@ function destroyCamp(c) {
   moraleAdd(15); SFX.crash(0.8, 0); SFX.bell();
   msg('Yamyam totemi yıkıldı! Kamp dağıldı. Halkın bu gece biraz daha rahat uyuyacak.', '#ffd27a', 7);
 }
+// Yaklaşık 200 m: konum işareti yok, ses menzilde uzaklıkla sıfıra iner.
+function captiveCry(d,dt) {
+  if(!L||L.dead||!d.carry||d.insideB)return;
+  const distance=dist(d,L);if(distance>=3600)return;
+  if(Math.random()<dt*.4)SFX.scream(.5*(1-distance/3600),panOf(d.x));
+}
 function updCannibal(d, dt, prey) {
   const def = DINO.yamyam, c = G.ccamps[d.campI];
   d.swing = Math.max(0, (d.swing || 0) - dt);
   if (d.carry) {
     const v = d.carry;
     if (!c || !c.alive) { dropCarry(d, true); d.leave = true; return; }
-    steer(d, c.x, c.y, def.spd * 0.95, dt, true); d.anim += dt * 9;
+    steer(d, c.x, c.y, def.spd * 0.8, dt, true); d.anim += dt * 9;
     v.x = d.x - Math.cos(d.ang) * 12; v.y = d.y - Math.sin(d.ang) * 12;
-    if (Math.random() < dt * 0.4 && L) SFX.scream(clamp(1 - dist(d, L) / 1300, 0.05, 0.5), panOf(d.x));
+    captiveCry(d,dt);
     if (dist(d, c) < 60) { d.carry = null; captiveArrive(c, v); d.raid = false; d.charge = false; d.silent = false; }
     return;
   }
