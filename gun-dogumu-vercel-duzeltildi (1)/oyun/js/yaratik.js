@@ -345,12 +345,19 @@ function isBold(d) {
   return false;
 }
 
-function bloodStain(x, y, r) { G.stains.push({ x, y, r, life: 110 }); if (G.stains.length > 220) G.stains.splice(0, G.stains.length - 220); }
+function bloodStain(x, y, r, power, producer) {
+  const stain={x,y,r,life:110};G.stains.push(stain);
+  if(G.stains.length>220)G.stains.splice(0,G.stains.length-220);
+  if(!G.scents)G.scents=[];
+  G.scents.push({x,y,age:0,power:power||1,src:stain,blood:true,producer:producer||null});
+  if(G.scents.length>200)G.scents.splice(0,G.scents.length-200);
+  return stain;
+}
 function updDino(d, dt, prey, zones) {
   // yaralı hayvan kan kaybeder: yerde iz bırakır (yaralı avı izle)
   if (!d.tamed && d.hp > 0 && d.hp < d.maxhp * 0.7) {
     d.bleedT = (d.bleedT || 0) - dt;
-    if (d.bleedT <= 0) { const sev = 1 - d.hp / d.maxhp; d.bleedT = (d.moving ? 0.5 : 1.6) * (1.3 - sev); bloodStain(d.x + rand(-4, 4), d.y + rand(-4, 4), rand(2.5, 5) * clamp(d.r / 22, 0.7, 2.2));
+    if (d.bleedT <= 0) { const sev = 1 - d.hp / d.maxhp; d.bleedT = (d.moving ? 0.5 : 1.6) * (1.3 - sev); bloodStain(d.x + rand(-4, 4), d.y + rand(-4, 4), rand(2.5, 5) * clamp(d.r / 22, 0.7, 2.2),1,d);
       G.parts.push({ x: d.x, y: d.y, vx: rand(-12, 12), vy: rand(-12, 12), life: 0.6, col: '#7a0d0d', s: 3, blood: 1, drip: 1 }); }
   }
   d.atkCd -= dt; d.hurt = Math.max(0, d.hurt - dt); d.blink -= dt; if (d.blink < -0.15) d.blink = rand(1.5, 5);
@@ -395,7 +402,7 @@ function updScent(dt) {
     if (q.washT <= 0) { q.washT = 1; const local = typeof precipAt === 'function' ? precipAt(q.x, q.y) : null; q.washRate = local === 'yagmur' ? (G.weather && G.weather.type === 'firtina' ? 5 : 3) : local === 'kar' ? 0.8 : 1; }
     q.age += dt * q.washRate;
   }
-  G.scents = G.scents.filter(q => q.age < 24 && q.src && !q.src.dead);
+  G.scents = G.scents.filter(q => q.age < 24 && q.src && !q.src.dead && (!q.blood || q.src.life>0));
   for (const p of G.people) {
     if (p.dead || p.inHut || p.insideB || p.grabbed || guardSafe(p)) continue;
     p.scentT = (p.scentT || 0) - dt;
@@ -403,7 +410,9 @@ function updScent(dt) {
     if (p.scentT > 0 || (!moving && Math.random() > dt * 0.12)) continue;
     const strong = personScentPower(p);
     p.scentT = (moving ? rand(0.65, 1.05) : rand(1.8, 2.8)) / strong;
-    G.scents.push({ x: p.x + rand(-5, 5), y: p.y + rand(-5, 5), age: 0, power: strong, src: p });
+    const x=p.x+rand(-5,5),y=p.y+rand(-5,5);
+    if(p.injury&&p.injury.type==='kanama')bloodStain(x,y,3.5,strong,p);
+    else G.scents.push({x,y,age:0,power:strong,src:p});
   }
   if (G.scents.length > 200) G.scents.splice(0, G.scents.length - 200);
 }
@@ -430,7 +439,7 @@ function scentTrailFor(d, base) {
   let best = null, bestScore = 0;
   for (let i = G.scents.length - 1; i >= 0; i--) {
     const q = G.scents[i];
-    if (t_dead(q.src)) continue;
+    if (q.producer===d || t_dead(q.src) || (q.blood && q.src.life<=0)) continue;
     if (d.terr && Math.hypot(q.x - d.terr.x, q.y - d.terr.y) > d.terr.r) continue;
     const freshness = clamp(1 - q.age / 24, 0, 1);
     if (freshness <= 0) continue;
@@ -588,7 +597,7 @@ function updPred(d, dt, prey, zones) {
         tx = undefined;
       }
     }
-  } else if (d.scent && d.scent.age < 24 && !t_dead(d.scent.src) && Math.hypot(d.scent.x - d.x, d.scent.y - d.y) > 18) {
+  } else if (d.scent && d.scent.age < 24 && d.scent.producer!==d && !t_dead(d.scent.src) && (!d.scent.blood || d.scent.src.life>0) && Math.hypot(d.scent.x - d.x, d.scent.y - d.y) > 18) {
     tx = d.scent.x; ty = d.scent.y; spd = def.spd * (0.3 + 0.25 * clamp(1 - d.scent.age / 24, 0, 1));   // koku izini takip (Codex)
   } else {
     d.scent = null;
