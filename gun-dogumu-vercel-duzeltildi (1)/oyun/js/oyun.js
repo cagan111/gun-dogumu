@@ -444,7 +444,7 @@ function newDay() {
   G.day++; G.flags = {}; G.devDone = false; G.leaveDone = false; G.mimic = null; G.tracks = []; G.silent = false;
   let tn = 0; for (const d of G.dinos) if (d.tamed) tn += d.type === 'boynuzlu' ? 3 : d.type === 'uzunboyun' ? 5 : 1;
   const need = 10;
-  { const nb = G.people.filter(q => !(q.own && q.own.yatak)).length; if (nb) { moraleAdd(-Math.min(3, nb * 0.3)); if (G.day % 4 === 2) msg(`🛏️ ${nb} kişi yerde yattı, iyi dinlenemedi. Yatak ürettir ve dağıt.`, '#cba', 5); } }
+  { const nb = G.people.filter(q => !q.dead && !q.grabbed && nightBeddingTier(q)===0).length; if (nb) { moraleAdd(-Math.min(3, nb * 0.3)); if (G.day % 4 === 2) msg(`🛏️ ${nb} kişi yerde yattı, iyi dinlenemedi. Mağaraya yer yatağı veya yatak yerleştir.`, '#cba', 5); } }
   const rafs = G.builds.filter(b => b.type === 'raf' && b.built).length;
   if (rafs) addStock('et', rafs * 4);
   if (tn) { const fed = spendFood(Math.ceil(tn * DIFF[G.diff].eat)); if (!fed) msg('Evcil hayvanlar aç kaldı.', '#e9a', 4); }
@@ -502,7 +502,7 @@ function seasonDawn(sPrev) {
   else if (S.i === 2 && S.day === 44) msg('🍂 Kış yaklaşıyor (6 gün). Kurutma rafı, depo ve yataklar hazır mı?', '#fda', 7);
   const w = seasonW();
   if (w[3] > 0.5 && (G.tempCamp === undefined || G.tempCamp < 4)) {
-    const cold = G.people.filter(q => !q.dead && (!(q.own && q.own.yatak) || (!q.inHut && !q.homeT && dist(q, G.fire) > 420))).length;
+    const cold = G.people.filter(q => !q.dead && (nightBeddingTier(q)===0 || (!q.inHut && !q.homeT && dist(q, G.fire) > 420))).length;
     if (cold) { moraleAdd(-Math.min(2.5, cold * 0.25)); if (G.day - G.coldMsgDay >= 4) { G.coldMsgDay = G.day; msg(`🥶 ${cold} kişi gece üşüdü (yatak yok ya da ateşten uzak). Yatak ürettirin, ateşi canlı tutun.`, '#cde', 6); } }
   }
 }
@@ -794,6 +794,13 @@ function loadGame(s) {
     c.captives = (s3.captives || []).map(o => { const p = mkPerson(o.x, o.y, o.name, false, o.child); Object.assign(p, o); delete p.eatDay; p.inHut = null; p.grabbed = false; return { p, eatDay: o.eatDay }; });
   });
   assignHomes(); assignEquip(); assignBeds();
+  // v4 zaten inHut bina indeksini saklar; geceyi yüklerken uyuyanı dışarı çıkarma.
+  if(goHome())for(const saved of D.people){
+    const p=G.people.find(q=>q.id===saved.id),b=G.builds[saved.inHut];
+    if(p&&p!==L&&!p.dead&&!p.grabbed&&!p.downed&&!p.bed&&!p.bedRes&&canNightRest(p)&&Number.isInteger(saved.inHut)&&saved.inHut>=0&&b&&b.built&&!b.dead&&['magara','kulube','cadir'].includes(b.type)){
+      p.inHut=b;p.x=b.x;p.y=b.y;if(!b.occ.includes(p))b.occ.push(p);
+    }
+  }
   G.tut = D.tut >= 0 ? { on: true, step: D.tut } : { on: false, step: 0 };
   { const ib = D.inside >= 0 ? G.builds[D.inside] : null; if (enterable(ib)) { enterBuilding(ib); L.x = ib.x; L.y = ib.y; L.insideB = ib; } }
   G.arrival=arrivalRead(D.arrival);
@@ -981,7 +988,7 @@ function sleepSupport(b) {
   if(!G.inside||G.inside.b!==b||b.type!=='magara')return floor;
   const beds=inFurn(b).filter(f=>f.k==='mat'||f.k==='bed');
   // cavFurniturePeople aynı sırayla uyuyanlara yatak gösterir; dolu yatağı paylaşma.
-  const occupied=G.people.filter(p=>p!==L&&!p.dead&&p.inHut===b&&!p.bed).length;
+  const occupied=G.people.filter(p=>p!==L&&!p.dead&&!p.grabbed&&p.inHut===b&&!p.bed).length;
   let best=null,bd=42;
   for(let i=occupied;i<beds.length;i++){const f=beds[i],d=Math.hypot(G.inside.x-f.x,G.inside.y-f.y);if(d<bd){best=f;bd=d;}}
   return !best?floor:best.k==='bed'?{tier:2,name:'yatak',hp:1.2,stam:20}:{tier:1,name:'yer yatağı',hp:.75,stam:14};

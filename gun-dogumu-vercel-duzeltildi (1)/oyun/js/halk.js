@@ -332,7 +332,7 @@ function atStation(p, b, dt) {
 }
 function storeCap() { let n = 0; for (const b of G.builds) if (b.built && !b.dead) n += roomCount(b, 'depo'); return 200 + 150 * n; }
 function enterHut(p) {
-  const h = homeOf(p); if (!h) return false;
+  const h = homeOf(p) || (goHome() && canNightRest(p) ? doorBuilding() : null); if (!h) return false;
   const ey = isRoomy(h) ? h.y + h.r * 0.85 : h.y + h.r + 4;
   if (steer(p, h.x, ey, pSpeed(p), G.dt, false) || Math.hypot(p.x - h.x, p.y - ey) < 16) { if (!h.occ.includes(p)) h.occ.push(p); p.inHut = h; p.x = h.x; p.y = h.y; }
   return true;
@@ -510,6 +510,16 @@ function updFear(p, dt, LS, night) {
 }
 
 // ---- ana kişi güncellemesi
+function canNightRest(p) { return p.child || HOME_GROUPS.includes(p.group) || (p.group === 'muhafiz' && !(p.post && !p.post.dead) && !doorDuty(p)); }
+function npcSleepTier(p) {
+  const b=p.inHut;if(!b)return 0;
+  if(b.type!=='magara')return p.own&&p.own.yatak?2:0;
+  const f=cavSleepFurniture(b,p);return f?(f.k==='bed'?2:1):0;
+}
+function nightBeddingTier(p) {
+  if(p===L&&G.sleep)return sleepSupport(G.sleep.b).tier;
+  return p.inHut&&p.inHut.type==='magara'?npcSleepTier(p):(p.own&&p.own.yatak?2:0);
+}
 const HOME_GROUPS = ['odun', 'tas', 'yiyecek', 'kasap', 'asci', 'ciftci', 'sifaci', 'zanaat', 'mimar', 'kasif', 'bos', 'avci'];
 function updPerson(p, dt, LS) {
   p.insideB = null; if (p.group !== 'avci') p.sneak = false;
@@ -547,14 +557,14 @@ function updPerson(p, dt, LS) {
   if (p.lastHurt > 6 && !(p.injury && p.injury.type === 'enfeksiyon')) {
     let h = 0;
     if (dist(p, G.fire) < fireR() + 20) h = 0.8;
-    if (p.inHut) h = 1.2;
+    if (p.inHut) h = [.35,.75,1.2][npcSleepTier(p)];
     if (nearSifahane(p)) h = Math.max(h, 0.8) * 2;
     p.hp = Math.min(p.maxhp, p.hp + h * dt);
   }
-  if (night && p.group === 'muhafiz') p.watched = true;
+  if (night && p.group === 'muhafiz' && (doorDuty(p) || (p.post && !p.post.dead))) p.watched = true;
   const gth = G.gather && gatherOk(p);
   if (p.inHut && gth) leaveHut(p);
-  if (p.inHut) { if (!goHome() || !(p.child || HOME_GROUPS.includes(p.group)) || p.bedRes) leaveHut(p); return; }
+  if (p.inHut) { p.moving=false; p.stam=Math.min(100,p.stam+[8,14,20][npcSleepTier(p)]*dt); if (!goHome() || !canNightRest(p) || p.bedRes) leaveHut(p); return; }
   if (!gth && p.gSeat) { p.gSeat = false; p.pose = null; }
   if (p.bedRes && !needsCarry(p)) {
     const bp = bedPos(p.bedRes.s, p.bedRes.i);
@@ -853,9 +863,10 @@ function updGuard(p, dt) {
   if (foe && !((foe.type === 'dev' || foe.type === 'yelken') && p.fear > 55 && !ab)) return rangedOrMelee(p, foe, dt);
   if (dp) {
     if (Math.hypot(p.x - dp.x, p.y - dp.y) > 5) { steer(p, dp.x, dp.y, pSpeed(p), dt, false); p.anim += dt * 9; }
-    else { p.moving = false; p.ang = angLerp(p.ang, Math.PI / 2 + Math.sin(G.now * 0.4 + p.id) * 0.5, Math.min(1, dt * 3)); }
+    else { p.insideB=doorBuilding();p.stageAd='Kapıda nöbet'; p.moving = false; p.ang = angLerp(p.ang, Math.PI / 2 + Math.sin(G.now * 0.4 + p.id) * 0.5, Math.min(1, dt * 3)); }
     return;
   }
+  if (goHome()) return homeBehavior(p, dt);
   p.seat += dt * 0.18;
   const pr = z ? 140 : (ab ? baseR * 0.5 : baseR * 0.72);
   steer(p, c.x + Math.cos(p.seat) * pr, c.y + Math.sin(p.seat) * pr, 75, dt, false); p.anim += dt * 6;
@@ -1222,7 +1233,7 @@ function halkDawn() {
       msg(`${a.name} ve ${gen(b.name)} bir bebeği oldu: ${c.name}! 👶`, '#ffd0e0', 6); moraleAdd(8); unlock('cocuk');
     }
   }
-  const hl = homelessCount();
+  const hl = G.people.filter(p=>!p.leader&&!homeOf(p)&&!(p.inHut&&p.inHut.built&&!p.inHut.dead)).length;
   if (hl > 0) { moraleAdd(-Math.min(8, hl)); msg(`${hl} kişi çadırsız, ateş başında üşüyerek uyudu. Çadır inşa et.`, '#bbb', 4); }
   // isyan
   const ad = G.people.filter(p => !p.child && !p.leader);
@@ -1240,8 +1251,10 @@ function halkDawn() {
 function doorBuilding() { return (G.cave && !G.cave.dead && G.cave.built) ? G.cave : null; }
 function doorGuards() {
   if (!goHome() || !doorBuilding()) return [];
-  const ms = members('muhafiz').filter(p => !p.dead && !(p.downed > 0) && !p.bed && !p.grabbed && !(p.post && !p.post.dead));
-  return ms.slice(0, ms.length >= 4 ? 2 : 1);
+  const ms = members('muhafiz').filter(p => !p.dead && !(p.downed > 0) && !p.bed && !p.grabbed && !p.injury && !p.carrying && !p.carriedBy && !(p.post && !p.post.dead)).sort((a,b)=>a.id-b.id);
+  if(!ms.length)return [];
+  const start=Math.max(0,G.day-1)%ms.length,n=ms.length>=4?2:1;
+  return Array.from({length:n},(_,i)=>ms[(start+i)%ms.length]);
 }
 function doorDuty(p) {
   const gs = doorGuards(), i = gs.indexOf(p); if (i < 0) return null;

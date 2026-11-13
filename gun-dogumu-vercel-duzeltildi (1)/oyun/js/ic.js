@@ -196,14 +196,21 @@ function inFurn(b) {
   for (const x of [.3, .7]) out.push({ k: 'torch', x: D.w * x, y: D.h - 6, ang: 0, room: -1 });
   return out;
 }
+// Tek eşya tek uyuyan: çizim ve dinlenme hesabı aynı sıralamayı kullanır.
+function cavSleepFurniture(b,p) {
+  const sleepers=G.people.filter(q=>q!==L&&!q.dead&&!q.grabbed&&q.inHut===b&&!q.bed);
+  const i=sleepers.indexOf(p);if(i<0)return null;
+  return inFurn(b).filter(f=>f.k==='bed'||f.k==='mat')[i]||null;
+}
 function cavFurniturePeople(b) {
   const furn = inFurn(b), beds = furn.filter(f => f.k === 'bed' || f.k === 'mat'), medical = furn.filter(f => f.k === 'healbed');
-  const list = G.people.filter(p => p !== L && (p.inHut === b || p.insideB === b || (p.bed && p.bed.s === b))), out = [];
+  const list = G.people.filter(p => p !== L && !p.dead && !p.grabbed && (p.inHut === b || p.insideB === b || (p.bed && p.bed.s === b))), out = [];
   let sleeping = 0;
   for (const p of list) {
     let f = null, pose = p.pose || 'stand', ang = Math.PI / 2;
     if (p.bed && p.bed.s === b) { f = medical[p.bed.i]; pose = 'sleep'; }
-    else if (p.inHut === b) { f = beds[sleeping++ % Math.max(1, beds.length)]; pose = f ? 'sleep' : 'sit'; }
+    else if (p.inHut === b) { f = beds[sleeping++];pose='sleep'; if(!f){const D=inDims(b),n=sleeping-beds.length-1;f={x:clamp(D.w*.3+(n%5)*38,20,D.w-20),y:clamp(D.h*.55+Math.floor(n/5)*50,20,D.h-20),ang:Math.PI/2};} }
+    else if (p.group==='muhafiz'&&doorDuty(p)) { const D=inDims(b);f={x:D.w/2+24+(doorGuards().indexOf(p)*32),y:D.h-28,ang:Math.PI/2};pose='stand'; }
     else {
       f = cavFurnitureSync(b).items.find(q => !q.built && q.worker === p.id);
       if (!f) { const kind = { asci: 'hearth', sifaci: 'herbs', kasap: 'block', zanaat: 'bench' }[p.group]; f = furn.find(q => q.k === kind && !q.main); }
