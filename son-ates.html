@@ -9064,6 +9064,17 @@ function sleepSpot() {
   return best;
 }
 function harmSig() { let n = G.deaths * 10 + (G.lost || 0) * 10; for (const p of G.people) { if (p.downed > 0 || p.grabbed) n += 5; } let h = 0; for (const b of G.builds) if (b.built) h += b.hp || 0; return { n, h, hp: L.hp }; }
+// Lider yalnız gerçekten yanında durduğu, boş ve tamamlanmış yataktan yararlanır.
+function sleepSupport(b) {
+  const floor={tier:0,name:'çıplak zemin',hp:.35,stam:8};
+  if(!G.inside||G.inside.b!==b||b.type!=='magara')return floor;
+  const beds=inFurn(b).filter(f=>f.k==='mat'||f.k==='bed');
+  // cavFurniturePeople aynı sırayla uyuyanlara yatak gösterir; dolu yatağı paylaşma.
+  const occupied=G.people.filter(p=>p!==L&&!p.dead&&p.inHut===b&&!p.bed).length;
+  let best=null,bd=42;
+  for(let i=occupied;i<beds.length;i++){const f=beds[i],d=Math.hypot(G.inside.x-f.x,G.inside.y-f.y);if(d<bd){best=f;bd=d;}}
+  return !best?floor:best.k==='bed'?{tier:2,name:'yatak',hp:1.2,stam:20}:{tier:1,name:'yer yatağı',hp:.75,stam:14};
+}
 function trySleep() {
   if (G.sleep) { wakeUp('Uyandın.'); return; }
   if (!goHome()) { msg('Henüz uyku vakti değil. Karanlık çökünce uyuyabilirsin.', '#ccc', 3); return; }
@@ -9073,8 +9084,8 @@ function trySleep() {
   if (!G.inside && G.dinos.some(d => threatNear(d, L.x, L.y))) { msg('Yakında bir şey var. Şimdi uyuyamazsın.', '#e99', 3); return; }
   G.sleep = { b, sig: harmSig(), t: 0, day: G.day };
   if (G.placing) cancelPlace(); G.huntMode = false;
-  const g = doorGuard();
-  msg(g ? `😴 Uyuyorsun. ${g.name} kapıda nöbette.` : '😴 Uyuyorsun. Kapıda gözcü yok…', g ? '#cde' : '#e99', 4);
+  const g = doorGuard(), rest=sleepSupport(b);
+  msg(`Uyku yeri: ${rest.name}. `+(g ? `😴 Uyuyorsun. ${g.name} kapıda nöbette.` : '😴 Uyuyorsun. Kapıda gözcü yok…'), g ? '#cde' : '#e99', 4);
 }
 function wakeUp(why, alarm) {
   if (!G.sleep) return;
@@ -9088,9 +9099,10 @@ function sleepTick(dt) {
   const s = G.sleep, b = s.b; s.t += dt;
   if (!b || b.dead) { wakeUp('Barınağın yıkıldı!', true); return; }
   L.x = b.x; L.y = b.y; L.insideB = b; L.moving = false; L.sprinting = false;
-  L.hp = Math.min(L.maxhp, L.hp + 1.2 * dt); L.stam = Math.min(100, L.stam + 20 * dt);
+  const rest=sleepSupport(b);
+  L.hp = Math.min(L.maxhp, L.hp + rest.hp * dt); L.stam = Math.min(100, L.stam + rest.stam * dt);
   G.interact = null;
-  if (!goHome() && (G.day !== s.day || phase() < 0.3)) { wakeUp('☀️ Sabah oldu. Dinlenmiş uyandın.'); return; }
+  if (!goHome() && (G.day !== s.day || phase() < 0.3)) { wakeUp(rest.tier===0?'☀️ Sabah oldu. Sert zeminde pek rahat uyuyamadın.':rest.tier===1?'☀️ Sabah oldu. Yer yatağında dinlendin.':'☀️ Sabah oldu. Yatakta iyice dinlendin.'); return; }
   const g = doorGuard();
   if (g) {
     const q = stnPos(b);
