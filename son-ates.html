@@ -5625,7 +5625,17 @@ function atStation(p, b, dt) {
   return true;
 }
 function storeCap() { let n = 0; for (const b of G.builds) if (b.built && !b.dead) n += roomCount(b, 'depo'); return 200 + 150 * n; }
+// RNG harcamadan kişiye/güne göre akşamın farklı anlarında yatış.
+function nightBedtime(p) {
+  const offset=(((p.id||0)*7+G.day*11)%17)/17;
+  if(p.child)return .50+offset*.04;
+  if(p.tired)return .50+offset*.05;
+  if(tr(p,'uykusuz'))return .78+offset*.05;
+  return .58+offset*.10;
+}
+function nightReady(p) { return goHome()&&phase()>=nightBedtime(p); }
 function enterHut(p) {
+  if(!nightReady(p))return false;
   const h = homeOf(p) || (goHome() && canNightRest(p) ? doorBuilding() : null); if (!h) return false;
   const ey = isRoomy(h) ? h.y + h.r * 0.85 : h.y + h.r + 4;
   if (steer(p, h.x, ey, pSpeed(p), G.dt, false) || Math.hypot(p.x - h.x, p.y - ey) < 16) { if (!h.occ.includes(p)) h.occ.push(p); p.inHut = h; p.x = h.x; p.y = h.y; }
