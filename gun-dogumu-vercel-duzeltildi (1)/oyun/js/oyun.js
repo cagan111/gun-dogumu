@@ -90,6 +90,13 @@ function autoAim(range) {
   for (const d of G.dinos) { if (!hostile(d) && !(d.type === 'boynuzlu' && !d.tamed) && !(d.type === 'uzunboyun' && !d.tamed)) continue; if (d.tamed) continue; const dd = dist(d, L) - d.r; if (dd < bd) { bd = dd; best = d; } }
   return best;
 }
+// Aynı teslim/konum güncellemesi iç ve dış hareketten sonra çalışır.
+function leaderCarryUpdate(p) {
+  const q=G.lcarry;if(!q)return;
+  if(q.dead||q.bed){q.carriedBy=0;G.lcarry=null;return;}
+  q.x=p.x-Math.cos(p.ang)*12;q.y=p.y-Math.sin(p.ang)*12;q.carriedBy=-1;
+  if(q.bedRes&&!q.bedRes.s.dead&&dist(p,q.bedRes.s)<q.bedRes.s.r+40){G.lcarry=null;putInBed(q);}
+}
 function updLeader(dt) {
   const p = L;
   // Sağlık, içeride/sofrada erken dönüş olsa da yalnız bir kez ilerler.
@@ -103,21 +110,23 @@ function updLeader(dt) {
   if (touch.jx || touch.jy) { mx = touch.jx; my = touch.jy; }
   { const fx = Math.cos(G.yaw), fy = Math.sin(G.yaw), f = -my, r = mx; mx = fx * f - fy * r; my = fy * f + fx * r; }
   const m = Math.hypot(mx, my);
+  const carrying=!!(G.lcarry&&!G.lcarry.dead&&!G.lcarry.bed&&!G.mount),loadMul=carrying?(p.stam>1?.65:.45):1;
   p.sneak = !!(keys.ControlLeft || keys.ControlRight || G.sneakOn) && !G.mount;
   if (G.inside) {
     const b = G.inside.b; if (!b || b.dead) { exitBuilding(); return; }
-    p.moving = m > 0.1; p.sprinting = false; p.stam = clamp(p.stam + 16 * dt, 0, 100);
-    if (p.moving) { inMove(mx / m, my / m, 110 * Math.min(1, m) * (p.sneak ? 0.5 : 1), dt); p.anim += dt * 9; if (!G.inside) return; }
+    p.moving = m > 0.1; p.sprinting = false; p.stam = clamp(p.stam + (carrying?(m>.1?-8:6):16)*dt, 0, 100);
+    if (p.moving) { inMove(mx / m, my / m, 110 * loadMul * Math.min(1, m) * (p.sneak ? 0.5 : 1), dt); p.anim += dt * 9; if (!G.inside) return; }
     { const I = G.inside, rm = inRooms(b).find(r => r.t === 'sifa' && I.x >= r.x && I.x <= r.x + r.w && I.y >= r.y && I.y <= r.y + r.h);
       const care = b.type === 'magara' ? inFurn(b).some(f => f.k === 'herbs' && Math.hypot(I.x - f.x, I.y - f.y) < 90) : !!rm;
       if (care) leaderHeal(dt, 5); else G.healT = 0; }
     p.x = b.x; p.y = b.y; p.insideB = b; p.ang = G.yaw; p.atkCd -= dt; p.swing = Math.max(0, p.swing - dt);
+    leaderCarryUpdate(p);
     G.interact = findInteract(); G.lookP = G.interact && G.interact.kind === 'person' ? G.interact.o : null; G.actT = 0; G.actProg = 0;
     return;
   }
   if (G.seated && seatedTick(dt)) { G.interact = null; return; }
-  p.sprinting = !p.sneak && (keys.ShiftLeft || keys.ShiftRight || touch.run) && m > 0.1 && p.stam > 1;
-  p.stam = clamp(p.stam + (p.sprinting ? -28 : 16) * dt, 0, 100);
+  p.sprinting = !carrying && !p.sneak && (keys.ShiftLeft || keys.ShiftRight || touch.run) && m > 0.1 && p.stam > 1;
+  p.stam = clamp(p.stam + (carrying?(m>.1?-8:6):(p.sprinting?-28:16))*dt, 0, 100);
   const mouseAim = !isTouch;
   if (G.mount) {
     const d = G.mount; d.ramCd = (d.ramCd || 0) - dt;
@@ -137,7 +146,7 @@ function updLeader(dt) {
   } else {
     p.moving = m > 0.1;
     if (p.moving) {
-      const k = Math.min(1, m), spd = pSpeed(p) * (p.sprinting ? 1.6 : 1);
+      const k = Math.min(1, m), spd = pSpeed(p) * loadMul * (p.sprinting ? 1.6 : 1);
       const fromX=p.x, fromY=p.y;
       p.x += mx / m * spd * k * dt; p.y += my / m * spd * k * dt; pushOut(p, false);
       if (cavWalkEnter(fromX,fromY)) return;
@@ -199,14 +208,7 @@ function updLeader(dt) {
     else if (p.lastHurt > 8) p.hp = Math.min(p.maxhp, p.hp + 0.3 * dt);
   }
   // sırtındaki yaralı
-  if (G.lcarry) {
-    const q = G.lcarry;
-    if (q.dead || q.bed) G.lcarry = null;
-    else {
-      q.x = p.x - Math.cos(p.ang) * 12; q.y = p.y - Math.sin(p.ang) * 12; q.carriedBy = -1;
-      if (q.bedRes && dist(p, q.bedRes.s) < q.bedRes.s.r + 40) { G.lcarry = null; putInBed(q); }
-    }
-  }
+  leaderCarryUpdate(p);
   // yumurta teslimi
   if (G.carryEgg && L && dist(L, G.fire) < 130) {
     G.carryEgg = false; G.eggs.push({ hatch: G.day + 1 });
