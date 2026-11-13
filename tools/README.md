@@ -6,3 +6,4 @@
 
 Yollar /home/claude/ig/... olarak yazılı; yeni ortamda OUT/OUTDIR değişkenlerini güncelle.
 Görsel dil: lacivert #0E1830 zemin, altta turuncu-sarı doğan güneş, krem #FFF6E5 başlık, altın #FFC857 vurgu, Poppins.
+- reel_story.py: hikayeli Reels; Flow sahneleri (720x1280) 1080x1920e buyutulur, ustune Turkce yazi katmanlari ve kapanis karti eklenir, Flow sesi korunur. SCENES/CLOSING/SRC/OUT degistirilerek yeni hikaye yapilir. Poppins agirliklari: Bold, Medium, Regular, Light.
