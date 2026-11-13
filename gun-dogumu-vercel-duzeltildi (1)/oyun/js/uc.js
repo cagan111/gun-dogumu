@@ -941,7 +941,7 @@ function rebuildTreeInst(cx, cy, writeShadows) {
         // gövde dibinde eğrelti öbekleri: zemine kesik çizgiyle değmesin
         for (let q = 0; q < 3; q++) { const a = t.sw * 3 + q * 2.1, rr = 14 + q * 6; realPut('litter', t.tone + q, t.x + Math.cos(a) * rr, gh(t.x + Math.cos(a) * rr, t.y + Math.sin(a) * rr) - 1, t.y + Math.sin(a) * rr, 0, 30 + q * 8, a, distance); }
         continue; }
-      if (realFar(rk, t.tone + t.sw, t.x, yb - 2, t.y, rh, ys)) continue; }
+      if (realFar(rk, t.tone + t.sw, t.x, yb - 2, t.y, rh, ys, t.sw)) continue; }
     if (b === 5) {                                       // palmiye: kıvrık gövde + taç yaprakları
       let x = t.x, y = y0, z = t.y; const seg = 5, L = (H * 0.75) / seg, lean = 0.25 + r2 * 0.35;
       for (let i = 0; i < seg; i++) { const rz = lean * (i + 1) / seg, w = 5.2 - i * 0.55; instAdd(T.trunk, x, y, z, w, L * 1.06, w, t.sw, C.t, 0, rz); x += -Math.sin(rz) * Math.cos(t.sw) * L; y += Math.cos(rz) * L; z += Math.sin(rz) * Math.sin(t.sw) * L; }
@@ -2548,34 +2548,44 @@ function realPut(kind, key, x, y, z, height, width, ang, dist, ys = 1) {
 // ---- uzak ağaç kartları (impostor): gerçek modelin yandan çekilmiş resmi, kameraya dönen dikey kart
 function realImpostor(name) {
   const M = REAL.M[name]; if (!M || M.imp) return;
-  const W = M.w0, H = M.h0, th = 512, tw = Math.max(64, Math.min(512, Math.round(th * W / H / 4) * 4));
-  const rt = new THREE.WebGLRenderTarget(tw, th, { depthBuffer: true });
-  const sc = new THREE.Scene(); sc.add(new THREE.HemisphereLight(0xeef4ff, 0x4a5a3a, 1.05)); const dl = new THREE.DirectionalLight(0xfff2dc, 0.9); dl.position.set(0.4, 1, 0.8); sc.add(dl);
+  const NV = 8, W = M.w0 * 1.15, H = M.h0, th = REAL.low ? 256 : 512, tw = Math.max(64, Math.min(512, Math.round(th * W / H / 4) * 4));
+  const rt = new THREE.WebGLRenderTarget(tw * NV, th, { depthBuffer: true });
+  const sc = new THREE.Scene(); sc.add(new THREE.HemisphereLight(0xeef4ff, 0x4a5a3a, 1.0)); const dl = new THREE.DirectionalLight(0xfff2dc, 0.85); sc.add(dl);
   for (const im of M.meshes) { const m = im.material.clone(); m.onBeforeCompile = () => {}; m.customProgramCacheKey = () => 'imp'; sc.add(new THREE.Mesh(im.geometry, m)); }
-  const cam = new THREE.OrthographicCamera(-W / 2, W / 2, H, 0, -W * 4, W * 4); cam.position.set(0, 0, W); cam.lookAt(0, 0, 0); cam.updateProjectionMatrix();
-  const r = U3.r, oc = r.getClearColor(new THREE.Color()), oa = r.getClearAlpha();
-  r.setRenderTarget(rt); r.setClearColor(0x000000, 0); r.clear(); r.render(sc, cam); r.setRenderTarget(null); r.setClearColor(oc, oa);
+  const cam = new THREE.OrthographicCamera(-W / 2, W / 2, H, 0, -W * 4, W * 4);
+  const r = U3.r, oc = r.getClearColor(new THREE.Color()), oa = r.getClearAlpha(), ac = r.autoClear;
+  r.setRenderTarget(rt); r.setClearColor(0x000000, 0); r.clear(); r.autoClear = false; rt.scissorTest = true;
+  /* 8 yönden çekim: kolon k = ağacın yerel çevresinde k*45° açıdan bakış; ışık bakana göre hep aynı (yandan-üstten) */
+  for (let k = 0; k < NV; k++) { const f = k / NV * Math.PI * 2, sx = Math.sin(f), cz = Math.cos(f);
+    cam.position.set(sx * W, 0, cz * W); cam.lookAt(0, 0, 0); cam.updateProjectionMatrix();
+    dl.position.set(sx * 0.8 + cz * 0.4, 1, cz * 0.8 - sx * 0.4);
+    rt.viewport.set(k * tw, 0, tw, th); rt.scissor.set(k * tw, 0, tw, th); r.setRenderTarget(rt); r.render(sc, cam); }
+  rt.scissorTest = false; r.autoClear = ac; r.setRenderTarget(null); r.setClearColor(oc, oa);
   const mat = new THREE.MeshBasicMaterial({ map: rt.texture, alphaTest: 0.45, side: THREE.DoubleSide });
   mat.onBeforeCompile = sh => {
-    sh.vertexShader = sh.vertexShader.replace('#include <project_vertex>', `
+    sh.vertexShader = sh.vertexShader.replace('#include <uv_vertex>', `#include <uv_vertex>
+      { vec3 ic0 = instanceMatrix[3].xyz; vec2 dv = cameraPosition.xz - ic0.xz;
+        float ph = atan(dv.x, dv.y) - instanceMatrix[2][0];
+        float col = mod(floor(ph / 6.2831853 * ${NV}.0 + 0.5), ${NV}.0);
+        vUv.x = (vUv.x + col) / ${NV}.0; }`).replace('#include <project_vertex>', `
       vec3 ic = instanceMatrix[3].xyz; float isx = length(instanceMatrix[0].xyz), isy = length(instanceMatrix[1].xyz);
       vec3 cr = normalize(vec3(viewMatrix[0][0], 0.0, viewMatrix[2][0]));
       vec4 mvPosition = viewMatrix * vec4(ic + cr * position.x * isx + vec3(0.0, position.y * isy, 0.0), 1.0);
       gl_Position = projectionMatrix * mvPosition;`);
   };
-  mat.customProgramCacheKey = () => 'impBill';
+  mat.customProgramCacheKey = () => 'impBill8';
   const g = new THREE.PlaneGeometry(1, 1); g.translate(0, 0.5, 0);
   const cap = REAL.low ? 400 : 2500, ib = new THREE.InstancedMesh(g, mat, cap); ib.count = 0; ib.frustumCulled = false; ib.userData.max = cap; ib.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-  U3.scene.add(ib); M.imp = { ib, rt, mat };
+  U3.scene.add(ib); M.imp = { ib, rt, mat, W };
 }
 // uzakta kart koy: realPut ile aynı model seçimi (yakın/uzak geçişte tür değişmez)
-function realFar(kind, key, x, y, z, height, ys = 1) {
+function realFar(kind, key, x, y, z, height, ys = 1, ang = 0) {
   if (!REAL.ready) return false;
   const list = REAL_SET[kind].filter(n => REAL.M[n]); if (!list.length) return false;
   const name = list[Math.floor(((key * 9.73) % 1 + 1) % 1 * list.length) % list.length], M = REAL.M[name];
   if (!M.imp) realImpostor(name);
   const ib = M.imp && M.imp.ib; if (!ib || ib.count >= ib.userData.max) return false;
-  const s = height / M.h0; _rm.makeScale(M.w0 * s, height * ys, 1); _rm.setPosition(x, y, z);
+  const s = height / M.h0; _rm.makeScale(M.imp.W * s, height * ys, 1); _rm.setPosition(x, y, z); _rm.elements[8] = ang;   /* yerel dönüş: shader doğru bakış kolonunu seçer */
   ib.setMatrixAt(ib.count++, _rm); return true;
 }
 function realFarReset() { for (const k of ['tree', 'conifer']) for (const n of REAL_SET[k]) { const M = REAL.M[n]; if (M && M.imp) M.imp.ib.count = 0; } }
