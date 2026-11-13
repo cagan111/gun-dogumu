@@ -8,3 +8,5 @@ Kullanım:
 node tools/build-standalone.cjs --input 'gun-dogumu-vercel-duzeltildi (1)/oyun/index.html' --output /tmp/son-ates-check.html
 
 Araç sonra güncelindex'e eklenmişdeniz.js/varlik.js'i de otomatikalır; bu tabandakiindexhenüz15script olduğundanoikiöncekipaketuygulanmışsayılmadı. Claude kendi bundle sahibi olarakinceleyipistersekullanabilir, yayın komutu yok. Codex kaynakbranchcodex/bundle-check-20261113 taban187b95c. Patch yalnızyeniaraç/test/rapor, eskiPRmergeyok. EXTRACTONLYteslim ağacını merge/cherry-picketme.
+
+Kaynak451b343 sonkontrol:7üretimJS testlipaketlebirebir, index artıkdeniz/varlikile17script. Aracı geçici451b343index+JSağacında çalıştırınca17/17inline+18toplamgövde(inlineUIile)V8parsegeçti. Testtam15sayısınakilitlenmekyerine enaz15çekirdek+GLTFLoader+external-tagkalmaması sözleşmesinekaydırıldı; yeniJSeklenincegereksizredolmasın. Eski187b95cfixture15doğrulamasıgeçerli. Bu yinebrowsertestideğil.
