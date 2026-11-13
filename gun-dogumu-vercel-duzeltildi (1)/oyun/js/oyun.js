@@ -738,7 +738,7 @@ function serialize() {
     trees: G.trees.map(o => o.amt), rocks: G.rocks.map(o => o.dead ? 0 : o.amt), crystals: G.crystals.map(o => o.dead ? 0 : o.amt),
     bushes: G.bushes.map(o => o.amt), herbs: G.herbs.map(o => o.amt), poisons: G.poisons.map(o => o.amt), nests: G.nests.map(n => n.eggs),
     builds: G.builds.map(b => ({ type: b.type, x: b.x, y: b.y, hp: b.hp, uses: b.uses, ang: b.ang, built: b.built, prog: b.prog, planted: b.planted, g: b.g, rooms: b.rooms, furniture: cavFurnitureSave(b), crop: b.crop, cur: b.cur })),
-    people: G.people.map(p => { /* kaçırılmakta olan kurban da kaydedilir; yüklemede olduğu yerde serbest kalır */ const o = {}; for (const k of pf) o[k] = p[k]; o.inHut = p.inHut ? G.builds.indexOf(p.inHut) : -1; o.homeT = p.homeT ? G.builds.indexOf(p.homeT) : -1; o.bed = p.bed ? [G.builds.indexOf(p.bed.s), p.bed.i] : null; return o; }),
+    people: G.people.map(p => { /* kaçırılmakta olan kurban da kaydedilir; yüklemede olduğu yerde serbest kalır */ const o = {}; for (const k of pf) o[k] = p[k]; o.inHut = p.inHut ? G.builds.indexOf(p.inHut) : -1; o.homeT = p.homeT ? G.builds.indexOf(p.homeT) : -1; o.post = p.post && p.post.type==='kule' && p.post.built && !p.post.dead ? G.builds.indexOf(p.post) : -1; o.bed = p.bed ? [G.builds.indexOf(p.bed.s), p.bed.i] : null; return o; }),
     dinos: G.dinos.filter(d => d.tamed).map(d => ({ type: d.type, x: d.x, y: d.y, hp: d.hp, maxhp: d.maxhp, pet: !!d.pet, growth: d.growth || 0, r: d.r, mounted: G.mount === d })),
     explored: ex,
     ccamps: G.ccamps.map(c => ({ alive: c.alive, totem: c.totem, found: c.found, spDay: c.spDay || 0, captives: c.captives.map(cp => { const o = { eatDay: cp.eatDay }; for (const k of pf) o[k] = cp.p[k]; return o; }) }))
@@ -777,7 +777,7 @@ function loadGame(s) {
   for (const b of D.builds) { if (!BUILD[b.type]) continue; const o = makeBuild(b.type, b.x, b.y, b.ang); o.hp = b.hp; o.uses = b.uses; o.prog = b.prog || 0; o.planted = !!b.planted; o.g = b.g || 0; if (b.type === 'tarla') { o.crop = CROPS[b.crop] ? b.crop : 'cali'; o.cur = CROPS[b.cur] ? b.cur : o.planted ? 'cali' : null; } if (b.rooms) o.rooms = b.rooms.slice(); cavFurnitureRestore(o, b.furniture); if (b.type === 'magara') G.cave = o; if (b.built !== false) finishBuild(o, true); }
   for (const s2 of D.people) {
     const p = mkPerson(s2.x, s2.y, s2.name, s2.leader, s2.child);
-    Object.assign(p, s2); p.inHut = null; p.homeT = null; p.bed = null; p.eq = {}; p.sk = Object.assign({}, p.sk || {});
+    Object.assign(p, s2); p.post = null; p.inHut = null; p.homeT = null; p.bed = null; p.eq = {}; p.sk = Object.assign({}, p.sk || {});
     p.bag = s2.bag && typeof s2.bag === 'object' ? Object.assign({}, s2.bag) : {}; p.carry = +s2.carry || 0; p.cookGot = s2.cookGot || null; p.batch = s2.batch || null; p.cook = p.cook || 0;
     const ht = G.builds[s2.homeT]; if (s2.homeT >= 0 && ht && ht.type === 'cadir') moveHome(p, ht);
     if (s2.bed) { const slot = healBedFor(G.builds[s2.bed[0]], s2.bed[1], p); if (slot) { slot.s.beds[slot.i] = p.id; p.bed = slot; } }
@@ -798,6 +798,11 @@ function loadGame(s) {
     c.captives = (s3.captives || []).map(o => { const p = mkPerson(o.x, o.y, o.name, false, o.child); Object.assign(p, o); delete p.eatDay; p.inHut = null; p.grabbed = false; return { p, eatDay: o.eatDay }; });
   });
   assignHomes(); assignEquip(); assignBeds();
+  // Kule görevini kapı nöbeti/uyku hesaplanmadan önce geri kur; eski v4 alanı yoksa geç.
+  for(const saved of D.people){
+    const p=G.people.find(q=>q.id===saved.id),b=G.builds[saved.post];
+    if(p&&p!==L&&p.group==='muhafiz'&&!p.dead&&!p.grabbed&&!p.desert&&!p.downed&&!p.bed&&Number.isInteger(saved.post)&&saved.post>=0&&b&&b.type==='kule'&&b.built&&!b.dead&&!b.guard){b.guard=p;p.post=b;}
+  }
   // v4 zaten inHut bina indeksini saklar; geceyi yüklerken uyuyanı dışarı çıkarma.
   if(goHome())for(const saved of D.people){
     const p=G.people.find(q=>q.id===saved.id),b=G.builds[saved.inHut];
