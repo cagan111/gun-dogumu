@@ -657,6 +657,7 @@ function startScreen() {
   for (const b of document.querySelectorAll('.diffs button')) b.onclick = () => { UI.diff = b.dataset.d; for (const x of document.querySelectorAll('.diffs button')) x.classList.toggle('on', x === b); $('ddesc').textContent = DIFF[UI.diff].desc; };
   $('go').onclick = () => { audioInit(); newGame(UI.diff, $('tutChk').checked); };
   if (sv) $('cont').onclick = () => { audioInit(); try { loadGame(sv.s); } catch (e) { console.error(e); store.del('sonAtesKayit4'); startScreen(); } };
+  if(typeof varlikMenu==='function')varlikMenu();
 }
 // Statik metin + mevcut dünya: video/varlık indirmesi ve ek render geçişi yok.
 let arrivalPanel=null;

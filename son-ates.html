@@ -4677,6 +4677,25 @@ function blobT(b, x, y) {
   return 1 - Math.hypot(dx, dy) / (b.r * (1 + 0.18 * Math.sin(a * 3 + b.p) + 0.08 * Math.sin(a * 7 + b.q)));
 }
 
+// Biyom lekeleri değişmeden kalır; her örnekte tüm adayı taramak yerine
+// blobT'nin aynı 1.6*r sınırını kapsayan, sırası korunmuş aday listesi kullanılır.
+const BLOB_CELL=1000;
+let blobIndex=null;
+function buildBlobIndex() {
+  const n=Math.ceil(WORLD/BLOB_CELL), cells=Array.from({length:n*n},()=>[]);
+  for(const b of G.blobs) {
+    const m=b.r*1.6, x0=Math.max(0,Math.floor((b.x-m)/BLOB_CELL)),x1=Math.min(n-1,Math.floor((b.x+m)/BLOB_CELL));
+    const y0=Math.max(0,Math.floor((b.y-m)/BLOB_CELL)),y1=Math.min(n-1,Math.floor((b.y+m)/BLOB_CELL));
+    for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++)cells[y*n+x].push(b);
+  }
+  blobIndex={source:G.blobs,length:G.blobs.length,n,cells};
+}
+function blobsNear(x,y) {
+  const q=blobIndex;
+  if(!q||q.source!==G.blobs||q.length!==G.blobs.length||x<0||y<0||x>=WORLD||y>=WORLD||!Number.isFinite(x)||!Number.isFinite(y))return G.blobs;
+  return q.cells[Math.floor(y/BLOB_CELL)*q.n+Math.floor(x/BLOB_CELL)];
+}
+
 // ---- yükseklik haritası (HC birimlik ızgara, çift doğrusal örnekleme)
 const HC = 50; let HN = Math.round(WORLD / HC), HW = HN + 1;
 function islandGridReset() { HN = Math.round(WORLD / HC); HW = HN + 1; }
@@ -4733,7 +4752,7 @@ function rawH(x, y) {
   const vv = Math.abs(fbm(x / 4200 - 3.3, y / 4200 + 8.8, 2) - 0.5) * 2;
   h -= (1 - sstep(0, 0.22, vv)) * 45 * wI;
   let mm = 0, mist = 0, sw = 0, md = 0;
-  for (const b of G.blobs) {
+  for (const b of blobsNear(x,y)) {
     const t = blobT(b, x, y); if (t <= -0.3) continue;
     if (b.k === 1) mm = Math.max(mm, sstep(-0.25, 0.55, t));
     else if (b.k === 3) mist = Math.max(mist, sstep(-0.2, 0.45, t));
@@ -4806,9 +4825,10 @@ function biomeAt(x, y) {
   const c = landness(x, y);
   if (c < 0 || (HM && groundH(x, y) < 0)) return B_SEA;
   let mt = -1;
-  for (const b of G.blobs) if (b.k === 1) { const t = blobT(b, x, y); if (t > mt) mt = t; }
+  const bs=blobsNear(x,y);
+  for (const b of bs) if (b.k === 1) { const t = blobT(b, x, y); if (t > mt) mt = t; }
   if (c < 170 + 150 * vnoise(x / 650 + 3.1, y / 650 - 7.7) && mt < -0.1) return 5;
-  for (const k of [3, 1, 2, 4]) for (const b of G.blobs) { if (b.k === k && blobT(b, x, y) > 0) return k; }
+  for (const k of [3, 1, 2, 4]) for (const b of bs) { if (b.k === k && blobT(b, x, y) > 0) return k; }
   return 0;
 }
 function biomeFast(x, y) {
@@ -4823,6 +4843,7 @@ function coastR(a, r0 = 4500 * ISLK) {
 }
 
 function genWorld(seed,chooseHome=false) {
+  blobIndex=null;
   const coastal=G.caveTerrain===2,savedHome={v:1,x:HOME.x,y:HOME.y,ang:HOME.ang};
   if(coastal){setHome(null);G.coastPlanning=true}
   const S = mulberry32(seed);
@@ -4865,6 +4886,7 @@ function genWorld(seed,chooseHome=false) {
   placeBlob(4, 700, 950, 2300, 2900, 1500, 0.9);              // kampa en yakın ova
   for (let i = 0; i < Math.round(7 * ISLK * ISLK); i++) placeBlob(4, 700, 1250, 2500, 6000 * ISLK, 1600, 0.9);
 
+  buildBlobIndex();
   // ---- yükseklik haritası
   HM = new Float32Array(HW * HW);
   for (let j = 0; j < HW; j++) for (let i = 0; i < HW; i++) HM[j * HW + i] = rawH(i * HC, j * HC);
@@ -6777,8 +6799,15 @@ function removeDino(d) {
 }
 
 // ---- hasar
+// Saldırıyı yapan canlıya göre tek sınır: kaynak yoksa çevresel hasar aynen kalır.
+function combatDamage(dmg, src) {
+  if (!src || (src.kind && src.kind!=='person' && src.kind!=='dino')) return dmg;
+  if (src===L || src.leader===true) return dmg*0.5;
+  return ((src.type && DINO[src.type]) || typeof src.leader==='boolean' || src.isRescue) ? dmg*1.25 : dmg;
+}
 function hurt(t, dmg, src, poison, isProj) {
   if (!t || t.dead) return;
+  dmg=combatDamage(dmg,src);
   if (t.isRescue) { t.hp -= dmg * DIFF[G.diff].dmg; t.hurtT = 0.2; if (t.hp <= 0) rescueDies(t); return; }
   if (t.type) {
     if (t.type === 'kanatli' && t.alt > 0.4 && !isProj) return;
@@ -7004,7 +7033,7 @@ function scentTrailFor(d, base) {
   let best = null, bestScore = 0;
   for (let i = G.scents.length - 1; i >= 0; i--) {
     const q = G.scents[i];
-    if (!q.src || q.src.dead || guardSafe(q.src)) continue;
+    if (t_dead(q.src)) continue;
     if (d.terr && Math.hypot(q.x - d.terr.x, q.y - d.terr.y) > d.terr.r) continue;
     const freshness = clamp(1 - q.age / 24, 0, 1);
     if (freshness <= 0) continue;
@@ -7054,9 +7083,9 @@ function updPred(d, dt, prey, zones) {
     if (b.dead || !isNight()) { d.siege = null; d.leave = true; return; }
     if (dist(d, b) > d.r + b.r + 6) {
       steer(d, b.x, b.y, def.spd * 0.8, dt, true); d.anim += dt * 10;
-      if (d.bash && d.atkCd <= 0) { const f = d.bash; d.atkCd = def.cd; f.hp -= def.dmg; f.hit = 0.2; SFX.hit(L ? clamp(1 - dist(f, L) / 700, 0, 0.5) : 0.2); if (f.hp <= 0) destroyBuild(f); }
+      if (d.bash && d.atkCd <= 0) { const f = d.bash; d.atkCd = def.cd; f.hp -= combatDamage(def.dmg,d); f.hit = 0.2; SFX.hit(L ? clamp(1 - dist(f, L) / 700, 0, 0.5) : 0.2); if (f.hp <= 0) destroyBuild(f); }
     } else if (d.atkCd <= 0) {
-      d.atkCd = def.cd; b.hp -= def.dmg * 1.5; b.hit = 0.2; G.shake = Math.max(G.shake, L && dist(b, L) < 500 ? 4 : 0);
+      d.atkCd = def.cd; b.hp -= combatDamage(def.dmg*1.5,d); b.hit = 0.2; G.shake = Math.max(G.shake, L && dist(b, L) < 500 ? 4 : 0);
       SFX.hit(L ? clamp(1 - dist(b, L) / 900, 0.05, 0.6) : 0.2);
       if (b.hp <= 0) destroyBuild(b);
       else if (Math.random() < 0.25) for (const q of b.occ.slice()) { leaveHut(q); q.fear = Math.min(100, q.fear + 40); }
@@ -7070,7 +7099,7 @@ function updPred(d, dt, prey, zones) {
     if (d.watcher <= 0 || !isNight() || d.hurt > 0 || G.people.some(p => !p.inHut && !p.insideB && Math.hypot(p.x - d.x, p.y - d.y) < 300)) { d.watcher = 0; d.leave = true; }
     return;
   }
-  if (d.type === 'geceavcisi' && !isNight() && !G.finale) d.leave = true;
+  // Gün ışığı tek başına takibi bitirmez; gece doğumu/algısı ve gerçek geri çekilmeler korunur.
   if (d.type === 'yelken' && d.home && d.tgt && !d.tgt.dead && Math.hypot(d.tgt.x - d.home.x, d.tgt.y - d.home.y) > 750) { d.tgt = null; d.wx = d.home.x; d.wy = d.home.y; }
   if (d.type === 'yelken' && L) { d.growlT = (d.growlT || rand(5, 10)) - dt; if (d.growlT <= 0) { d.growlT = rand(10, 20); const dd = dist(d, L); if (dd < 1100) SFX.growl(clamp(1 - dd / 1100, 0.1, 0.9), panOf(d.x)); } }
   if (d.type === 'geceavcisi' && L && Math.random() < dt * 0.15 && dist(d, L) < 800) SFX.chitter(clamp(1 - dist(d, L) / 800, 0.05, 0.5), panOf(d.x));
@@ -7109,7 +7138,10 @@ function updPred(d, dt, prey, zones) {
     let best = null, bs = 1e9;
     if (d.mother && G.carryEgg && L) best = L;
     else for (const t of prey) {
-      const dd = dist(d, t); if (dd > sense) continue;
+      if (t_dead(t)) continue;
+      const dd = dist(d, t);
+      // Görüş/işitme sınırının dışında da rüzgârla ulaşan canlı insan kokusunu izleyebilir.
+      if (dd > sense && (t.type || t.isRescue || !smellsP(d,t,sense*0.72))) continue;
       // sessiz yürüyeni duymaz; ama önündeyse görür
       if (!t.type && !t.isRescue && d.tgt !== t && !(d.rush > 0) && !d.finale && !predNotices(d, t, dd, sense)) continue;
       // bölgesel yırtıcı kendi topraklarından çıkmaz
@@ -7159,7 +7191,7 @@ function updPred(d, dt, prey, zones) {
         tx = undefined;
       }
     }
-  } else if (d.scent && d.scent.age < 24 && d.scent.src && !d.scent.src.dead && !guardSafe(d.scent.src) && Math.hypot(d.scent.x - d.x, d.scent.y - d.y) > 18) {
+  } else if (d.scent && d.scent.age < 24 && !t_dead(d.scent.src) && Math.hypot(d.scent.x - d.x, d.scent.y - d.y) > 18) {
     tx = d.scent.x; ty = d.scent.y; spd = def.spd * (0.3 + 0.25 * clamp(1 - d.scent.age / 24, 0, 1));   // koku izini takip (Codex)
   } else {
     d.scent = null;
@@ -7177,7 +7209,7 @@ function updPred(d, dt, prey, zones) {
     d.spdNow = spd;
     steer(d, tx, ty, spd, dt, true); d.anim += dt * spd / 22;
     for (const z of zones) { if (bold && !z.guard) continue; const dx = d.x - z.x, dy = d.y - z.y, dd = Math.hypot(dx, dy) || 1; if (dd < z.r) { d.x = z.x + dx / dd * z.r; d.y = z.y + dy / dd * z.r; } }
-    if (d.bash && d.atkCd <= 0 && ((t && !inSafe(t.x, t.y, zones)) || d.type === 'dev' || bold)) { const b = d.bash; d.atkCd = def.cd; b.hp -= def.dmg * (d.type === 'dev' ? 2 : 1); b.hit = 0.2; SFX.hit(L ? clamp(1 - dist(b, L) / 700, 0, 0.5) : 0.2); if (b.hp <= 0) destroyBuild(b); }
+    if (d.bash && d.atkCd <= 0 && ((t && !inSafe(t.x, t.y, zones)) || d.type === 'dev' || bold)) { const b = d.bash; d.atkCd = def.cd; b.hp -= combatDamage(def.dmg*(d.type === 'dev' ? 2 : 1),d); b.hit = 0.2; SFX.hit(L ? clamp(1 - dist(b, L) / 700, 0, 0.5) : 0.2); if (b.hp <= 0) destroyBuild(b); }
   }
   checkTraps(d);
 }
@@ -7192,7 +7224,7 @@ function checkTraps(d) {
 }
 function dinoAttack(d, t) {
   const def = DINO[d.type]; d.atkCd = def.cd * rand(0.85, 1.15);
-  if (t.kind === 'build') { t.hp -= def.dmg * 2; t.hit = 0.2; G.shake = Math.max(G.shake, 4); SFX.hit(0.5); if (t.hp <= 0) destroyBuild(t); return; }
+  if (t.kind === 'build') { t.hp -= combatDamage(def.dmg*2,d); t.hit = 0.2; G.shake = Math.max(G.shake, 4); SFX.hit(0.5); if (t.hp <= 0) destroyBuild(t); return; }
   if (t.isRescue) { hurt(t, def.dmg, d); return; }
   if (d.type === 'dev' && !t.leader && !t.type && Math.random() < 0.55) {
     t.grabbed = true; t.grabT = 12; t.downed = 0; d.carry = t; d.carryDmg = 0;
@@ -7410,7 +7442,7 @@ function updPet(d, dt) {
   for (const o of G.dinos) { if (o === d || !hostile(o)) continue; const dd = dist(o, L); if (dd < fd) { fd = dd; foe = o; } }
   if (foe) {
     if (dist(d, foe) > d.r + foe.r + 6) { steer(d, foe.x, foe.y, 240, dt, true); d.anim += dt * 12; }
-    else { d.moving = false; if (d.atkCd <= 0) { d.atkCd = 0.8; hurt(foe, 5 + 10 * g, L); } }
+    else { d.moving = false; if (d.atkCd <= 0) { d.atkCd = 0.8; hurt(foe, 5 + 10 * g, d); } }
     return;
   }
   const tx = L.x + Math.cos(L.ang + Math.PI * 0.75) * 40, ty = L.y + Math.sin(L.ang + Math.PI * 0.75) * 40;
@@ -8204,7 +8236,7 @@ function updLeader(dt) {
       }
     }
     for (const c of G.ccamps) if (c.alive && Math.hypot(c.x - hx, c.y - 12 - hy) < 42) {
-      c.totem -= dmgOf(p); hit = true; ftext(c.x, c.y - 50, `Totem ${Math.max(0, Math.round(c.totem))}`, '#fc9');
+      c.totem -= combatDamage(dmgOf(p),p); hit = true; ftext(c.x, c.y - 50, `Totem ${Math.max(0, Math.round(c.totem))}`, '#fc9');
       if (c.totem <= 0) destroyCamp(c);
     }
     if (hit) { SFX.hit(0.6); G.shake = Math.max(G.shake, 3); }
@@ -13068,6 +13100,7 @@ function buildWorld() {
   // zemin: dörtlü ağaç arazi + deniz (her karede terUpdate ile güncellenir)
   terReset(); TER.group = new THREE.Group(); W.add(TER.group); U3.sl = typeof seasonLook === 'function' ? seasonLook() : null;
   U3.sea = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), MAT.sea); U3.sea.rotation.x = -Math.PI / 2; U3.sea.scale.set(30000, 30000, 1); U3.sea.renderOrder = 2; W.add(U3.sea);
+  if(typeof denizInit==='function')denizInit(U3);
   // göller ve bataklık havuzları: kıyı yüksekliklerinin en düşüğüne oturan düz su
   const waterY = (o, r) => { let m = 1e9; for (let i = 0; i < 8; i++) { const a = i / 8 * TAU; m = Math.min(m, gh(o.x + Math.cos(a) * r, o.y + Math.sin(a) * r)); } return Math.max(m, gh(o.x, o.y)) + 0.8; };
   U3.lakeM = []; for (const l of G.lakes) { const m = new THREE.Mesh(GEO.disc, l.frozen ? MAT.ice : MAT.water); m.scale.set(l.r + 6, 1, l.r + 6); m.position.set(l.x, l.h !== undefined ? l.h : waterY(l, l.r), l.y); W.add(m); U3.lakeM.push([l, m]); }
@@ -13257,7 +13290,7 @@ function rebuildTreeInst(cx, cy, writeShadows) {
         // gövde dibinde eğrelti öbekleri: zemine kesik çizgiyle değmesin
         for (let q = 0; q < 3; q++) { const a = t.sw * 3 + q * 2.1, rr = 14 + q * 6; realPut('litter', t.tone + q, t.x + Math.cos(a) * rr, gh(t.x + Math.cos(a) * rr, t.y + Math.sin(a) * rr) - 1, t.y + Math.sin(a) * rr, 0, 30 + q * 8, a, distance); }
         continue; }
-      if (distance > realR(rk) && realFar(rk, t.tone + t.sw, t.x, yb - 2, t.y, rh, ys)) continue; }
+      if (realFar(rk, t.tone + t.sw, t.x, yb - 2, t.y, rh, ys)) continue; }
     if (b === 5) {                                       // palmiye: kıvrık gövde + taç yaprakları
       let x = t.x, y = y0, z = t.y; const seg = 5, L = (H * 0.75) / seg, lean = 0.25 + r2 * 0.35;
       for (let i = 0; i < seg; i++) { const rz = lean * (i + 1) / seg, w = 5.2 - i * 0.55; instAdd(T.trunk, x, y, z, w, L * 1.06, w, t.sw, C.t, 0, rz); x += -Math.sin(rz) * Math.cos(t.sw) * L; y += Math.cos(rz) * L; z += Math.sin(rz) * Math.sin(t.sw) * L; }
@@ -14119,9 +14152,10 @@ function cavPortalPass(t, cam) {
   const dx = cam.position.x - mx, dz = cam.position.z - mz, dist = Math.hypot(dx, dz);
   const far = U3.quality === 'dusuk' ? 1400 : 2600;
   if (dist > far) { if (IN.b && dist > far + 600) interiorExit(); return; }
-  if (-Math.sin(a) * dx + Math.cos(a) * dz < 1) return;                     // ağzın arkasından bakılıyor
+  const front=-Math.sin(a)*dx+Math.cos(a)*dz; if(front<=0) return;
+  const lateral=Math.cos(a)*dx+Math.sin(a)*dz, closeMask=front<4&&Math.abs(lateral)<32;                     // ağzın arkasından bakılıyor
   PORT.v.set(mx, ghE(mx, mz) + 30, mz).project(cam);
-  if (PORT.v.z > 1 || Math.abs(PORT.v.x) > 1.6 || Math.abs(PORT.v.y) > 1.8) return;   // ekranda değil
+  if(!closeMask && (PORT.v.z > 1 || Math.abs(PORT.v.x) > 1.6 || Math.abs(PORT.v.y) > 1.8)) return;   // ekranda değil
   cavPortalInit(); inSync(b);
   const T = cavPortalT(b); if (!T) return;
   PORT.Ti.copy(T).invert();
@@ -14130,9 +14164,13 @@ function cavPortalPass(t, cam) {
   inAnimate(t, b);
   for (const o of IN.out) o.visible = false;
   const fg = IN.scene.fog, n0 = fg.near, f0 = fg.far; fg.near = n0 + dist * 0.6; fg.far = f0 + dist * 0.6;
-  PORT.mask.matrix.copy(e.g.matrixWorld); PORT.mask.matrix.multiply(PORT.m.makeTranslation(0, 0, ez + 1.3)); PORT.mask.matrixWorldNeedsUpdate = true; PORT.mask.updateMatrixWorld(true);
+  PORT.mask.matrix.copy(e.g.matrixWorld); PORT.mask.matrix.multiply(PORT.m.makeTranslation(0, 0, closeMask?ez:ez+1.3)); PORT.mask.matrixWorldNeedsUpdate = true; PORT.mask.updateMatrixWorld(true);
   const r = U3.r; r.autoClear = false;
-  r.render(PORT.scene, cam); r.clearDepth();
+  const nearMask=closeMask, originalNear=cam.near;
+  if(nearMask){cam.near=.01;cam.updateProjectionMatrix();PORT.mask.traverse(o=>{if(o.material)o.material.depthTest=false;});}
+  r.render(PORT.scene, cam);
+  if(nearMask){cam.near=originalNear;cam.updateProjectionMatrix();PORT.mask.traverse(o=>{if(o.material)o.material.depthTest=true;});}
+  r.clearDepth();
   inStencil(true); r.render(IN.scene, pc); inStencil(false);
   r.autoClear = true; fg.near = n0; fg.far = f0;
 }
@@ -14817,6 +14855,12 @@ function realPrep(name, scene) {
     if (leafy) realWind(m);
     m.needsUpdate = true;
     const im = new THREE.InstancedMesh(g, m, cap); im.count = 0; im.frustumCulled = false; im.castShadow = !REAL.low; im.userData.max = cap; im.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    // Yaprak gölgesi görünür yaprakla aynı uTime/rüzgâr geometrisini izlesin.
+    // Alpha kesimi ve çift taraflı yapraklar depth geçişinde de korunur.
+    if (leafy && im.castShadow) {
+      const depth = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map: m.map, alphaMap: m.alphaMap, alphaTest: m.alphaTest, side: m.side });
+      realWind(depth); im.customDepthMaterial = depth;
+    }
     U3.scene.add(im); return im;
   });
   REAL.M[name] = { meshes, h0, w0 };
@@ -14923,6 +14967,136 @@ function realGrass() {
   GEO.bladeReal = g; U3.grB.geometry = g; if (U3.inst && U3.inst.tgrass) U3.inst.tgrass.geometry = g;
   if (U3.grE) U3.grE.visible = false;   // köşeli eğrelti öbekleri: gerçek eğreltiler var
   m.color.setRGB(1.35, 1.35, 1.3);       // örnek renkleri (biyom paleti) koyu: kartları aydınlat
+}
+
+</script>
+<script>
+'use strict';
+// Görsel deniz. Oynanışın SEA_Y/isSea/yüzme/kayıt sınırını değiştirmez.
+// uc.js buildWorld deniz mesh'ini oluşturduktan sonra denizInit(U3) çağırır.
+const DENIZ = { depth:null, world:0, mode:'', builds:0 };
+function denizDepthTexture() {
+  if(DENIZ.depth)DENIZ.depth.dispose();
+  const n=256,data=new Uint8Array(n*n*4);
+  for(let j=0;j<n;j++)for(let i=0;i<n;i++) {
+    const depth=Math.max(0,-groundH((i+.5)*WORLD/n,(j+.5)*WORLD/n)),k=(j*n+i)*4;
+    data[k]=Math.min(255,Math.round(depth/190*255));data[k+1]=data[k+2]=data[k];data[k+3]=255;
+  }
+  const t=new THREE.DataTexture(data,n,n,THREE.RGBAFormat);t.minFilter=t.magFilter=THREE.LinearFilter;t.generateMipmaps=false;t.needsUpdate=true;
+  DENIZ.depth=t;DENIZ.world=WORLD;return t;
+}
+function denizHeight(x,z,t,depth,low=false) {
+  if(low||depth<=2)return 0;
+  const d=Math.max(0,Math.min(1,(depth-2)/58)),q=d*d*(3-2*d);
+  return q*(7*Math.sin(x*.008+z*.003+t*.8)+3*Math.sin(-x*.005+z*.011-t*1.1));
+}
+function denizInit(u) {
+  if(!u||!u.sea||typeof THREE==='undefined')return false;
+  const low=(typeof REAL!=='undefined'&&REAL.low)||!(u.r&&u.r.capabilities.maxVertexTextures>0);
+  const depth=denizDepthTexture(),mesh=u.sea;
+  // Var olan tek deniz draw-call'ı kalır. Yakına sık, ufka seyrek örnekleme.
+  if(!low) {
+    const g=new THREE.PlaneGeometry(1,1,80,80),p=g.attributes.position;
+    for(let i=0;i<p.count;i++)for(const axis of [0,1]) {
+      const v=p.array[i*3+axis]*2,a=Math.abs(v),r=a<=.65?a/.65*1500:1500+Math.pow((a-.65)/.35,2)*13500;
+      p.array[i*3+axis]=Math.sign(v)*r/30000;
+    }
+    p.needsUpdate=true;g.computeBoundingSphere();mesh.geometry.dispose();mesh.geometry=g;
+  }
+  // Küresel MAT.sea'yı değiştirme: göller, arazi ve diğer malzemeler etkilenmez.
+  const m=new THREE.MeshPhongMaterial({color:0x20596a,specular:0xb6d5dc,shininess:90,transparent:true,opacity:.9,emissive:0x020a10});
+  m.onBeforeCompile=sh=>{
+    Object.assign(sh.uniforms,{denizTime:u.uTime,denizSky:u.seaSky,denizDepth:{value:depth},denizWorld:{value:WORLD}});
+    const common=`uniform float denizTime;uniform float denizWorld;uniform sampler2D denizDepth;varying vec3 denizWP;
+      float seaDepth(vec2 p){vec2 uv=p/denizWorld;if(uv.x<0.||uv.y<0.||uv.x>1.||uv.y>1.)return 190.;return texture2D(denizDepth,uv).r*190.;}
+      float seaAmp(float d){return smoothstep(2.,60.,d);}
+    `;
+    sh.vertexShader=common+sh.vertexShader.replace('#include <begin_vertex>',`#include <begin_vertex>
+      vec3 wp=(modelMatrix*vec4(transformed,1.)).xyz;
+      ${low?'':'float da=seaAmp(seaDepth(wp.xz));transformed.z+=da*(7.*sin(wp.x*.008+wp.z*.003+denizTime*.8)+3.*sin(-wp.x*.005+wp.z*.011-denizTime*1.1));'}
+    `).replace('#include <project_vertex>','#include <project_vertex>\ndenizWP=(modelMatrix*vec4(transformed,1.)).xyz;');
+    sh.fragmentShader=common+'uniform vec3 denizSky;\n'+sh.fragmentShader
+      .replace('#include <normal_fragment_begin>',`#include <normal_fragment_begin>
+        float dd=seaDepth(denizWP.xz),da=seaAmp(dd);vec2 p=denizWP.xz;float t=denizTime;
+        float a=p.x*.008+p.y*.003+t*.8,b=-p.x*.005+p.y*.011-t*1.1;
+        vec2 slope=da*vec2(.056*cos(a)-.015*cos(b),.021*cos(a)+.033*cos(b));
+        slope+=vec2(.045*sin(p.x*.08+p.y*.03+t*1.8),.035*cos(p.y*.095-p.x*.02-t*1.5));
+        vec3 wn=normalize(vec3(-slope.x,1.,-slope.y));normal=normalize((viewMatrix*vec4(wn,0.)).xyz);
+      `)
+      .replace('#include <output_fragment>',`vec3 vd=normalize(cameraPosition-denizWP);float fres=pow(1.-max(0.,dot(vd,wn)),4.);
+        outgoingLight=mix(outgoingLight,denizSky,.38*fres);
+        float band=(1.-smoothstep(4.,15.,dd))*smoothstep(.6,2.,dd);
+        float foam=band*smoothstep(.62,.92,.5+.5*sin(dd*.9-t*1.3+sin(p.x*.055+p.y*.04)));
+        outgoingLight=mix(outgoingLight,vec3(.75,.83,.8),foam*.65);
+        diffuseColor.a=mix(.62,.98,smoothstep(1.,45.,dd));
+        #include <output_fragment>`);
+  };
+  m.customProgramCacheKey=()=>low?'deniz-low-v1':'deniz-wave-v1';mesh.material=m;
+  // Her build kendi materyalini alır; yeni dünyaya geçerken disposeTree bırakır.
+  DENIZ.mode=low?'low-flat':'desktop-waves';DENIZ.builds++;return true;
+}
+
+</script>
+<script>
+'use strict';
+// Ortamı menü açıkken hazırla; ilk dünya çizimi GLB çözümlemesini boğmasın.
+// Oynanış/kayıt API'si ve REAL yükleyicisi değişmez. Beklemeden başlamak isteğe bağlıdır.
+const VARLIK_MENU={phase:'idle',timer:0,start:0,total:0,warm:[],warmAt:0,error:''};
+function varlikPaint() {
+  const s=VARLIK_MENU,ready=s.phase==='ready',waiting=s.phase==='loading'||s.phase==='warming';
+  for(const id of ['go','cont']) { const b=document.getElementById(id);if(b)b.disabled=waiting; }
+  const text=document.getElementById('varlikStatus'),skip=document.getElementById('varlikSkip');
+  if(text) {
+    const n=typeof REAL==='undefined'?0:Object.keys(REAL.M).length;
+    const message=ready?'Çevre hazır.':s.phase==='loading'?(n===s.total?'Zemin hazırlanıyor…':`Çevre hazırlanıyor · ${n}/${s.total}`):s.phase==='warming'?`Uzak görünüm hazırlanıyor · ${s.warmAt}/${s.warm.length}`:s.phase==='bypassed'?'Ayrıntılar oyun sırasında tamamlanabilir.':'Çevre henüz tamamlanamadı; beklemeden başlayabilirsin.';
+    if(text.textContent!==message)text.textContent=message;
+  }
+  if(skip)skip.style.display=waiting?'inline-block':'none';
+}
+function varlikSkip() { clearTimeout(VARLIK_MENU.timer);VARLIK_MENU.phase='bypassed';varlikPaint(); }
+function varlikFail(reason) { clearTimeout(VARLIK_MENU.timer);VARLIK_MENU.error=String(reason);VARLIK_MENU.phase='error';varlikPaint(); }
+function varlikPoll() {
+  const s=VARLIK_MENU;if(s.phase!=='loading')return;
+  if(performance.now()-s.start>45000){varlikFail('timeout');return;}
+  if(REAL.why||REAL.err){varlikFail(REAL.why||REAL.err);return;}
+  const n=Object.keys(REAL.M).length;
+  if(REAL.ready && n===s.total && REALG.on.value===1) {
+    s.phase='warming';s.warm=[...new Set([...REAL_SET.tree,...REAL_SET.conifer])].filter(n=>REAL.M[n]);s.warmAt=0;
+    s.timer=setTimeout(varlikWarm,0);
+  } else s.timer=setTimeout(varlikPoll,100);
+  varlikPaint();
+}
+function varlikWarm() {
+  const s=VARLIK_MENU;if(s.phase!=='warming')return;
+  // Her kart ayrı görevde; menü/girdi arada nefes alır. Oyun başladıysa yeni RT işi yapma.
+  if(G.started){varlikSkip();return;}
+  try {
+    if(s.warmAt<s.warm.length){const n=s.warm[s.warmAt];realImpostor(n);if(!REAL.M[n].imp)throw new Error('impostor');s.warmAt++;s.timer=setTimeout(varlikWarm,0);}
+    else {s.phase='ready';}
+    varlikPaint();
+  } catch(e){varlikFail(e);}
+}
+function varlikBegin() {
+  const s=VARLIK_MENU;clearTimeout(s.timer);s.phase='loading';s.start=performance.now();s.error='';
+  s.total=typeof REAL_SET==='undefined'?0:new Set(Object.values(REAL_SET).flat()).size;
+  varlikPaint();
+  // İlk menü boyansın; büyük kurulum aynı başlangıç script görevine eklenmesin.
+  s.timer=setTimeout(()=>{
+    try {
+      if(typeof init3D!=='function'||typeof realStart!=='function'||!init3D()){varlikFail('WebGL');return;}
+      realStart();varlikPoll();
+    } catch(e){varlikFail(e);}
+  },0);
+}
+function varlikMenu() {
+  const go=document.getElementById('go');if(!go)return;
+  if(!document.getElementById('varlikStatus')) {
+    const box=document.createElement('div');box.style.cssText='margin:10px 0;font-size:14px;color:#d5d5bf';
+    const text=document.createElement('p');text.id='varlikStatus';text.setAttribute('role','status');text.setAttribute('aria-live','polite');text.style.margin='6px 0';box.appendChild(text);
+    const skip=document.createElement('button');skip.id='varlikSkip';skip.textContent='Beklemeyi atla';skip.title='Çevre ayrıntıları oyun sırasında tamamlanabilir';skip.style.cssText='min-height:44px;font:inherit';skip.onclick=varlikSkip;box.appendChild(skip);go.parentNode.insertBefore(box,go);
+  }
+  const s=VARLIK_MENU;
+  if(s.phase==='idle'||s.phase==='bypassed'||s.phase==='error')varlikBegin();else varlikPaint();
 }
 
 </script>
@@ -15586,6 +15760,7 @@ function startScreen() {
   for (const b of document.querySelectorAll('.diffs button')) b.onclick = () => { UI.diff = b.dataset.d; for (const x of document.querySelectorAll('.diffs button')) x.classList.toggle('on', x === b); $('ddesc').textContent = DIFF[UI.diff].desc; };
   $('go').onclick = () => { audioInit(); newGame(UI.diff, $('tutChk').checked); };
   if (sv) $('cont').onclick = () => { audioInit(); try { loadGame(sv.s); } catch (e) { console.error(e); store.del('sonAtesKayit4'); startScreen(); } };
+  if(typeof varlikMenu==='function')varlikMenu();
 }
 // Statik metin + mevcut dünya: video/varlık indirmesi ve ek render geçişi yok.
 let arrivalPanel=null;
