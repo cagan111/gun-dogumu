@@ -937,6 +937,7 @@ function rebuildTreeInst(cx, cy, writeShadows) {
       // eğimde gövde havada kalmasın: çevredeki en alçak noktaya göre biraz gömülür
       const yb = Math.min(gh(t.x + 14, t.y), gh(t.x - 14, t.y), gh(t.x, t.y + 14), gh(t.x, t.y - 14), y0 + 1.5) - 3;
       if (realPut(rk, t.tone + t.sw, t.x, yb, t.y, rh, 0, t.sw, distance, ys)) {
+        if (writeShadows && REAL.shadow) TS.pop();   /* gerçek gölge var: eski leke gölgesi çift olmasın */
         // gövde dibinde eğrelti öbekleri: zemine kesik çizgiyle değmesin
         for (let q = 0; q < 3; q++) { const a = t.sw * 3 + q * 2.1, rr = 14 + q * 6; realPut('litter', t.tone + q, t.x + Math.cos(a) * rr, gh(t.x + Math.cos(a) * rr, t.y + Math.sin(a) * rr) - 1, t.y + Math.sin(a) * rr, 0, 30 + q * 8, a, distance); }
         continue; }
@@ -1625,6 +1626,7 @@ function updAtmos(dt, t, LS) {
   U3.sun.color.copy(c3(0x8fa6e0)).lerp(SKY.t, solar);
   at.lightDir.copy(_v2).lerp(_v, solar).normalize();
   U3.sun.position.copy(cp).addScaledVector(at.lightDir, 1000);
+  if (REAL.shadow) { const q = 1600 / 2048, tx = Math.round(cp.x / q) * q - cp.x, tz = Math.round(cp.z / q) * q - cp.z; U3.sun.position.x += tx; U3.sun.position.z += tz; U3.sun.target.position.x += tx; U3.sun.target.position.z += tz; U3.sun.castShadow = U3.sun.intensity > 0.18; }   /* texel snap: yürürken gölge titremesin; gece kapalı */
   // nokta ışıkları: lights() içinden en yakın MAXL tanesi
   const arr = [];
   for (const l of LS) { const d = Math.hypot(l.x - cp.x, l.y - cp.z); if (d < 1500) arr.push([d - l.r, l]); }
