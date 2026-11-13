@@ -44,6 +44,25 @@ function blobT(b, x, y) {
   return 1 - Math.hypot(dx, dy) / (b.r * (1 + 0.18 * Math.sin(a * 3 + b.p) + 0.08 * Math.sin(a * 7 + b.q)));
 }
 
+// Biyom lekeleri değişmeden kalır; her örnekte tüm adayı taramak yerine
+// blobT'nin aynı 1.6*r sınırını kapsayan, sırası korunmuş aday listesi kullanılır.
+const BLOB_CELL=1000;
+let blobIndex=null;
+function buildBlobIndex() {
+  const n=Math.ceil(WORLD/BLOB_CELL), cells=Array.from({length:n*n},()=>[]);
+  for(const b of G.blobs) {
+    const m=b.r*1.6, x0=Math.max(0,Math.floor((b.x-m)/BLOB_CELL)),x1=Math.min(n-1,Math.floor((b.x+m)/BLOB_CELL));
+    const y0=Math.max(0,Math.floor((b.y-m)/BLOB_CELL)),y1=Math.min(n-1,Math.floor((b.y+m)/BLOB_CELL));
+    for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++)cells[y*n+x].push(b);
+  }
+  blobIndex={source:G.blobs,length:G.blobs.length,n,cells};
+}
+function blobsNear(x,y) {
+  const q=blobIndex;
+  if(!q||q.source!==G.blobs||q.length!==G.blobs.length||x<0||y<0||x>=WORLD||y>=WORLD||!Number.isFinite(x)||!Number.isFinite(y))return G.blobs;
+  return q.cells[Math.floor(y/BLOB_CELL)*q.n+Math.floor(x/BLOB_CELL)];
+}
+
 // ---- yükseklik haritası (HC birimlik ızgara, çift doğrusal örnekleme)
 const HC = 50; let HN = Math.round(WORLD / HC), HW = HN + 1;
 function islandGridReset() { HN = Math.round(WORLD / HC); HW = HN + 1; }
@@ -100,7 +119,7 @@ function rawH(x, y) {
   const vv = Math.abs(fbm(x / 4200 - 3.3, y / 4200 + 8.8, 2) - 0.5) * 2;
   h -= (1 - sstep(0, 0.22, vv)) * 45 * wI;
   let mm = 0, mist = 0, sw = 0, md = 0;
-  for (const b of G.blobs) {
+  for (const b of blobsNear(x,y)) {
     const t = blobT(b, x, y); if (t <= -0.3) continue;
     if (b.k === 1) mm = Math.max(mm, sstep(-0.25, 0.55, t));
     else if (b.k === 3) mist = Math.max(mist, sstep(-0.2, 0.45, t));
@@ -173,9 +192,10 @@ function biomeAt(x, y) {
   const c = landness(x, y);
   if (c < 0 || (HM && groundH(x, y) < 0)) return B_SEA;
   let mt = -1;
-  for (const b of G.blobs) if (b.k === 1) { const t = blobT(b, x, y); if (t > mt) mt = t; }
+  const bs=blobsNear(x,y);
+  for (const b of bs) if (b.k === 1) { const t = blobT(b, x, y); if (t > mt) mt = t; }
   if (c < 170 + 150 * vnoise(x / 650 + 3.1, y / 650 - 7.7) && mt < -0.1) return 5;
-  for (const k of [3, 1, 2, 4]) for (const b of G.blobs) { if (b.k === k && blobT(b, x, y) > 0) return k; }
+  for (const k of [3, 1, 2, 4]) for (const b of bs) { if (b.k === k && blobT(b, x, y) > 0) return k; }
   return 0;
 }
 function biomeFast(x, y) {
@@ -190,6 +210,7 @@ function coastR(a, r0 = 4500 * ISLK) {
 }
 
 function genWorld(seed,chooseHome=false) {
+  blobIndex=null;
   const coastal=G.caveTerrain===2,savedHome={v:1,x:HOME.x,y:HOME.y,ang:HOME.ang};
   if(coastal){setHome(null);G.coastPlanning=true}
   const S = mulberry32(seed);
@@ -232,6 +253,7 @@ function genWorld(seed,chooseHome=false) {
   placeBlob(4, 700, 950, 2300, 2900, 1500, 0.9);              // kampa en yakın ova
   for (let i = 0; i < Math.round(7 * ISLK * ISLK); i++) placeBlob(4, 700, 1250, 2500, 6000 * ISLK, 1600, 0.9);
 
+  buildBlobIndex();
   // ---- yükseklik haritası
   HM = new Float32Array(HW * HW);
   for (let j = 0; j < HW; j++) for (let i = 0; i < HW; i++) HM[j * HW + i] = rawH(i * HC, j * HC);

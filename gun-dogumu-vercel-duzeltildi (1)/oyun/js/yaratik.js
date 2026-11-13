@@ -194,8 +194,15 @@ function removeDino(d) {
 }
 
 // ---- hasar
+// Saldırıyı yapan canlıya göre tek sınır: kaynak yoksa çevresel hasar aynen kalır.
+function combatDamage(dmg, src) {
+  if (!src || (src.kind && src.kind!=='person' && src.kind!=='dino')) return dmg;
+  if (src===L || src.leader===true) return dmg*0.5;
+  return ((src.type && DINO[src.type]) || typeof src.leader==='boolean' || src.isRescue) ? dmg*1.25 : dmg;
+}
 function hurt(t, dmg, src, poison, isProj) {
   if (!t || t.dead) return;
+  dmg=combatDamage(dmg,src);
   if (t.isRescue) { t.hp -= dmg * DIFF[G.diff].dmg; t.hurtT = 0.2; if (t.hp <= 0) rescueDies(t); return; }
   if (t.type) {
     if (t.type === 'kanatli' && t.alt > 0.4 && !isProj) return;
@@ -421,7 +428,7 @@ function scentTrailFor(d, base) {
   let best = null, bestScore = 0;
   for (let i = G.scents.length - 1; i >= 0; i--) {
     const q = G.scents[i];
-    if (!q.src || q.src.dead || guardSafe(q.src)) continue;
+    if (t_dead(q.src)) continue;
     if (d.terr && Math.hypot(q.x - d.terr.x, q.y - d.terr.y) > d.terr.r) continue;
     const freshness = clamp(1 - q.age / 24, 0, 1);
     if (freshness <= 0) continue;
@@ -471,9 +478,9 @@ function updPred(d, dt, prey, zones) {
     if (b.dead || !isNight()) { d.siege = null; d.leave = true; return; }
     if (dist(d, b) > d.r + b.r + 6) {
       steer(d, b.x, b.y, def.spd * 0.8, dt, true); d.anim += dt * 10;
-      if (d.bash && d.atkCd <= 0) { const f = d.bash; d.atkCd = def.cd; f.hp -= def.dmg; f.hit = 0.2; SFX.hit(L ? clamp(1 - dist(f, L) / 700, 0, 0.5) : 0.2); if (f.hp <= 0) destroyBuild(f); }
+      if (d.bash && d.atkCd <= 0) { const f = d.bash; d.atkCd = def.cd; f.hp -= combatDamage(def.dmg,d); f.hit = 0.2; SFX.hit(L ? clamp(1 - dist(f, L) / 700, 0, 0.5) : 0.2); if (f.hp <= 0) destroyBuild(f); }
     } else if (d.atkCd <= 0) {
-      d.atkCd = def.cd; b.hp -= def.dmg * 1.5; b.hit = 0.2; G.shake = Math.max(G.shake, L && dist(b, L) < 500 ? 4 : 0);
+      d.atkCd = def.cd; b.hp -= combatDamage(def.dmg*1.5,d); b.hit = 0.2; G.shake = Math.max(G.shake, L && dist(b, L) < 500 ? 4 : 0);
       SFX.hit(L ? clamp(1 - dist(b, L) / 900, 0.05, 0.6) : 0.2);
       if (b.hp <= 0) destroyBuild(b);
       else if (Math.random() < 0.25) for (const q of b.occ.slice()) { leaveHut(q); q.fear = Math.min(100, q.fear + 40); }
@@ -487,7 +494,7 @@ function updPred(d, dt, prey, zones) {
     if (d.watcher <= 0 || !isNight() || d.hurt > 0 || G.people.some(p => !p.inHut && !p.insideB && Math.hypot(p.x - d.x, p.y - d.y) < 300)) { d.watcher = 0; d.leave = true; }
     return;
   }
-  if (d.type === 'geceavcisi' && !isNight() && !G.finale) d.leave = true;
+  // Gün ışığı tek başına takibi bitirmez; gece doğumu/algısı ve gerçek geri çekilmeler korunur.
   if (d.type === 'yelken' && d.home && d.tgt && !d.tgt.dead && Math.hypot(d.tgt.x - d.home.x, d.tgt.y - d.home.y) > 750) { d.tgt = null; d.wx = d.home.x; d.wy = d.home.y; }
   if (d.type === 'yelken' && L) { d.growlT = (d.growlT || rand(5, 10)) - dt; if (d.growlT <= 0) { d.growlT = rand(10, 20); const dd = dist(d, L); if (dd < 1100) SFX.growl(clamp(1 - dd / 1100, 0.1, 0.9), panOf(d.x)); } }
   if (d.type === 'geceavcisi' && L && Math.random() < dt * 0.15 && dist(d, L) < 800) SFX.chitter(clamp(1 - dist(d, L) / 800, 0.05, 0.5), panOf(d.x));
@@ -526,7 +533,10 @@ function updPred(d, dt, prey, zones) {
     let best = null, bs = 1e9;
     if (d.mother && G.carryEgg && L) best = L;
     else for (const t of prey) {
-      const dd = dist(d, t); if (dd > sense) continue;
+      if (t_dead(t)) continue;
+      const dd = dist(d, t);
+      // Görüş/işitme sınırının dışında da rüzgârla ulaşan canlı insan kokusunu izleyebilir.
+      if (dd > sense && (t.type || t.isRescue || !smellsP(d,t,sense*0.72))) continue;
       // sessiz yürüyeni duymaz; ama önündeyse görür
       if (!t.type && !t.isRescue && d.tgt !== t && !(d.rush > 0) && !d.finale && !predNotices(d, t, dd, sense)) continue;
       // bölgesel yırtıcı kendi topraklarından çıkmaz
@@ -576,7 +586,7 @@ function updPred(d, dt, prey, zones) {
         tx = undefined;
       }
     }
-  } else if (d.scent && d.scent.age < 24 && d.scent.src && !d.scent.src.dead && !guardSafe(d.scent.src) && Math.hypot(d.scent.x - d.x, d.scent.y - d.y) > 18) {
+  } else if (d.scent && d.scent.age < 24 && !t_dead(d.scent.src) && Math.hypot(d.scent.x - d.x, d.scent.y - d.y) > 18) {
     tx = d.scent.x; ty = d.scent.y; spd = def.spd * (0.3 + 0.25 * clamp(1 - d.scent.age / 24, 0, 1));   // koku izini takip (Codex)
   } else {
     d.scent = null;
@@ -594,7 +604,7 @@ function updPred(d, dt, prey, zones) {
     d.spdNow = spd;
     steer(d, tx, ty, spd, dt, true); d.anim += dt * spd / 22;
     for (const z of zones) { if (bold && !z.guard) continue; const dx = d.x - z.x, dy = d.y - z.y, dd = Math.hypot(dx, dy) || 1; if (dd < z.r) { d.x = z.x + dx / dd * z.r; d.y = z.y + dy / dd * z.r; } }
-    if (d.bash && d.atkCd <= 0 && ((t && !inSafe(t.x, t.y, zones)) || d.type === 'dev' || bold)) { const b = d.bash; d.atkCd = def.cd; b.hp -= def.dmg * (d.type === 'dev' ? 2 : 1); b.hit = 0.2; SFX.hit(L ? clamp(1 - dist(b, L) / 700, 0, 0.5) : 0.2); if (b.hp <= 0) destroyBuild(b); }
+    if (d.bash && d.atkCd <= 0 && ((t && !inSafe(t.x, t.y, zones)) || d.type === 'dev' || bold)) { const b = d.bash; d.atkCd = def.cd; b.hp -= combatDamage(def.dmg*(d.type === 'dev' ? 2 : 1),d); b.hit = 0.2; SFX.hit(L ? clamp(1 - dist(b, L) / 700, 0, 0.5) : 0.2); if (b.hp <= 0) destroyBuild(b); }
   }
   checkTraps(d);
 }
@@ -609,7 +619,7 @@ function checkTraps(d) {
 }
 function dinoAttack(d, t) {
   const def = DINO[d.type]; d.atkCd = def.cd * rand(0.85, 1.15);
-  if (t.kind === 'build') { t.hp -= def.dmg * 2; t.hit = 0.2; G.shake = Math.max(G.shake, 4); SFX.hit(0.5); if (t.hp <= 0) destroyBuild(t); return; }
+  if (t.kind === 'build') { t.hp -= combatDamage(def.dmg*2,d); t.hit = 0.2; G.shake = Math.max(G.shake, 4); SFX.hit(0.5); if (t.hp <= 0) destroyBuild(t); return; }
   if (t.isRescue) { hurt(t, def.dmg, d); return; }
   if (d.type === 'dev' && !t.leader && !t.type && Math.random() < 0.55) {
     t.grabbed = true; t.grabT = 12; t.downed = 0; d.carry = t; d.carryDmg = 0;
@@ -827,7 +837,7 @@ function updPet(d, dt) {
   for (const o of G.dinos) { if (o === d || !hostile(o)) continue; const dd = dist(o, L); if (dd < fd) { fd = dd; foe = o; } }
   if (foe) {
     if (dist(d, foe) > d.r + foe.r + 6) { steer(d, foe.x, foe.y, 240, dt, true); d.anim += dt * 12; }
-    else { d.moving = false; if (d.atkCd <= 0) { d.atkCd = 0.8; hurt(foe, 5 + 10 * g, L); } }
+    else { d.moving = false; if (d.atkCd <= 0) { d.atkCd = 0.8; hurt(foe, 5 + 10 * g, d); } }
     return;
   }
   const tx = L.x + Math.cos(L.ang + Math.PI * 0.75) * 40, ty = L.y + Math.sin(L.ang + Math.PI * 0.75) * 40;

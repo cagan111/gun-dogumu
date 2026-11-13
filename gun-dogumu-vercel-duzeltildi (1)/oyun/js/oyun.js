@@ -147,7 +147,7 @@ function updLeader(dt) {
       }
     }
     for (const c of G.ccamps) if (c.alive && Math.hypot(c.x - hx, c.y - 12 - hy) < 42) {
-      c.totem -= dmgOf(p); hit = true; ftext(c.x, c.y - 50, `Totem ${Math.max(0, Math.round(c.totem))}`, '#fc9');
+      c.totem -= combatDamage(dmgOf(p),p); hit = true; ftext(c.x, c.y - 50, `Totem ${Math.max(0, Math.round(c.totem))}`, '#fc9');
       if (c.totem <= 0) destroyCamp(c);
     }
     if (hit) { SFX.hit(0.6); G.shake = Math.max(G.shake, 3); }

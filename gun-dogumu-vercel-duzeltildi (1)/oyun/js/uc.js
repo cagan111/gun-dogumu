@@ -750,6 +750,7 @@ function buildWorld() {
   // zemin: dörtlü ağaç arazi + deniz (her karede terUpdate ile güncellenir)
   terReset(); TER.group = new THREE.Group(); W.add(TER.group); U3.sl = typeof seasonLook === 'function' ? seasonLook() : null;
   U3.sea = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), MAT.sea); U3.sea.rotation.x = -Math.PI / 2; U3.sea.scale.set(30000, 30000, 1); U3.sea.renderOrder = 2; W.add(U3.sea);
+  if(typeof denizInit==='function')denizInit(U3);
   // göller ve bataklık havuzları: kıyı yüksekliklerinin en düşüğüne oturan düz su
   const waterY = (o, r) => { let m = 1e9; for (let i = 0; i < 8; i++) { const a = i / 8 * TAU; m = Math.min(m, gh(o.x + Math.cos(a) * r, o.y + Math.sin(a) * r)); } return Math.max(m, gh(o.x, o.y)) + 0.8; };
   U3.lakeM = []; for (const l of G.lakes) { const m = new THREE.Mesh(GEO.disc, l.frozen ? MAT.ice : MAT.water); m.scale.set(l.r + 6, 1, l.r + 6); m.position.set(l.x, l.h !== undefined ? l.h : waterY(l, l.r), l.y); W.add(m); U3.lakeM.push([l, m]); }
@@ -939,7 +940,7 @@ function rebuildTreeInst(cx, cy, writeShadows) {
         // gövde dibinde eğrelti öbekleri: zemine kesik çizgiyle değmesin
         for (let q = 0; q < 3; q++) { const a = t.sw * 3 + q * 2.1, rr = 14 + q * 6; realPut('litter', t.tone + q, t.x + Math.cos(a) * rr, gh(t.x + Math.cos(a) * rr, t.y + Math.sin(a) * rr) - 1, t.y + Math.sin(a) * rr, 0, 30 + q * 8, a, distance); }
         continue; }
-      if (distance > realR(rk) && realFar(rk, t.tone + t.sw, t.x, yb - 2, t.y, rh, ys)) continue; }
+      if (realFar(rk, t.tone + t.sw, t.x, yb - 2, t.y, rh, ys)) continue; }
     if (b === 5) {                                       // palmiye: kıvrık gövde + taç yaprakları
       let x = t.x, y = y0, z = t.y; const seg = 5, L = (H * 0.75) / seg, lean = 0.25 + r2 * 0.35;
       for (let i = 0; i < seg; i++) { const rz = lean * (i + 1) / seg, w = 5.2 - i * 0.55; instAdd(T.trunk, x, y, z, w, L * 1.06, w, t.sw, C.t, 0, rz); x += -Math.sin(rz) * Math.cos(t.sw) * L; y += Math.cos(rz) * L; z += Math.sin(rz) * Math.sin(t.sw) * L; }
@@ -1801,9 +1802,10 @@ function cavPortalPass(t, cam) {
   const dx = cam.position.x - mx, dz = cam.position.z - mz, dist = Math.hypot(dx, dz);
   const far = U3.quality === 'dusuk' ? 1400 : 2600;
   if (dist > far) { if (IN.b && dist > far + 600) interiorExit(); return; }
-  if (-Math.sin(a) * dx + Math.cos(a) * dz < 1) return;                     // ağzın arkasından bakılıyor
+  const front=-Math.sin(a)*dx+Math.cos(a)*dz; if(front<=0) return;
+  const lateral=Math.cos(a)*dx+Math.sin(a)*dz, closeMask=front<4&&Math.abs(lateral)<32;                     // ağzın arkasından bakılıyor
   PORT.v.set(mx, ghE(mx, mz) + 30, mz).project(cam);
-  if (PORT.v.z > 1 || Math.abs(PORT.v.x) > 1.6 || Math.abs(PORT.v.y) > 1.8) return;   // ekranda değil
+  if(!closeMask && (PORT.v.z > 1 || Math.abs(PORT.v.x) > 1.6 || Math.abs(PORT.v.y) > 1.8)) return;   // ekranda değil
   cavPortalInit(); inSync(b);
   const T = cavPortalT(b); if (!T) return;
   PORT.Ti.copy(T).invert();
@@ -1812,9 +1814,13 @@ function cavPortalPass(t, cam) {
   inAnimate(t, b);
   for (const o of IN.out) o.visible = false;
   const fg = IN.scene.fog, n0 = fg.near, f0 = fg.far; fg.near = n0 + dist * 0.6; fg.far = f0 + dist * 0.6;
-  PORT.mask.matrix.copy(e.g.matrixWorld); PORT.mask.matrix.multiply(PORT.m.makeTranslation(0, 0, ez + 1.3)); PORT.mask.matrixWorldNeedsUpdate = true; PORT.mask.updateMatrixWorld(true);
+  PORT.mask.matrix.copy(e.g.matrixWorld); PORT.mask.matrix.multiply(PORT.m.makeTranslation(0, 0, closeMask?ez:ez+1.3)); PORT.mask.matrixWorldNeedsUpdate = true; PORT.mask.updateMatrixWorld(true);
   const r = U3.r; r.autoClear = false;
-  r.render(PORT.scene, cam); r.clearDepth();
+  const nearMask=closeMask, originalNear=cam.near;
+  if(nearMask){cam.near=.01;cam.updateProjectionMatrix();PORT.mask.traverse(o=>{if(o.material)o.material.depthTest=false;});}
+  r.render(PORT.scene, cam);
+  if(nearMask){cam.near=originalNear;cam.updateProjectionMatrix();PORT.mask.traverse(o=>{if(o.material)o.material.depthTest=true;});}
+  r.clearDepth();
   inStencil(true); r.render(IN.scene, pc); inStencil(false);
   r.autoClear = true; fg.near = n0; fg.far = f0;
 }
@@ -2499,6 +2505,12 @@ function realPrep(name, scene) {
     if (leafy) realWind(m);
     m.needsUpdate = true;
     const im = new THREE.InstancedMesh(g, m, cap); im.count = 0; im.frustumCulled = false; im.castShadow = !REAL.low; im.userData.max = cap; im.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    // Yaprak gölgesi görünür yaprakla aynı uTime/rüzgâr geometrisini izlesin.
+    // Alpha kesimi ve çift taraflı yapraklar depth geçişinde de korunur.
+    if (leafy && im.castShadow) {
+      const depth = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map: m.map, alphaMap: m.alphaMap, alphaTest: m.alphaTest, side: m.side });
+      realWind(depth); im.customDepthMaterial = depth;
+    }
     U3.scene.add(im); return im;
   });
   REAL.M[name] = { meshes, h0, w0 };
