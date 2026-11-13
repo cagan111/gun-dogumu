@@ -377,6 +377,10 @@ function updDino(d, dt, prey, zones) {
 // ---- ses ve gizlilik
 // kişinin çıkardığı gürültü: 0 (çömelip duran) … 1 (koşan); yağmur sesi bastırır
 // Rüzgârın açısı, estiği yönü gösterir. Koku noktaları kısa ömürlü ve sınırlıdır. (Codex)
+// Canlı koku ve bırakılan iz aynı güç hesabını kullanır; aktif kanama ×2.
+function personScentPower(p) {
+  return (p.haul==='et'||p.haul==='cigEt'?1.7:1)*(p.hp<p.maxhp*.5?1.65:1)*(p.injury&&p.injury.type==='kanama'?2:1);
+}
 function updScent(dt) {
   if (!G.wind) G.wind = { a: rand(0, TAU), s: 0.55, ta: rand(0, TAU), ts: 0.55, t: 0 };
   if (!G.scents) G.scents = [];
@@ -397,7 +401,7 @@ function updScent(dt) {
     p.scentT = (p.scentT || 0) - dt;
     const moving = p.moving || p.sprinting;
     if (p.scentT > 0 || (!moving && Math.random() > dt * 0.12)) continue;
-    const strong = (p.haul === 'et' || p.haul === 'cigEt' ? 1.7 : 1) * (p.hp < p.maxhp * 0.5 ? 1.65 : 1);
+    const strong = personScentPower(p);
     p.scentT = (moving ? rand(0.65, 1.05) : rand(1.8, 2.8)) / strong;
     G.scents.push({ x: p.x + rand(-5, 5), y: p.y + rand(-5, 5), age: 0, power: strong, src: p });
   }
@@ -417,9 +421,7 @@ function scentReach(d, src, base, power) {
 }
 function smellsP(d, p, base) {
   if (!p || p.dead || p.inHut || p.insideB || p.grabbed || guardSafe(p)) return false;
-  let power = 1;
-  if (p.haul === 'et' || p.haul === 'cigEt') power *= 1.7;
-  if (p.hp < p.maxhp * 0.5) power *= 1.65;
+  const power = personScentPower(p);
   return dist(d, p) < scentReach(d, p, base, power);
 }
 // En güçlü taze izi seçer; yaşlı izler zayıflar ve kaybolur.
