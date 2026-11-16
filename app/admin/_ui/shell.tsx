@@ -29,7 +29,7 @@ export function AdminShell({ email, children }: { email: string; children: React
             <span className="hidden truncate text-xs text-slate-600 sm:inline">{email}</span>
             <span className="flex-1" />
             <LangSwitcher />
-            <LogoutButton label={t("panel.logoutShort")} />
+            <LogoutButton label={t("panel.logoutShort")} compact />
           </div>
           <nav aria-label={t("adm.nav.label")} className="mx-auto flex max-w-6xl gap-1 overflow-x-auto px-3">
             {NAV.map((n) => (

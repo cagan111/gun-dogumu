@@ -70,13 +70,16 @@ function Inner({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-slate-200 bg-white/95 px-4 py-2.5 backdrop-blur">
-          <h1 className="min-w-0 flex-1 truncate text-base font-extrabold md:hidden">{tenant.name}</h1>
-          <span className="hidden flex-1 md:block" />
-          <StatusBadge />
-          <SmsChip />
-          <LangSwitcher />
-          <span className="md:hidden"><LogoutButton label={t("panel.logoutShort")} /></span>
+        <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 px-4 py-2 backdrop-blur md:flex md:items-center md:justify-end md:gap-3">
+          <div className="flex items-center gap-2 md:hidden">
+            <h1 className="min-w-0 flex-1 truncate text-base font-extrabold">{tenant.name}</h1>
+            <LogoutButton label={t("panel.logoutShort")} compact />
+          </div>
+          <div className="mt-1.5 flex flex-wrap items-center gap-2 md:mt-0">
+            <StatusBadge />
+            <SmsChip />
+            <LangSwitcher />
+          </div>
         </header>
         {tenant.status === "suspended" ? <p role="alert" className="bg-red-700 px-4 py-2 text-sm font-medium text-white">{t("sub.suspendedNote")}</p> : null}
         <main id="main" className="flex-1 px-3 py-4 pb-28 md:px-6 md:pb-8">{children}</main>
