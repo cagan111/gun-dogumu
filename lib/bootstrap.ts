@@ -1,7 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "./db";
 import { createLoginToken, setPasswordLink } from "./login-token";
-import { logger } from "./logger";
+import { sendAuthEmail } from "./messaging/auth-mail";
 import { normalizeEmail } from "./login";
 
 /**
@@ -30,6 +30,6 @@ export async function ensureSuperadmin(env: Record<string, string | undefined> =
     result = "relinked";
   }
   const token = await createLoginToken(user.id, "set_password");
-  logger.warn({ email, link: setPasswordLink(token) }, "SÜPER-ADMİN şifre belirleme bağlantısı (24 saat, tek kullanımlık)");
+  await sendAuthEmail(email, "set_password", setPasswordLink(token)); // e-posta sağlayıcı Mock iken bağlantı loga düşer
   return result;
 }

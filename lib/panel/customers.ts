@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { NotFoundError } from "../booking";
-import type { PanelCtx } from "../panel-auth";
+import { assertWritable, type PanelCtx } from "../panel-auth";
 import { assertFeature, hasFeature } from "../plan";
 
 export const customerQuerySchema = z.object({
@@ -57,6 +57,7 @@ export const notesSchema = z.object({ notes: z.string().trim().max(2000).nullabl
 
 /** Müşteri notu: Pro+ (`customerNotes`). Başlangıç planında plan_feature (402). Owner ve staff yazabilir. */
 export async function updateCustomerNotes(ctx: PanelCtx, id: string, input: z.output<typeof notesSchema>) {
+  assertWritable(ctx);
   assertFeature(await planOfTenant(ctx), "customerNotes");
   const r = await ctx.db.customer.updateMany({ where: { id }, data: { notes: input.notes && input.notes.length ? input.notes : null } });
   if (r.count === 0) throw new NotFoundError("Müşteri");

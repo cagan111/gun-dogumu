@@ -60,6 +60,18 @@ export async function debit(tenantId: string, amount: number, opts: { reason: De
   return withTenant(tenantId).$transaction((tx) => entry(tx, tenantId, -amount, opts.reason, opts));
 }
 
+/** Transaction içinden düşüm (mesaj kaydıyla atomik olsun diye). */
+export function debitTx(tx: LedgerTx, tenantId: string, amount: number, opts: { reason: DebitReason; messageId?: string | null; note?: string | null; allowNegative?: boolean }) {
+  assertAmount(amount);
+  return entry(tx, tenantId, -amount, opts.reason, opts);
+}
+
+/** Transaction içinden iade. */
+export function refundTx(tx: LedgerTx, tenantId: string, amount: number, opts: { messageId?: string | null; note?: string | null } = {}) {
+  assertAmount(amount);
+  return entry(tx, tenantId, amount, "refund", opts);
+}
+
 /** İade (başarısız gönderim vb.): pozitif delta, reason=refund. */
 export async function refund(tenantId: string, amount: number, opts: { messageId?: string | null; note?: string | null } = {}) {
   assertAmount(amount);

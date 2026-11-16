@@ -1,11 +1,13 @@
 import { randomInt } from "node:crypto";
-import { withTenant } from "./db";
+import { prisma, withTenant } from "./db";
 import { OtpError, RateLimitedError } from "./errors";
+import { sendMessage } from "./messaging/send";
+import { asLocale, renderTemplate } from "./messaging/templates";
 import { logger } from "./logger";
 import { normalizePhone } from "./phone";
 import { HOUR, rateLimit } from "./ratelimit";
 import { getAuthSecret, safeEqualHex, sha256Hex } from "./secret";
-import { InvalidPhoneError } from "./booking";
+import { BookingError, InvalidPhoneError } from "./booking";
 
 export const OTP_TTL_MS = 5 * 60_000;
 export const OTP_MAX_ATTEMPTS = 5;
@@ -33,15 +35,32 @@ export function evaluateOtp(row: OtpRow, code: string, pepper: string, now: Date
   return safeEqualHex(hashOtp(code, pepper), row.codeHash) ? "ok" : "wrong";
 }
 
-// ---- gönderim (geçici) ----
+// ---- gönderim ----
+
+/** OTP gönderilemedi (kredi yok / sağlayıcı hatası) — yalnız üretimde fırlatılır (503). */
+export class OtpDeliveryError extends BookingError {
+  constructor() { super("sms_unavailable", "Doğrulama kodu şu an gönderilemedi, lütfen salonla iletişime geçin"); }
+}
 
 /**
- * TODO(T-050): Mesajlaşma katmanı (MessageProvider + kredi düşümü) gelince gerçek SMS/WhatsApp gönderimi buradan yapılacak.
- * Şimdilik yalnız loglar; üretimde kod loga YAZILMAZ (yalnız geliştirmede).
+ * OTP'yi SMS ile gönderir. Kredi salondan düşer (reason notification, 1 segment).
+ * Kredi yoksa / gönderim başarısızsa: üretimde OtpDeliveryError (503); geliştirmede kod loga yazılıp devam edilir.
+ * MessageLog'a kodun kendisi YAZILMAZ (maskelenir).
  */
 export async function sendOtp(tenantId: string, phone: string, code: string): Promise<void> {
   const dev = process.env.NODE_ENV !== "production";
-  logger.warn({ tenantId, phone, ...(dev ? { code } : {}) }, "OTP gönderimi yapılmadı (T-050 bekliyor, yalnız log)");
+  const t = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { locale: true } });
+  const locale = asLocale(t?.locale);
+  const outcome = await sendMessage({
+    tenantId, to: phone, text: renderTemplate("otp", locale, { code }), logContent: renderTemplate("otp", locale, { code: "******" }),
+    template: "otp", reason: "notification", fallback: { whatsapp: false },
+  });
+  if (outcome.status === "sent") return;
+  if (!dev) {
+    logger.warn({ tenantId, status: outcome.status, reason: outcome.reason }, "OTP gönderilemedi");
+    throw new OtpDeliveryError();
+  }
+  logger.warn({ tenantId, phone, code, status: outcome.status }, "OTP gönderilemedi; geliştirmede kod loga yazıldı");
 }
 
 // ---- servis ----

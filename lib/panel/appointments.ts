@@ -1,8 +1,9 @@
 import { z } from "zod";
+import { appointmentChanged } from "../appointment-hook";
 import { computeAvailability, type StaffAvailabilityInput } from "../availability";
 import { AlreadyClosedError, createAppointment, isOverlapError, NotFoundError, SlotTakenError, SlotUnavailableError } from "../booking";
 import { ConflictError, ValidationError } from "../errors";
-import { type PanelCtx } from "../panel-auth";
+import { assertWritable, type PanelCtx } from "../panel-auth";
 import { phoneSchema } from "../phone";
 import { addDays, dayRangeUtc, isValidDate, utcToLocal } from "../time";
 
@@ -70,6 +71,7 @@ export const createSchema = z.object({
 
 /** Panelden randevu: en erken/en geç kuralı atlanır; çalışma saati, izin ve çakışma kuralı atlanmaz. */
 export async function createPanelAppointment(ctx: PanelCtx, input: z.output<typeof createSchema>, now: Date = new Date()) {
+  assertWritable(ctx);
   const a = await createAppointment(ctx.db, {
     tenantId: ctx.tenantId, serviceId: input.serviceId, staffId: input.staffId, startsAt: input.startsAt,
     customer: input.customer, source: input.source, note: input.note ?? null, now, bypassLeadRules: true,
@@ -84,6 +86,7 @@ export const moveSchema = z.object({
 
 /** Randevuyu taşır: yeni saat/personel için müsaitlik (kendisi hariç) yeniden doğrulanır; çakışma → 409. */
 export async function moveAppointment(ctx: PanelCtx, id: string, input: z.output<typeof moveSchema>) {
+  assertWritable(ctx);
   const appt = await ctx.db.appointment.findFirst({ where: { id } });
   if (!appt) throw new NotFoundError("Randevu");
   if (!ACTIVE.includes(appt.status as (typeof ACTIVE)[number])) throw new AlreadyClosedError();
@@ -137,6 +140,7 @@ export async function moveAppointment(ctx: PanelCtx, id: string, input: z.output
     if (isOverlapError(e)) throw new SlotTakenError();
     throw e;
   }
+  await appointmentChanged(id, "moved");
   return getAppointment(ctx, id);
 }
 
@@ -149,6 +153,7 @@ export const statusSchema = z.object({ status: z.enum(["confirmed", "completed",
 
 /** Durum değiştirir. no_show geçişleri Customer.noShowCount'u artırır/azaltır (atomik). */
 export async function setAppointmentStatus(ctx: PanelCtx, id: string, status: z.output<typeof statusSchema>["status"], now: Date = new Date()) {
+  assertWritable(ctx);
   try {
     await ctx.db.$transaction(async (tx) => {
       const a = await tx.appointment.findFirst({ where: { id } });
@@ -170,5 +175,6 @@ export async function setAppointmentStatus(ctx: PanelCtx, id: string, status: z.
     if (isOverlapError(e)) throw new SlotTakenError(); // iptal/gelmedi → confirmed'a dönüşte slot başkasına geçmiş
     throw e;
   }
+  await appointmentChanged(id, status === "cancelled_by_salon" ? "cancelled_by_salon" : "status");
   return getAppointment(ctx, id);
 }

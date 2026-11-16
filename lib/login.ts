@@ -3,6 +3,7 @@ import type { Role } from "@prisma/client";
 import { prisma } from "./db";
 import { consumeLoginToken, createLoginToken, magicLink } from "./login-token";
 import { logger } from "./logger";
+import { sendAuthEmail } from "./messaging/auth-mail";
 import { MINUTE, rateLimit } from "./ratelimit";
 
 export const BCRYPT_ROUNDS = 10;
@@ -67,5 +68,5 @@ export async function requestMagicLink(emailRaw: string, ip: string): Promise<vo
   const user = await prisma.user.findUnique({ where: { email }, select: { id: true } });
   if (!user) return;
   const token = await createLoginToken(user.id, "magic_link");
-  logger.warn({ email, link: magicLink(token) }, "sihirli giriş bağlantısı (e-posta sağlayıcı yok, yalnız log)");
+  await sendAuthEmail(email, "magic_link", magicLink(token)); // e-posta sağlayıcı Mock iken bağlantı loga düşer
 }

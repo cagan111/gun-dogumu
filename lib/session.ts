@@ -13,12 +13,13 @@ export interface SessionLike {
 export async function resolveTenantUser(session: SessionLike | null) {
   const id = session?.user?.id;
   if (!id) throw new UnauthorizedError();
-  const u = await prisma.user.findUnique({ where: { id } });
+  const u = await prisma.user.findUnique({ where: { id }, include: { tenant: { select: { status: true } } } });
   if (!u || !u.tenantId || (u.role !== "owner" && u.role !== "staff")) throw new UnauthorizedError();
   if (session?.user?.tenantId && session.user.tenantId !== u.tenantId) throw new UnauthorizedError();
   return {
     user: { id: u.id, email: u.email, name: u.name, role: u.role as Role },
     tenantId: u.tenantId,
+    tenantStatus: u.tenant?.status ?? "active",
     db: withTenant(u.tenantId),
   };
 }

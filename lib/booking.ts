@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { prisma, type TenantDb } from "./db";
 import { computeAvailability, type StaffAvailabilityInput } from "./availability";
+import { appointmentChanged } from "./appointment-hook";
 import { normalizePhone } from "./phone";
 import { addDays, dayRangeUtc, utcToLocal } from "./time";
 
@@ -169,7 +170,9 @@ export async function createAppointment(db: TenantDb, input: CreateAppointmentIn
   const tries = input.staffId === "any" ? 3 : 1;
   for (let i = 1; ; i++) {
     try {
-      return await attempt(db, input);
+      const a = await attempt(db, input);
+      await appointmentChanged(a.id, "created");
+      return a;
     } catch (e) {
       const taken = e instanceof SlotTakenError || isOverlapError(e);
       if (!taken) throw e;
@@ -191,5 +194,6 @@ export async function cancelByToken(token: string, now: Date = new Date(), clien
     data: { status: "cancelled_by_customer", cancelledAt: now },
   });
   if (res.count === 0) throw new AlreadyClosedError();
+  await appointmentChanged(appt.id, "cancelled_by_customer");
   return client.appointment.findUniqueOrThrow({ where: { id: appt.id } });
 }

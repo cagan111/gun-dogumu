@@ -1,9 +1,11 @@
 import { z } from "zod";
+import { appointmentChanged } from "../appointment-hook";
 import { SMS_PACKAGES } from "@/config/plans";
 import { NotFoundError } from "../booking";
 import { ConflictError } from "../errors";
 import * as ledger from "../ledger";
-import { assertOwner, type PanelCtx } from "../panel-auth";
+import { assertOwner, assertWritable, type PanelCtx } from "../panel-auth";
+import { auditPanel } from "./audit";
 import { isValidTimeZone } from "../time";
 
 const httpsUrl = z.string().trim().max(500).url().refine((u) => u.startsWith("https://"), "https_only");
@@ -44,9 +46,16 @@ export async function getSettings(ctx: PanelCtx) {
 
 export async function updateSettings(ctx: PanelCtx, input: SettingsInput) {
   assertOwner(ctx);
+  assertWritable(ctx);
   const data = { ...input };
   if (data.reminderOffsets) data.reminderOffsets = [...data.reminderOffsets].sort((a, b) => b - a);
   await ctx.db.tenant.update({ where: { id: ctx.tenantId }, data });
+  await auditPanel(ctx, "settings.update", { fields: Object.keys(data) });
+  if (data.reminderOffsets) {
+    // Hatırlatma zamanları değişti: gelecekteki randevuların planı yenilenir (eski anahtarlar işleyicide zaten geçersiz sayılmaz; yeni ofsetler eklenir)
+    const ids = await ctx.db.appointment.findMany({ where: { status: { in: ["pending", "confirmed"] }, startsAt: { gt: new Date() } }, select: { id: true }, take: 2000 });
+    for (const a of ids) await appointmentChanged(a.id);
+  }
   return getSettings(ctx);
 }
 
@@ -61,6 +70,7 @@ export const smsRequestSchema = z.object({ size: z.number().int().refine((n) => 
 /** Paket talebi (owner). Zaten açık aynı boyutta talep varsa yenisi açılmaz (409). */
 export async function createSmsRequest(ctx: PanelCtx, input: z.output<typeof smsRequestSchema>) {
   assertOwner(ctx);
+  assertWritable(ctx);
   const open = await ctx.db.smsPackageRequest.findFirst({ where: { status: "open", size: input.size } });
   if (open) throw new ConflictError("size", "Bu paket için bekleyen talebiniz var");
   return ctx.db.smsPackageRequest.create({ data: { size: input.size } as never });

@@ -59,13 +59,20 @@ Biçim: `- [ ] T-NNN | sahip: claude|codex|- | açıklama`. Başlamadan sahip ya
 - [ ] T-042 | sahip: codex | Rapor ekranı
 
 ## M4 – Bildirimler
-- [ ] T-050 | sahip: claude | `lib/messaging` MessageProvider + Mock + Netgsm + İletiMerkezi + GenericHttp + WhatsAppCloud
-- [ ] T-051 | sahip: claude | SMS segment hesabı (GSM-7 / Türkçe tek-kaydırma / UCS-2) + testler
-- [ ] T-052 | sahip: claude | SmsLedger: bakiye, düşüm, iade, aylık plan kredisi + testler
-- [ ] T-053 | sahip: claude | Şablonlar tr/en (onay, 24s, 2s, iptal, değişiklik)
-- [ ] T-054 | sahip: claude | pg-boss işleri: hatırlatma zamanlama/iptal, idempotency, sessiz saatler
-- [ ] T-055 | sahip: claude | Kredi bitince e-posta/WhatsApp'a düşme + salona uyarı
-- [ ] T-056 | sahip: claude | Kampanya SMS'i (Salon+, yalnız izinli, çıkış ifadesi)
+- [x] T-050 | sahip: claude | `lib/messaging` MessageProvider + Mock + Netgsm + İletiMerkezi + GenericHttp + WhatsAppCloud
+  - `lib/messaging/{types,providers,registry,send}.ts`: Mock/Netgsm/İletiMerkezi/GenericHttp/WhatsAppCloud + MockEmail; `ALLOW_REAL_SMS=true` kapısı, kapalıyken Mock'a düşer; her gönderim MessageLog yazar.
+- [x] T-051 | sahip: claude | SMS segment hesabı (GSM-7 / Türkçe tek-kaydırma / UCS-2) + testler
+  - `lib/messaging/segments.ts` `smsSegments` (gsm7 160/153, gsm7_tr 155/149, ucs2 70/67, profil ayarlı); 16 test.
+- [x] T-052 | sahip: claude | SmsLedger: bakiye, düşüm, iade, aylık plan kredisi + testler
+  - `sendMessage` kredi düşümü + MessageLog aynı transaction (`debitTx`), hata → iade; `grantMonthlyCredits(now)` ayda bir (not `monthly:YYYY-MM`), `recordManualPayment` sonrası tetiklenir.
+- [x] T-053 | sahip: claude | Şablonlar tr/en (onay, 24s, 2s, iptal, değişiklik)
+  - `lib/messaging/templates.ts` tr/en 11 şablon + kampanya çıkış ifadesi, `formatWhen` salon saat diliminde; uzunluk/segment testleri.
+- [x] T-054 | sahip: claude | pg-boss işleri: hatırlatma zamanlama/iptal, idempotency, sessiz saatler
+  - `jobs/{queue,boss,handlers,worker}.ts` (`pnpm worker`), saf `planReminders` + `onAppointmentChanged`, anahtar `rem:{id}:{ofset}:{startsAt}`; işleyici taşınma/iptal/yinelenme kontrolü; testte MemoryQueue.
+- [x] T-055 | sahip: claude | Kredi bitince e-posta/WhatsApp'a düşme + salona uyarı
+  - Kredi yetmezse WhatsApp (Salon+, yapılandırılmışsa) → e-posta → atlandı kaydı; salona günde bir `low_credit` e-postası (anahtarlı).
+- [x] T-056 | sahip: claude | Kampanya SMS'i (Salon+, yalnız izinli, çıkış ifadesi)
+  - `sendCampaign` (`lib/messaging/campaign.ts`) + `POST /api/panel/campaigns` (owner); Salon+, yalnız izinli, çıkış ifadesi, sessiz saat `quiet_hours` (409), kredi önceden kontrol.
 
 ## M5 – Süper-admin ve gelir
 - [x] T-060 | sahip: claude | Süper-admin API: salonlar, manuel ödeme → abonelik uzatma, SMS paketi → defter, AuditLog
@@ -95,6 +102,9 @@ Biçim: `- [ ] T-NNN | sahip: claude|codex|- | açıklama`. Başlamadan sahip ya
 - [ ] T-085 | sahip: codex | Lighthouse mobil ölçümü (randevu sayfası > 85)
 
 ## Ek (inceleme sonrası)
-- [ ] T-090 | sahip: claude | Askıya alınmış (suspended) salonda panel yazma işlemlerini engelle (okuma serbest)
-- [ ] T-091 | sahip: claude | Panel değişikliklerini (hizmet, ayar, personel) AuditLog'a yaz
-- [ ] T-092 | sahip: claude | Ödeme/ay yenilemede planın aylık SMS kredisini deftere ekle (T-052 ile)
+- [x] T-090 | sahip: claude | Askıya alınmış (suspended) salonda panel yazma işlemlerini engelle (okuma serbest)
+  - `ctx.tenantStatus` + `assertWritable` (servis katmanı) ve `panelRoute` yazma yöntemlerinde 423 `suspended`; okuma serbest.
+- [x] T-091 | sahip: claude | Panel değişikliklerini (hizmet, ayar, personel) AuditLog'a yaz
+  - `lib/panel/audit.ts` `auditPanel`: hizmet/personel/saat/izin/ayar/kampanya AuditLog (actorId = kullanıcı).
+- [x] T-092 | sahip: claude | Ödeme/ay yenilemede planın aylık SMS kredisini deftere ekle (T-052 ile)
+  - T-052 ile birlikte: `grantMonthlyCreditsFor` ödeme sonrası ve günlük işte; aynı ay ikinci kez verilmez.

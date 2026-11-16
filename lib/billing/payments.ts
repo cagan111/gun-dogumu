@@ -3,6 +3,8 @@ import { writeAudit } from "../audit";
 import { NotFoundError } from "../booking";
 import { withTenant } from "../db";
 import { ValidationError } from "../errors";
+import { logger } from "../logger";
+import { grantMonthlyCreditsFor } from "../messaging/credits";
 import { isPlanId } from "../plan";
 import { getPaymentProvider } from "./payment-provider";
 
@@ -30,7 +32,7 @@ export async function recordManualPayment(actor: { id: string }, input: z.output
   const provider = getPaymentProvider("manual");
   const charge = await provider.charge({ tenantId: input.tenantId, amountTry: input.amountTry, months: input.months, plan: input.plan, note: input.note, actorId: actor.id });
   const db = withTenant(input.tenantId);
-  return db.$transaction(async (tx) => {
+  const result = await db.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT id FROM "Tenant" WHERE id = ${input.tenantId} FOR UPDATE`;
     const t = await tx.tenant.findUnique({ where: { id: input.tenantId } });
     if (!t) throw new NotFoundError("Salon");
@@ -50,4 +52,11 @@ export async function recordManualPayment(actor: { id: string }, input: z.output
     });
     return { paymentId: payment.id, status: "active" as const, plan: input.plan ?? t.plan, subscriptionEndsAt: endsAt };
   });
+  // Yeni dönem için plan aylık SMS kredisi (bu ay verilmediyse); hata ödemeyi bozmaz, günlük iş telafi eder
+  try {
+    await grantMonthlyCreditsFor(input.tenantId, now);
+  } catch (err) {
+    logger.error({ err, tenantId: input.tenantId }, "ödeme sonrası aylık kredi verilemedi");
+  }
+  return result;
 }

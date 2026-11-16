@@ -16,6 +16,8 @@ export const STATUS_BY_CODE: Record<string, number> = {
   already_closed: 409,
   conflict: 409,
   suspended: 423,
+  quiet_hours: 409,
+  sms_unavailable: 503,
   rate_limited: 429,
   unauthorized: 401,
   forbidden: 403,
