@@ -43,6 +43,25 @@ function SmsChip() {
   );
 }
 
+function MobileMenu() {
+  const t = useT();
+  const { tenant } = usePanel();
+  const alert = tenant.status === "past_due" || tenant.status === "suspended" || (tenant.status === "trial" && tenant.daysLeft !== null && tenant.daysLeft <= 3);
+  return (
+    <details className="relative">
+      <summary aria-label={t("panel.menu")} className="relative flex h-9 w-9 cursor-pointer list-none items-center justify-center rounded-full border border-slate-300 bg-white text-lg font-bold leading-none text-slate-800 [&::-webkit-details-marker]:hidden">
+        <span aria-hidden>⋯</span>
+        {alert ? <span aria-hidden className="absolute right-0 top-0 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-white" /> : null}
+      </summary>
+      <div className="absolute right-0 top-11 z-50 w-60 space-y-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-lg">
+        <StatusBadge />
+        <div><LangSwitcher /></div>
+        <LogoutButton label={t("panel.logoutShort")} compact />
+      </div>
+    </details>
+  );
+}
+
 function Inner({ children }: { children: React.ReactNode }) {
   const path = usePathname();
   const t = useT();
@@ -70,12 +89,14 @@ function Inner({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 px-4 py-2 backdrop-blur md:flex md:items-center md:justify-end md:gap-3">
+        <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 px-3 py-1.5 backdrop-blur md:flex md:items-center md:justify-end md:gap-3 md:px-4 md:py-2">
+          {/* mobil: tek kompakt satır — salon adı · SMS · menü (durum rozeti, dil, çıkış menüde) */}
           <div className="flex items-center gap-2 md:hidden">
             <h1 className="min-w-0 flex-1 truncate text-base font-extrabold">{tenant.name}</h1>
-            <LogoutButton label={t("panel.logoutShort")} compact />
+            <SmsChip />
+            <MobileMenu />
           </div>
-          <div className="mt-1.5 flex flex-wrap items-center gap-2 md:mt-0">
+          <div className="hidden flex-wrap items-center gap-2 md:flex">
             <StatusBadge />
             <SmsChip />
             <LangSwitcher />

@@ -21,6 +21,7 @@ export const panelTr = {
   "nav.staff": "Personel",
   "nav.reports": "Raporlar",
   "nav.settings": "Ayarlar",
+  "panel.menu": "Menü",
   "panel.logoutShort": "Çıkış",
   "role.owner": "Salon sahibi",
   "role.staff": "Personel",

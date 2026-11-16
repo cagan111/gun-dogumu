@@ -17,8 +17,8 @@ import type { Appt, ApptStatus, Staff, Svc, TimeOff, WH } from "./types";
 import { fmtMin, money, parseHM, statusTone, svcName, useLoader } from "./util";
 
 const PPM = 1.25; // px / dakika
-const GUTTER = 48;
-const MIN_COL = 136;
+const GUTTER = 44;
+const MIN_COL = 120;
 const ACTIVE: ApptStatus[] = ["pending", "confirmed"];
 
 interface Col { key: string; date: string; staff: Staff; label: string; sub?: string }
@@ -229,19 +229,19 @@ export function CalendarView() {
       ) : null}
 
       {cols.length ? (
-        <div className={cn("mt-3 max-h-[calc(100dvh-17rem)] min-h-80 overflow-auto rounded-2xl border border-slate-200 bg-white md:max-h-[calc(100dvh-15rem)]", apptsQ.loading && "opacity-70")} data-testid="cal-scroll" tabIndex={0} aria-label={t("cal.grid")}>
+        <div className={cn("mt-3 max-h-[calc(100dvh-16rem)] min-h-80 overflow-auto rounded-2xl border border-slate-200 bg-white md:max-h-[calc(100dvh-15rem)]", apptsQ.loading && "opacity-70")} data-testid="cal-scroll" tabIndex={0} aria-label={t("cal.grid")}>
           <div style={{ display: "grid", gridTemplateColumns: `${GUTTER}px repeat(${cols.length}, minmax(${MIN_COL}px, 1fr))` }}>
             <div className="sticky left-0 top-0 z-30 border-b border-r border-slate-200 bg-white" />
             {cols.map((c) => (
               <div key={c.key} className="sticky top-0 z-20 border-b border-r border-slate-200 bg-white px-2 py-2 text-center">
                 <div className="flex items-center justify-center gap-1.5 text-sm font-bold">
                   <span aria-hidden className="h-2.5 w-2.5 rounded-full" style={{ background: c.staff.color }} />
-                  <span className={cn("truncate", view === "week" && isTodayCol(c) && "text-brand")}>{c.label}</span>
+                  <span className={cn("min-w-0 truncate", view === "week" && isTodayCol(c) && "text-brand")}>{c.label}</span>
                 </div>
                 {c.sub ? <div className="text-xs text-slate-600">{c.sub}</div> : null}
               </div>
             ))}
-            <div className="sticky left-0 z-10 border-r border-slate-200 bg-white" style={{ height }}>
+            <div className="sticky left-0 z-20 border-r border-slate-200 bg-white" style={{ height }}>
               {Array.from({ length: Math.ceil((gridEnd - gridStart) / 60) + 1 }, (_, i) => gridStart + i * 60).filter((m) => m < gridEnd + 1).map((m) => (
                 <span key={m} className="absolute right-1 -translate-y-1/2 text-[11px] font-medium tabular-nums text-slate-600" style={{ top: (m - gridStart) * PPM + (m === gridStart ? 8 : 0) }}>{fmtMin(m)}</span>
               ))}

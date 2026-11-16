@@ -23,6 +23,7 @@ export const panelEn: Record<keyof typeof panelTr, string> = {
   "nav.staff": "Staff",
   "nav.reports": "Reports",
   "nav.settings": "Settings",
+  "panel.menu": "Menu",
   "panel.logoutShort": "Log out",
   "role.owner": "Salon owner",
   "role.staff": "Staff",
