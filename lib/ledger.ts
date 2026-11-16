@@ -22,7 +22,8 @@ function assertAmount(n: number): void {
   if (!Number.isInteger(n) || n <= 0) throw new ValidationError("Miktar pozitif tam sayı olmalı", "amount");
 }
 
-async function lockTenant(tx: LedgerTx, tenantId: string): Promise<void> {
+/** Tenant satırı kilidi. Aynı transaction'da bu satıra FK veren bir INSERT (KEY SHARE) yapılacaksa kilit ÖNCE alınmalı, yoksa iki işlem birbirini bekleyip 40P01 olur. */
+export async function lockTenant(tx: LedgerTx, tenantId: string): Promise<void> {
   await tx.$queryRaw`SELECT id FROM "Tenant" WHERE id = ${tenantId} FOR UPDATE`;
 }
 

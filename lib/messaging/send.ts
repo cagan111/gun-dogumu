@@ -5,7 +5,7 @@
 import { Prisma, type Channel, type MessageStatus } from "@prisma/client";
 import { prisma, withTenant } from "../db";
 import { InsufficientCreditsError, ValidationError } from "../errors";
-import { debitTx, getBalance, refundTx, type DebitReason } from "../ledger";
+import { debitTx, getBalance, lockTenant, refundTx, type DebitReason } from "../ledger";
 import { logger } from "../logger";
 import { hasFeature } from "../plan";
 import { getEmailProvider, getSmsProvider, getWhatsAppProvider, whatsappConfigured } from "./registry";
@@ -73,6 +73,8 @@ export async function sendMessage(input: SendInput): Promise<SendOutcome> {
   let logId: string;
   try {
     logId = await withTenant(tenantId).$transaction(async (tx) => {
+      // kilit sırası: önce tenant FOR UPDATE, sonra MessageLog INSERT (FK KEY SHARE) — tersi eşzamanlı gönderimde 40P01
+      await lockTenant(tx, tenantId);
       const log = await tx.messageLog.create({
         data: { channel: "sms", recipient: input.to, template: input.template, content: input.logContent ?? input.text, provider: sms.name, status: "queued", cost: segments, idempotencyKey: key, appointmentId: input.appointmentId ?? null } as never,
       });

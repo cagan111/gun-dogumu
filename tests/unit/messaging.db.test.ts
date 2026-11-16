@@ -117,6 +117,17 @@ describe.skipIf(!HAS_DB)("mesajlaşma, işler, kampanya, kredi (gerçek DB)", ()
     expect(led).toHaveLength(1);
   });
 
+  it("aynı salona farklı anahtarlarla eşzamanlı gönderimler kilitlenmez (40P01 regresyonu)", async () => {
+    const s = await mkSalon();
+    for (let round = 0; round < 5; round++) {
+      const before = await balance(s);
+      const res = await Promise.all(Array.from({ length: 8 }, (_, i) =>
+        M.send.sendMessage({ tenantId: s.tenantId, to: "+905331119999", text: "merhaba", template: "campaign", reason: "campaign", idempotencyKey: `dl-${uid}-${round}-${i}` })));
+      expect(res.every((r) => r.status === "sent")).toBe(true);
+      expect(await balance(s)).toBe(before - 8);
+    }
+  });
+
   it("taşınan randevuda eski hatırlatma atlanır, yenisi planlanır", async () => {
     const s = await mkSalon();
     const a = await mkAppt(s);
