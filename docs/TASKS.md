@@ -88,7 +88,8 @@ Biçim: `- [ ] T-NNN | sahip: claude|codex|- | açıklama`. Başlamadan sahip ya
 ## M5 – Süper-admin ve gelir
 - [x] T-060 | sahip: claude | Süper-admin API: salonlar, manuel ödeme → abonelik uzatma, SMS paketi → defter, AuditLog
   - `/api/admin/{tenants,tenants/[id],…/plan,…/suspend,…/unsuspend,payments,sms-credits,sms-requests,sms-requests/[id],plan-prices,revenue,audit}`; `lib/admin/service.ts`, `lib/billing/payments.ts`; her mutasyon AuditLog (actorId).
-- [ ] T-061 | sahip: claude | `/admin` ekranları (liste, ödeme, kredi, audit)
+- [x] T-061 | sahip: claude | `/admin` ekranları (liste, ödeme, kredi, audit)
+  - `app/admin` (layout superadmin kapısı) + `_ui`: salon listesi+gelir kartları, `/admin/salon/[id]` (manuel ödeme, kredi, paket, askı, ödemeler), `/admin/sms`, `/admin/fiyatlar`, `/admin/denetim`; yıkıcı işlemlerde onay penceresi.
 - [x] T-062 | sahip: claude | Abonelik durum makinesi (trial → active → past_due 7 gün → suspended) + uyarı işleri
   - `lib/billing/subscription.ts` `nextStatus` (saf) + `applySubscriptionTick` (AuditLog + tekrarsız uyarı listesi); zamanlanmış çağrı T-054/pg-boss işinde yapılacak.
 - [x] T-063 | sahip: claude | Gelir özeti (MRR, aktif salon, satılan SMS)
