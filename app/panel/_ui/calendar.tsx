@@ -418,7 +418,7 @@ function ApptSheet({ appt, staff, services, onClose, onChanged }: { appt: Appt |
 
   if (!appt || !cur) return null;
   const svc = services.find((s) => s.id === appt.serviceId);
-  const stf = svc && svc.staffIds.length ? staff.filter((s) => svc.staffIds.includes(s.id)) : staff;
+  const stf = svc ? staff.filter((s) => svc.staffIds.includes(s.id)) : staff;
   return (
     <>
       <Sheet open onClose={onClose} title={t("appt.title")}>
@@ -495,7 +495,7 @@ function CreateSheet({ init, staff, services, onClose, onCreated }: { init: { da
   }, [init, services]);
 
   const svc = services.find((s) => s.id === serviceId);
-  const staffOpts = svc && svc.staffIds.length ? staff.filter((s) => svc.staffIds.includes(s.id)) : staff;
+  const staffOpts = svc ? staff.filter((s) => svc.staffIds.includes(s.id)) : staff;
   useEffect(() => { if (staffId !== "any" && !staffOpts.some((s) => s.id === staffId)) setStaffId("any"); }, [staffOpts, staffId]);
 
   function toggleWalkIn(v: boolean) {

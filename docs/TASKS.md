@@ -54,10 +54,12 @@ Biçim: `- [ ] T-NNN | sahip: claude|codex|- | açıklama`. Başlamadan sahip ya
   - `app/panel` kabuğu (`_ui/shell`) + `_ui/calendar` gün/hafta, sürükle-bırak (pointer events, 409/422 geri alma), randevu sayfası, + Randevu; i18n `lib/i18n/panel-{tr,en}.ts`.
 - [x] T-035 | sahip: claude | Panel API: hizmet, personel, çalışma saati, izin CRUD
   - `/api/panel/{services,staff,time-off}` + `staff/[id]/working-hours` (PUT); yazma yalnız owner (`assertOwner`, servis katmanında), plan `maxStaff` → 402 `plan_limit`; servis `lib/panel/catalog.ts`, mola doğrulama `lib/hours.ts`.
-- [ ] T-036 | sahip: claude | Hizmet/personel/saat/izin ekranları
+- [x] T-036 | sahip: claude | Hizmet/personel/saat/izin ekranları
+  - `/panel/hizmetler` (`_ui/services`), `/panel/personel` (`_ui/staff`: ekle/düzenle, 7 günlük saat editörü + mola, izin listesi/ekle); staff rolünde yazma kontrolleri gizli, plan_limit 402 mesajı.
 - [x] T-037 | sahip: claude | Müşteri API: arama, geçmiş, not, gelmedi sayısı
   - `GET /api/panel/customers` (q, sayfalı), `GET/PATCH /api/panel/customers/[id]` (notlar Pro+, Başlangıç → 402 `plan_feature`); `lib/panel/customers.ts`.
-- [ ] T-038 | sahip: claude | Müşteri listesi ekranı
+- [x] T-038 | sahip: claude | Müşteri listesi ekranı
+  - `/panel/musteriler` (`_ui/customers`): arama, sayfalama, ayrıntı + notlar (plan_feature → "Pro paketinde"), `?id=` ile açılır.
 - [x] T-039 | sahip: claude | Ayarlar API (SMS başlığı, hatırlatma zamanları, iptal kuralı, görünüm)
   - `/api/panel/settings` (GET/PATCH owner), `/api/panel/sms/{requests,balance}`; bakiye kanonik `lib/ledger.ts` (tenant satırı FOR UPDATE; eşzamanlı düşüm testi); `lib/panel/settings.ts`.
 - [ ] T-040 | sahip: claude | Ayarlar ekranı + SMS bakiye kartı + paket talep butonu

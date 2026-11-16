@@ -56,3 +56,11 @@ export function useLoader<T>(fn: () => Promise<T>, deps: unknown[]) {
   useEffect(reload, deps);
   return { data, error, loading, reload, setData };
 }
+
+/** weekday: 0 = Pazar … 6 = Cumartesi (API düzeni). */
+export function weekdayName(w: number, locale: Locale): string {
+  const d = new Date(Date.UTC(2024, 0, 7 + w, 12));
+  return new Intl.DateTimeFormat(locale === "tr" ? "tr-TR" : "en-GB", { weekday: "long", timeZone: "UTC" }).format(d);
+}
+/** Pazartesi başlangıçlı gün sırası. */
+export const WEEK_ORDER = [1, 2, 3, 4, 5, 6, 0] as const;
