@@ -137,7 +137,7 @@ export async function bookPublic(slug: string, input: PublicBookingInput, now: D
     serviceId: input.serviceId,
     staffId: input.staffId,
     startsAt: input.startsAt,
-    customer: { ...input.customer, marketingConsent: input.marketingConsent },
+    customer: { ...input.customer, marketingConsent: input.marketingConsent, kvkkAccepted: input.kvkkAccepted },
     source: "online",
     now,
   });

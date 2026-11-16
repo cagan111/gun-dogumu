@@ -35,10 +35,12 @@ export interface CreateAppointmentInput {
   /** Personel id'si ya da "any" (fark etmez). */
   staffId: string | "any";
   startsAt: Date;
-  customer: { name: string; phone: string; email?: string | null; locale?: string; marketingConsent?: boolean };
+  customer: { name: string; phone: string; email?: string | null; locale?: string; marketingConsent?: boolean; kvkkAccepted?: boolean };
   source?: "online" | "panel" | "walk_in";
   note?: string | null;
   now?: Date;
+  /** Panel: en erken/en geç kuralı ve geçmiş saat atlanır, 5 dk ızgara kullanılır; çalışma saati, mola, izin ve çakışma kuralları ASLA atlanmaz. */
+  bypassLeadRules?: boolean;
 }
 
 /** Postgres exclusion violation (23P01) mı? Prisma bunu P2010/P2004/bilinmeyen hata olarak sarabilir. */
@@ -111,10 +113,14 @@ async function attempt(db: TenantDb, input: CreateAppointmentInput) {
       workingHours: hours.filter((h) => h.staffId === id).map((h) => ({ weekday: h.weekday, startMin: h.startMin, endMin: h.endMin, breaks: parseBreaks(h.breaks) })),
       timeOff: timeOff.filter((t) => t.staffId === id).map((t) => ({ startsAt: t.startsAt, endsAt: t.endsAt })),
     }));
+    const bypass = input.bypassLeadRules === true;
     const base = {
-      tenant: { timeZone: tz, slotMinutes: tenant.slotMinutes, minLeadMinutes: tenant.minLeadMinutes, maxAdvanceDays: tenant.maxAdvanceDays },
+      tenant: bypass
+        ? { timeZone: tz, slotMinutes: Math.min(5, tenant.slotMinutes), minLeadMinutes: 0, maxAdvanceDays: 0 }
+        : { timeZone: tz, slotMinutes: tenant.slotMinutes, minLeadMinutes: tenant.minLeadMinutes, maxAdvanceDays: tenant.maxAdvanceDays },
       service: { durationMin: service.durationMin, bufferMin: service.bufferMin },
-      staff, date: local.date, now,
+      // bypass: "şimdi" = o yerel günün başı → o gün geçmiş/ileri sayılmaz
+      staff, date: local.date, now: bypass ? range.start : now,
     };
     const t = input.startsAt.getTime();
     const free = computeAvailability({ ...base, busy: busyRows }).find((s) => s.start.getTime() === t);
@@ -138,10 +144,11 @@ async function attempt(db: TenantDb, input: CreateAppointmentInput) {
 
     const c = input.customer;
     const consent = c.marketingConsent === true;
+    const kvkk = c.kvkkAccepted === true;
     const customer = await tx.customer.upsert({
       where: { tenantId_phone: { tenantId: input.tenantId, phone } },
-      create: { name: c.name.trim(), phone, email: c.email ?? null, locale: c.locale ?? tenant.locale, marketingConsent: consent, marketingConsentAt: consent ? now : null } as Prisma.CustomerUncheckedCreateInput,
-      update: { name: c.name.trim(), ...(c.email ? { email: c.email } : {}), ...(consent ? { marketingConsent: true, marketingConsentAt: now } : {}) },
+      create: { name: c.name.trim(), phone, email: c.email ?? null, locale: c.locale ?? tenant.locale, marketingConsent: consent, marketingConsentAt: consent ? now : null, kvkkAcceptedAt: kvkk ? now : null } as Prisma.CustomerUncheckedCreateInput,
+      update: { name: c.name.trim(), ...(c.email ? { email: c.email } : {}), ...(consent ? { marketingConsent: true, marketingConsentAt: now } : {}), ...(kvkk ? { kvkkAcceptedAt: now } : {}) },
     });
 
     const endsAt = new Date(t + service.durationMin * 60_000);

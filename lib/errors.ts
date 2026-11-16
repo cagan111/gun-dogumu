@@ -25,3 +25,23 @@ export class OtpError extends BookingError {
 export class InvalidTokenError extends BookingError {
   constructor() { super("invalid_token", "Bağlantı geçersiz veya süresi dolmuş"); }
 }
+/** Plan limiti aşıldı, örn. personel sayısı (402). */
+export class PlanLimitError extends BookingError {
+  constructor(public limit: number, message = "Planınızın limiti doldu, planı yükseltin") { super("plan_limit", message); }
+}
+/** Özellik planda yok, örn. müşteri notları / raporlar (402). */
+export class PlanFeatureError extends BookingError {
+  constructor(public feature: string) { super("plan_feature", "Bu özellik planınızda yok, planı yükseltin"); }
+}
+/** SMS kredisi yetersiz (402). */
+export class InsufficientCreditsError extends BookingError {
+  constructor(public balance: number, public needed: number) { super("insufficient_credits", "SMS kredisi yetersiz"); }
+}
+/** Ödeme sağlayıcısı yapılandırılmamış (501). */
+export class PaymentNotConfiguredError extends BookingError {
+  constructor(provider: string) { super("not_configured", `${provider} ödeme sağlayıcısı yapılandırılmadı`); }
+}
+/** İş kuralı doğrulama hatası (400). Şema doğrulaması dışındaki kontroller için. */
+export class ValidationError extends BookingError {
+  constructor(message: string, public field?: string) { super("validation", message); }
+}

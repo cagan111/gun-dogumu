@@ -23,6 +23,10 @@ export const STATUS_BY_CODE: Record<string, number> = {
   otp_expired: 400,
   otp_locked: 429,
   invalid_token: 400,
+  plan_limit: 402,
+  plan_feature: 402,
+  insufficient_credits: 402,
+  not_configured: 501,
 };
 
 export function statusForCode(code: string): number {
@@ -43,6 +47,10 @@ export function errorResponse(e: unknown): NextResponse {
     if (e.code === "suspended") extra.suspended = true;
     const field = (e as { field?: unknown }).field;
     if (typeof field === "string") extra.field = field;
+    const feature = (e as { feature?: unknown }).feature;
+    if (typeof feature === "string") extra.feature = feature;
+    const limit = (e as { limit?: unknown }).limit;
+    if (typeof limit === "number") extra.limit = limit;
     return jsonError(statusForCode(e.code), e.code, e.message, extra);
   }
   logger.error({ err: e }, "api: beklenmeyen hata");

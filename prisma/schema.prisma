@@ -229,6 +229,7 @@ model Customer {
   locale             String        @default("tr")
   marketingConsent   Boolean       @default(false)
   marketingConsentAt DateTime?
+  kvkkAcceptedAt     DateTime?
   noShowCount        Int           @default(0)
   createdAt          DateTime      @default(now())
   appointments       Appointment[]

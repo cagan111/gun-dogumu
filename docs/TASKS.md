@@ -42,15 +42,20 @@ Biçim: `- [ ] T-NNN | sahip: claude|codex|- | açıklama`. Başlamadan sahip ya
 - [x] T-031 | sahip: claude | Kayıt + salon oluşturma API'si (slug benzersizliği, 14 gün deneme)
   - `POST /api/auth/signup`, `GET /api/auth/slug-check`; tenant+owner+SMS kredisi tek transaction'da, çakışmada 409.
 - [ ] T-032 | sahip: codex | Kayıt sihirbazı arayüzü (ad, şehir, slug, saatler, ilk hizmetler)
-- [ ] T-033 | sahip: claude | Panel API: randevu listele/ekle/taşı/durum (gelmedi), tenant korumalı
+- [x] T-033 | sahip: claude | Panel API: randevu listele/ekle/taşı/durum (gelmedi), tenant korumalı
+  - `app/api/panel/appointments` (GET liste, POST ekle, `[id]` GET/PATCH taşı, `[id]/status`); servis `lib/panel/appointments.ts`, panelden `bypassLeadRules` (çakışma/mesai asla atlanmaz), gelmedi sayacı atomik.
 - [ ] T-034 | sahip: codex | Takvim (günlük/haftalık, personel sütunları, sürükle-bırak)
-- [ ] T-035 | sahip: claude | Panel API: hizmet, personel, çalışma saati, izin CRUD
+- [x] T-035 | sahip: claude | Panel API: hizmet, personel, çalışma saati, izin CRUD
+  - `/api/panel/{services,staff,time-off}` + `staff/[id]/working-hours` (PUT); yazma yalnız owner (`assertOwner`, servis katmanında), plan `maxStaff` → 402 `plan_limit`; servis `lib/panel/catalog.ts`, mola doğrulama `lib/hours.ts`.
 - [ ] T-036 | sahip: codex | Hizmet/personel/saat/izin ekranları
-- [ ] T-037 | sahip: claude | Müşteri API: arama, geçmiş, not, gelmedi sayısı
+- [x] T-037 | sahip: claude | Müşteri API: arama, geçmiş, not, gelmedi sayısı
+  - `GET /api/panel/customers` (q, sayfalı), `GET/PATCH /api/panel/customers/[id]` (notlar Pro+, Başlangıç → 402 `plan_feature`); `lib/panel/customers.ts`.
 - [ ] T-038 | sahip: codex | Müşteri listesi ekranı
-- [ ] T-039 | sahip: claude | Ayarlar API (SMS başlığı, hatırlatma zamanları, iptal kuralı, görünüm)
+- [x] T-039 | sahip: claude | Ayarlar API (SMS başlığı, hatırlatma zamanları, iptal kuralı, görünüm)
+  - `/api/panel/settings` (GET/PATCH owner), `/api/panel/sms/{requests,balance}`; bakiye kanonik `lib/ledger.ts` (tenant satırı FOR UPDATE; eşzamanlı düşüm testi); `lib/panel/settings.ts`.
 - [ ] T-040 | sahip: codex | Ayarlar ekranı + SMS bakiye kartı + paket talep butonu
-- [ ] T-041 | sahip: claude | Rapor API (randevu sayısı, ciro tahmini, en çok hizmet/personel, gelmeme oranı)
+- [x] T-041 | sahip: claude | Rapor API (randevu sayısı, ciro tahmini, en çok hizmet/personel, gelmeme oranı)
+  - `GET /api/panel/reports?month=YYYY-MM` (Pro+); `lib/panel/reports.ts` (salon saat dilimiyle ay, ciro = completed + geçmiş confirmed).
 - [ ] T-042 | sahip: codex | Rapor ekranı
 
 ## M4 – Bildirimler
@@ -63,11 +68,15 @@ Biçim: `- [ ] T-NNN | sahip: claude|codex|- | açıklama`. Başlamadan sahip ya
 - [ ] T-056 | sahip: claude | Kampanya SMS'i (Salon+, yalnız izinli, çıkış ifadesi)
 
 ## M5 – Süper-admin ve gelir
-- [ ] T-060 | sahip: claude | Süper-admin API: salonlar, manuel ödeme → abonelik uzatma, SMS paketi → defter, AuditLog
+- [x] T-060 | sahip: claude | Süper-admin API: salonlar, manuel ödeme → abonelik uzatma, SMS paketi → defter, AuditLog
+  - `/api/admin/{tenants,tenants/[id],…/plan,…/suspend,…/unsuspend,payments,sms-credits,sms-requests,sms-requests/[id],plan-prices,revenue,audit}`; `lib/admin/service.ts`, `lib/billing/payments.ts`; her mutasyon AuditLog (actorId).
 - [ ] T-061 | sahip: codex | `/admin` ekranları (liste, ödeme, kredi, audit)
-- [ ] T-062 | sahip: claude | Abonelik durum makinesi (trial → active → past_due 7 gün → suspended) + uyarı işleri
-- [ ] T-063 | sahip: claude | Gelir özeti (MRR, aktif salon, satılan SMS)
-- [ ] T-064 | sahip: claude | `PaymentProvider` arayüzü + `manual`
+- [x] T-062 | sahip: claude | Abonelik durum makinesi (trial → active → past_due 7 gün → suspended) + uyarı işleri
+  - `lib/billing/subscription.ts` `nextStatus` (saf) + `applySubscriptionTick` (AuditLog + tekrarsız uyarı listesi); zamanlanmış çağrı T-054/pg-boss işinde yapılacak.
+- [x] T-063 | sahip: claude | Gelir özeti (MRR, aktif salon, satılan SMS)
+  - `GET /api/admin/revenue` (`revenueSummary`: MRR güncel plan fiyatlarıyla, durum sayıları, bu ay satılan SMS) + `PATCH /api/admin/plan-prices`, `getPlanPrice()` (`lib/plan-price.ts`).
+- [x] T-064 | sahip: claude | `PaymentProvider` arayüzü + `manual`
+  - `lib/billing/payment-provider.ts`: `PaymentProvider`, `ManualPaymentProvider`, iyzico/PayTR `not_configured` taslakları.
 - [x] T-065 | sahip: claude | İlk açılışta SUPERADMIN_EMAIL hesabı + şifre bağlantısı loga
   - `lib/bootstrap.ts` `ensureSuperadmin()` (`instrumentation.ts`'ten), `POST /api/auth/set-password`; bağlantı pino warn ile loga.
 

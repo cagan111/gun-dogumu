@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { AlreadyClosedError, CancelWindowError, InvalidPhoneError, NotFoundError, SlotTakenError, SlotUnavailableError } from "@/lib/booking";
-import { RateLimitedError, SuspendedError } from "@/lib/errors";
+import { InsufficientCreditsError, PaymentNotConfiguredError, PlanFeatureError, PlanLimitError, RateLimitedError, SuspendedError } from "@/lib/errors";
 import { clientIp, errorResponse, parseWith } from "@/lib/http";
 
 describe("errorResponse", () => {
@@ -14,6 +14,10 @@ describe("errorResponse", () => {
     expect(status(new InvalidPhoneError())).toBe(400);
     expect(status(new AlreadyClosedError())).toBe(409);
     expect(status(new SuspendedError())).toBe(423);
+    expect(status(new PlanLimitError(1))).toBe(402);
+    expect(status(new PlanFeatureError("reports"))).toBe(402);
+    expect(status(new InsufficientCreditsError(0, 1))).toBe(402);
+    expect(status(new PaymentNotConfiguredError("iyzico"))).toBe(501);
   });
   it("429 Retry-After taşır; bilinmeyen hata 500 ve ayrıntı sızdırmaz", async () => {
     const r = errorResponse(new RateLimitedError(42));
