@@ -8,3 +8,6 @@
 - [ ] Gizlilik politikası, kullanım koşulları, aydınlatma metni: KKTC 89/2007 sayılı yasaya göre avukata kontrol ettir.
 - [ ] iyzico/PayTR üye işyeri başvurusu (ileride).
 - [ ] E-posta sağlayıcı (SMTP/Resend) hesabı: sihirli giriş bağlantıları ve şifre sıfırlama şimdilik e-posta yerine loga yazılıyor (T-030).
+- [ ] Gerçek `Dockerfile`'ı internet erişimli bir makinede bir kez `docker compose build` ile doğrula (sandbox'ta apt/Debian deposu engelliydi; yerelde yalnız `node:22-bookworm` tabanlı eşdeğeri derlendi). Sonra VPS'te `docs/RUNBOOK.md` adımlarını ve geri yükleme provasını uygula.
+- [ ] GitHub Actions workflow'u (`.github/workflows/ci.yml`) repo GitHub'a taşınınca ilk çalıştırmada yeşil mi bak.
+

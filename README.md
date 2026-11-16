@@ -17,6 +17,15 @@ pnpm db:seed                    # 2 demo salon + süper-admin (üretimde yalnız
 pnpm build && pnpm start        # NEXTAUTH_SECRET ve DATABASE_URL tanımlı olmalı
 node tests/e2e/booking.cjs      # 375×812 başsız Playwright: ana sayfa, giriş, kayıt, tam randevu + iptal, 404
 node tests/e2e/panel.cjs        # salon paneli (takvim, hizmet, müşteri, rapor, ayar) + süper-admin (ödeme, kredi, denetim); ödeme/hizmet ekler → önce `pnpm db:seed`
+JOBS_QUEUE=pgboss pnpm start   # flow.cjs için iş kuyruğu AÇIK olmalı (sunucuyu bu ortamla başlatın)
+node tests/e2e/flow.cjs         # T-082: /kayit sihirbazı → panelde hizmet → müşteri randevusu → hatırlatma işi pgboss.job'da → /r/{token} iptali (seed gerekmez, her seferinde yeni salon)
+node tests/e2e/isolation.cjs    # T-081: gerçek HTTP; A sahibi B'nin randevu/müşteri/hizmet kimlikleriyle → 404; oturumsuz 401; staff rapor/müşteri ayrıntısı 403
 ```
+
+`flow.cjs` + `isolation.cjs` toplam 3 kayıt açar; kayıt IP başına saatte 5 ile sınırlı (bellek içi) — tekrar çalıştırmadan önce sunucuyu yeniden başlatın.
+
+## Dağıtım
+
+`docker compose up -d --build` (app, worker, Postgres 16, Caddy, günlük yedek). Kurulum, güncelleme, yedek/geri yükleme ve sorun giderme: `docs/RUNBOOK.md`. CI: `.github/workflows/ci.yml`.
 
 Ortam değişkenleri: `BASE_URL` (varsayılan `http://localhost:3000`), `SLUG` (varsayılan `lefkosa-usta-berber`), `SHOT_DIR` (ekran görüntüleri `ui-*.png`). Demo girişleri: `owner@lefkosa-usta-berber.test` / `demo12345`, `admin@kibrisrandevu.test` / `admin12345`.

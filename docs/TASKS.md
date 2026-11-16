@@ -14,8 +14,10 @@ Biçim: `- [ ] T-NNN | sahip: claude|codex|- | açıklama`. Başlamadan sahip ya
 - [x] T-005 | sahip: claude | `config/brand.ts`, `config/plans.ts`, `.env.example`
 - [x] T-006 | sahip: claude | Seed: 2 salon × 3 personel, 6 hizmet, 30 randevu (`SEED_DEMO`)
   - `prisma/seed.ts` (`pnpm db:seed`): 2 salon × 3 personel × 6 hizmet, 30 randevu/salon (çakışmasız, karışık durum), owner@<slug>.test/demo12345, SEED_DEMO/NODE_ENV korumalı süper-admin; tekrar çalıştırılabilir (demo içeriği sıfırlanıp bugüne göre üretilir).
-- [ ] T-007 | sahip: codex | Dockerfile + docker-compose (app, postgres, caddy, yedek) + Caddyfile
-- [ ] T-008 | sahip: codex | GitHub Actions CI (lint, typecheck, test, Postgres servisli)
+- [x] T-007 | sahip: claude | Dockerfile + docker-compose (app, postgres, caddy, yedek) + Caddyfile
+  - `Dockerfile` (deps/build/runner, standalone, kullanıcı `node`), `docker-entrypoint.sh` (migrate deploy → SEED_DEMO ise seed → web; `worker` rolü), `docker-compose.yml` (app, worker, db, caddy, backup), `Caddyfile` (`CADDY_SITE`); `lib/env.ts` açılış doğrulaması. Sandbox'ta daemon başlatılıp compose ayağa kalktı, `/api/health` Caddy :80 üzerinden 200 (bkz. DECISIONS).
+- [x] T-008 | sahip: claude | GitHub Actions CI (lint, typecheck, test, Postgres servisli)
+  - `.github/workflows/ci.yml`: Node 22, pnpm (packageManager 10.28), postgres:16 servisi, `prisma migrate deploy`, `pnpm run ci`, `pnpm build` (sahte NEXTAUTH_SECRET).
 
 ## M2 – Müşteri randevu akışı
 - [x] T-010 | sahip: claude | `lib/time.ts` saat dilimi yardımcıları + testler
@@ -110,10 +112,14 @@ Biçim: `- [ ] T-NNN | sahip: claude|codex|- | açıklama`. Başlamadan sahip ya
 ## Güvenlik ve kalite
 - [x] T-080 | sahip: claude | Rate limit yardımcısı (bellek/DB) + güvenlik başlıkları + CSRF
   - `lib/ratelimit.ts` (arayüz + bellek uygulaması, `setRateLimiter`), `lib/http.ts` (hata→HTTP, Zod 400, IP); güvenlik başlıkları zaten `next.config.mjs`'te; CSRF: oturum çerezi SameSite=Lax + JSON API, ayrı token yok.
-- [ ] T-081 | sahip: codex | e2e tenant izolasyon testi (başka salon ID → 404)
-- [ ] T-082 | sahip: codex | e2e: kayıt → hizmet → randevu → hatırlatma kuyrukta → iptal
-- [ ] T-083 | sahip: codex | Günlük pg_dump yedeği (14 gün) + RUNBOOK geri yükleme
-- [ ] T-084 | sahip: claude | `docs/RUNBOOK.md` (başlatma, güncelleme, log, SMS sağlayıcı değiştirme)
+- [x] T-081 | sahip: claude | e2e tenant izolasyon testi (başka salon ID → 404)
+  - `tests/e2e/isolation.cjs`: gerçek HTTP, A→B kimlikleriyle 8 çağrı hep 404, oturumsuz 401, staff 403; `next start` üzerinde yeşil.
+- [x] T-082 | sahip: claude | e2e: kayıt → hizmet → randevu → hatırlatma kuyrukta → iptal
+  - `tests/e2e/flow.cjs`: kayıt → hizmet → randevu → `pgboss.job`'da send-reminder/confirmation → iptal; `JOBS_QUEUE=pgboss next start` ile yeşil.
+- [x] T-083 | sahip: claude | Günlük pg_dump yedeği (14 gün) + RUNBOOK geri yükleme
+  - `backup` servisi (`scripts/backup-loop.sh`): açılışta + her 24 sa `pg_dump -Fc` → `./backups`, 14 gün tutulur; geri yükleme RUNBOOK §5.
+- [x] T-084 | sahip: claude | `docs/RUNBOOK.md` (başlatma, güncelleme, log, SMS sağlayıcı değiştirme)
+  - `docs/RUNBOOK.md` (kurulum, başlatma, süper-admin bağlantısı, güncelleme, yedek/geri yükleme, log, SMS sağlayıcı, sorun giderme).
 - [ ] T-085 | sahip: codex | Lighthouse mobil ölçümü (randevu sayfası > 85)
 
 ## Ek (inceleme sonrası)
@@ -123,3 +129,11 @@ Biçim: `- [ ] T-NNN | sahip: claude|codex|- | açıklama`. Başlamadan sahip ya
   - `lib/panel/audit.ts` `auditPanel`: hizmet/personel/saat/izin/ayar/kampanya AuditLog (actorId = kullanıcı).
 - [x] T-092 | sahip: claude | Ödeme/ay yenilemede planın aylık SMS kredisini deftere ekle (T-052 ile)
   - T-052 ile birlikte: `grantMonthlyCreditsFor` ödeme sonrası ve günlük işte; aynı ay ikinci kez verilmez.
+
+## Ek (kod incelemesi sonrası)
+- [x] T-093 | sahip: claude | Flaky DB testi: eşzamanlı `sendMessage` 40P01 kilitlenmesi
+  - Kök neden: aynı transaction'da önce `MessageLog` INSERT (Tenant FK → KEY SHARE) sonra `SELECT … FOR UPDATE` (ledger); iki işlem birbirini bekliyordu. Kilit sırası sabitlendi (önce tenant FOR UPDATE), regresyon testi eklendi.
+- [x] T-094 | sahip: claude | Güvenlik: staff rolü rapor ve müşteri verisine erişemez
+  - Rapor, müşteri ayrıntısı ve not yazma yalnız owner (`assertOwner`, servis katmanı); staff yalnız ≥3 karakterli ad/telefon araması yapar (≤8 sonuç, {id, ad, telefon}); DB testi.
+- [x] T-095 | sahip: claude | Mobil takvim cilası
+  - Yatay kaydırma + yapışkan saat sütunu/personel başlığı (min sütun 120px), mobil üst çubuk tek satır (ad · SMS · ⋯ menü).

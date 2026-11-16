@@ -11,3 +11,5 @@
 - M4 bildirimler tamam: mesaj sağlayıcıları (+ALLOW_REAL_SMS kapısı), segment hesabı, şablonlar, kredi düşümü/iade/aylık kredi, pg-boss işleri (`pnpm worker`), WhatsApp/e-posta yedekleme, kampanya, OTP/sihirli bağlantı bağlantıları, askıda panel yazma engeli ve panel AuditLog; 77 yeni test (Claude).
 - T-006/T-017–T-020/T-032/T-070–T-072: seed, i18n (tr/en), 4 adımlı mobil randevu akışı + `/r/[token]` + Randevularım, giriş/kayıt sihirbazı, ana sayfa ve hukuk taslakları tamam; `node tests/e2e/booking.cjs` 375×812 başsız kontrolü yeşil (panel/admin yalnız yer tutucu).
 - T-034/T-036/T-038/T-040/T-042/T-061: salon paneli (takvim gün/hafta + sürükle-bırak, hizmet/personel/saat/izin, müşteri, ayarlar+SMS+kampanya, rapor) ve süper-admin (salonlar, ödeme, kredi, SMS talepleri, fiyatlar, denetim) arayüzleri tamam; `node tests/e2e/panel.cjs` başsız kontrolü yeşil (Claude).
+- T-007/T-008/T-081–T-084 + 40P01 kilitlenme kökü (sendMessage kilit sırası), staff yetki sıkılaştırması, mobil takvim cilası: Docker (compose app+worker+db+caddy+yedek, sandbox'ta ayağa kalktı), CI workflow, RUNBOOK, `flow.cjs`/`isolation.cjs` e2e yeşil; 226 test (Claude).
+
