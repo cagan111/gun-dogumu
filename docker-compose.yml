@@ -1,0 +1,87 @@
+# KıbrısRandevu: app + worker + postgres + caddy + yedek.
+#   cp .env.example .env   # NEXTAUTH_SECRET, POSTGRES_PASSWORD, APP_DOMAIN... doldur
+#   docker compose up -d --build
+x-app-env: &app-env
+  NODE_ENV: production
+  DATABASE_URL: postgresql://${POSTGRES_USER:-randevu}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD .env içinde tanımlı olmalı}@db:5432/${POSTGRES_DB:-randevu}
+  NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:?NEXTAUTH_SECRET .env içinde tanımlı olmalı (openssl rand -base64 32)}
+  # NEXTAUTH_URL boşsa: APP_DOMAIN varsa https://APP_DOMAIN, yoksa http://localhost
+  NEXTAUTH_URL: ${NEXTAUTH_URL:-${APP_DOMAIN:+https://}${APP_DOMAIN:-http://localhost}}
+  AUTH_TRUST_HOST: "true"
+
+services:
+  app:
+    build: .
+    image: kibris-randevu:latest
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      <<: *app-env
+    depends_on:
+      db: { condition: service_healthy }
+    expose: ["3000"]
+
+  worker:
+    image: kibris-randevu:latest
+    command: ["worker"]
+    healthcheck: { disable: true }  # imajın HTTP sağlık kontrolü yalnız web için
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      <<: *app-env
+      SEED_DEMO: "false"
+    depends_on:
+      db: { condition: service_healthy }
+      app: { condition: service_healthy }
+
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-randevu}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD .env içinde tanımlı olmalı}
+      POSTGRES_DB: ${POSTGRES_DB:-randevu}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports: ["80:80", "443:443", "443:443/udp"]
+    environment:
+      # APP_DOMAIN doluysa otomatik HTTPS, boşsa :80 (HTTP)
+      CADDY_SITE: ${APP_DOMAIN:-:80}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      app: { condition: service_healthy }
+
+  # T-083: günlük pg_dump (-Fc), ./backups içinde 14 gün tutulur
+  backup:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      PGHOST: db
+      PGUSER: ${POSTGRES_USER:-randevu}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: ${POSTGRES_DB:-randevu}
+      BACKUP_KEEP_DAYS: ${BACKUP_KEEP_DAYS:-14}
+      BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-86400}
+    volumes:
+      - ./backups:/backups
+      - ./scripts/backup-loop.sh:/backup-loop.sh:ro
+    entrypoint: ["sh", "/backup-loop.sh"]
+    depends_on:
+      db: { condition: service_healthy }
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:

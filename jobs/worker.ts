@@ -1,10 +1,12 @@
 /** `pnpm worker`: pg-boss işleyicilerini ve günlük zamanlamaları başlatır. */
+import { assertEnv } from "../lib/env";
 import { logger } from "../lib/logger";
 import { JOB } from "./queue";
 
 try { process.loadEnvFile(".env"); } catch { /* .env yok: ortamdan okunur */ }
 
 async function main() {
+  assertEnv(logger);
   const { getBoss, stopBoss } = await import("./boss");
   const h = await import("./handlers");
   const boss = await getBoss("worker");
