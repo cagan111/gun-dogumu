@@ -93,3 +93,8 @@ Biçim: `- [ ] T-NNN | sahip: claude|codex|- | açıklama`. Başlamadan sahip ya
 - [ ] T-083 | sahip: codex | Günlük pg_dump yedeği (14 gün) + RUNBOOK geri yükleme
 - [ ] T-084 | sahip: claude | `docs/RUNBOOK.md` (başlatma, güncelleme, log, SMS sağlayıcı değiştirme)
 - [ ] T-085 | sahip: codex | Lighthouse mobil ölçümü (randevu sayfası > 85)
+
+## Ek (inceleme sonrası)
+- [ ] T-090 | sahip: claude | Askıya alınmış (suspended) salonda panel yazma işlemlerini engelle (okuma serbest)
+- [ ] T-091 | sahip: claude | Panel değişikliklerini (hizmet, ayar, personel) AuditLog'a yaz
+- [ ] T-092 | sahip: claude | Ödeme/ay yenilemede planın aylık SMS kredisini deftere ekle (T-052 ile)
