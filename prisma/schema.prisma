@@ -1,0 +1,359 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum TenantStatus {
+  trial
+  active
+  past_due
+  suspended
+}
+enum Role {
+  owner
+  staff
+  superadmin
+}
+enum AppointmentStatus {
+  pending
+  confirmed
+  cancelled_by_customer
+  cancelled_by_salon
+  completed
+  no_show
+}
+enum AppointmentSource {
+  online
+  panel
+  walk_in
+}
+enum LedgerReason {
+  plan_monthly
+  package_purchase
+  reminder
+  confirmation
+  campaign
+  notification
+  refund
+  adjustment
+}
+enum Channel {
+  sms
+  whatsapp
+  email
+}
+enum MessageStatus {
+  queued
+  sent
+  failed
+  skipped
+}
+enum InvoiceStatus {
+  open
+  paid
+  void
+}
+enum PaymentMethod {
+  manual
+  iyzico
+  paytr
+}
+enum TimeOffKind {
+  leave
+  holiday
+  other
+}
+enum RequestStatus {
+  open
+  fulfilled
+  rejected
+}
+
+model Tenant {
+  id                 String       @id @default(cuid())
+  slug               String       @unique
+  name               String
+  city               String
+  address            String?
+  phone              String?
+  logoUrl            String?
+  coverUrl           String?
+  brandColor         String?
+  timeZone           String       @default("Asia/Famagusta")
+  locale             String       @default("tr")
+  plan               String       @default("baslangic")
+  status             TenantStatus @default(trial)
+  trialEndsAt        DateTime?
+  subscriptionEndsAt DateTime?
+  pastDueSince       DateTime?
+  smsSenderName      String?      @db.VarChar(11)
+  smsProvider        String?
+  // randevu kuralları
+  slotMinutes        Int          @default(15)
+  minLeadMinutes     Int          @default(60)
+  maxAdvanceDays     Int          @default(60)
+  cancelHoursBefore  Int          @default(2)
+  reminderOffsets    Int[]        @default([1440, 120]) // dakika
+  quietStartHour     Int          @default(22)
+  quietEndHour       Int          @default(8)
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+  lastLoginAt        DateTime?
+
+  users        User[]
+  staff        Staff[]
+  services     Service[]
+  customers    Customer[]
+  appointments Appointment[]
+  smsLedger    SmsLedger[]
+  messages     MessageLog[]
+  invoices     Invoice[]
+  payments     Payment[]
+  workingHours WorkingHours[]
+  timeOff      TimeOff[]
+  serviceStaff ServiceStaff[]
+  smsRequests  SmsPackageRequest[]
+  otps         Otp[]
+}
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String?
+  name         String
+  role         Role
+  tenantId     String?
+  tenant       Tenant?   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  staff        Staff?
+  createdAt    DateTime  @default(now())
+  lastLoginAt  DateTime?
+
+  @@index([tenantId])
+}
+
+model Staff {
+  id           String         @id @default(cuid())
+  tenantId     String
+  tenant       Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name         String
+  photoUrl     String?
+  color        String         @default("#2563eb")
+  active       Boolean        @default(true)
+  sortOrder    Int            @default(0)
+  userId       String?        @unique
+  user         User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+  services     ServiceStaff[]
+  workingHours WorkingHours[]
+  timeOff      TimeOff[]
+  appointments Appointment[]
+
+  @@index([tenantId])
+}
+
+model Service {
+  id            String         @id @default(cuid())
+  tenantId      String
+  tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  nameTr        String
+  nameEn        String?
+  durationMin   Int
+  priceTry      Decimal        @db.Decimal(10, 2)
+  bufferMin     Int            @default(0)
+  active        Boolean        @default(true)
+  sortOrder     Int            @default(0)
+  staff         ServiceStaff[]
+  appointments  Appointment[]
+
+  @@index([tenantId])
+}
+
+model ServiceStaff {
+  tenantId  String
+  tenant    Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  serviceId String
+  service   Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  staffId   String
+  staff     Staff   @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  @@id([serviceId, staffId])
+  @@index([tenantId])
+}
+
+/// Haftanın günü: 0 = Pazar … 6 = Cumartesi. Dakika cinsinden yerel saat (0–1440). breaks: [[başlangıç, bitiş], …]
+model WorkingHours {
+  id        String @id @default(cuid())
+  tenantId  String
+  tenant    Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  staffId   String
+  staff     Staff  @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  weekday   Int
+  startMin  Int
+  endMin    Int
+  breaks    Json   @default("[]")
+
+  @@unique([staffId, weekday])
+  @@index([tenantId])
+}
+
+model TimeOff {
+  id       String      @id @default(cuid())
+  tenantId String
+  tenant   Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  staffId  String
+  staff    Staff       @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  startsAt DateTime
+  endsAt   DateTime
+  kind     TimeOffKind @default(leave)
+  reason   String?
+
+  @@index([tenantId, staffId, startsAt])
+}
+
+model Customer {
+  id                 String        @id @default(cuid())
+  tenantId           String
+  tenant             Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name               String
+  phone              String // E.164
+  email              String?
+  notes              String?
+  locale             String        @default("tr")
+  marketingConsent   Boolean       @default(false)
+  marketingConsentAt DateTime?
+  noShowCount        Int           @default(0)
+  createdAt          DateTime      @default(now())
+  appointments       Appointment[]
+
+  @@unique([tenantId, phone])
+}
+
+/// Çift rezervasyon migration'daki exclusion constraint ile DB seviyesinde engellenir.
+model Appointment {
+  id          String            @id @default(cuid())
+  tenantId    String
+  tenant      Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  staffId     String
+  staff       Staff             @relation(fields: [staffId], references: [id])
+  serviceId   String
+  service     Service           @relation(fields: [serviceId], references: [id])
+  customerId  String
+  customer    Customer          @relation(fields: [customerId], references: [id])
+  startsAt    DateTime
+  endsAt      DateTime // hizmet sonu
+  blockedUntil DateTime // endsAt + tampon; çakışma bununla hesaplanır
+  status      AppointmentStatus @default(confirmed)
+  source      AppointmentSource @default(online)
+  note        String?
+  cancelToken String            @unique
+  priceTry    Decimal           @db.Decimal(10, 2)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  cancelledAt DateTime?
+
+  @@index([tenantId, startsAt])
+  @@index([staffId, startsAt])
+}
+
+model SmsLedger {
+  id           String       @id @default(cuid())
+  tenantId     String
+  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  delta        Int
+  reason       LedgerReason
+  messageId    String?
+  balanceAfter Int
+  note         String?
+  createdAt    DateTime     @default(now())
+
+  @@index([tenantId, createdAt])
+}
+
+model MessageLog {
+  id             String        @id @default(cuid())
+  tenantId       String
+  tenant         Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  channel        Channel
+  recipient      String
+  template       String
+  content        String
+  provider       String
+  status         MessageStatus @default(queued)
+  providerId     String?
+  providerResult String?
+  cost           Int           @default(0)
+  idempotencyKey String?       @unique
+  appointmentId  String?
+  createdAt      DateTime      @default(now())
+
+  @@index([tenantId, createdAt])
+}
+
+model Invoice {
+  id          String        @id @default(cuid())
+  tenantId    String
+  tenant      Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  amountTry   Decimal       @db.Decimal(10, 2)
+  periodStart DateTime
+  periodEnd   DateTime
+  status      InvoiceStatus @default(open)
+  createdAt   DateTime      @default(now())
+  payments    Payment[]
+}
+
+model Payment {
+  id        String        @id @default(cuid())
+  tenantId  String
+  tenant    Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  invoiceId String?
+  invoice   Invoice?      @relation(fields: [invoiceId], references: [id])
+  amountTry Decimal       @db.Decimal(10, 2)
+  method    PaymentMethod @default(manual)
+  note      String?
+  createdBy String?
+  createdAt DateTime      @default(now())
+}
+
+model SmsPackageRequest {
+  id        String        @id @default(cuid())
+  tenantId  String
+  tenant    Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  size      Int
+  status    RequestStatus @default(open)
+  createdAt DateTime      @default(now())
+}
+
+model Otp {
+  id        String   @id @default(cuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  phone     String
+  codeHash  String
+  expiresAt DateTime
+  attempts  Int      @default(0)
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, phone, createdAt])
+}
+
+model PlanPrice {
+  planId    String   @id
+  priceTry  Decimal  @db.Decimal(10, 2)
+  updatedAt DateTime @updatedAt
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  actorId   String?
+  actorRole String?
+  tenantId  String?
+  action    String
+  details   Json?
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, createdAt])
+}

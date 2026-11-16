@@ -1,0 +1,3 @@
+# İnceleme notları
+
+(henüz yok)
