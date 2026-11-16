@@ -12,7 +12,8 @@ Biçim: `- [ ] T-NNN | sahip: claude|codex|- | açıklama`. Başlamadan sahip ya
 - [x] T-004 | sahip: claude | `/api/health` (DB ping) + pino logger
   - DB ping, 503 düşüş; pino.
 - [x] T-005 | sahip: claude | `config/brand.ts`, `config/plans.ts`, `.env.example`
-- [ ] T-006 | sahip: codex | Seed: 2 salon × 3 personel, 6 hizmet, 30 randevu (`SEED_DEMO`)
+- [x] T-006 | sahip: claude | Seed: 2 salon × 3 personel, 6 hizmet, 30 randevu (`SEED_DEMO`)
+  - `prisma/seed.ts` (`pnpm db:seed`): 2 salon × 3 personel × 6 hizmet, 30 randevu/salon (çakışmasız, karışık durum), owner@<slug>.test/demo12345, SEED_DEMO/NODE_ENV korumalı süper-admin; tekrar çalıştırılabilir (demo içeriği sıfırlanıp bugüne göre üretilir).
 - [ ] T-007 | sahip: codex | Dockerfile + docker-compose (app, postgres, caddy, yedek) + Caddyfile
 - [ ] T-008 | sahip: codex | GitHub Actions CI (lint, typecheck, test, Postgres servisli)
 
@@ -31,17 +32,22 @@ Biçim: `- [ ] T-NNN | sahip: claude|codex|- | açıklama`. Başlamadan sahip ya
   - `GET /api/r/[token]`, `POST /api/r/[token]/cancel` (`lib/cancel.ts`).
 - [x] T-016 | sahip: claude | OTP (hash'li, 5 dk, rate limit) + "Randevularım" API
   - `lib/otp.ts` + `otp/request`, `otp/verify`, `my-appointments`; imzalı çerez 30 dk; `sendOtp()` yalnız loglar (T-050 TODO).
-- [ ] T-017 | sahip: codex | `/[salonSlug]` 4 adımlı randevu arayüzü (mobil, klavye erişilebilir)
-- [ ] T-018 | sahip: codex | Onay ekranı, `/r/{token}` iptal sayfası, Randevularım sayfası
-- [ ] T-019 | sahip: codex | Aydınlatma metni linki + işaretsiz pazarlama izni kutusu
-- [ ] T-020 | sahip: claude | i18n altyapısı (tr/en sözlükleri, dil seçimi)
+- [x] T-017 | sahip: claude | `/[salonSlug]` 4 adımlı randevu arayüzü (mobil, klavye erişilebilir)
+  - `app/(public)/[salonSlug]` tek sayfa 4 adım (hizmet → uzman → gün/saat → bilgiler), sabit alt çubuk, 409/423/404 işleme; `booking-flow.tsx`.
+- [x] T-018 | sahip: claude | Onay ekranı, `/r/{token}` iptal sayfası, Randevularım sayfası
+  - Başarı ekranı + iptal bağlantısı, `app/r/[token]` özet/iptal, `randevularim` OTP akışı.
+- [x] T-019 | sahip: claude | Aydınlatma metni linki + işaretsiz pazarlama izni kutusu
+  - Zorunlu KVKK onayı (/gizlilik bağlantılı) + işaretsiz pazarlama izni kutusu.
+- [x] T-020 | sahip: claude | i18n altyapısı (tr/en sözlükleri, dil seçimi)
+  - `lib/i18n/{tr,en,shared,index,client}`: en, tr anahtarlarının tamamını içermek zorunda (tip); `getLocale/getT/translate`, `I18nProvider/useT`, `LangSwitcher`.
 
 ## M3 – Salon paneli
 - [x] T-030 | sahip: claude | Auth.js: e-posta+şifre, sihirli bağlantı, rol/tenant oturumu, rate limit
   - `auth.ts` (Credentials + magic-link sağlayıcısı, JWT userId/role/tenantId), `lib/session.ts`, `middleware.ts`, `LoginToken` migration'ı; sihirli bağlantı e-posta yerine loga.
 - [x] T-031 | sahip: claude | Kayıt + salon oluşturma API'si (slug benzersizliği, 14 gün deneme)
   - `POST /api/auth/signup`, `GET /api/auth/slug-check`; tenant+owner+SMS kredisi tek transaction'da, çakışmada 409.
-- [ ] T-032 | sahip: codex | Kayıt sihirbazı arayüzü (ad, şehir, slug, saatler, ilk hizmetler)
+- [x] T-032 | sahip: claude | Kayıt sihirbazı arayüzü (ad, şehir, slug, saatler, ilk hizmetler)
+  - `/giris`, `/giris/sihirli`, `/sifre-belirle`, `/kayit` 4 adımlı sihirbaz (saatler + hizmetler kayıt+girişten sonra panel API'siyle yazılır; hata olursa `/panel?onboarding=1`); `/panel` ve `/admin` yer tutucu.
 - [x] T-033 | sahip: claude | Panel API: randevu listele/ekle/taşı/durum (gelmedi), tenant korumalı
   - `app/api/panel/appointments` (GET liste, POST ekle, `[id]` GET/PATCH taşı, `[id]/status`); servis `lib/panel/appointments.ts`, panelden `bypassLeadRules` (çakışma/mesai asla atlanmaz), gelmedi sayacı atomik.
 - [ ] T-034 | sahip: codex | Takvim (günlük/haftalık, personel sütunları, sürükle-bırak)
@@ -88,9 +94,12 @@ Biçim: `- [ ] T-NNN | sahip: claude|codex|- | açıklama`. Başlamadan sahip ya
   - `lib/bootstrap.ts` `ensureSuperadmin()` (`instrumentation.ts`'ten), `POST /api/auth/set-password`; bağlantı pino warn ile loga.
 
 ## M6 – Pazarlama ve SEO
-- [ ] T-070 | sahip: codex | `/` ana sayfa TR/EN (özellikler, fiyatlar, SSS, CTA, WhatsApp)
-- [ ] T-071 | sahip: codex | Salon sayfası SEO (meta, OG, LocalBusiness JSON-LD)
-- [ ] T-072 | sahip: codex | Gizlilik + kullanım koşulları şablon sayfaları
+- [x] T-070 | sahip: claude | `/` ana sayfa TR/EN (özellikler, fiyatlar, SSS, CTA, WhatsApp)
+  - `/` TR/EN: hero, özellikler, fiyatlar (getAllPlanPrices), SSS, CTA, CONTACT_WHATSAPP (boşsa gizli).
+- [x] T-071 | sahip: claude | Salon sayfası SEO (meta, OG, LocalBusiness JSON-LD)
+  - Salon sayfası generateMetadata (başlık/açıklama/OG/canonical) + HairSalon JSON-LD.
+- [x] T-072 | sahip: claude | Gizlilik + kullanım koşulları şablon sayfaları
+  - `/gizlilik`, `/kosullar` taslak şablonlar (KKTC 89/2007; "taslak – avukat kontrolü gerekir").
 
 ## Güvenlik ve kalite
 - [x] T-080 | sahip: claude | Rate limit yardımcısı (bellek/DB) + güvenlik başlıkları + CSRF

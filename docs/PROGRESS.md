@@ -9,3 +9,4 @@
 
 ## 2026-11-17
 - M4 bildirimler tamam: mesaj sağlayıcıları (+ALLOW_REAL_SMS kapısı), segment hesabı, şablonlar, kredi düşümü/iade/aylık kredi, pg-boss işleri (`pnpm worker`), WhatsApp/e-posta yedekleme, kampanya, OTP/sihirli bağlantı bağlantıları, askıda panel yazma engeli ve panel AuditLog; 77 yeni test (Claude).
+- T-006/T-017–T-020/T-032/T-070–T-072: seed, i18n (tr/en), 4 adımlı mobil randevu akışı + `/r/[token]` + Randevularım, giriş/kayıt sihirbazı, ana sayfa ve hukuk taslakları tamam; `node tests/e2e/booking.cjs` 375×812 başsız kontrolü yeşil (panel/admin yalnız yer tutucu).

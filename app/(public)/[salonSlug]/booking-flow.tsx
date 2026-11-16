@@ -1,0 +1,366 @@
+"use client";
+import Link from "next/link";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Alert, Field, Spinner } from "@/components/ui/field";
+import { Button, buttonClass } from "@/components/ui/button";
+import { cn } from "@/lib/cn";
+import { dayParts, formatPrice, formatWhen, initials } from "@/lib/format";
+import { useI18n } from "@/lib/i18n/client";
+import { addDays } from "@/lib/time";
+
+interface Service { id: string; nameTr: string; nameEn: string | null; durationMin: number; priceTry: number; staffIds: string[] }
+interface Staff { id: string; name: string; photoUrl: string | null }
+interface Slot { startsAt: string; time: string; staffIds: string[] }
+interface Props { slug: string; salonName: string; timeZone: string; today: string; maxAdvanceDays: number; services: Service[]; staff: Staff[] }
+interface Done { cancelUrl: string; startsAt: string }
+
+const STEPS = 4;
+const hue = (s: string) => [...s].reduce((a, c) => (a * 31 + c.charCodeAt(0)) % 360, 7);
+
+function Avatar({ name, photoUrl, size = "h-14 w-14" }: { name: string; photoUrl?: string | null; size?: string }) {
+  if (photoUrl) {
+    return <img src={photoUrl} alt="" className={cn(size, "shrink-0 rounded-full object-cover")} />;
+  }
+  return (
+    <span aria-hidden className={cn(size, "grid shrink-0 place-items-center rounded-full text-base font-bold text-white")} style={{ backgroundColor: `hsl(${hue(name)} 45% 36%)` }}>
+      {initials(name)}
+    </span>
+  );
+}
+
+export function BookingFlow({ slug, salonName, timeZone, today, maxAdvanceDays, services, staff }: Props) {
+  const { t, locale } = useI18n();
+  const [step, setStep] = useState(1);
+  const [service, setService] = useState<Service | null>(null);
+  const [staffId, setStaffId] = useState<string>("any");
+  const [date, setDate] = useState(today);
+  const [slots, setSlots] = useState<Slot[] | null>(null);
+  const [slot, setSlot] = useState<Slot | null>(null);
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("+90 ");
+  const [email, setEmail] = useState("");
+  const [kvkk, setKvkk] = useState(false);
+  const [marketing, setMarketing] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [banner, setBanner] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState<Done | null>(null);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const dayRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+
+  const svcName = (s: Service) => (locale === "en" && s.nameEn ? s.nameEn : s.nameTr);
+  const eligibleStaff = useMemo(() => (service ? staff.filter((s) => service.staffIds.includes(s.id)) : []), [service, staff]);
+  const days = useMemo(() => Array.from({ length: maxAdvanceDays }, (_, i) => addDays(today, i)), [today, maxAdvanceDays]);
+  const staffLabel = staffId === "any" ? t("b.staff.any") : (staff.find((s) => s.id === staffId)?.name ?? "");
+
+  // adım değişince başlığa odaklan (ekran okuyucu + klavye)
+  useEffect(() => { headingRef.current?.focus(); window.scrollTo({ top: 0 }); }, [step, done]);
+
+  const loadSlots = useCallback(async (signal?: AbortSignal) => {
+    if (!service) return;
+    setSlots(null);
+    try {
+      const qs = new URLSearchParams({ serviceId: service.id, staffId, date });
+      const res = await fetch(`/api/public/${slug}/slots?${qs}`, { signal, cache: "no-store" });
+      if (!res.ok) throw new Error(String(res.status));
+      const j = (await res.json()) as { slots: Slot[] };
+      setSlots(j.slots);
+    } catch (e) {
+      if ((e as Error).name === "AbortError") return;
+      setSlots([]);
+      setBanner(t("common.genericError"));
+    }
+  }, [service, staffId, date, slug, t]);
+
+  useEffect(() => {
+    if (step !== 3) return;
+    const ac = new AbortController();
+    void loadSlots(ac.signal);
+    return () => ac.abort();
+  }, [step, loadSlots]);
+
+  useEffect(() => { if (step === 3) dayRefs.current[date]?.scrollIntoView({ inline: "center", block: "nearest" }); }, [step, date]);
+
+  const groups = useMemo(() => {
+    const g = { morning: [] as Slot[], noon: [] as Slot[], evening: [] as Slot[] };
+    for (const s of slots ?? []) {
+      const h = Number(s.time.slice(0, 2));
+      (h < 12 ? g.morning : h < 17 ? g.noon : g.evening).push(s);
+    }
+    return g;
+  }, [slots]);
+
+  function validateDetails() {
+    const e: Record<string, string> = {};
+    if (name.trim().length < 2) e.name = t("b.details.errName");
+    if (phone.replace(/\D/g, "").length < 7) e.phone = t("b.details.errPhone");
+    if (email.trim() && !/^\S+@\S+\.\S+$/.test(email.trim())) e.email = t("b.details.errEmail");
+    if (!kvkk) e.kvkk = t("b.details.errKvkk");
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  }
+
+  async function submit() {
+    if (!service || !slot || !validateDetails()) return;
+    setBusy(true); setBanner(null);
+    // "Fark etmez" ise slotun ilk uygun personeli; sunucu yarışta yeniden atar
+    const chosen = staffId === "any" ? "any" : staffId;
+    try {
+      const res = await fetch(`/api/public/${slug}/appointments`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          serviceId: service.id, staffId: chosen, startsAt: slot.startsAt,
+          customer: { name: name.trim(), phone: phone.trim(), ...(email.trim() ? { email: email.trim() } : {}), locale },
+          kvkkAccepted: true, marketingConsent: marketing,
+        }),
+      });
+      if (res.status === 201) {
+        const j = (await res.json()) as Done;
+        setDone(j);
+        return;
+      }
+      const j = (await res.json().catch(() => ({}))) as { error?: { code?: string } };
+      const code = j.error?.code;
+      if (res.status === 409 || code === "slot_taken") {
+        setBanner(t("b.err.slotTaken")); setSlot(null); setStep(3); // slotlar adım 3 efektiyle tazelenir
+      } else if (res.status === 422) {
+        setBanner(t("b.err.unavailable")); setSlot(null); setStep(3);
+      } else if (res.status === 423) {
+        window.location.reload();
+      } else if (res.status === 429) {
+        setBanner(t("common.rateLimited"));
+      } else if (res.status === 404) {
+        setBanner(t("b.err.notFound"));
+      } else if (code === "validation" || code === "invalid_phone") {
+        if (JSON.stringify(j).includes("invalid_phone") || code === "invalid_phone") setErrors({ phone: t("b.details.errPhone") });
+        else setBanner(t("b.err.validation"));
+      } else setBanner(t("common.genericError"));
+    } catch {
+      setBanner(t("common.genericError"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const canNext = step === 1 ? !!service : step === 2 ? true : step === 3 ? !!slot : true;
+  function next() {
+    setBanner(null);
+    if (step < STEPS) setStep(step + 1);
+  }
+  function back() {
+    setBanner(null);
+    if (step > 1) setStep(step - 1);
+  }
+
+  /* ───────── başarı ekranı ───────── */
+  if (done && service && slot) {
+    const full = typeof window !== "undefined" ? `${window.location.origin}${done.cancelUrl}` : done.cancelUrl;
+    return (
+      <main className="mx-auto max-w-2xl px-4 py-8">
+        <div className="rounded-2xl bg-white p-6 text-center shadow-sm ring-1 ring-slate-200">
+          <span aria-hidden className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-emerald-100 text-3xl text-emerald-700">✓</span>
+          <h2 ref={headingRef} tabIndex={-1} className="mt-4 text-2xl font-extrabold outline-none">{t("b.success.title")}</h2>
+          <p className="mt-1 text-slate-700">{t("b.success.sub", { name: name.trim().split(/\s+/)[0] ?? "" })}</p>
+          <dl className="mt-5 divide-y divide-slate-100 rounded-xl bg-slate-50 text-left text-sm">
+            <Row k={t("b.summary.service")} v={svcName(service)} />
+            <Row k={t("b.summary.staff")} v={staffLabel} />
+            <Row k={t("b.summary.when")} v={formatWhen(slot.startsAt, locale, timeZone)} />
+            <Row k={t("b.summary.total")} v={formatPrice(service.priceTry, locale)} />
+          </dl>
+          <p className="mt-5 text-sm text-slate-700">{t("b.success.cancelHint")}</p>
+          <a href={done.cancelUrl} data-testid="cancel-link" className={buttonClass("primary", "mt-2 w-full")}>{t("b.success.cancelLink")}</a>
+          <p className="mt-2 break-all text-xs text-slate-500">{full}</p>
+          <div className="mt-4 flex justify-center gap-4 text-sm font-medium">
+            <Link href={`/${slug}/randevularim`} className="text-brand underline">{t("b.myAppts")}</Link>
+            <a href={`/${slug}`} className="text-brand underline">{t("b.success.another")}</a>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  const titles = [t("b.service.title"), t("b.staff.title"), t("b.date.title"), t("b.details.title")];
+
+  return (
+    <main className="mx-auto max-w-2xl px-4 pb-32 pt-5">
+      <div className="mb-4">
+        <p className="text-sm font-medium text-slate-700" aria-live="polite">{t("b.steps", { n: step, total: STEPS })}</p>
+        <div className="mt-1.5 flex gap-1.5" aria-hidden>
+          {Array.from({ length: STEPS }, (_, i) => <span key={i} className={cn("h-1.5 flex-1 rounded-full", i < step ? "bg-brand" : "bg-slate-200")} />)}
+        </div>
+      </div>
+      <h2 ref={headingRef} tabIndex={-1} className="text-xl font-extrabold outline-none">{titles[step - 1]}</h2>
+      {step === 1 ? <p className="mt-1 text-sm text-slate-700">{t("b.service.sub")}</p> : null}
+      {banner ? <Alert className="mt-3">{banner}</Alert> : null}
+
+      {/* Adım 1 – hizmet */}
+      {step === 1 ? (
+        <ul className="mt-4 space-y-3">
+          {services.length === 0 ? <li><Alert tone="info">{t("b.service.empty")}</Alert></li> : null}
+          {services.map((s) => {
+            const sel = service?.id === s.id;
+            return (
+              <li key={s.id}>
+                <button
+                  type="button"
+                  aria-pressed={sel}
+                  onClick={() => { setService(s); if (staffId !== "any" && !s.staffIds.includes(staffId)) setStaffId("any"); setSlot(null); }}
+                  className={cn("flex w-full min-h-16 items-center justify-between gap-3 rounded-2xl border bg-white p-4 text-left shadow-sm transition", sel ? "border-brand ring-2 ring-brand" : "border-slate-200 hover:border-slate-300")}
+                >
+                  <span>
+                    <span className="block font-semibold">{svcName(s)}</span>
+                    <span className="mt-0.5 block text-sm text-slate-600">{t("common.minutes", { n: s.durationMin })}</span>
+                  </span>
+                  <span className="shrink-0 font-bold">{formatPrice(s.priceTry, locale)}</span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      ) : null}
+
+      {/* Adım 2 – personel */}
+      {step === 2 ? (
+        <ul className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <li>
+            <StaffCard selected={staffId === "any"} onClick={() => { setStaffId("any"); setSlot(null); }} title={t("b.staff.any")} sub={t("b.staff.anySub")}
+              avatar={<span aria-hidden className="grid h-14 w-14 place-items-center rounded-full bg-slate-200 text-xl text-slate-700">★</span>} />
+          </li>
+          {eligibleStaff.map((s) => (
+            <li key={s.id}>
+              <StaffCard selected={staffId === s.id} onClick={() => { setStaffId(s.id); setSlot(null); }} title={s.name} avatar={<Avatar name={s.name} photoUrl={s.photoUrl} />} />
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
+      {/* Adım 3 – gün + saat */}
+      {step === 3 ? (
+        <div className="mt-4">
+          <div role="group" aria-label={t("b.date.title")} className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-2 scrollbar-none">
+            {days.map((d) => {
+              const p = dayParts(d, locale);
+              const sel = d === date;
+              return (
+                <button
+                  key={d}
+                  ref={(el) => { dayRefs.current[d] = el; }}
+                  type="button"
+                  aria-pressed={sel}
+                  aria-label={p.long}
+                  onClick={() => { setDate(d); setSlot(null); }}
+                  className={cn("flex min-h-20 w-16 shrink-0 flex-col items-center justify-center rounded-2xl border text-sm", sel ? "border-brand bg-brand text-brand-fg" : "border-slate-200 bg-white hover:border-slate-300")}
+                >
+                  <span className="text-xs font-medium opacity-90">{d === today ? t("b.date.today") : p.weekday}</span>
+                  <span className="text-xl font-extrabold leading-tight">{p.day}</span>
+                  <span className="text-xs opacity-90">{p.month}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="mt-4" aria-live="polite" aria-busy={slots === null}>
+            {slots === null ? (
+              <p className="flex items-center gap-2 text-sm text-slate-700"><Spinner />{t("b.slot.loading")}</p>
+            ) : slots.length === 0 ? (
+              <Alert tone="info">{t("b.slot.none")}</Alert>
+            ) : (
+              (["morning", "noon", "evening"] as const).map((g) =>
+                groups[g].length ? (
+                  <section key={g} className="mb-4" aria-label={t(`b.slot.${g}`)}>
+                    <h3 className="mb-2 text-sm font-semibold text-slate-700">{t(`b.slot.${g}`)}</h3>
+                    <div className="grid grid-cols-4 gap-2">
+                      {groups[g].map((s) => (
+                        <button
+                          key={s.startsAt}
+                          type="button"
+                          aria-pressed={slot?.startsAt === s.startsAt}
+                          onClick={() => setSlot(s)}
+                          className={cn("min-h-11 rounded-xl border text-sm font-semibold", slot?.startsAt === s.startsAt ? "border-brand bg-brand text-brand-fg" : "border-slate-300 bg-white hover:border-slate-400")}
+                        >
+                          {s.time}
+                        </button>
+                      ))}
+                    </div>
+                  </section>
+                ) : null,
+              )
+            )}
+          </div>
+        </div>
+      ) : null}
+
+      {/* Adım 4 – bilgiler */}
+      {step === 4 && service && slot ? (
+        <form id="booking-form" className="mt-4 space-y-4" noValidate onSubmit={(e) => { e.preventDefault(); void submit(); }}>
+          <section aria-label={t("b.summary.title")} className="rounded-2xl bg-white p-4 text-sm shadow-sm ring-1 ring-slate-200">
+            <p className="font-semibold">{salonName}</p>
+            <dl className="mt-2 divide-y divide-slate-100">
+              <Row k={t("b.summary.service")} v={svcName(service)} />
+              <Row k={t("b.summary.staff")} v={staffLabel} />
+              <Row k={t("b.summary.when")} v={formatWhen(slot.startsAt, locale, timeZone)} />
+              <Row k={t("b.summary.total")} v={formatPrice(service.priceTry, locale)} />
+            </dl>
+          </section>
+          <Field label={t("b.details.name")} name="name" autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} error={errors.name} required />
+          <Field label={t("b.details.phone")} name="phone" type="tel" inputMode="tel" autoComplete="tel" value={phone} onChange={(e) => setPhone(e.target.value)} hint={t("b.details.phoneHint")} error={errors.phone} required />
+          <Field label={t("b.details.email")} optional={t("common.optional")} name="email" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} error={errors.email} />
+          <div>
+            <label className="flex items-start gap-3 text-sm">
+              <input type="checkbox" name="kvkk" checked={kvkk} onChange={(e) => setKvkk(e.target.checked)} aria-invalid={errors.kvkk ? true : undefined} aria-required className="mt-0.5 h-5 w-5 shrink-0 accent-[rgb(var(--brand))]" />
+              <span>
+                {t("b.details.kvkkPre")}
+                <Link href="/gizlilik" target="_blank" className="font-semibold text-brand underline">{t("b.details.kvkkLink")}</Link>
+                {t("b.details.kvkkPost")}
+              </span>
+            </label>
+            {errors.kvkk ? <p role="alert" className="mt-1 text-sm font-medium text-red-700">{errors.kvkk}</p> : null}
+          </div>
+          <label className="flex items-start gap-3 text-sm">
+            <input type="checkbox" name="marketing" checked={marketing} onChange={(e) => setMarketing(e.target.checked)} className="mt-0.5 h-5 w-5 shrink-0 accent-[rgb(var(--brand))]" />
+            <span>{t("b.details.marketing")}</span>
+          </label>
+        </form>
+      ) : null}
+
+      {/* Sabit alt çubuk */}
+      <div className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white/95 backdrop-blur">
+        <div className="mx-auto flex max-w-2xl items-center gap-3 px-4 pb-safe pt-3">
+          {step > 1 ? <Button variant="secondary" onClick={back} disabled={busy}>{t("common.back")}</Button> : null}
+          {step < STEPS ? (
+            <Button className="flex-1" onClick={next} disabled={!canNext}>{t("common.next")}</Button>
+          ) : (
+            <Button type="submit" form="booking-form" className="flex-1" disabled={busy}>
+              {busy ? <><Spinner />{t("b.confirming")}</> : t("b.confirm")}
+            </Button>
+          )}
+        </div>
+      </div>
+    </main>
+  );
+}
+
+function Row({ k, v }: { k: string; v: string }) {
+  return (
+    <div className="flex justify-between gap-4 px-4 py-2.5 first:pt-2.5">
+      <dt className="text-slate-600">{k}</dt>
+      <dd className="text-right font-semibold">{v}</dd>
+    </div>
+  );
+}
+
+function StaffCard({ selected, onClick, title, sub, avatar }: { selected: boolean; onClick: () => void; title: string; sub?: string; avatar: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      aria-pressed={selected}
+      onClick={onClick}
+      className={cn("flex h-full min-h-32 w-full flex-col items-center justify-center gap-2 rounded-2xl border bg-white p-3 text-center shadow-sm", selected ? "border-brand ring-2 ring-brand" : "border-slate-200 hover:border-slate-300")}
+    >
+      {avatar}
+      <span className="text-sm font-semibold leading-tight">{title}</span>
+      {sub ? <span className="text-xs text-slate-600">{sub}</span> : null}
+    </button>
+  );
+}
