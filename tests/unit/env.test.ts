@@ -20,7 +20,4 @@ describe("açılış ortam doğrulaması", () => {
     expect(l.warn).toHaveBeenCalledOnce();
     expect(exit).not.toHaveBeenCalled();
   });
-  it("ALLOW_REAL_SMS=true ile mock sağlayıcı tutarsız", () => {
-    expect(envProblems({ DATABASE_URL: "x", NEXTAUTH_SECRET: "a".repeat(20), ALLOW_REAL_SMS: "true", SMS_PROVIDER: "mock" }).map((x) => x.key)).toEqual(["SMS_PROVIDER"]);
-  });
 });

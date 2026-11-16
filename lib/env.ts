@@ -7,9 +7,6 @@ export function envProblems(env: Record<string, string | undefined> = process.en
   if (!env.DATABASE_URL) out.push({ key: "DATABASE_URL", message: "tanımlı değil" });
   if (!secret) out.push({ key: "NEXTAUTH_SECRET", message: "tanımlı değil (üretir: openssl rand -base64 32)" });
   else if (secret.length < 16) out.push({ key: "NEXTAUTH_SECRET", message: "en az 16 karakter olmalı (önerilen: openssl rand -base64 32)" });
-  if (env.ALLOW_REAL_SMS === "true" && (!env.SMS_PROVIDER || env.SMS_PROVIDER === "mock")) {
-    out.push({ key: "SMS_PROVIDER", message: "ALLOW_REAL_SMS=true iken mock dışında bir sağlayıcı seçilmeli" });
-  }
   return out;
 }
 
