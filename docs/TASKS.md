@@ -17,11 +17,15 @@ Biçim: `- [ ] T-NNN | sahip: claude|codex|- | açıklama`. Başlamadan sahip ya
 - [ ] T-008 | sahip: codex | GitHub Actions CI (lint, typecheck, test, Postgres servisli)
 
 ## M2 – Müşteri randevu akışı
-- [ ] T-010 | sahip: claude | `lib/time.ts` saat dilimi yardımcıları + testler
-- [ ] T-011 | sahip: claude | `lib/availability.ts` müsaitlik motoru + kapsamlı testler (gece yarısı, mola, izin, tampon, en erken/en geç)
-- [ ] T-012 | sahip: claude | `lib/booking.ts` randevu oluşturma (transaction + çakışma, "fark etmez" personel ataması)
+- [x] T-010 | sahip: claude | `lib/time.ts` saat dilimi yardımcıları + testler
+  - `lib/time.ts` Intl tabanlı; DST boşluğu ileri kaydırılır, çift saat ilk anına çözülür; 11 test.
+- [x] T-011 | sahip: claude | `lib/availability.ts` müsaitlik motoru + kapsamlı testler (gece yarısı, mola, izin, tampon, en erken/en geç)
+  - `lib/availability.ts` `computeAvailability` saf fonksiyon; endMin>1440 taşan vardiya, 27 test.
+- [x] T-012 | sahip: claude | `lib/booking.ts` randevu oluşturma (transaction + çakışma, "fark etmez" personel ataması)
+  - `lib/booking.ts` `createAppointment`/`cancelByToken`, SlotTakenError; 8 gerçek-DB testi (`booking.db.test.ts`).
 - [ ] T-013 | sahip: claude | Public API: salon bilgisi, hizmetler, personel, slotlar, randevu oluştur (Zod)
-- [ ] T-014 | sahip: claude | `lib/phone.ts` E.164 doğrulama (KKTC/TR/UK) + testler
+- [x] T-014 | sahip: claude | `lib/phone.ts` E.164 doğrulama (KKTC/TR/UK) + testler
+  - `lib/phone.ts` `normalizePhone`/`isKktcMobile`/`phoneSchema`; 6 test.
 - [ ] T-015 | sahip: claude | İptal token'ı + `/r/{token}` API (X saat kuralı)
 - [ ] T-016 | sahip: claude | OTP (hash'li, 5 dk, rate limit) + "Randevularım" API
 - [ ] T-017 | sahip: codex | `/[salonSlug]` 4 adımlı randevu arayüzü (mobil, klavye erişilebilir)
