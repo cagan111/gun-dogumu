@@ -1,7 +1,9 @@
+import { panelEn } from "./panel-en";
 import type { Dict } from "./tr";
 
 /** English dictionary — must contain every key of tr.ts (enforced by the type). Placeholder: {name}. */
 export const en: Dict = {
+  ...panelEn,
   "common.loading": "Loading…",
   "common.back": "Back",
   "common.next": "Continue",

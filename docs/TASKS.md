@@ -50,7 +50,8 @@ Biçim: `- [ ] T-NNN | sahip: claude|codex|- | açıklama`. Başlamadan sahip ya
   - `/giris`, `/giris/sihirli`, `/sifre-belirle`, `/kayit` 4 adımlı sihirbaz (saatler + hizmetler kayıt+girişten sonra panel API'siyle yazılır; hata olursa `/panel?onboarding=1`); `/panel` ve `/admin` yer tutucu.
 - [x] T-033 | sahip: claude | Panel API: randevu listele/ekle/taşı/durum (gelmedi), tenant korumalı
   - `app/api/panel/appointments` (GET liste, POST ekle, `[id]` GET/PATCH taşı, `[id]/status`); servis `lib/panel/appointments.ts`, panelden `bypassLeadRules` (çakışma/mesai asla atlanmaz), gelmedi sayacı atomik.
-- [ ] T-034 | sahip: claude | Takvim (günlük/haftalık, personel sütunları, sürükle-bırak)
+- [x] T-034 | sahip: claude | Takvim (günlük/haftalık, personel sütunları, sürükle-bırak)
+  - `app/panel` kabuğu (`_ui/shell`) + `_ui/calendar` gün/hafta, sürükle-bırak (pointer events, 409/422 geri alma), randevu sayfası, + Randevu; i18n `lib/i18n/panel-{tr,en}.ts`.
 - [x] T-035 | sahip: claude | Panel API: hizmet, personel, çalışma saati, izin CRUD
   - `/api/panel/{services,staff,time-off}` + `staff/[id]/working-hours` (PUT); yazma yalnız owner (`assertOwner`, servis katmanında), plan `maxStaff` → 402 `plan_limit`; servis `lib/panel/catalog.ts`, mola doğrulama `lib/hours.ts`.
 - [ ] T-036 | sahip: claude | Hizmet/personel/saat/izin ekranları

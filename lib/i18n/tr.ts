@@ -1,5 +1,8 @@
+import { panelTr } from "./panel-tr";
+
 /** Türkçe sözlük (kaynak dil). Anahtar eklerken en.ts de derlenmek için güncellenmelidir. Yer tutucu: {ad}. */
 export const tr = {
+  ...panelTr,
   // ortak
   "common.loading": "Yükleniyor…",
   "common.back": "Geri",
