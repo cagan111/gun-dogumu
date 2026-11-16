@@ -11,3 +11,4 @@
 - [ ] Gerçek `Dockerfile`'ı internet erişimli bir makinede bir kez `docker compose build` ile doğrula (sandbox'ta apt/Debian deposu engelliydi; yerelde yalnız `node:22-bookworm` tabanlı eşdeğeri derlendi). Sonra VPS'te `docs/RUNBOOK.md` adımlarını ve geri yükleme provasını uygula.
 - [ ] GitHub Actions workflow'u (`.github/workflows/ci.yml`) repo GitHub'a taşınınca ilk çalıştırmada yeşil mi bak.
 
+- [ ] Gerçek salon sahiplerinden izinli kısa yorumlar/alıntılar topla (ana sayfada kullanılacak; o zamana kadar alıntı yok).

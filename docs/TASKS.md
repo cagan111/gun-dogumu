@@ -137,3 +137,12 @@ Biçim: `- [ ] T-NNN | sahip: claude|codex|- | açıklama`. Başlamadan sahip ya
   - Rapor, müşteri ayrıntısı ve not yazma yalnız owner (`assertOwner`, servis katmanı); staff yalnız ≥3 karakterli ad/telefon araması yapar (≤8 sonuç, {id, ad, telefon}); DB testi.
 - [x] T-095 | sahip: claude | Mobil takvim cilası
   - Yatay kaydırma + yapışkan saat sütunu/personel başlığı (min sütun 120px), mobil üst çubuk tek satır (ad · SMS · ⋯ menü).
+
+## Codex'e verilen işler (2026-11-16, PR #1 yorum 6932651050 / 6932659192)
+- [ ] T-100 | sahip: codex | Görsel kimlik ve "insancıl" tasarım (yalnız arayüz)
+- [ ] T-101 | sahip: codex | Bağımsız kod incelemesi → docs/REVIEW.md
+- [ ] T-102 | sahip: codex | İngilizce arayüz kontrolü ve düzeltmesi
+- [ ] T-103 | sahip: codex | Lighthouse mobil > 85 (randevu sayfası)
+- [ ] T-104 | sahip: codex | iCal dışa aktarma (personel başına gizli token)
+- [ ] T-105 | sahip: codex | Google yorum isteği SMS'i (varsayılan kapalı)
+- [ ] T-106 | sahip: codex | Panel PWA + yeni randevu bildirimi
