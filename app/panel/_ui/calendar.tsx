@@ -373,7 +373,7 @@ const ACTIONS: Record<ApptStatus, { to: "confirmed" | "completed" | "no_show" | 
 function ApptSheet({ appt, staff, services, onClose, onChanged }: { appt: Appt | null; staff: Staff[]; services: Svc[]; onClose: () => void; onChanged: () => void }) {
   const { t, locale } = useI18n();
   const toast = useToast();
-  const { tenant } = usePanel();
+  const { tenant, role } = usePanel();
   const [busy, setBusy] = useState(false);
   const [moving, setMoving] = useState(false);
   const [confirmCancel, setConfirmCancel] = useState(false);
@@ -430,7 +430,7 @@ function ApptSheet({ appt, staff, services, onClose, onChanged }: { appt: Appt |
           </div>
           <dl className="grid grid-cols-[7rem_1fr] gap-x-3 gap-y-2 text-sm">
             <dt className="text-slate-600">{t("appt.customer")}</dt>
-            <dd className="font-semibold"><Link className="underline" href={`/panel/musteriler?id=${appt.customer.id}`}>{appt.customer.name}</Link></dd>
+            <dd className="font-semibold">{role === "owner" ? <Link className="underline" href={`/panel/musteriler?id=${appt.customer.id}`}>{appt.customer.name}</Link> : appt.customer.name}</dd>
             <dt className="text-slate-600">{t("appt.phone")}</dt>
             <dd><a className="font-semibold text-brand underline" href={`tel:${appt.customer.phone}`}>{appt.customer.phone}</a></dd>
             <dt className="text-slate-600">{t("appt.service")}</dt>

@@ -185,6 +185,23 @@ describe.skipIf(!HAS_DB)("panel API servisleri (gerçek DB)", () => {
     await expect(M.cat.deleteTimeOff(M.ownerB, to.id)).rejects.toMatchObject({ code: "not_found" });
   });
 
+  it("staff: rapor ve müşteri ayrıntısı/notu 403; arama yalnız ad/telefon, en az 3 karakter, ≤8 sonuç, minimal alan", async () => {
+    const forbidden = { code: "forbidden" };
+    await expect(M.rep.monthlyReport(M.staffA, M.date.slice(0, 7))).rejects.toMatchObject(forbidden);
+    const owner = await M.cust.searchCustomers(M.ownerA, M.cust.customerQuerySchema.parse({ pageSize: 1 }));
+    const cid = owner.customers[0]!.id;
+    await expect(M.cust.getCustomer(M.staffA, cid)).rejects.toMatchObject(forbidden);
+    await expect(M.cust.updateCustomerNotes(M.staffA, cid, { notes: "gizli" })).rejects.toMatchObject(forbidden);
+    await expect(M.cust.searchCustomers(M.staffA, M.cust.customerQuerySchema.parse({}))).rejects.toMatchObject({ code: "validation" });
+    await expect(M.cust.searchCustomers(M.staffA, M.cust.customerQuerySchema.parse({ q: "de" }))).rejects.toMatchObject({ code: "validation" });
+    const r = await M.cust.searchCustomers(M.staffA, M.cust.customerQuerySchema.parse({ q: "dEn", pageSize: 100 }));
+    expect(r.customers.length).toBeGreaterThan(0);
+    expect(r.customers.length).toBeLessThanOrEqual(8);
+    for (const c of r.customers) expect(Object.keys(c).sort()).toEqual(["id", "name", "phone"]);
+    // başka salonun müşterisi görünmez
+    expect((await M.cust.searchCustomers(M.staffA, M.cust.customerQuerySchema.parse({ q: "Başka Müşteri" }))).total).toBe(0);
+  });
+
   it("müşteri araması (ad/telefon, sayfalı) ve notlar: Başlangıç 402, Pro ok, tenant izolasyonu", async () => {
     const { prisma } = M.db;
     const r1 = await M.cust.searchCustomers(M.ownerA, M.cust.customerQuerySchema.parse({ q: "dEn" }));

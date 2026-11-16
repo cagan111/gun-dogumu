@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { NotFoundError } from "../booking";
-import { assertWritable, type PanelCtx } from "../panel-auth";
+import { ValidationError } from "../errors";
+import { assertOwner, assertWritable, type PanelCtx } from "../panel-auth";
 import { assertFeature, hasFeature } from "../plan";
 
 export const customerQuerySchema = z.object({
@@ -15,8 +16,25 @@ async function planOfTenant(ctx: PanelCtx): Promise<string> {
 }
 
 /** İsim veya telefon (rakam parçası) araması, sayfalı. */
+/**
+ * Yetki kararı (staff): müşteri listesi/ayrıntısı/notları ve raporlar YALNIZ owner'a açıktır.
+ * Personel yalnızca randevu oluştururken müşteriyi bulmak için ad/telefon araması yapabilir:
+ * en az 3 karakterlik sorgu zorunlu (listeleme/tarama yok), en çok 8 sonuç, sayfalama yok,
+ * ve yalnız {id, name, phone} döner (e-posta, gelmedi sayısı, izin, not yok).
+ */
+export const STAFF_SEARCH_MIN = 3;
+export const STAFF_SEARCH_MAX = 8;
+
 export async function searchCustomers(ctx: PanelCtx, q: z.output<typeof customerQuerySchema>) {
   const term = q.q ?? "";
+  if (ctx.user.role !== "owner") {
+    if (term.length < STAFF_SEARCH_MIN) throw new ValidationError(`En az ${STAFF_SEARCH_MIN} karakter girin`, "q");
+    const digits = term.replace(/[^\d+]/g, "");
+    const or: object[] = [{ name: { contains: term, mode: "insensitive" } }];
+    if (digits.length >= STAFF_SEARCH_MIN) or.push({ phone: { contains: digits } });
+    const rows = await ctx.db.customer.findMany({ where: { OR: or }, orderBy: [{ name: "asc" }, { id: "asc" }], take: STAFF_SEARCH_MAX, select: { id: true, name: true, phone: true } });
+    return { page: 1, pageSize: STAFF_SEARCH_MAX, total: rows.length, customers: rows };
+  }
   const digits = term.replace(/[^\d+]/g, "");
   const or: object[] = [];
   if (term) or.push({ name: { contains: term, mode: "insensitive" } });
@@ -33,6 +51,7 @@ export async function searchCustomers(ctx: PanelCtx, q: z.output<typeof customer
 }
 
 export async function getCustomer(ctx: PanelCtx, id: string, now: Date = new Date()) {
+  assertOwner(ctx);
   const c = await ctx.db.customer.findFirst({ where: { id } });
   if (!c) throw new NotFoundError("Müşteri");
   const include = { service: { select: { nameTr: true, nameEn: true } }, staff: { select: { name: true } } };
@@ -55,8 +74,9 @@ export async function getCustomer(ctx: PanelCtx, id: string, now: Date = new Dat
 
 export const notesSchema = z.object({ notes: z.string().trim().max(2000).nullable() });
 
-/** Müşteri notu: Pro+ (`customerNotes`). Başlangıç planında plan_feature (402). Owner ve staff yazabilir. */
+/** Müşteri notu: Pro+ (`customerNotes`). Başlangıç planında plan_feature (402). Yalnız owner. */
 export async function updateCustomerNotes(ctx: PanelCtx, id: string, input: z.output<typeof notesSchema>) {
+  assertOwner(ctx);
   assertWritable(ctx);
   assertFeature(await planOfTenant(ctx), "customerNotes");
   const r = await ctx.db.customer.updateMany({ where: { id }, data: { notes: input.notes && input.notes.length ? input.notes : null } });

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { NotFoundError } from "../booking";
 import { ValidationError } from "../errors";
-import type { PanelCtx } from "../panel-auth";
+import { assertOwner, type PanelCtx } from "../panel-auth";
 import { assertFeature } from "../plan";
 import { dayRangeUtc } from "../time";
 
@@ -16,6 +16,7 @@ export function monthRangeUtc(month: string, timeZone: string): { start: Date; e
 
 /** Pro+ raporu: durum dağılımı, ciro tahmini (tamamlanan + geçmiş onaylı), en çok hizmet/personel, gelmeme oranı. */
 export async function monthlyReport(ctx: PanelCtx, month: string, now: Date = new Date()) {
+  assertOwner(ctx);
   const t = await ctx.db.tenant.findUnique({ where: { id: ctx.tenantId }, select: { plan: true, timeZone: true } });
   if (!t) throw new NotFoundError("Salon");
   assertFeature(t.plan, "reports");
