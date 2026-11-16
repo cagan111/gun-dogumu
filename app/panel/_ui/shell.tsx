@@ -47,6 +47,7 @@ function Inner({ children }: { children: React.ReactNode }) {
   const path = usePathname();
   const t = useT();
   const { tenant, role } = usePanel();
+  const nav = role === "owner" ? NAV : NAV.slice(0, 1); // personel: yalnız takvim + randevu durumu
   const active = (href: string) => (href === "/panel" ? path === "/panel" : path.startsWith(href));
   return (
     <div className="min-h-dvh bg-slate-50 md:flex">
@@ -57,7 +58,7 @@ function Inner({ children }: { children: React.ReactNode }) {
           <p className="text-xs text-slate-600">{role === "owner" ? t("role.owner") : t("role.staff")}</p>
         </div>
         <nav aria-label={t("nav.label")} className="flex-1 space-y-1 p-3">
-          {NAV.map((n) => (
+          {nav.map((n) => (
             <Link key={n.href} href={n.href} aria-current={active(n.href) ? "page" : undefined} className={cn("flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold", active(n.href) ? "bg-brand text-brand-fg" : "text-slate-700 hover:bg-slate-100")}>
               <Icon d={n.icon} />{t(n.key)}
             </Link>
@@ -80,8 +81,8 @@ function Inner({ children }: { children: React.ReactNode }) {
         {tenant.status === "suspended" ? <p role="alert" className="bg-red-700 px-4 py-2 text-sm font-medium text-white">{t("sub.suspendedNote")}</p> : null}
         <main id="main" className="flex-1 px-3 py-4 pb-28 md:px-6 md:pb-8">{children}</main>
       </div>
-      <nav aria-label={t("nav.label")} className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-6 border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)] md:hidden">
-        {NAV.map((n) => (
+      <nav aria-label={t("nav.label")} style={{ gridTemplateColumns: `repeat(${nav.length}, minmax(0, 1fr))` }} className="fixed inset-x-0 bottom-0 z-40 grid border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)] md:hidden">
+        {nav.map((n) => (
           <Link key={n.href} href={n.href} aria-current={active(n.href) ? "page" : undefined} className={cn("flex min-h-14 flex-col items-center justify-center gap-0.5 px-0.5 text-[11px] font-semibold", active(n.href) ? "text-brand" : "text-slate-600")}>
             <Icon d={n.icon} />
             <span className="max-w-full truncate">{t(n.key)}</span>

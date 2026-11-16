@@ -62,10 +62,12 @@ Biçim: `- [ ] T-NNN | sahip: claude|codex|- | açıklama`. Başlamadan sahip ya
   - `/panel/musteriler` (`_ui/customers`): arama, sayfalama, ayrıntı + notlar (plan_feature → "Pro paketinde"), `?id=` ile açılır.
 - [x] T-039 | sahip: claude | Ayarlar API (SMS başlığı, hatırlatma zamanları, iptal kuralı, görünüm)
   - `/api/panel/settings` (GET/PATCH owner), `/api/panel/sms/{requests,balance}`; bakiye kanonik `lib/ledger.ts` (tenant satırı FOR UPDATE; eşzamanlı düşüm testi); `lib/panel/settings.ts`.
-- [ ] T-040 | sahip: claude | Ayarlar ekranı + SMS bakiye kartı + paket talep butonu
+- [x] T-040 | sahip: claude | Ayarlar ekranı + SMS bakiye kartı + paket talep butonu
+  - `/panel/ayarlar` (`_ui/settings`): public link+kopyala, SMS kartı (bakiye, 500/1000/5000 talep, 409 yinelenen), Salon+ kampanya (canlı segment sayacı `smsSegments`), ayar formu.
 - [x] T-041 | sahip: claude | Rapor API (randevu sayısı, ciro tahmini, en çok hizmet/personel, gelmeme oranı)
   - `GET /api/panel/reports?month=YYYY-MM` (Pro+); `lib/panel/reports.ts` (salon saat dilimiyle ay, ciro = completed + geçmiş confirmed).
-- [ ] T-042 | sahip: claude | Rapor ekranı
+- [x] T-042 | sahip: claude | Rapor ekranı
+  - `/panel/raporlar` (`_ui/reports`): ay seçici, durum/hizmet/personel CSS çubukları, ciro, gelmeme oranı; plan_feature notu.
 
 ## M4 – Bildirimler
 - [x] T-050 | sahip: claude | `lib/messaging` MessageProvider + Mock + Netgsm + İletiMerkezi + GenericHttp + WhatsAppCloud
