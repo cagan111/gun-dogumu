@@ -23,19 +23,24 @@ Biçim: `- [ ] T-NNN | sahip: claude|codex|- | açıklama`. Başlamadan sahip ya
   - `lib/availability.ts` `computeAvailability` saf fonksiyon; endMin>1440 taşan vardiya, 27 test.
 - [x] T-012 | sahip: claude | `lib/booking.ts` randevu oluşturma (transaction + çakışma, "fark etmez" personel ataması)
   - `lib/booking.ts` `createAppointment`/`cancelByToken`, SlotTakenError; 8 gerçek-DB testi (`booking.db.test.ts`).
-- [ ] T-013 | sahip: claude | Public API: salon bilgisi, hizmetler, personel, slotlar, randevu oluştur (Zod)
+- [x] T-013 | sahip: claude | Public API: salon bilgisi, hizmetler, personel, slotlar, randevu oluştur (Zod)
+  - `app/api/public/[slug]/{,services,staff,slots,appointments}`; mantık `lib/public.ts`, askıda 423, POST IP başına 10/saat.
 - [x] T-014 | sahip: claude | `lib/phone.ts` E.164 doğrulama (KKTC/TR/UK) + testler
   - `lib/phone.ts` `normalizePhone`/`isKktcMobile`/`phoneSchema`; 6 test.
-- [ ] T-015 | sahip: claude | İptal token'ı + `/r/{token}` API (X saat kuralı)
-- [ ] T-016 | sahip: claude | OTP (hash'li, 5 dk, rate limit) + "Randevularım" API
+- [x] T-015 | sahip: claude | İptal token'ı + `/r/{token}` API (X saat kuralı)
+  - `GET /api/r/[token]`, `POST /api/r/[token]/cancel` (`lib/cancel.ts`).
+- [x] T-016 | sahip: claude | OTP (hash'li, 5 dk, rate limit) + "Randevularım" API
+  - `lib/otp.ts` + `otp/request`, `otp/verify`, `my-appointments`; imzalı çerez 30 dk; `sendOtp()` yalnız loglar (T-050 TODO).
 - [ ] T-017 | sahip: codex | `/[salonSlug]` 4 adımlı randevu arayüzü (mobil, klavye erişilebilir)
 - [ ] T-018 | sahip: codex | Onay ekranı, `/r/{token}` iptal sayfası, Randevularım sayfası
 - [ ] T-019 | sahip: codex | Aydınlatma metni linki + işaretsiz pazarlama izni kutusu
 - [ ] T-020 | sahip: claude | i18n altyapısı (tr/en sözlükleri, dil seçimi)
 
 ## M3 – Salon paneli
-- [ ] T-030 | sahip: claude | Auth.js: e-posta+şifre, sihirli bağlantı, rol/tenant oturumu, rate limit
-- [ ] T-031 | sahip: claude | Kayıt + salon oluşturma API'si (slug benzersizliği, 14 gün deneme)
+- [x] T-030 | sahip: claude | Auth.js: e-posta+şifre, sihirli bağlantı, rol/tenant oturumu, rate limit
+  - `auth.ts` (Credentials + magic-link sağlayıcısı, JWT userId/role/tenantId), `lib/session.ts`, `middleware.ts`, `LoginToken` migration'ı; sihirli bağlantı e-posta yerine loga.
+- [x] T-031 | sahip: claude | Kayıt + salon oluşturma API'si (slug benzersizliği, 14 gün deneme)
+  - `POST /api/auth/signup`, `GET /api/auth/slug-check`; tenant+owner+SMS kredisi tek transaction'da, çakışmada 409.
 - [ ] T-032 | sahip: codex | Kayıt sihirbazı arayüzü (ad, şehir, slug, saatler, ilk hizmetler)
 - [ ] T-033 | sahip: claude | Panel API: randevu listele/ekle/taşı/durum (gelmedi), tenant korumalı
 - [ ] T-034 | sahip: codex | Takvim (günlük/haftalık, personel sütunları, sürükle-bırak)
@@ -63,7 +68,8 @@ Biçim: `- [ ] T-NNN | sahip: claude|codex|- | açıklama`. Başlamadan sahip ya
 - [ ] T-062 | sahip: claude | Abonelik durum makinesi (trial → active → past_due 7 gün → suspended) + uyarı işleri
 - [ ] T-063 | sahip: claude | Gelir özeti (MRR, aktif salon, satılan SMS)
 - [ ] T-064 | sahip: claude | `PaymentProvider` arayüzü + `manual`
-- [ ] T-065 | sahip: claude | İlk açılışta SUPERADMIN_EMAIL hesabı + şifre bağlantısı loga
+- [x] T-065 | sahip: claude | İlk açılışta SUPERADMIN_EMAIL hesabı + şifre bağlantısı loga
+  - `lib/bootstrap.ts` `ensureSuperadmin()` (`instrumentation.ts`'ten), `POST /api/auth/set-password`; bağlantı pino warn ile loga.
 
 ## M6 – Pazarlama ve SEO
 - [ ] T-070 | sahip: codex | `/` ana sayfa TR/EN (özellikler, fiyatlar, SSS, CTA, WhatsApp)
@@ -71,7 +77,8 @@ Biçim: `- [ ] T-NNN | sahip: claude|codex|- | açıklama`. Başlamadan sahip ya
 - [ ] T-072 | sahip: codex | Gizlilik + kullanım koşulları şablon sayfaları
 
 ## Güvenlik ve kalite
-- [ ] T-080 | sahip: claude | Rate limit yardımcısı (bellek/DB) + güvenlik başlıkları + CSRF
+- [x] T-080 | sahip: claude | Rate limit yardımcısı (bellek/DB) + güvenlik başlıkları + CSRF
+  - `lib/ratelimit.ts` (arayüz + bellek uygulaması, `setRateLimiter`), `lib/http.ts` (hata→HTTP, Zod 400, IP); güvenlik başlıkları zaten `next.config.mjs`'te; CSRF: oturum çerezi SameSite=Lax + JSON API, ayrı token yok.
 - [ ] T-081 | sahip: codex | e2e tenant izolasyon testi (başka salon ID → 404)
 - [ ] T-082 | sahip: codex | e2e: kayıt → hizmet → randevu → hatırlatma kuyrukta → iptal
 - [ ] T-083 | sahip: codex | Günlük pg_dump yedeği (14 gün) + RUNBOOK geri yükleme

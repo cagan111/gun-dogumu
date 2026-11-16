@@ -67,6 +67,10 @@ enum TimeOffKind {
   holiday
   other
 }
+enum LoginTokenPurpose {
+  magic_link
+  set_password
+}
 enum RequestStatus {
   open
   fulfilled
@@ -129,6 +133,7 @@ model User {
   tenantId     String?
   tenant       Tenant?   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   staff        Staff?
+  loginTokens  LoginToken[]
   createdAt    DateTime  @default(now())
   lastLoginAt  DateTime?
 
@@ -356,4 +361,18 @@ model AuditLog {
   createdAt DateTime @default(now())
 
   @@index([tenantId, createdAt])
+}
+
+/// Tek kullanımlık giriş / şifre belirleme bağlantısı. Ham token saklanmaz, yalnız SHA-256 özeti.
+model LoginToken {
+  id        String            @id @default(cuid())
+  userId    String
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  purpose   LoginTokenPurpose
+  tokenHash String            @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime          @default(now())
+
+  @@index([userId, purpose])
 }

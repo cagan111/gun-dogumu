@@ -17,8 +17,10 @@
   },
   "dependencies": {
     "@prisma/client": "6.2.1",
+    "bcryptjs": "2.4.3",
     "libphonenumber-js": "1.11.18",
     "next": "15.1.6",
+    "next-auth": "5.0.0-beta.25",
     "pino": "9.6.0",
     "react": "19.0.0",
     "react-dom": "19.0.0",
@@ -26,6 +28,7 @@
   },
   "devDependencies": {
     "@eslint/js": "9.18.0",
+    "@types/bcryptjs": "2.4.6",
     "@types/node": "22.10.7",
     "@types/react": "19.0.7",
     "@types/react-dom": "19.0.3",
@@ -39,5 +42,12 @@
     "typescript-eslint": "8.20.0",
     "vitest": "2.1.8"
   },
-  "pnpm": { "onlyBuiltDependencies": ["@prisma/client", "@prisma/engines", "prisma", "esbuild"] }
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@prisma/client",
+      "@prisma/engines",
+      "prisma",
+      "esbuild"
+    ]
+  }
 }
