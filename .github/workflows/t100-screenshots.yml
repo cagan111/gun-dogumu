@@ -57,18 +57,37 @@ jobs:
           if ! rg -q 'process.env.DESKTOP' tests/e2e/booking.cjs; then
             sed -i 's/viewport: { width: 375, height: 812 }/viewport: process.env.DESKTOP === "1" ? { width: 1280, height: 800 } : { width: 375, height: 812 }/' tests/e2e/booking.cjs
           fi
+          node <<'NODE'
+          const fs = require("node:fs");
+          for (const path of ["tests/e2e/booking.cjs", "tests/e2e/panel.cjs"]) {
+            let script = fs.readFileSync(path, "utf8");
+            script = script.replace(/^(\s*)await (\w+)\.goto\(/gm, (_, indent, page) => (
+              indent + "await " + page + '.waitForLoadState("networkidle");\n' + indent + "await " + page + ".goto("
+            ));
+            const pages = { octx: "page", dctx: "dp", actx: "ap" };
+            script = script.replace(/^(\s*)await (octx|dctx|actx)\.close\(/gm, (_, indent, context) => (
+              indent + "await " + pages[context] + '.waitForLoadState("networkidle");\n' + indent + "await " + context + ".close("
+            ));
+            if (path.endsWith("booking.cjs")) {
+              script = script.replace('path: shot("booking-success")', 'path: shot("booking-success"), mask: [page.locator(\'[data-testid="cancel-link"] + p\')]');
+            }
+            fs.writeFileSync(path, script);
+          }
+          NODE
           pnpm start > "$RUNNER_TEMP/app.log" 2>&1 &
           for attempt in $(seq 1 30); do
             if curl --fail --silent http://localhost:3000/api/health; then break; fi
             sleep 1
           done
           pnpm db:seed
-          SHOT_DIR="$SHOT_DIR/375" node tests/e2e/booking.cjs
+          result=0
+          SHOT_DIR="$SHOT_DIR/375" node tests/e2e/booking.cjs || result=1
           pnpm db:seed
-          DESKTOP=1 SHOT_DIR="$SHOT_DIR/1280" node tests/e2e/booking.cjs
+          DESKTOP=1 SHOT_DIR="$SHOT_DIR/1280" node tests/e2e/booking.cjs || result=1
           pnpm db:seed
-          node tests/e2e/panel.cjs
-          node tests/e2e/isolation.cjs
+          node tests/e2e/panel.cjs || result=1
+          node tests/e2e/isolation.cjs || result=1
+          exit "$result"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
