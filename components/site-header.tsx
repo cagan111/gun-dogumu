@@ -7,11 +7,11 @@ import { getT } from "@/lib/i18n";
 export async function SiteHeader() {
   const { t } = await getT();
   return (
-    <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/90 backdrop-blur">
+    <header className="sticky top-0 z-30 border-b border-line bg-paper/95 backdrop-blur">
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-3 px-4">
         <Link href="/" className="flex items-center gap-2 font-bold text-slate-900">
           <span aria-hidden className="grid h-8 w-8 place-items-center rounded-lg bg-brand text-sm text-brand-fg">K</span>
-          <span className="hidden min-[400px]:inline">{brand.name}</span>
+          <span className="text-sm sm:text-base">{brand.name}</span>
         </Link>
         <nav aria-label="Ana" className="hidden items-center gap-6 text-sm font-medium text-slate-700 md:flex">
           <a href="/#ozellikler" className="hover:text-slate-950">{t("nav.features")}</a>
@@ -31,7 +31,7 @@ export async function SiteHeader() {
 export async function SiteFooter() {
   const { t } = await getT();
   return (
-    <footer className="border-t border-slate-200 bg-slate-50">
+    <footer className="border-t border-line bg-paper">
       <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-8 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
         <p>{t("home.footer", { year: new Date().getFullYear() })}</p>
         <nav aria-label="Alt" className="flex gap-5">

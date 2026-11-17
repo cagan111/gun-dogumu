@@ -19,10 +19,10 @@ const hue = (s: string) => [...s].reduce((a, c) => (a * 31 + c.charCodeAt(0)) % 
 
 function Avatar({ name, photoUrl, size = "h-14 w-14" }: { name: string; photoUrl?: string | null; size?: string }) {
   if (photoUrl) {
-    return <img src={photoUrl} alt="" className={cn(size, "shrink-0 rounded-full object-cover")} />;
+    return <img src={photoUrl} alt="" className={cn(size, "shrink-0 staff-portrait text-clay object-cover")} />;
   }
   return (
-    <span aria-hidden className={cn(size, "grid shrink-0 place-items-center rounded-full text-base font-bold text-white")} style={{ backgroundColor: `hsl(${hue(name)} 45% 36%)` }}>
+    <span aria-hidden className={cn(size, "grid shrink-0 place-items-center staff-portrait text-base font-bold")} style={{ backgroundColor: `hsl(${hue(name)} 38% 88%)`, color: `hsl(${hue(name)} 48% 28%)` }}>
       {initials(name)}
     </span>
   );
@@ -158,11 +158,15 @@ export function BookingFlow({ slug, salonName, timeZone, today, maxAdvanceDays, 
     const full = typeof window !== "undefined" ? `${window.location.origin}${done.cancelUrl}` : done.cancelUrl;
     return (
       <main className="mx-auto max-w-2xl px-4 py-8">
-        <div className="rounded-2xl bg-white p-6 text-center shadow-sm ring-1 ring-slate-200">
-          <span aria-hidden className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-emerald-100 text-3xl text-emerald-700">✓</span>
-          <h2 ref={headingRef} tabIndex={-1} className="mt-4 text-2xl font-extrabold outline-none">{t("b.success.title")}</h2>
+        <div className="rounded-t-[3rem] rounded-b-xl border border-line bg-white p-6 text-center">
+          <svg aria-hidden viewBox="0 0 88 72" className="mx-auto h-[72px] w-[88px]" fill="none">
+            <path d="M18 37C18 22 28 11 44 11c14 0 26 10 26 25S61 62 44 62 18 52 18 37Z" fill="#e7ecde" />
+            <path d="m33 37 8 8 15-17" stroke="#465635" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="m9 22-4-4m6 17-6 1m66-17 5-5m1 20 6-2M21 8l-2-4" stroke="#9b4835" strokeWidth="2" strokeLinecap="round" />
+          </svg>
+          <h2 ref={headingRef} tabIndex={-1} className="display-heading mt-3 text-3xl font-semibold outline-none">{t("b.success.title")}</h2>
           <p className="mt-1 text-slate-700">{t("b.success.sub", { name: name.trim().split(/\s+/)[0] ?? "" })}</p>
-          <dl className="mt-5 divide-y divide-slate-100 rounded-xl bg-slate-50 text-left text-sm">
+          <dl className="mt-5 divide-y divide-line rounded-lg bg-paper text-left text-sm">
             <Row k={t("b.summary.service")} v={svcName(service)} />
             <Row k={t("b.summary.staff")} v={staffLabel} />
             <Row k={t("b.summary.when")} v={formatWhen(slot.startsAt, locale, timeZone)} />
@@ -190,7 +194,7 @@ export function BookingFlow({ slug, salonName, timeZone, today, maxAdvanceDays, 
           {Array.from({ length: STEPS }, (_, i) => <span key={i} className={cn("h-1.5 flex-1 rounded-full", i < step ? "bg-brand" : "bg-slate-200")} />)}
         </div>
       </div>
-      <h2 ref={headingRef} tabIndex={-1} className="text-xl font-extrabold outline-none">{titles[step - 1]}</h2>
+      <h2 ref={headingRef} tabIndex={-1} className="display-heading text-2xl font-semibold outline-none">{titles[step - 1]}</h2>
       {step === 1 ? <p className="mt-1 text-sm text-slate-700">{t("b.service.sub")}</p> : null}
       {banner ? <Alert className="mt-3">{banner}</Alert> : null}
 
@@ -206,7 +210,7 @@ export function BookingFlow({ slug, salonName, timeZone, today, maxAdvanceDays, 
                   type="button"
                   aria-pressed={sel}
                   onClick={() => { setService(s); if (staffId !== "any" && !s.staffIds.includes(staffId)) setStaffId("any"); setSlot(null); }}
-                  className={cn("flex w-full min-h-16 items-center justify-between gap-3 rounded-2xl border bg-white p-4 text-left shadow-sm transition", sel ? "border-brand ring-2 ring-brand" : "border-slate-200 hover:border-slate-300")}
+                  className={cn("booking-option flex w-full min-h-16 items-center justify-between gap-3 rounded-lg border bg-white p-4 text-left transition", sel ? "border-brand" : "border-line hover:border-olive")}
                 >
                   <span>
                     <span className="block font-semibold">{svcName(s)}</span>
@@ -225,7 +229,7 @@ export function BookingFlow({ slug, salonName, timeZone, today, maxAdvanceDays, 
         <ul className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
           <li>
             <StaffCard selected={staffId === "any"} onClick={() => { setStaffId("any"); setSlot(null); }} title={t("b.staff.any")} sub={t("b.staff.anySub")}
-              avatar={<span aria-hidden className="grid h-14 w-14 place-items-center rounded-full bg-slate-200 text-xl text-slate-700">★</span>} />
+              avatar={<span aria-hidden className="grid h-14 w-14 place-items-center staff-portrait bg-sand text-xl text-olive">★</span>} />
           </li>
           {eligibleStaff.map((s) => (
             <li key={s.id}>
@@ -250,7 +254,7 @@ export function BookingFlow({ slug, salonName, timeZone, today, maxAdvanceDays, 
                   aria-pressed={sel}
                   aria-label={p.long}
                   onClick={() => { setDate(d); setSlot(null); }}
-                  className={cn("flex min-h-20 w-16 shrink-0 flex-col items-center justify-center rounded-2xl border text-sm", sel ? "border-brand bg-brand text-brand-fg" : "border-slate-200 bg-white hover:border-slate-300")}
+                  className={cn("flex min-h-20 w-16 shrink-0 flex-col items-center justify-center booking-option rounded-xl border text-sm", sel ? "border-brand" : "border-line bg-white hover:border-olive")}
                 >
                   <span className="text-xs font-medium opacity-90">{d === today ? t("b.date.today") : p.weekday}</span>
                   <span className="text-xl font-extrabold leading-tight">{p.day}</span>
@@ -262,14 +266,14 @@ export function BookingFlow({ slug, salonName, timeZone, today, maxAdvanceDays, 
 
           <div className="mt-4" aria-live="polite" aria-busy={slots === null}>
             {slots === null ? (
-              <p className="flex items-center gap-2 text-sm text-slate-700"><Spinner />{t("b.slot.loading")}</p>
+              <p className="flex items-center gap-2 rounded-lg border border-line bg-white p-4 text-sm text-slate-700"><Spinner />{t("b.slot.loading")}</p>
             ) : slots.length === 0 ? (
               <Alert tone="info">{t("b.slot.none")}</Alert>
             ) : (
               (["morning", "noon", "evening"] as const).map((g) =>
                 groups[g].length ? (
                   <section key={g} className="mb-4" aria-label={t(`b.slot.${g}`)}>
-                    <h3 className="mb-2 text-sm font-semibold text-slate-700">{t(`b.slot.${g}`)}</h3>
+                    <h3 className="mb-2 border-b border-line pb-2 text-sm font-bold text-olive">{t(`b.slot.${g}`)}</h3>
                     <div className="grid grid-cols-4 gap-2">
                       {groups[g].map((s) => (
                         <button
@@ -277,7 +281,7 @@ export function BookingFlow({ slug, salonName, timeZone, today, maxAdvanceDays, 
                           type="button"
                           aria-pressed={slot?.startsAt === s.startsAt}
                           onClick={() => setSlot(s)}
-                          className={cn("min-h-11 rounded-xl border text-sm font-semibold", slot?.startsAt === s.startsAt ? "border-brand bg-brand text-brand-fg" : "border-slate-300 bg-white hover:border-slate-400")}
+                          className={cn("booking-option min-h-11 rounded-lg border text-sm font-semibold", slot?.startsAt === s.startsAt ? "border-brand" : "border-line bg-white hover:border-olive")}
                         >
                           {s.time}
                         </button>
@@ -294,7 +298,7 @@ export function BookingFlow({ slug, salonName, timeZone, today, maxAdvanceDays, 
       {/* Adım 4 – bilgiler */}
       {step === 4 && service && slot ? (
         <form id="booking-form" className="mt-4 space-y-4" noValidate onSubmit={(e) => { e.preventDefault(); void submit(); }}>
-          <section aria-label={t("b.summary.title")} className="rounded-2xl bg-white p-4 text-sm shadow-sm ring-1 ring-slate-200">
+          <section aria-label={t("b.summary.title")} className="rounded-lg border border-line bg-white p-4 text-sm">
             <p className="font-semibold">{salonName}</p>
             <dl className="mt-2 divide-y divide-slate-100">
               <Row k={t("b.summary.service")} v={svcName(service)} />
@@ -325,7 +329,7 @@ export function BookingFlow({ slug, salonName, timeZone, today, maxAdvanceDays, 
       ) : null}
 
       {/* Sabit alt çubuk */}
-      <div className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white/95 backdrop-blur">
+      <div className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-paper/95 backdrop-blur">
         <div className="mx-auto flex max-w-2xl items-center gap-3 px-4 pb-safe pt-3">
           {step > 1 ? <Button variant="secondary" onClick={back} disabled={busy}>{t("common.back")}</Button> : null}
           {step < STEPS ? (
@@ -356,7 +360,7 @@ function StaffCard({ selected, onClick, title, sub, avatar }: { selected: boolea
       type="button"
       aria-pressed={selected}
       onClick={onClick}
-      className={cn("flex h-full min-h-32 w-full flex-col items-center justify-center gap-2 rounded-2xl border bg-white p-3 text-center shadow-sm", selected ? "border-brand ring-2 ring-brand" : "border-slate-200 hover:border-slate-300")}
+      className={cn("booking-option flex h-full min-h-32 w-full flex-col items-center justify-center gap-3 rounded-xl border bg-white p-3 text-center", selected ? "border-brand" : "border-line hover:border-olive")}
     >
       {avatar}
       <span className="text-sm font-semibold leading-tight">{title}</span>

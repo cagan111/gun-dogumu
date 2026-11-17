@@ -213,7 +213,7 @@ export function CalendarView() {
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1">
-        <h2 className="text-xl font-extrabold" aria-live="polite">{title}</h2>
+        <h2 className="display-heading text-2xl font-semibold" aria-live="polite">{title}</h2>
         <span className="text-sm text-slate-600">{t("cal.count", { n: count })}</span>
         {view === "week" && staff.length ? (
           <SelectField label={t("cal.staff")} value={weekStaffId} onChange={(e) => setWeekStaffId(e.target.value)} className="ml-auto w-44">
@@ -228,12 +228,23 @@ export function CalendarView() {
         <Alert tone="info" className="mt-3">{t("cal.noStaff")} <Link href="/panel/personel" className="font-semibold underline">{t("nav.staff")}</Link></Alert>
       ) : null}
 
+      {base.loading || apptsQ.loading ? (
+        <p role="status" className="mt-3 rounded-lg border border-line bg-white px-4 py-3 text-sm text-slate-700">{t("cal.loading")}</p>
+      ) : cols.length > 0 && visible.length === 0 && !base.error && !apptsQ.error ? (
+        <div className="mt-3 flex items-center gap-3 rounded-lg border border-line bg-paper p-3">
+          <svg aria-hidden viewBox="0 0 48 48" className="h-12 w-12 shrink-0 text-olive" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M9 12h30v28H9zM9 20h30M17 8v8m14-8v8m-9 8 2 4 4 1-3 3v4l-3-2-4 2 1-4-3-3 4-1z" />
+          </svg>
+          <p className="text-sm text-slate-700">{t(view === "day" ? "cal.emptyDay" : "cal.emptyWeek")}</p>
+        </div>
+      ) : null}
+
       {cols.length ? (
-        <div className={cn("mt-3 max-h-[calc(100dvh-16rem)] min-h-80 overflow-auto rounded-2xl border border-slate-200 bg-white md:max-h-[calc(100dvh-15rem)]", apptsQ.loading && "opacity-70")} data-testid="cal-scroll" tabIndex={0} aria-label={t("cal.grid")}>
+        <div className={cn("mt-3 max-h-[calc(100dvh-16rem)] min-h-80 overflow-auto rounded-lg border border-line bg-white md:max-h-[calc(100dvh-15rem)]", apptsQ.loading && "opacity-70")} data-testid="cal-scroll" tabIndex={0} aria-label={t("cal.grid")}>
           <div style={{ display: "grid", gridTemplateColumns: `${GUTTER}px repeat(${cols.length}, minmax(${MIN_COL}px, 1fr))` }}>
             <div className="sticky left-0 top-0 z-30 border-b border-r border-slate-200 bg-white" />
             {cols.map((c) => (
-              <div key={c.key} className="sticky top-0 z-20 border-b border-r border-slate-200 bg-white px-2 py-2 text-center">
+              <div key={c.key} className="sticky top-0 z-20 border-b border-r border-line bg-paper px-2 py-2 text-center">
                 <div className="flex items-center justify-center gap-1.5 text-sm font-bold">
                   <span aria-hidden className="h-2.5 w-2.5 rounded-full" style={{ background: c.staff.color }} />
                   <span className={cn("min-w-0 truncate", view === "week" && isTodayCol(c) && "text-brand")}>{c.label}</span>
@@ -323,6 +334,8 @@ function Block({ p, color, gridStart, locale, ghost, onClick, ...ptr }: {
   const { t } = useI18n();
   const { a } = p;
   const cancelled = a.status === "cancelled_by_customer" || a.status === "cancelled_by_salon";
+  const statusMark = cancelled ? "—" : { pending: "◷", confirmed: "•", completed: "✓", no_show: "×", cancelled_by_customer: "—", cancelled_by_salon: "—" }[a.status];
+  const service = svcName(a.service, locale);
   const w = 100 / p.lanes;
   const h = Math.max(p.dur * PPM - 2, 24);
   const label = `${fmtMin(p.start)}–${fmtMin(p.start + p.dur)} ${a.customer.name}, ${svcName(a.service, locale)}, ${a.staff.name}, ${t(`st.${a.status}` as Key)}`;
@@ -337,9 +350,8 @@ function Block({ p, color, gridStart, locale, ghost, onClick, ...ptr }: {
       className={cn(
         "absolute z-10 overflow-hidden rounded-md border border-l-4 px-1.5 py-0.5 text-left text-xs leading-tight text-slate-900 shadow-sm transition-opacity md:cursor-grab md:active:cursor-grabbing",
         a.status === "pending" && "border-dashed",
-        a.status === "completed" && "opacity-70",
         a.status === "no_show" && "border-red-500 text-red-900",
-        cancelled && "opacity-45 line-through",
+        cancelled && "line-through",
         ghost && "opacity-30",
       )}
       style={{
@@ -350,11 +362,12 @@ function Block({ p, color, gridStart, locale, ghost, onClick, ...ptr }: {
         touchAction: "manipulation",
       }}
     >
-      <span className="block truncate font-bold">
-        {a.status === "completed" ? "✓ " : a.status === "no_show" ? "✗ " : a.status === "pending" ? "? " : ""}{fmtMin(p.start)} {a.customer.name}
+      <span className="flex min-w-0 items-center gap-1 font-bold">
+        <span aria-hidden className="shrink-0">{statusMark}</span>
+        <span className="truncate">{h >= 34 ? service : `${a.customer.name} · ${service}`}</span>
       </span>
-      {h >= 40 ? <span className="block truncate text-slate-700">{svcName(a.service, locale)}</span> : null}
-      {h >= 58 ? <span className="block truncate text-[11px] font-medium text-slate-600">{t(`st.${a.status}` as Key)}</span> : null}
+      {h >= 34 ? <span className="block truncate text-slate-700">{a.customer.name}</span> : null}
+      {h >= 52 ? <span className="block truncate text-[11px] font-medium tabular-nums text-slate-600">{fmtMin(p.start)} · {t(`st.${a.status}` as Key)}</span> : null}
     </button>
   );
 }

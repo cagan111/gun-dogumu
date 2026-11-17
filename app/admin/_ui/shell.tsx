@@ -21,11 +21,11 @@ export function AdminShell({ email, children }: { email: string; children: React
   const active = (h: string) => (h === "/admin" ? path === "/admin" || path.startsWith("/admin/salon") : path.startsWith(h));
   return (
     <ToastProvider>
-      <div className="min-h-dvh bg-slate-50">
+      <div className="min-h-dvh bg-paper">
         <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:left-2 focus:top-2 focus:z-[80] focus:rounded-lg focus:bg-white focus:px-3 focus:py-2">{t("common.skipToContent")}</a>
-        <header className="sticky top-0 z-30 border-b border-slate-200 bg-white">
+        <header className="sticky top-0 z-30 border-b border-line bg-white">
           <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-4 gap-y-1 px-4 py-2">
-            <h1 className="text-base font-extrabold">{t("admin.title")}</h1>
+            <h1 className="display-heading text-xl font-semibold text-sea">{t("admin.title")}</h1>
             <span className="hidden truncate text-xs text-slate-600 sm:inline">{email}</span>
             <span className="flex-1" />
             <LangSwitcher />

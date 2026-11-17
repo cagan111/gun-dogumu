@@ -12,7 +12,7 @@ export async function SalonHeader({ name, city, address, logoUrl, coverUrl, slug
   const line = [address, city].filter(Boolean).join(", ");
   return (
     <header
-      className="relative overflow-hidden bg-brand text-brand-fg"
+      className="relative overflow-hidden border-b-4 border-sand bg-brand text-brand-fg"
       style={coverUrl ? { backgroundImage: `linear-gradient(rgb(0 0 0 / .35), rgb(0 0 0 / .55)), url(${JSON.stringify(coverUrl)})`, backgroundSize: "cover", backgroundPosition: "center" } : { backgroundImage: "linear-gradient(135deg, rgb(var(--brand)) 0%, rgb(var(--brand) / .75) 100%)" }}
     >
       <div className={`mx-auto flex max-w-2xl flex-col px-4 ${compact ? "pb-5 pt-4" : "pb-7 pt-4"}`}>
@@ -27,7 +27,7 @@ export async function SalonHeader({ name, city, address, logoUrl, coverUrl, slug
             <span aria-hidden className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl border-2 border-white/60 bg-white/20 text-xl font-bold">{initials(name)}</span>
           )}
           <div className="min-w-0">
-            <h1 className="text-2xl font-extrabold leading-tight">{name}</h1>
+            <h1 className="display-heading text-3xl font-semibold leading-tight">{name}</h1>
             {line ? (
               <p className="mt-1 flex flex-wrap items-center gap-x-2 text-sm opacity-95">
                 <span className="truncate">{line}</span>

@@ -83,6 +83,9 @@ export const panelEn: Record<keyof typeof panelTr, string> = {
   "appt.note": "Note",
   "appt.walkIn": "Walk-in (now)",
 
+  "cal.loading": "Loading your calendar…",
+  "cal.emptyDay": "No appointments to show for this day. Select an open slot to add one.",
+  "cal.emptyWeek": "No appointments to show for this week. Select an open slot to add one.",
   "cal.today": "Today",
   "cal.prev": "Previous",
   "cal.next": "Next",

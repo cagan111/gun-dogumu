@@ -81,6 +81,9 @@ export const panelTr = {
   "appt.note": "Not",
   "appt.walkIn": "Yürüyen müşteri (şimdi)",
 
+  "cal.loading": "Takvimi açıyoruz…",
+  "cal.emptyDay": "Bu gün için randevu görünmüyor. Boş bir saate dokunarak randevu ekleyebilirsiniz.",
+  "cal.emptyWeek": "Bu hafta için randevu görünmüyor. Boş bir saate dokunarak randevu ekleyebilirsiniz.",
   "cal.today": "Bugün",
   "cal.prev": "Önceki",
   "cal.next": "Sonraki",

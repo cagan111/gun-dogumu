@@ -20,7 +20,7 @@ export default async function Page({ params }: { params: Promise<{ salonSlug: st
   const { t } = await getT();
   const s = r.salon;
   return (
-    <div style={brandVars(s.brandColor) as React.CSSProperties} className="min-h-screen bg-slate-50">
+    <div style={brandVars(s.brandColor) as React.CSSProperties} className="min-h-screen bg-paper">
       <SalonHeader name={s.name} slug={s.slug} compact {...(r.kind === "ok" ? { city: r.salon.city, address: r.salon.address, logoUrl: s.logoUrl, coverUrl: s.coverUrl } : {})} />
       <main className="mx-auto max-w-2xl px-4 py-6">
         {r.kind === "closed" ? (

@@ -39,10 +39,10 @@ export default async function SalonPage({ params }: Props) {
 
   if (r.kind === "closed") {
     return (
-      <div style={brandVars(r.salon.brandColor) as React.CSSProperties} className="min-h-screen bg-slate-50">
+      <div style={brandVars(r.salon.brandColor) as React.CSSProperties} className="min-h-screen bg-paper">
         <SalonHeader name={r.salon.name} compact />
         <main className="mx-auto max-w-2xl px-4 py-12 text-center">
-          <h2 className="text-xl font-bold">{t("b.closed.title", { name: r.salon.name })}</h2>
+          <h2 className="display-heading text-2xl font-semibold">{t("b.closed.title", { name: r.salon.name })}</h2>
           <p className="mt-2 text-slate-700">{t("b.closed.body")}</p>
         </main>
       </div>
@@ -68,7 +68,7 @@ export default async function SalonPage({ params }: Props) {
   };
 
   return (
-    <div style={brandVars(salon.brandColor) as React.CSSProperties} className="min-h-screen bg-slate-50">
+    <div style={brandVars(salon.brandColor) as React.CSSProperties} className="min-h-screen bg-paper">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }} />
       <SalonHeader name={salon.name} city={salon.city} address={salon.address} logoUrl={salon.logoUrl} coverUrl={salon.coverUrl} slug={salon.slug} />
       <BookingFlow

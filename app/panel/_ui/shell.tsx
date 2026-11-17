@@ -69,11 +69,11 @@ function Inner({ children }: { children: React.ReactNode }) {
   const nav = role === "owner" ? NAV : NAV.slice(0, 1); // personel: yalnız takvim + randevu durumu
   const active = (href: string) => (href === "/panel" ? path === "/panel" : path.startsWith(href));
   return (
-    <div className="min-h-dvh bg-slate-50 md:flex">
+    <div className="min-h-dvh bg-paper md:flex">
       <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:left-2 focus:top-2 focus:z-[80] focus:rounded-lg focus:bg-white focus:px-3 focus:py-2">{t("common.skipToContent")}</a>
-      <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col border-r border-slate-200 bg-white md:flex">
+      <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col border-r border-line bg-paper md:flex">
         <div className="border-b border-slate-200 px-5 py-4">
-          <p className="truncate text-lg font-extrabold">{tenant.name}</p>
+          <p className="display-heading truncate text-xl font-semibold">{tenant.name}</p>
           <p className="text-xs text-slate-600">{role === "owner" ? t("role.owner") : t("role.staff")}</p>
         </div>
         <nav aria-label={t("nav.label")} className="flex-1 space-y-1 p-3">
@@ -89,7 +89,7 @@ function Inner({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 px-3 py-1.5 backdrop-blur md:flex md:items-center md:justify-end md:gap-3 md:px-4 md:py-2">
+        <header className="sticky top-0 z-30 border-b border-line bg-white/95 px-3 py-1.5 backdrop-blur md:flex md:items-center md:justify-end md:gap-3 md:px-4 md:py-2">
           {/* mobil: tek kompakt satır — salon adı · SMS · menü (durum rozeti, dil, çıkış menüde) */}
           <div className="flex items-center gap-2 md:hidden">
             <h1 className="min-w-0 flex-1 truncate text-base font-extrabold">{tenant.name}</h1>

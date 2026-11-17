@@ -11,12 +11,13 @@ const { chromium } = require("playwright");
 
 const BASE = process.env.BASE_URL || "http://localhost:3000";
 const SLUG = process.env.SLUG || "lefkosa-usta-berber";
+const VIEWPORT = process.env.DESKTOP === "1" ? { width: 1280, height: 800 } : { width: 375, height: 812 };
 const SHOTS = process.env.SHOT_DIR || os.tmpdir();
 const shot = (n) => path.join(SHOTS, `ui-${n}.png`);
 
 (async () => {
   const browser = await chromium.launch();
-  const ctx = await browser.newContext({ viewport: { width: 375, height: 812 }, deviceScaleFactor: 1, locale: "tr-TR" });
+  const ctx = await browser.newContext({ viewport: VIEWPORT, deviceScaleFactor: 1, locale: "tr-TR" });
   const page = await ctx.newPage();
   const problems = [];
   page.on("console", (m) => { if (m.type() === "error") problems.push(`console: ${m.text()}`); });
