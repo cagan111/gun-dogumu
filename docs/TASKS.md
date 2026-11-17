@@ -146,3 +146,14 @@ Biçim: `- [ ] T-NNN | sahip: claude|codex|- | açıklama`. Başlamadan sahip ya
 - [ ] T-104 | sahip: codex | iCal dışa aktarma (personel başına gizli token)
 - [ ] T-105 | sahip: codex | Google yorum isteği SMS'i (varsayılan kapalı)
 - [ ] T-106 | sahip: codex | Panel PWA + yeni randevu bildirimi
+
+## REVIEW.md T-101 bulgularından düzeltmeler (öncelik sırasıyla)
+- [ ] T-110 | sahip: codex | (Yüksek 1) Üretimde e-posta sağlayıcı yoksa sihirli bağlantıyı kapat; token/URL'yi loglardan çıkar (ilk açılış süper-admin şifre bağlantısı istisna, brief gereği) + log yakalayan test
+- [ ] T-111 | sahip: codex | (Yüksek 3) OTP: salon başına maliyet tavanı + yeniden gönderim bekleme süresi; kayıtlı/kayıtsız numarada aynı HTTP yanıtı
+- [ ] T-112 | sahip: codex | (Yüksek 2) Mesaj gönderiminde işçi kesintisi: askıda `queued` kayıtları uzlaştırma (süreli sahiplik + iade/yeniden deneme) + kesinti enjekte eden test
+- [ ] T-113 | sahip: codex | (Orta 4) OTP: salon+telefon başına tek kullanılmamış kod (kısıt/kilit) + paralel test
+- [ ] T-114 | sahip: codex | (Orta 5) Abonelik taraması ile ödeme yarışı: kilit altında yeniden okuma / koşullu güncelleme
+- [ ] T-115 | sahip: codex | (Orta 6) İptal kontrolünde okunan startsAt ile koşullu güncelleme
+- [ ] T-116 | sahip: codex | (Orta 7) Kampanya: kalıcı kampanya/alıcı kaydı, kredi rezervasyonu, yeniden denemede yalnız kalanlar
+- [ ] T-117 | sahip: codex | (Orta 8) Manuel ödemede idempotency anahtarı
+- [ ] T-118 | sahip: codex | Tenant kapsamı: desteklenmeyen işlemleri (ilişki mutasyonu, ham SQL vb.) withTenant'ta açıkça reddet
