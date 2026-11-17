@@ -3,14 +3,14 @@ on: push
 
 jobs:
   ci:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
         include:
           - label: once
-            ref: 231187ca9444f721b50884b67c6cb0c33c6cff32
+            ref: 91820c46926e9d8e553aa5898e231961f0681f80
           - label: sonra
             ref: 5e5a08762fdf246862e31bf9ed036fe3f856a58d
     services:
