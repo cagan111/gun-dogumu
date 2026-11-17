@@ -1,0 +1,76 @@
+name: T-100 ekran görüntüleri
+on: push
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: once
+            ref: 231187ca9444f721b50884b67c6cb0c33c6cff32
+          - label: sonra
+            ref: 5e5a08762fdf246862e31bf9ed036fe3f856a58d
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: randevu
+          POSTGRES_PASSWORD: randevu
+          POSTGRES_DB: randevu
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U randevu -d randevu"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      DATABASE_URL: postgresql://randevu:randevu@localhost:5432/randevu
+      NEXTAUTH_SECRET: ci-dummy-secret-not-for-production-0123456789
+      NEXTAUTH_URL: http://localhost:3000
+      JOBS_QUEUE: none
+      SMS_PROVIDER: mock
+      ALLOW_REAL_SMS: "false"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ matrix.ref }}
+      - uses: pnpm/action-setup@v4 # sürüm package.json `packageManager` alanından (pnpm 10.28.0)
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec prisma migrate deploy
+      - run: pnpm run ci
+      - run: pnpm build
+
+      - name: Playwright kur
+        run: |
+          pnpm add --save-dev --ignore-scripts playwright@1.56.1
+          pnpm exec playwright install --with-deps chromium
+      - name: Ekran görüntülerini ve tarayıcı kontrollerini çalıştır
+        env:
+          SHOT_DIR: ${{ runner.temp }}/shots
+        run: |
+          mkdir -p "$SHOT_DIR/375" "$SHOT_DIR/1280"
+          if ! rg -q 'process.env.DESKTOP' tests/e2e/booking.cjs; then
+            sed -i 's/viewport: { width: 375, height: 812 }/viewport: process.env.DESKTOP === "1" ? { width: 1280, height: 800 } : { width: 375, height: 812 }/' tests/e2e/booking.cjs
+          fi
+          pnpm start > "$RUNNER_TEMP/app.log" 2>&1 &
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://localhost:3000/api/health; then break; fi
+            sleep 1
+          done
+          pnpm db:seed
+          SHOT_DIR="$SHOT_DIR/375" node tests/e2e/booking.cjs
+          pnpm db:seed
+          DESKTOP=1 SHOT_DIR="$SHOT_DIR/1280" node tests/e2e/booking.cjs
+          pnpm db:seed
+          node tests/e2e/panel.cjs
+          node tests/e2e/isolation.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: t100-${{ matrix.label }}
+          path: ${{ runner.temp }}/shots
