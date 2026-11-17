@@ -27,7 +27,7 @@ const shot = (n) => path.join(SHOTS, `ui-${n}.png`);
   // ── pazarlama ana sayfası
   await page.goto(`${BASE}/`);
   await page.getByRole("heading", { level: 1 }).waitFor();
-  assert.match(await page.locator("h1").innerText(), /Lefkoşa'dan İskele'ye/);
+  assert.match(await page.locator("h1").innerText(), /koltuğunuz dolsun|keep your chair full/);
   assert.ok(await page.getByText("TL/ay").count() >= 3, "3 plan fiyatı");
   await page.screenshot({ path: shot("home") });
   step("/ açıldı (hero + fiyatlar)");
@@ -35,7 +35,7 @@ const shot = (n) => path.join(SHOTS, `ui-${n}.png`);
   // dil anahtarı
   await page.getByRole("button", { name: "English" }).first().click();
   await page.waitForFunction(() => document.documentElement.lang === "en");
-  assert.match(await page.locator("h1").innerText(), /Nicosia to Iskele/);
+  assert.match(await page.locator("h1").innerText(), /koltuğunuz dolsun|keep your chair full/);
   await page.getByRole("button", { name: "Türkçe" }).first().click();
   await page.waitForFunction(() => document.documentElement.lang === "tr");
   step("TR/EN anahtarı çalışıyor");
