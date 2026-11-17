@@ -4,9 +4,9 @@ import { inputClass } from "@/components/ui/field";
 
 function Label({ id, label, optional }: { id: string; label: string; optional?: string }) {
   return (
-    <label htmlFor={id} className="mb-1.5 flex items-baseline justify-between text-sm font-medium text-slate-800">
+    <label htmlFor={id} className="mb-1.5 flex items-baseline justify-between text-sm font-semibold text-ink">
       <span>{label}</span>
-      {optional ? <span className="text-xs font-normal text-slate-500">{optional}</span> : null}
+      {optional ? <span className="text-xs font-normal text-mute">{optional}</span> : null}
     </label>
   );
 }
@@ -14,8 +14,8 @@ function Label({ id, label, optional }: { id: string; label: string; optional?: 
 function Msgs({ id, hint, error }: { id: string; hint?: string; error?: string | null }) {
   return (
     <>
-      {hint ? <p id={`${id}-h`} className="mt-1 text-xs text-slate-600">{hint}</p> : null}
-      {error ? <p id={`${id}-e`} role="alert" className="mt-1 text-sm font-medium text-red-700">{error}</p> : null}
+      {hint ? <p id={`${id}-h`} className="mt-1 text-[13px] text-mute">{hint}</p> : null}
+      {error ? <p id={`${id}-e`} role="alert" className="mt-1 text-sm font-medium text-danger">{error}</p> : null}
     </>
   );
 }
@@ -48,26 +48,26 @@ export function CheckField({ label, hint, className, ...props }: Omit<React.Inpu
   const id = useId();
   return (
     <div className={className}>
-      <label htmlFor={id} className="flex min-h-11 cursor-pointer items-center gap-3 text-sm font-medium text-slate-800">
-        <input id={id} type="checkbox" className="h-5 w-5 shrink-0 rounded border-slate-400 accent-[rgb(var(--brand))]" aria-describedby={hint ? `${id}-h` : undefined} {...props} />
+      <label htmlFor={id} className="flex min-h-11 cursor-pointer items-center gap-3 text-sm font-medium text-ink">
+        <input id={id} type="checkbox" className="h-5 w-5 shrink-0 rounded-md border-line-strong accent-[rgb(var(--brand))]" aria-describedby={hint ? `${id}-h` : undefined} {...props} />
         <span>{label}</span>
       </label>
-      {hint ? <p id={`${id}-h`} className="ml-8 text-xs text-slate-600">{hint}</p> : null}
+      {hint ? <p id={`${id}-h`} className="ml-8 text-[13px] text-mute">{hint}</p> : null}
     </div>
   );
 }
 
 export function Card({ children, className, as: As = "section", ...props }: React.HTMLAttributes<HTMLElement> & { as?: "section" | "div" | "article" }) {
-  return <As className={cn("rounded-2xl border border-slate-200 bg-white p-4 shadow-sm", className)} {...props}>{children}</As>;
+  return <As className={cn("rounded-2xl border border-line bg-bone p-4 shadow-card", className)} {...props}>{children}</As>;
 }
 
 type Tone = "slate" | "green" | "amber" | "red" | "sky" | "violet";
 const TONES: Record<Tone, string> = {
-  slate: "bg-slate-100 text-slate-800", green: "bg-emerald-100 text-emerald-900", amber: "bg-amber-100 text-amber-900",
-  red: "bg-red-100 text-red-900", sky: "bg-sky-100 text-sky-900", violet: "bg-violet-100 text-violet-900",
+  slate: "bg-sand text-ink-soft", green: "bg-ok-bg text-ok", amber: "bg-warn-bg text-warn",
+  red: "bg-danger-bg text-danger", sky: "bg-info-bg text-info", violet: "bg-[#F0E4EC] text-plum",
 };
 export function Badge({ tone = "slate", children, className }: { tone?: Tone; children: React.ReactNode; className?: string }) {
-  return <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold", TONES[tone], className)}>{children}</span>;
+  return <span className={cn("inline-flex items-center rounded-md px-2 py-0.5 text-xs font-semibold", TONES[tone], className)}>{children}</span>;
 }
 
 export const selectClass = inputClass;
