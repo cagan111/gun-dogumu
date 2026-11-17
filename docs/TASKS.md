@@ -139,8 +139,10 @@ Biçim: `- [ ] T-NNN | sahip: claude|codex|- | açıklama`. Başlamadan sahip ya
   - Yatay kaydırma + yapışkan saat sütunu/personel başlığı (min sütun 120px), mobil üst çubuk tek satır (ad · SMS · ⋯ menü).
 
 ## Codex'e verilen işler (2026-11-16, PR #1 yorum 6932651050 / 6932659192)
-- [ ] T-100 | sahip: codex | Görsel kimlik ve "insancıl" tasarım (yalnız arayüz)
-- [ ] T-101 | sahip: codex | Bağımsız kod incelemesi → docs/REVIEW.md
+- [x] T-100 | sahip: codex | Görsel kimlik ve "insancıl" tasarım (yalnız arayüz)
+  - Pazarlama, rezervasyon ve yönetim ekranları için yeni görsel kimlik, TR/EN metinler ve mobil/masaüstü çekimleri.
+- [x] T-101 | sahip: codex | Bağımsız kod incelemesi → docs/REVIEW.md
+  - Sekiz bulgu, senaryo ve düzeltme önerisi raporlandı.
 - [ ] T-102 | sahip: codex | İngilizce arayüz kontrolü ve düzeltmesi
 - [ ] T-103 | sahip: codex | Lighthouse mobil > 85 (randevu sayfası)
 - [ ] T-104 | sahip: codex | iCal dışa aktarma (personel başına gizli token)
