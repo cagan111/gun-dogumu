@@ -45,18 +45,17 @@ export function Sheet({ open, onClose, title, children, wide }: { open: boolean;
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center md:items-center">
-      <div className="absolute inset-0 bg-ink-deep/55 backdrop-blur-[2px]" onClick={onClose} aria-hidden />
+      <div className="absolute inset-0 bg-slate-900/50" onClick={onClose} aria-hidden />
       <div
         ref={ref}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className={cn("relative flex max-h-[92dvh] w-full animate-rise flex-col rounded-t-2xl bg-bone shadow-pop md:rounded-2xl", wide ? "md:max-w-2xl" : "md:max-w-md")}
+        className={cn("relative flex max-h-[92dvh] w-full flex-col rounded-t-2xl bg-white shadow-xl md:rounded-2xl", wide ? "md:max-w-2xl" : "md:max-w-md")}
       >
-        <div aria-hidden className="mx-auto mt-2 h-1 w-9 rounded-full bg-line-strong/60 md:hidden" />
-        <div className="flex items-start justify-between gap-3 border-b border-line px-4 py-3">
-          <h2 id={titleId} className="font-display text-xl font-semibold">{title}</h2>
-          <button type="button" onClick={onClose} aria-label={t("common.close")} className="-mr-2 grid h-11 w-11 shrink-0 place-items-center rounded-full text-2xl leading-none text-ink-soft hover:bg-sand">
+        <div className="flex items-start justify-between gap-3 border-b border-slate-200 px-4 py-3">
+          <h2 id={titleId} className="text-lg font-bold">{title}</h2>
+          <button type="button" onClick={onClose} aria-label={t("common.close")} className="-mr-2 grid h-11 w-11 shrink-0 place-items-center rounded-full text-2xl leading-none text-slate-600 hover:bg-slate-100">
             <span aria-hidden>×</span>
           </button>
         </div>
@@ -73,7 +72,7 @@ export function ConfirmDialog({ open, title, body, confirmLabel, busy, onConfirm
   const t = useT();
   return (
     <Sheet open={open} onClose={onCancel} title={title}>
-      {body ? <p className="text-ink-soft">{body}</p> : null}
+      {body ? <p className="text-slate-700">{body}</p> : null}
       <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
         <Button variant="secondary" onClick={onCancel} data-autofocus>{t("common.cancel")}</Button>
         <Button variant={danger ? "danger" : "primary"} onClick={onConfirm} disabled={busy}>{confirmLabel}</Button>
