@@ -8,8 +8,8 @@ type Labels = { group: string; a: string; b: string; pause: string; play: string
  * Hero sahnesi: A (salondan bir an) ve B (ürün: 3 telefon) dönüşümlü. 8 sn / 12 sn; fare üstündeyken, duraklatılınca
  * ve prefers-reduced-motion'da otomatik geçiş kapalı (noktalarla elle geçilir).
  */
-export function HeroStage({ a, b, cardsA, cardsB, labels }: { a: React.ReactNode; b: React.ReactNode; cardsA: React.ReactNode; cardsB: React.ReactNode; labels: Labels }) {
-  const [scene, setScene] = useState<"a" | "b">("a");
+export function HeroStage({ a, b, cardsA, cardsB, labels, only }: { a: React.ReactNode; b: React.ReactNode; cardsA: React.ReactNode; cardsB: React.ReactNode; labels: Labels; only?: "a" | "b" }) {
+  const [scene, setScene] = useState<"a" | "b">(only ?? "a");
   const [paused, setPaused] = useState(false);
   const [hover, setHover] = useState(false);
   const [reduced, setReduced] = useState(true);
@@ -23,14 +23,14 @@ export function HeroStage({ a, b, cardsA, cardsB, labels }: { a: React.ReactNode
   }, []);
 
   useEffect(() => {
-    if (paused || hover || reduced) return;
+    if (only || paused || hover || reduced) return;
     const id = setTimeout(() => setScene((s) => (s === "a" ? "b" : "a")), scene === "a" ? 7000 : 12000);
     return () => clearTimeout(id);
   }, [scene, paused, hover, reduced]);
 
   const auto = !paused && !reduced;
   return (
-    <div className="pb-14">
+    <div className={only ? "" : "pb-14"}>
       <div className="hs" data-scene={scene} role="group" aria-roledescription="carousel" aria-label={labels.group}
         onPointerEnter={(e) => { if (e.pointerType === "mouse") setHover(true); }} onPointerLeave={() => setHover(false)}>
         <div className="hs-clip hs-u">
@@ -40,7 +40,7 @@ export function HeroStage({ a, b, cardsA, cardsB, labels }: { a: React.ReactNode
         <div className="hs-cards hs-u" aria-hidden>
           {scene === "a" ? cardsA : cardsB}
         </div>
-        <div className="hs-ctl" role="group" aria-label={labels.group}>
+        {only ? null : <div className="hs-ctl" role="group" aria-label={labels.group}>
           <button type="button" className="hs-dot" aria-pressed={scene === "a"} aria-label={labels.a} onClick={() => { setScene("a"); }} />
           <button type="button" className="hs-dot" aria-pressed={scene === "b"} aria-label={labels.b} onClick={() => { setScene("b"); }} />
           {!reduced ? (
@@ -48,7 +48,7 @@ export function HeroStage({ a, b, cardsA, cardsB, labels }: { a: React.ReactNode
               <Icon name={auto ? "pause" : "play"} size={18} />
             </button>
           ) : null}
-        </div>
+        </div>}
       </div>
     </div>
   );

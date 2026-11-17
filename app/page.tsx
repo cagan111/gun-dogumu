@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { brand } from "@/config/brand";
 import { PLANS, type PlanId } from "@/config/plans";
 import { Faq, Features, FinalCta, Local, Pricing, Problem, Steps } from "@/components/marketing/sections";
-import { Hero } from "@/components/marketing/hero";
+import { heroVideo } from "@/config/hero";
+import { Hero, ProductBand } from "@/components/marketing/hero";
 import "@/components/marketing/marketing.css";
 import { SiteFooter, SiteHeader } from "@/components/site-header";
 import { getT } from "@/lib/i18n";
@@ -26,6 +27,7 @@ export default async function Home() {
       <SiteHeader tone="ink" />
       <main id="icerik">
         <Hero t={t} />
+        {heroVideo ? <ProductBand t={t} /> : null}
         <div className="bg-ink-deep"><div className="tile-rule" role="presentation" /></div>
         <Problem t={t} />
         <Steps t={t} />

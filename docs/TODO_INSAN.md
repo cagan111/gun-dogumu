@@ -12,3 +12,5 @@
 - [ ] GitHub Actions workflow'u (`.github/workflows/ci.yml`) repo GitHub'a taşınınca ilk çalıştırmada yeşil mi bak.
 
 - [ ] Gerçek salon sahiplerinden izinli kısa yorumlar/alıntılar topla (ana sayfada kullanılacak; o zamana kadar alıntı yok).
+
+- [ ] Lefkoşa'da gerçek bir berberde müşteri gözünden 10–15 sn çekim (yatay+dikey) — stok videonun yerine (`config/hero.ts`, `docs/LICENSES.md`).
