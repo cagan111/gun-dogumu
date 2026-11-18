@@ -214,6 +214,11 @@ async function main() {
   }
   const now = new Date();
   const passwordHash = await bcrypt.hash(DEMO_PASSWORD, 10);
+  // E2E betiklerinden kalan test salonlarını temizle (randevular cascade değil → önce onlar)
+  const stale = { tenant: { slug: { startsWith: "e2e-" } } };
+  await prisma.appointment.deleteMany({ where: stale });
+  const gone = await prisma.tenant.deleteMany({ where: { slug: { startsWith: "e2e-" } } });
+  if (gone.count) console.log(`${gone.count} artık e2e salonu silindi.`);
   console.log("Demo salonlar yükleniyor…");
   for (const def of SALONS) await seedSalon(def, now, passwordHash);
 

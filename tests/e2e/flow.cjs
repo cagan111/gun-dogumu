@@ -139,6 +139,9 @@ const PASSWORD = "sifre12345";
     assert.deepEqual(noise, [], `konsol hataları:\n${noise.join("\n")}`);
     console.log("TAMAM — flow.cjs (kayıt → hizmet → randevu → hatırlatma kuyruğu → iptal)");
   } finally {
+    // oluşturduğumuz salonu sil: Appointment→Staff/Service/Customer cascade değil, önce randevular
+    await prisma.appointment.deleteMany({ where: { tenant: { slug: SLUG } } }).catch(() => {});
+    await prisma.tenant.deleteMany({ where: { slug: SLUG } }).catch((e) => console.error("temizlik başarısız:", e.message));
     await prisma.$disconnect().catch(() => {});
     await browser.close();
   }

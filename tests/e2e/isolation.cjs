@@ -140,6 +140,11 @@ async function book(s, name, phone) {
 
     console.log("TAMAM — isolation.cjs (tenant izolasyonu + staff yetkileri, gerçek HTTP)");
   } finally {
+    // oluşturduğumuz salonları sil (hata olsa da): önce randevular (Staff/Service/Customer ilişkisi cascade değil)
+    try {
+      await prisma.appointment.deleteMany({ where: { tenant: { slug: { startsWith: `e2e-iso-` , endsWith: `-${uid}` } } } });
+      await prisma.tenant.deleteMany({ where: { slug: { startsWith: `e2e-iso-` , endsWith: `-${uid}` } } });
+    } catch (e) { console.error("temizlik başarısız:", e.message); }
     await prisma.$disconnect().catch(() => {});
   }
 })().catch((e) => { console.error("BAŞARISIZ:", e); process.exit(1); });

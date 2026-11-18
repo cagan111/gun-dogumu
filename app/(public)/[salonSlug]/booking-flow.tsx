@@ -41,7 +41,9 @@ export function BookingFlow({ slug, salonName, timeZone, today, maxAdvanceDays, 
   const [email, setEmail] = useState("");
   const [kvkk, setKvkk] = useState(false);
   const [marketing, setMarketing] = useState(false);
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const [submitted, setSubmitted] = useState(false);
+  const [serverErrors, setServerErrors] = useState<Record<string, string>>({});
   const [banner, setBanner] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState<Done | null>(null);
@@ -90,19 +92,25 @@ export function BookingFlow({ slug, salonName, timeZone, today, maxAdvanceDays, 
     return g;
   }, [slots]);
 
+  // Canlı doğrulama; hata yalnız alan odağı bırakınca (touched) ya da ilk gönderim denemesinden sonra gösterilir
+  const fieldErrors: Record<string, string> = {};
+  if (name.trim().length < 2) fieldErrors.name = t("b.details.errName");
+  if (phone.replace(/\D/g, "").length < 7) fieldErrors.phone = t("b.details.errPhone");
+  if (email.trim() && !/^\S+@\S+\.\S+$/.test(email.trim())) fieldErrors.email = t("b.details.errEmail");
+  if (!kvkk) fieldErrors.kvkk = t("b.details.errKvkk");
+  const errors: Record<string, string> = {};
+  for (const k of Object.keys(fieldErrors)) if (submitted || touched[k]) errors[k] = fieldErrors[k] ?? "";
+  if (serverErrors.phone && !errors.phone) errors.phone = serverErrors.phone;
+  const touch = (k: string) => setTouched((p) => (p[k] ? p : { ...p, [k]: true }));
+
   function validateDetails() {
-    const e: Record<string, string> = {};
-    if (name.trim().length < 2) e.name = t("b.details.errName");
-    if (phone.replace(/\D/g, "").length < 7) e.phone = t("b.details.errPhone");
-    if (email.trim() && !/^\S+@\S+\.\S+$/.test(email.trim())) e.email = t("b.details.errEmail");
-    if (!kvkk) e.kvkk = t("b.details.errKvkk");
-    setErrors(e);
-    return Object.keys(e).length === 0;
+    setSubmitted(true);
+    return Object.keys(fieldErrors).length === 0;
   }
 
   async function submit() {
     if (!service || !slot || !validateDetails()) return;
-    setBusy(true); setBanner(null);
+    setBusy(true); setBanner(null); setServerErrors({});
     // "Fark etmez" ise slotun ilk uygun personeli; sunucu yarışta yeniden atar
     const chosen = staffId === "any" ? "any" : staffId;
     try {
@@ -133,7 +141,7 @@ export function BookingFlow({ slug, salonName, timeZone, today, maxAdvanceDays, 
       } else if (res.status === 404) {
         setBanner(t("b.err.notFound"));
       } else if (code === "validation" || code === "invalid_phone") {
-        if (JSON.stringify(j).includes("invalid_phone") || code === "invalid_phone") setErrors({ phone: t("b.details.errPhone") });
+        if (JSON.stringify(j).includes("invalid_phone") || code === "invalid_phone") setServerErrors({ phone: t("b.details.errPhone") });
         else setBanner(t("b.err.validation"));
       } else setBanner(t("common.genericError"));
     } catch {
@@ -307,19 +315,19 @@ export function BookingFlow({ slug, salonName, timeZone, today, maxAdvanceDays, 
               <Row k={t("b.summary.total")} v={formatPrice(service.priceTry, locale)} />
             </dl>
           </section>
-          <Field label={t("b.details.name")} name="name" autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} error={errors.name} required />
-          <Field label={t("b.details.phone")} name="phone" type="tel" inputMode="tel" autoComplete="tel" value={phone} onChange={(e) => setPhone(e.target.value)} hint={t("b.details.phoneHint")} error={errors.phone} required />
-          <Field label={t("b.details.email")} optional={t("common.optional")} name="email" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} error={errors.email} />
+          <Field label={t("b.details.name")} name="name" autoComplete="name" value={name} onChange={(e) => { setName(e.target.value); if (serverErrors.name) setServerErrors({}); }} onBlur={() => touch("name")} error={errors.name} required />
+          <Field label={t("b.details.phone")} name="phone" type="tel" inputMode="tel" autoComplete="tel" value={phone} onChange={(e) => { setPhone(e.target.value); if (serverErrors.phone) setServerErrors({}); }} onBlur={() => touch("phone")} hint={t("b.details.phoneHint")} error={errors.phone} required />
+          <Field label={t("b.details.email")} optional={t("common.optional")} name="email" type="email" autoComplete="email" value={email} onChange={(e) => { setEmail(e.target.value); if (serverErrors.email) setServerErrors({}); }} onBlur={() => touch("email")} error={errors.email} />
           <div>
             <label className="flex items-start gap-3 text-sm">
-              <input type="checkbox" name="kvkk" checked={kvkk} onChange={(e) => setKvkk(e.target.checked)} aria-invalid={errors.kvkk ? true : undefined} aria-required className="mt-0.5 h-5 w-5 shrink-0 accent-[rgb(var(--brand))]" />
+              <input type="checkbox" name="kvkk" checked={kvkk} onChange={(e) => { setKvkk(e.target.checked); touch("kvkk"); }} aria-invalid={errors.kvkk ? true : undefined} aria-describedby={errors.kvkk ? "kvkk-err" : undefined} aria-required className="mt-0.5 h-5 w-5 shrink-0 accent-[rgb(var(--brand))]" />
               <span>
                 {t("b.details.kvkkPre")}
                 <Link href="/gizlilik" target="_blank" className="font-semibold text-brand underline">{t("b.details.kvkkLink")}</Link>
                 {t("b.details.kvkkPost")}
               </span>
             </label>
-            {errors.kvkk ? <p role="alert" className="mt-1 text-sm font-medium text-red-700">{errors.kvkk}</p> : null}
+            {errors.kvkk ? <p id="kvkk-err" role="alert" className="mt-1 text-sm font-medium text-red-700">{errors.kvkk}</p> : null}
           </div>
           <label className="flex items-start gap-3 text-sm">
             <input type="checkbox" name="marketing" checked={marketing} onChange={(e) => setMarketing(e.target.checked)} className="mt-0.5 h-5 w-5 shrink-0 accent-[rgb(var(--brand))]" />
@@ -333,9 +341,9 @@ export function BookingFlow({ slug, salonName, timeZone, today, maxAdvanceDays, 
         <div className="mx-auto flex max-w-2xl items-center gap-3 px-4 pb-safe pt-3">
           {step > 1 ? <Button variant="secondary" onClick={back} disabled={busy}>{t("common.back")}</Button> : null}
           {step < STEPS ? (
-            <Button className="flex-1" onClick={next} disabled={!canNext}>{t("common.next")}</Button>
+            <Button key="next" className="flex-1" onClick={next} disabled={!canNext}>{t("common.next")}</Button>
           ) : (
-            <Button type="submit" form="booking-form" className="flex-1" disabled={busy}>
+            <Button key="confirm" type="submit" form="booking-form" className="flex-1" disabled={busy}>
               {busy ? <><Spinner />{t("b.confirming")}</> : t("b.confirm")}
             </Button>
           )}

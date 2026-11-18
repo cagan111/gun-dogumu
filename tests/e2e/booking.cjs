@@ -82,6 +82,16 @@ const shot = (n) => path.join(SHOTS, `ui-${n}.png`);
   step(`saat seçildi: ${time}`);
   await page.getByRole("button", { name: "Devam" }).click();
 
+  // adım 4 açılışında hata gösterilmez; alan odağı bırakınca gösterilir
+  await page.getByLabel("Ad soyad").waitFor();
+  assert.equal(await page.locator("#booking-form [role=alert]").count(), 0, "adım 4 açılışında doğrulama hatası yok");
+  await page.getByLabel("Ad soyad").focus();
+  await page.getByLabel("Telefon").focus();
+  await page.getByText("Lütfen adınızı yazın").waitFor();
+  assert.equal(await page.getByLabel("Ad soyad").getAttribute("aria-invalid"), "true");
+  await page.getByLabel("Ad soyad").fill("E2E");
+  assert.equal(await page.getByText("Lütfen adınızı yazın").count(), 0, "düzeltince hata kalkar");
+
   // KVKK zorunlu
   await page.getByLabel("Ad soyad").fill("E2E Test");
   await page.getByLabel("Telefon").fill("+90 533 999 00 11");
