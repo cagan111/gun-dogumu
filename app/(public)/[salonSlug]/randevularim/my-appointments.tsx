@@ -65,7 +65,7 @@ export function MyAppointments({ slug, timeZone }: { slug: string; timeZone: str
   }
 
   return (
-    <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+    <div className="rounded-2xl bg-surface p-5 shadow-sm ring-1 ring-slate-200">
       <h2 className="text-xl font-extrabold">{t("mine.title")}</h2>
       {err ? <Alert className="mt-3">{err}</Alert> : null}
 

@@ -2,7 +2,7 @@ import { useId } from "react";
 import { cn } from "@/lib/cn";
 
 export const inputClass =
-  "block min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-base text-slate-900 placeholder:text-slate-400 aria-[invalid=true]:border-red-600";
+  "block min-h-11 w-full rounded-xl border border-slate-300 bg-surface px-3.5 py-2 text-base text-slate-900 placeholder:text-slate-400 aria-[invalid=true]:border-red-600";
 
 /** Etiketli giriş alanı; hata/ipucu aria-describedby ile bağlanır. */
 export function Field({
@@ -18,16 +18,16 @@ export function Field({
       </label>
       <input id={id} className={inputClass} aria-invalid={error ? true : undefined} aria-describedby={describedBy} {...props} />
       {hint ? <p id={`${id}-h`} className="mt-1 text-xs text-slate-600">{hint}</p> : null}
-      {error ? <p id={`${id}-e`} role="alert" className="mt-1 text-sm font-medium text-red-700">{error}</p> : null}
+      {error ? <p id={`${id}-e`} role="alert" className="mt-1 text-sm font-medium text-red-400">{error}</p> : null}
     </div>
   );
 }
 
 export function Alert({ tone = "error", children, className }: { tone?: "error" | "info" | "success"; children: React.ReactNode; className?: string }) {
   const tones = {
-    error: "border-red-200 bg-red-50 text-red-900",
+    error: "border-red-200 bg-red-50 text-red-200",
     info: "border-line bg-paper text-olive",
-    success: "border-emerald-200 bg-emerald-50 text-emerald-900",
+    success: "border-emerald-200 bg-emerald-50 text-emerald-200",
   };
   return (
     <div role={tone === "error" ? "alert" : "status"} className={cn("rounded-xl border px-4 py-3 text-sm", tones[tone], className)}>

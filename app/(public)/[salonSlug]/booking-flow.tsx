@@ -22,7 +22,7 @@ function Avatar({ name, photoUrl, size = "h-14 w-14" }: { name: string; photoUrl
     return <img src={photoUrl} alt="" className={cn(size, "shrink-0 staff-portrait text-clay object-cover")} />;
   }
   return (
-    <span aria-hidden className={cn(size, "grid shrink-0 place-items-center staff-portrait text-base font-bold")} style={{ backgroundColor: `hsl(${hue(name)} 38% 88%)`, color: `hsl(${hue(name)} 48% 28%)` }}>
+    <span aria-hidden className={cn(size, "grid shrink-0 place-items-center staff-portrait text-base font-bold")} style={{ backgroundColor: `hsl(${hue(name)} 28% 20%)`, color: `hsl(${hue(name)} 60% 78%)` }}>
       {initials(name)}
     </span>
   );
@@ -166,11 +166,11 @@ export function BookingFlow({ slug, salonName, timeZone, today, maxAdvanceDays, 
     const full = typeof window !== "undefined" ? `${window.location.origin}${done.cancelUrl}` : done.cancelUrl;
     return (
       <main className="mx-auto max-w-2xl px-4 py-8">
-        <div className="rounded-t-[3rem] rounded-b-xl border border-line bg-white p-6 text-center">
+        <div className="rounded-t-[3rem] rounded-b-xl border border-line bg-surface p-6 text-center">
           <svg aria-hidden viewBox="0 0 88 72" className="booking-success-mark mx-auto h-[72px] w-[88px]" fill="none">
-            <path d="M18 37C18 22 28 11 44 11c14 0 26 10 26 25S61 62 44 62 18 52 18 37Z" fill="#e7ecde" />
-            <path d="m33 37 8 8 15-17" stroke="#465635" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-            <path d="m9 22-4-4m6 17-6 1m66-17 5-5m1 20 6-2M21 8l-2-4" stroke="#9b4835" strokeWidth="2" strokeLinecap="round" />
+            <path d="M18 37C18 22 28 11 44 11c14 0 26 10 26 25S61 62 44 62 18 52 18 37Z" fill="#1F1B12" />
+            <path d="m33 37 8 8 15-17" stroke="#C9A96E" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="m9 22-4-4m6 17-6 1m66-17 5-5m1 20 6-2M21 8l-2-4" stroke="#E58F78" strokeWidth="2" strokeLinecap="round" />
           </svg>
           <h2 ref={headingRef} tabIndex={-1} className="booking-step-heading display-heading mt-3 text-3xl font-semibold">{t("b.success.title")}</h2>
           <p className="mt-1 text-slate-700">{t("b.success.sub", { name: name.trim().split(/\s+/)[0] ?? "" })}</p>
@@ -218,7 +218,7 @@ export function BookingFlow({ slug, salonName, timeZone, today, maxAdvanceDays, 
                   type="button"
                   aria-pressed={sel}
                   onClick={() => { setService(s); if (staffId !== "any" && !s.staffIds.includes(staffId)) setStaffId("any"); setSlot(null); }}
-                  className={cn("booking-option flex w-full min-h-16 items-center justify-between gap-3 rounded-lg border bg-white p-4 text-left transition", sel ? "border-brand" : "border-line hover:border-olive")}
+                  className={cn("booking-option flex w-full min-h-16 items-center justify-between gap-3 rounded-lg border bg-surface p-4 text-left transition", sel ? "border-brand" : "border-line hover:border-olive")}
                 >
                   <span>
                     <span className="block font-semibold">{svcName(s)}</span>
@@ -262,7 +262,7 @@ export function BookingFlow({ slug, salonName, timeZone, today, maxAdvanceDays, 
                   aria-pressed={sel}
                   aria-label={p.long}
                   onClick={() => { setDate(d); setSlot(null); }}
-                  className={cn("flex min-h-20 w-16 shrink-0 flex-col items-center justify-center booking-option rounded-xl border text-sm", sel ? "border-brand" : "border-line bg-white hover:border-olive")}
+                  className={cn("flex min-h-20 w-16 shrink-0 flex-col items-center justify-center booking-option rounded-xl border text-sm", sel ? "border-brand" : "border-line bg-surface hover:border-olive")}
                 >
                   <span className="text-xs font-medium opacity-90">{d === today ? t("b.date.today") : p.weekday}</span>
                   <span className="text-xl font-extrabold leading-tight">{p.day}</span>
@@ -274,7 +274,7 @@ export function BookingFlow({ slug, salonName, timeZone, today, maxAdvanceDays, 
 
           <div className="mt-4" aria-live="polite" aria-busy={slots === null}>
             {slots === null ? (
-              <p className="flex items-center gap-2 rounded-lg border border-line bg-white p-4 text-sm text-slate-700"><Spinner />{t("b.slot.loading")}</p>
+              <p className="flex items-center gap-2 rounded-lg border border-line bg-surface p-4 text-sm text-slate-700"><Spinner />{t("b.slot.loading")}</p>
             ) : slots.length === 0 ? (
               <Alert tone="info">{t("b.slot.none")}</Alert>
             ) : (
@@ -289,7 +289,7 @@ export function BookingFlow({ slug, salonName, timeZone, today, maxAdvanceDays, 
                           type="button"
                           aria-pressed={slot?.startsAt === s.startsAt}
                           onClick={() => setSlot(s)}
-                          className={cn("booking-option min-h-11 rounded-lg border text-sm font-semibold", slot?.startsAt === s.startsAt ? "border-brand" : "border-line bg-white hover:border-olive")}
+                          className={cn("booking-option min-h-11 rounded-lg border text-sm font-semibold", slot?.startsAt === s.startsAt ? "border-brand" : "border-line bg-surface hover:border-olive")}
                         >
                           {s.time}
                         </button>
@@ -306,7 +306,7 @@ export function BookingFlow({ slug, salonName, timeZone, today, maxAdvanceDays, 
       {/* Adım 4 – bilgiler */}
       {step === 4 && service && slot ? (
         <form id="booking-form" className="mt-4 space-y-4" noValidate onSubmit={(e) => { e.preventDefault(); void submit(); }}>
-          <section aria-label={t("b.summary.title")} className="rounded-lg border border-line bg-white p-4 text-sm">
+          <section aria-label={t("b.summary.title")} className="rounded-lg border border-line bg-surface p-4 text-sm">
             <p className="font-semibold">{salonName}</p>
             <dl className="mt-2 divide-y divide-slate-100">
               <Row k={t("b.summary.service")} v={svcName(service)} />
@@ -327,7 +327,7 @@ export function BookingFlow({ slug, salonName, timeZone, today, maxAdvanceDays, 
                 {t("b.details.kvkkPost")}
               </span>
             </label>
-            {errors.kvkk ? <p id="kvkk-err" role="alert" className="mt-1 text-sm font-medium text-red-700">{errors.kvkk}</p> : null}
+            {errors.kvkk ? <p id="kvkk-err" role="alert" className="mt-1 text-sm font-medium text-red-400">{errors.kvkk}</p> : null}
           </div>
           <label className="flex items-start gap-3 text-sm">
             <input type="checkbox" name="marketing" checked={marketing} onChange={(e) => setMarketing(e.target.checked)} className="mt-0.5 h-5 w-5 shrink-0 accent-[rgb(var(--brand))]" />
@@ -368,7 +368,7 @@ function StaffCard({ selected, onClick, title, sub, avatar }: { selected: boolea
       type="button"
       aria-pressed={selected}
       onClick={onClick}
-      className={cn("booking-option flex h-full min-h-32 w-full flex-col items-center justify-center gap-3 rounded-xl border bg-white p-3 text-center", selected ? "border-brand" : "border-line hover:border-olive")}
+      className={cn("booking-option flex h-full min-h-32 w-full flex-col items-center justify-center gap-3 rounded-xl border bg-surface p-3 text-center", selected ? "border-brand" : "border-line hover:border-olive")}
     >
       {avatar}
       <span className="text-sm font-semibold leading-tight">{title}</span>

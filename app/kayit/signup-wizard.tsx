@@ -183,7 +183,7 @@ export function SignupWizard() {
             <Field label={t("signup.slug")} name="slug" value={slug} autoCapitalize="none" spellCheck={false}
               onChange={(e) => { setSlugTouched(true); setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "")); }}
               hint={t("signup.slugHint")} error={errors.slug && slugState !== "ok" ? errors.slug : null} required />
-            <p data-testid="slug-status" aria-live="polite" className={cn("mt-1 text-sm font-medium", slugState === "ok" ? "text-emerald-700" : slugState === "checking" ? "text-slate-600" : "text-red-700")}>
+            <p data-testid="slug-status" aria-live="polite" className={cn("mt-1 text-sm font-medium", slugState === "ok" ? "text-emerald-300" : slugState === "checking" ? "text-slate-600" : "text-red-400")}>
               {slugState !== "idle" && !errors.slug ? slugMsg[slugState] : slugState === "ok" ? slugMsg.ok : ""}
             </p>
           </div>
@@ -224,7 +224,7 @@ export function SignupWizard() {
               const on = svcs.some((s) => s.tr === translate("tr", p.key));
               return (
                 <button key={p.key} type="button" aria-pressed={on} onClick={() => toggleService(p)}
-                  className={cn("min-h-10 rounded-full border px-4 text-sm font-medium", on ? "border-brand bg-brand text-brand-fg" : "border-slate-300 bg-white hover:bg-slate-50")}>
+                  className={cn("min-h-10 rounded-full border px-4 text-sm font-medium", on ? "border-brand bg-brand text-brand-fg" : "border-slate-300 bg-surface hover:bg-slate-50")}>
                   {t(p.key)}
                 </button>
               );
@@ -238,7 +238,7 @@ export function SignupWizard() {
                   <Field label={t("signup.services.duration")} inputMode="numeric" value={s.dur} onChange={(e) => patchSvc(s.key, { dur: e.target.value.replace(/\D/g, "") })} />
                   <Field label={t("signup.services.price")} inputMode="numeric" value={s.price} onChange={(e) => patchSvc(s.key, { price: e.target.value.replace(/\D/g, "") })} />
                 </div>
-                <button type="button" className="mt-2 text-sm font-medium text-red-700 underline" onClick={() => setSvcs((c) => c.filter((x) => x.key !== s.key))}>{t("signup.services.remove")}</button>
+                <button type="button" className="mt-2 text-sm font-medium text-red-400 underline" onClick={() => setSvcs((c) => c.filter((x) => x.key !== s.key))}>{t("signup.services.remove")}</button>
               </li>
             ))}
           </ul>

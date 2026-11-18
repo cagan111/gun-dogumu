@@ -18,10 +18,10 @@ interface Report {
   noShowRate: number;
 }
 
-const BAR: Record<StatusTone, string> = { slate: "bg-[#8a7a68]", green: "bg-olive", amber: "bg-[#b08a3e]", red: "bg-clay", sky: "bg-[#7d8f5f]", violet: "bg-sea" };
+const BAR: Record<StatusTone, string> = { slate: "bg-[#8a7a68]", green: "bg-[#5FAF86]", amber: "bg-[#b08a3e]", red: "bg-clay", sky: "bg-[#7d8f5f]", violet: "bg-[#9A8BD6]" };
 // Durum çubukları sıcak palet: zeytin = olumlu, pirinç/kum = bekleyen, kil = olumsuz.
 const STATUS_BAR: Record<string, string> = {
-  completed: "bg-olive", confirmed: "bg-[#7d8f5f]", pending: "bg-[#b08a3e]",
+  completed: "bg-[#5FAF86]", confirmed: "bg-[#7d8f5f]", pending: "bg-[#b08a3e]",
   no_show: "bg-clay", cancelled_by_customer: "bg-[#c98f7e]", cancelled_by_salon: "bg-[#8a7a68]",
 };
 const STATUSES = ["completed", "confirmed", "pending", "no_show", "cancelled_by_customer", "cancelled_by_salon"] as const;

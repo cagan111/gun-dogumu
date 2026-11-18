@@ -113,15 +113,15 @@ export function DatePicker({ label, value, onChange, mode = "date", hideLabel, c
       <div className="relative">
         <button ref={btnRef} type="button" aria-haspopup="dialog" aria-expanded={open} aria-labelledby={`${id}-l ${id}-b`} aria-required={required || undefined}
           onClick={() => (open ? close(false) : show())}
-          className="flex min-h-11 w-full items-center justify-between gap-2 rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-left text-base text-slate-900">
+          className="flex min-h-11 w-full items-center justify-between gap-2 rounded-xl border border-slate-300 bg-surface px-3.5 py-2 text-left text-base text-slate-900">
           <span id={`${id}-b`} className="tabular-nums">{shown || "—"}</span>
           <svg aria-hidden viewBox="0 0 24 24" className="h-5 w-5 shrink-0 text-olive" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 6h16v14H4zM4 10h16M8 3v5m8-5v5" /></svg>
         </button>
         {open ? (
           <>
-            <div className="fixed inset-0 z-[60] bg-slate-900/40 md:bg-transparent" onClick={() => close()} aria-hidden />
+            <div className="fixed inset-0 z-[60] bg-black/60 md:bg-transparent" onClick={() => close()} aria-hidden />
             <div ref={popRef} role="dialog" aria-modal="true" aria-label={label} onKeyDown={trapTab}
-              className="fixed inset-x-0 bottom-0 z-[61] rounded-t-2xl border border-line bg-white p-3 pb-6 shadow-xl md:absolute md:inset-x-auto md:bottom-auto md:left-0 md:top-full md:mt-1 md:w-72 md:rounded-xl md:pb-3">
+              className="fixed inset-x-0 bottom-0 z-[61] rounded-t-2xl border border-line bg-surface p-3 pb-6 shadow-xl md:absolute md:inset-x-auto md:bottom-auto md:left-0 md:top-full md:mt-1 md:w-72 md:rounded-xl md:pb-3">
               <div className="mb-2 flex items-center justify-between">
                 <button type="button" className={nav} aria-label={t(mode === "date" ? "pick.prevMonth" : "pick.prevYear")} onClick={() => (mode === "date" ? shiftMonth(-1) : setView({ ...view, y: view.y - 1 }))}><span aria-hidden>‹</span></button>
                 <div className="display-heading text-lg font-semibold" aria-live="polite">{heading}</div>
@@ -140,7 +140,7 @@ export function DatePicker({ label, value, onChange, mode = "date", hideLabel, c
                           <button key={c} type="button" role="gridcell" tabIndex={isF ? 0 : -1} data-sel={isF ? "1" : undefined} aria-selected={sel} aria-current={c === today ? "date" : undefined}
                             aria-label={fmt(locale, { weekday: "long", day: "numeric", month: "long", year: "numeric" }, utc(p.y, p.m, p.d))}
                             onClick={() => { onChange(c); close(); }}
-                            className={cn("m-0.5 grid h-10 place-items-center rounded-lg text-sm tabular-nums", sel ? "bg-olive font-bold text-white" : inMonth ? "text-slate-900 hover:bg-sand" : "text-slate-400 hover:bg-sand", c === today && !sel && "ring-1 ring-olive")}>
+                            className={cn("m-0.5 grid h-10 place-items-center rounded-lg text-sm tabular-nums", sel ? "bg-brand font-bold text-brand-fg" : inMonth ? "text-slate-900 hover:bg-sand" : "text-slate-400 hover:bg-sand", c === today && !sel && "ring-1 ring-olive")}>
                             {p.d}
                           </button>
                         );
@@ -159,7 +159,7 @@ export function DatePicker({ label, value, onChange, mode = "date", hideLabel, c
                         aria-label={fmt(locale, { month: "long", year: "numeric" }, utc(view.y, m))}
                         onKeyDown={(e) => onMonthKey(e, m)}
                         onClick={() => { onChange(`${view.y}-${pad(m)}`); close(); }}
-                        className={cn("min-h-11 rounded-lg text-sm font-medium", sel ? "bg-olive text-white" : "text-slate-900 hover:bg-sand")}>
+                        className={cn("min-h-11 rounded-lg text-sm font-medium", sel ? "bg-brand text-brand-fg" : "text-slate-900 hover:bg-sand")}>
                         {n}
                       </button>
                     );

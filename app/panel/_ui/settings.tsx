@@ -205,7 +205,7 @@ function SettingsForm() {
               </label>
             ))}
           </div>
-          {fe.reminderOffsets ? <p role="alert" className="text-sm font-medium text-red-700">{fe.reminderOffsets}</p> : null}
+          {fe.reminderOffsets ? <p role="alert" className="text-sm font-medium text-red-400">{fe.reminderOffsets}</p> : null}
         </fieldset>
         <SelectField label={t("set.locale")} hint={t("set.localeHint")} value={f.locale} onChange={(e) => set({ locale: e.target.value as "tr" | "en" })}>
           <option value="tr">Türkçe</option><option value="en">English</option>
@@ -232,7 +232,7 @@ function SettingsForm() {
         <div>
           <label htmlFor="brand-color" className="mb-1.5 block text-sm font-medium text-slate-800">{t("set.brand")}</label>
           <div className="flex items-center gap-3">
-            <input id="brand-color" type="color" value={f.brandColor ?? DEFAULT_BRAND} onChange={(e) => set({ brandColor: e.target.value })} className="h-11 w-16 cursor-pointer rounded-lg border border-slate-300 bg-white p-1" />
+            <input id="brand-color" type="color" value={f.brandColor ?? DEFAULT_BRAND} onChange={(e) => set({ brandColor: e.target.value })} className="h-11 w-16 cursor-pointer rounded-lg border border-slate-300 bg-surface p-1" />
             <span className="text-sm tabular-nums text-slate-700">{f.brandColor ?? DEFAULT_BRAND}</span>
             {f.brandColor ? <Button variant="ghost" onClick={() => set({ brandColor: null })}>{t("set.brandReset")}</Button> : null}
           </div>

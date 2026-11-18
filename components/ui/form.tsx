@@ -15,7 +15,7 @@ function Msgs({ id, hint, error }: { id: string; hint?: string; error?: string |
   return (
     <>
       {hint ? <p id={`${id}-h`} className="mt-1 text-xs text-slate-600">{hint}</p> : null}
-      {error ? <p id={`${id}-e`} role="alert" className="mt-1 text-sm font-medium text-red-700">{error}</p> : null}
+      {error ? <p id={`${id}-e`} role="alert" className="mt-1 text-sm font-medium text-red-400">{error}</p> : null}
     </>
   );
 }
@@ -58,13 +58,13 @@ export function CheckField({ label, hint, className, ...props }: Omit<React.Inpu
 }
 
 export function Card({ children, className, as: As = "section", ...props }: React.HTMLAttributes<HTMLElement> & { as?: "section" | "div" | "article" }) {
-  return <As className={cn("rounded-2xl border border-line bg-white p-4 shadow-sm", className)} {...props}>{children}</As>;
+  return <As className={cn("rounded-2xl border border-line bg-surface p-4 shadow-sm", className)} {...props}>{children}</As>;
 }
 
 type Tone = "slate" | "green" | "amber" | "red" | "sky" | "violet";
 const TONES: Record<Tone, string> = {
-  slate: "bg-slate-100 text-slate-800", green: "bg-emerald-100 text-emerald-900", amber: "bg-amber-100 text-amber-900",
-  red: "bg-red-100 text-red-900", sky: "bg-sand text-olive", violet: "bg-violet-100 text-violet-900",
+  slate: "bg-slate-100 text-slate-800", green: "bg-emerald-100 text-emerald-200", amber: "bg-amber-100 text-amber-200",
+  red: "bg-red-100 text-red-200", sky: "bg-sand text-olive", violet: "bg-violet-100 text-violet-200",
 };
 export function Badge({ tone = "slate", children, className }: { tone?: Tone; children: React.ReactNode; className?: string }) {
   return <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold", TONES[tone], className)}>{children}</span>;

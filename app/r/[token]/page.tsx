@@ -42,7 +42,7 @@ export default async function AppointmentPage({ params }: Props) {
     <div className="min-h-screen bg-slate-50">
       <SalonHeader name={a.salon.name} slug={a.salon.slug} compact />
       <main className="mx-auto max-w-2xl px-4 py-6">
-        <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+        <div className="rounded-2xl bg-surface p-5 shadow-sm ring-1 ring-slate-200">
           <h2 className="text-xl font-extrabold">{t("r.title")}</h2>
           <p data-testid="status" className="mt-1 inline-block rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-800">{t(`r.status.${a.status}` as const)}</p>
           <dl className="mt-4 divide-y divide-slate-100 text-sm">

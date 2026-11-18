@@ -18,7 +18,7 @@ export function HeroMedia() {
   useEffect(() => {
     if (play) ref.current?.play()?.catch(() => setFailed(true));
   }, [play]);
-  return <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 overflow-hidden bg-olive">
+  return <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 overflow-hidden bg-paper">
     {/* Dekoratif yerel poster; gerçek klibin seçimi LICENSES.md'de bekliyor. */}
     <img src={HERO_MEDIA.poster} alt="" fetchPriority="high" className="h-full w-full object-cover object-[65%_center]" />
     {play ? <video ref={ref} autoPlay muted loop playsInline preload="metadata" poster={HERO_MEDIA.poster} onError={(event) => {
@@ -29,6 +29,6 @@ export function HeroMedia() {
       {HERO_MEDIA.mobile ? <source src={HERO_MEDIA.mobile} type="video/mp4" media="(max-width: 767px)" /> : null}
       <source src={HERO_MEDIA.desktop!} type="video/mp4" />
     </video> : null}
-    <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/75 to-black/60" />
+    <div className="absolute inset-0 bg-gradient-to-r from-[#0B0B0C]/95 via-[#0B0B0C]/80 to-[#0B0B0C]/55" />
   </div>;
 }

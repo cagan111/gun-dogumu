@@ -45,13 +45,13 @@ export function Sheet({ open, onClose, title, children, wide }: { open: boolean;
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center md:items-center">
-      <div className="absolute inset-0 bg-slate-900/50" onClick={onClose} aria-hidden />
+      <div className="absolute inset-0 bg-black/70" onClick={onClose} aria-hidden />
       <div
         ref={ref}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className={cn("relative flex max-h-[92dvh] w-full flex-col rounded-t-2xl bg-white shadow-xl md:rounded-2xl", wide ? "md:max-w-2xl" : "md:max-w-md")}
+        className={cn("relative flex max-h-[92dvh] w-full flex-col rounded-t-2xl bg-surface shadow-xl md:rounded-2xl", wide ? "md:max-w-2xl" : "md:max-w-md")}
       >
         <div className="flex items-start justify-between gap-3 border-b border-slate-200 px-4 py-3">
           <h2 id={titleId} className="text-lg font-bold">{title}</h2>

@@ -22,7 +22,7 @@ export async function SalonHeader({ name, city, address, logoUrl, coverUrl, slug
         </div>
         <div className="mt-5 flex items-center gap-4">
           {logoUrl ? (
-            <img src={logoUrl} alt="" className="h-16 w-16 shrink-0 rounded-2xl border-2 border-white/70 bg-white object-cover" />
+            <img src={logoUrl} alt="" className="h-16 w-16 shrink-0 rounded-2xl border-2 border-white/70 bg-surface object-cover" />
           ) : (
             <span aria-hidden className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl border-2 border-white/60 bg-white/20 text-xl font-bold">{initials(name)}</span>
           )}

@@ -93,7 +93,7 @@ export function ServicesView() {
               {isOwner ? (
                 <div className="flex gap-2">
                   <Button variant="secondary" onClick={() => open(s)} aria-label={`${t("common.edit")}: ${svcName(s, locale)}`}>{t("common.edit")}</Button>
-                  <Button variant="ghost" className="text-red-800" onClick={() => setDel(s)} aria-label={`${t("common.delete")}: ${svcName(s, locale)}`}>{t("common.delete")}</Button>
+                  <Button variant="ghost" className="text-red-300" onClick={() => setDel(s)} aria-label={`${t("common.delete")}: ${svcName(s, locale)}`}>{t("common.delete")}</Button>
                 </div>
               ) : null}
             </Card>

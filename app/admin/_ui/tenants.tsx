@@ -67,7 +67,7 @@ export function TenantsView() {
       {err ? <Alert className="mt-3">{errorMessage(err, t)}</Alert> : null}
       <p className="mt-3 text-sm text-slate-600" aria-live="polite">{t("adm.total", { n: total })}</p>
 
-      <div className="mt-2 hidden overflow-x-auto rounded-2xl border border-slate-200 bg-white md:block">
+      <div className="mt-2 hidden overflow-x-auto rounded-2xl border border-slate-200 bg-surface md:block">
         <table className="w-full text-left text-sm" data-testid="tenants-table">
           <caption className="sr-only">{t("adm.nav.tenants")}</caption>
           <thead className="bg-slate-50 text-xs uppercase text-slate-600">

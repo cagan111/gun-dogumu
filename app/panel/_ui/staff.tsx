@@ -98,7 +98,7 @@ export function StaffView() {
                   <div className="flex flex-wrap gap-2">
                     <Button variant="secondary" onClick={() => setHoursFor(s)}>{t("staff.hours")}</Button>
                     <Button variant="secondary" onClick={() => open(s)} aria-label={`${t("common.edit")}: ${s.name}`}>{t("common.edit")}</Button>
-                    <Button variant="ghost" className="text-red-800" onClick={() => setDelStaff(s)} aria-label={`${t("common.delete")}: ${s.name}`}>{t("common.delete")}</Button>
+                    <Button variant="ghost" className="text-red-300" onClick={() => setDelStaff(s)} aria-label={`${t("common.delete")}: ${s.name}`}>{t("common.delete")}</Button>
                   </div>
                 ) : <Button variant="secondary" onClick={() => setHoursFor(s)}>{t("staff.hours")}</Button>}
               </Card>
@@ -126,7 +126,7 @@ export function StaffView() {
               <div role="radiogroup" aria-labelledby="color-l" className="flex flex-wrap gap-2">
                 {COLORS.map((c) => (
                   <button key={c} type="button" role="radio" aria-checked={draft.color === c} aria-label={c} onClick={() => setDraft({ ...draft, color: c })}
-                    className="h-10 w-10 rounded-full border-2" style={{ background: c, borderColor: draft.color === c ? "#0f172a" : "transparent", outline: draft.color === c ? "2px solid #fff" : undefined, outlineOffset: -4 }} />
+                    className="h-10 w-10 rounded-full border-2" style={{ background: c, borderColor: draft.color === c ? "#F2EEE6" : "transparent", outline: draft.color === c ? "2px solid #0B0B0C" : undefined, outlineOffset: -4 }} />
                 ))}
               </div>
             </div>
@@ -160,7 +160,7 @@ function TimeOffList({ list, staff, canEdit, onDelete }: { list: TimeOff[]; staf
               <p className="font-semibold">{staff.find((s) => s.id === o.staffId)?.name ?? "—"} <Badge className="ml-1">{t(`off.${o.kind}` as Key)}</Badge></p>
               <p className="text-sm text-slate-600">{fmtDateTime(o.startsAt, locale, tenant.timeZone)} → {fmtDateTime(o.endsAt, locale, tenant.timeZone)}{o.reason ? ` · ${o.reason}` : ""}</p>
             </div>
-            {canEdit ? <Button variant="ghost" className="text-red-800" onClick={() => onDelete(o)} aria-label={`${t("common.delete")}: ${fmtDateTime(o.startsAt, locale, tenant.timeZone)}`}>{t("common.delete")}</Button> : null}
+            {canEdit ? <Button variant="ghost" className="text-red-300" onClick={() => onDelete(o)} aria-label={`${t("common.delete")}: ${fmtDateTime(o.startsAt, locale, tenant.timeZone)}`}>{t("common.delete")}</Button> : null}
           </Card>
         </li>
       ))}
@@ -304,7 +304,7 @@ function HoursSheet({ staff, canEdit, onClose }: { staff: Staff | null; canEdit:
                       <div key={k} className="grid grid-cols-[1fr_1fr_auto] items-end gap-2">
                         <Field label={`${t("hours.break")} ${k + 1}: ${t("hours.from")}`} type="time" value={b.s} onChange={(e) => patch(i, { breaks: d.breaks.map((x, j) => (j === k ? { ...x, s: e.target.value } : x)) })} />
                         <Field label={`${t("hours.break")} ${k + 1}: ${t("hours.to")}`} type="time" value={b.e} onChange={(e) => patch(i, { breaks: d.breaks.map((x, j) => (j === k ? { ...x, e: e.target.value } : x)) })} />
-                        <Button variant="ghost" className="text-red-800" aria-label={`${t("hours.removeBreak")} (${name})`} onClick={() => patch(i, { breaks: d.breaks.filter((_, j) => j !== k) })}><span aria-hidden>×</span></Button>
+                        <Button variant="ghost" className="text-red-300" aria-label={`${t("hours.removeBreak")} (${name})`} onClick={() => patch(i, { breaks: d.breaks.filter((_, j) => j !== k) })}><span aria-hidden>×</span></Button>
                       </div>
                     ))}
                     {d.breaks.length < 5 ? <Button variant="secondary" className="!min-h-10 text-sm" onClick={() => patch(i, { breaks: [...d.breaks, { s: "12:30", e: "13:00" }] })}>+ {t("hours.addBreak")} ({name})</Button> : null}

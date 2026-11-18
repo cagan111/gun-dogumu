@@ -29,10 +29,10 @@ interface Placed { a: Appt; start: number; dur: number; lane: number; lanes: num
 function CalSkeleton({ label, cols }: { label: string; cols: number }) {
   const blocks = [[1, 2], [3, 1], [0, 2], [2, 2], [4, 1], [1, 1]];
   return (
-    <div role="status" aria-busy="true" aria-label={label} className="mt-3 overflow-hidden rounded-lg border border-line bg-white" data-testid="cal-skeleton">
+    <div role="status" aria-busy="true" aria-label={label} className="mt-3 overflow-hidden rounded-lg border border-line bg-surface" data-testid="cal-skeleton">
       <span className="sr-only">{label}</span>
       <div aria-hidden style={{ display: "grid", gridTemplateColumns: `${GUTTER}px repeat(${cols}, minmax(${cols > 3 ? 72 : MIN_COL}px, 1fr))` }} className="overflow-hidden">
-        <div className="border-b border-r border-line bg-white" />
+        <div className="border-b border-r border-line bg-surface" />
         {Array.from({ length: cols }, (_, i) => (
           <div key={i} className="flex items-center justify-center gap-1.5 border-b border-r border-line bg-paper px-2 py-3">
             <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-sand motion-reduce:animate-none" />
@@ -237,9 +237,9 @@ export function CalendarView() {
           <Button variant="secondary" className="!px-3" aria-label={t("cal.next")} onClick={() => setDate(addDays(date, step))}><span aria-hidden>›</span></Button>
         </div>
         <DatePicker label={t("cal.pickDate")} hideLabel value={date} onChange={(v) => v && setDate(v)} className="w-40" />
-        <div role="group" aria-label={t("cal.view")} className="inline-flex rounded-xl border border-slate-300 bg-white p-0.5">
+        <div role="group" aria-label={t("cal.view")} className="inline-flex rounded-xl border border-slate-300 bg-surface p-0.5">
           {(["day", "week"] as const).map((v) => (
-            <button key={v} type="button" aria-pressed={view === v} onClick={() => setView(v)} className={cn("min-h-10 rounded-lg px-4 text-sm font-semibold", view === v ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-100")}>{t(v === "day" ? "cal.day" : "cal.week")}</button>
+            <button key={v} type="button" aria-pressed={view === v} onClick={() => setView(v)} className={cn("min-h-10 rounded-lg px-4 text-sm font-semibold", view === v ? "bg-brand text-brand-fg" : "text-slate-700 hover:bg-slate-100")}>{t(v === "day" ? "cal.day" : "cal.week")}</button>
           ))}
         </div>
         <Button className="ml-auto" onClick={() => setCreate({ date, staffId: "any", time: "" })}>+ {t("cal.new")}</Button>
@@ -273,9 +273,9 @@ export function CalendarView() {
       ) : null}
 
       {cols.length ? (
-        <div className={cn("mt-3 max-h-[calc(100dvh-16rem)] min-h-80 overflow-auto rounded-lg border border-line bg-white md:max-h-[calc(100dvh-15rem)]", apptsQ.loading && "opacity-70")} data-testid="cal-scroll" tabIndex={0} aria-label={t("cal.grid")}>
+        <div className={cn("mt-3 max-h-[calc(100dvh-16rem)] min-h-80 overflow-auto rounded-lg border border-line bg-surface md:max-h-[calc(100dvh-15rem)]", apptsQ.loading && "opacity-70")} data-testid="cal-scroll" tabIndex={0} aria-label={t("cal.grid")}>
           <div style={{ display: "grid", gridTemplateColumns: `${GUTTER}px repeat(${cols.length}, minmax(${MIN_COL}px, 1fr))` }}>
-            <div className="sticky left-0 top-0 z-30 border-b border-r border-line bg-white" />
+            <div className="sticky left-0 top-0 z-30 border-b border-r border-line bg-surface" />
             {cols.map((c) => (
               <div key={c.key} className="sticky top-0 z-20 border-b border-r border-line bg-paper px-2 py-2 text-center">
                 <div className="flex items-center justify-center gap-1.5 text-sm font-bold">
@@ -285,7 +285,7 @@ export function CalendarView() {
                 {c.sub ? <div className="text-xs text-slate-600">{c.sub}</div> : null}
               </div>
             ))}
-            <div className="sticky left-0 z-20 border-r border-line bg-white" style={{ height }}>
+            <div className="sticky left-0 z-20 border-r border-line bg-surface" style={{ height }}>
               {Array.from({ length: Math.ceil((gridEnd - gridStart) / 60) + 1 }, (_, i) => gridStart + i * 60).filter((m) => m < gridEnd + 1).map((m) => (
                 <span key={m} className="absolute right-1 -translate-y-1/2 text-xs font-medium tabular-nums text-slate-700" style={{ top: (m - gridStart) * PPM + (m === gridStart ? 8 : 0) }}>{fmtMin(m)}</span>
               ))}
@@ -315,13 +315,13 @@ export function CalendarView() {
                   className="relative cursor-cell border-r border-line"
                   style={{
                     height,
-                    backgroundImage: `repeating-linear-gradient(to bottom, #cbd5e1 0, #cbd5e1 1px, transparent 1px, transparent ${60 * PPM}px), repeating-linear-gradient(to bottom, #f1f5f9 0, #f1f5f9 1px, transparent 1px, transparent ${snap * PPM}px)`,
+                    backgroundImage: `repeating-linear-gradient(to bottom, rgb(255 255 255 / .12) 0, rgb(255 255 255 / .12) 1px, transparent 1px, transparent ${60 * PPM}px), repeating-linear-gradient(to bottom, rgb(255 255 255 / .045) 0, rgb(255 255 255 / .045) 1px, transparent 1px, transparent ${snap * PPM}px)`,
                   }}
                   onClick={(e) => onColClick(e, c)}
                 >
                   {offs.map((o, i) => (
-                    <div key={i} aria-hidden className={cn("pointer-events-none absolute inset-x-0", o.kind === "off" ? "bg-slate-200/70" : o.kind === "break" ? "bg-slate-200/60" : "bg-amber-100/70")}
-                      style={{ top: (o.a - gridStart) * PPM, height: (o.b - o.a) * PPM, backgroundImage: o.kind === "off" ? undefined : "repeating-linear-gradient(135deg, transparent 0 6px, rgb(148 163 184 / .35) 6px 7px)" }} />
+                    <div key={i} aria-hidden className={cn("pointer-events-none absolute inset-x-0", o.kind === "off" ? "bg-black/45" : o.kind === "break" ? "bg-white/[.04]" : "bg-amber-100/70")}
+                      style={{ top: (o.a - gridStart) * PPM, height: (o.b - o.a) * PPM, backgroundImage: o.kind === "off" ? undefined : "repeating-linear-gradient(135deg, transparent 0 6px, rgb(255 255 255 / .12) 6px 7px)" }} />
                   ))}
                   {items.map((p) => {
                     const dragging = drag?.id === p.a.id;
@@ -383,14 +383,14 @@ function Block({ p, color, gridStart, locale, ghost, onClick, ...ptr }: {
       className={cn(
         "absolute z-10 overflow-hidden rounded-md border border-l-4 px-1.5 py-0.5 text-left text-xs leading-tight text-slate-900 shadow-sm transition-opacity md:cursor-grab md:active:cursor-grabbing",
         a.status === "pending" && "border-dashed",
-        a.status === "no_show" && "border-red-500 text-red-900",
+        a.status === "no_show" && "border-red-500 text-red-200",
         cancelled && "line-through",
         ghost && "opacity-30",
       )}
       style={{
         top: (p.start - gridStart) * PPM + 1, height: h, left: `calc(${p.lane * w}% + 2px)`, width: `calc(${w}% - 4px)`,
         borderColor: a.status === "no_show" ? undefined : color, borderLeftColor: color,
-        backgroundColor: `${color}26`,
+        backgroundColor: `${color}38`,
         backgroundImage: a.status === "no_show" ? "repeating-linear-gradient(135deg, transparent 0 5px, rgb(239 68 68 / .22) 5px 7px)" : undefined,
         touchAction: "manipulation",
       }}

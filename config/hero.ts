@@ -7,3 +7,5 @@ export const HERO_MEDIA: { poster: string; desktop: string | null; mobile: strin
 export function heroMotionAllowed(reducedMotion: boolean, saveData: boolean): boolean {
   return !reducedMotion && !saveData;
 }
+// Video eklemek için: public/hero/ altına barber.mp4 (masaüstü) ve barber-m.mp4 (mobil, isteğe bağlı) koyup
+// yukarıdaki desktop/mobile alanlarına "/hero/barber.mp4" yollarını yazın; poster için /hero/poster.webp kullanın.

@@ -1,3 +1,4 @@
+import { GalleryStrip } from "@/components/gallery-strip";
 import { HeroMedia } from "@/components/hero/media";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -17,9 +18,9 @@ const FEATURES = ["f1", "f2", "f3", "f4", "f5", "f6"] as const;
 const FAQ = ["faq1", "faq2", "faq3", "faq4", "faq5", "faq6"] as const;
 const POPULAR: PlanId = "pro";
 const SCENARIOS = [
-  { city: "home.nicosia", service: "home.nicosia.service", detail: "home.nicosia.detail", style: "border-clay bg-white" },
+  { city: "home.nicosia", service: "home.nicosia.service", detail: "home.nicosia.detail", style: "border-clay bg-surface" },
   { city: "home.kyrenia", service: "home.kyrenia.service", detail: "home.kyrenia.detail", style: "border-sea bg-paper" },
-  { city: "home.famagusta", service: "home.famagusta.service", detail: "home.famagusta.detail", style: "border-olive bg-white" },
+  { city: "home.famagusta", service: "home.famagusta.service", detail: "home.famagusta.detail", style: "border-olive bg-surface" },
 ] as const;
 const testimonials: { quote: string; attribution: string }[] = [];
 
@@ -39,14 +40,14 @@ export default async function Home() {
 
   return (
     <>
-      <a href="#icerik" className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded focus:bg-white focus:px-3 focus:py-2">{t("common.skipToContent")}</a>
+      <a href="#icerik" className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded focus:bg-surface focus:px-3 focus:py-2">{t("common.skipToContent")}</a>
       <SiteHeader />
       <main id="icerik">
-        <section className="relative isolate overflow-hidden border-b border-line bg-olive">
+        <section className="relative isolate overflow-hidden border-b border-line bg-paper">
           <HeroMedia />
           <div className="mx-auto grid max-w-6xl items-center gap-9 px-4 py-12 md:grid-cols-[1.2fr_1fr] md:py-20">
             <div>
-              <p className="text-xs font-bold uppercase tracking-[.16em] text-sand">{t("home.badge")}</p>
+              <p className="text-xs font-bold uppercase tracking-[.16em] text-gold">{t("home.badge")}</p>
               <h1 className="display-heading mt-3 max-w-xl text-[2.5rem] font-semibold leading-[1.08] tracking-tight text-white sm:text-[3.6rem]">{t("home.heroTitle")}</h1>
               <p className="mt-5 max-w-lg text-base leading-relaxed text-white sm:text-lg">{t("home.heroSub")}</p>
               <div className="mt-7 flex flex-wrap gap-3">
@@ -56,7 +57,7 @@ export default async function Home() {
               <p className="mt-3 text-sm text-white">{t("home.heroNote")}</p>
             </div>
             <div aria-hidden className="relative isolate mx-auto flex min-h-64 w-full max-w-sm items-center justify-center p-4 md:min-h-96">
-              <div className="relative w-full max-w-60 rotate-[-3deg] rounded-lg border border-line bg-white p-5 shadow-lg">
+              <div className="relative w-full max-w-60 rotate-[-3deg] rounded-lg border border-line bg-surface p-5 shadow-lg">
                 <p className="text-xs font-bold uppercase tracking-wider text-clay">{t("home.nicosia")}</p>
                 <p className="display-heading mt-1 text-xl font-semibold">{t("home.mockSalon")}</p>
                 <div className="mt-3 border-y border-line py-2 text-sm">
@@ -68,6 +69,7 @@ export default async function Home() {
             </div>
           </div>
         </section>
+        <GalleryStrip />
 
         <section className="mx-auto grid max-w-6xl gap-5 px-4 py-14 md:grid-cols-[1fr_1.2fr] md:items-start">
           <h2 className="display-heading text-3xl font-semibold text-olive sm:text-4xl">{t("home.why.title")}</h2>
@@ -119,8 +121,8 @@ export default async function Home() {
                 const p = PLANS[id];
                 const popular = id === POPULAR;
                 return (
-                  <article key={id} className={`relative flex flex-col rounded-lg border bg-white p-6 ${popular ? "border-sea ring-1 ring-sea" : "border-slate-200"}`}>
-                    {popular ? <span className="absolute -top-3 left-6 rounded-full bg-sea px-3 py-0.5 text-xs font-semibold text-white">{t("home.plan.popular")}</span> : null}
+                  <article key={id} className={`relative flex flex-col rounded-lg border bg-surface p-6 ${popular ? "border-sea ring-1 ring-sea" : "border-slate-200"}`}>
+                    {popular ? <span className="absolute -top-3 left-6 rounded-full bg-gold px-3 py-0.5 text-xs font-semibold text-[#0B0B0C]">{t("home.plan.popular")}</span> : null}
                     <h3 className="text-lg font-bold">{p.name[locale]}</h3>
                     <p className="mt-3"><span className="text-4xl font-extrabold">{fmt.format(prices[id])}</span> <span className="text-slate-600">{t("common.perMonth")}</span></p>
                     <p className="mt-1 text-sm font-medium text-olive">{t("home.plan.trial")}</p>
@@ -155,16 +157,16 @@ export default async function Home() {
           </div>
         </section>
 
-        <section className="bg-sea text-white">
+        <section className="border-t border-line bg-gradient-to-b from-sand to-surface text-white">
           <div className="mx-auto flex max-w-6xl flex-col items-start gap-4 px-4 py-12 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-2xl font-bold">{t("home.ctaTitle")}</h2>
-              <p className="mt-1 text-paper">{t("home.ctaSub")}</p>
+              <p className="mt-1 text-slate-600">{t("home.ctaSub")}</p>
             </div>
             <div className="flex flex-wrap gap-3">
               <Link href="/kayit" className={buttonClass("secondary", "border-transparent px-6")}>{t("home.ctaPrimary")}</Link>
               {waHref ? (
-                <a href={waHref} target="_blank" rel="noopener noreferrer" className={buttonClass("ghost", "border border-white/60 px-6 text-white hover:bg-white/10")}>{t("home.whatsapp")}</a>
+                <a href={waHref} target="_blank" rel="noopener noreferrer" className={buttonClass("ghost", "border border-white/25 px-6 text-white hover:bg-white/10")}>{t("home.whatsapp")}</a>
               ) : null}
             </div>
           </div>

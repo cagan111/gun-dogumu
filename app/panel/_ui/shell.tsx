@@ -37,7 +37,7 @@ function SmsChip() {
   const { balance } = usePanel();
   const t = useT();
   return (
-    <Link href="/panel/ayarlar#sms" className={cn("inline-flex min-h-9 items-center rounded-full border px-3 text-xs font-semibold", balance !== null && balance <= 10 ? "border-red-300 bg-red-50 text-red-800" : "border-slate-300 bg-white text-slate-800")} aria-label={t("sms.chip", { n: balance ?? "…" })}>
+    <Link href="/panel/ayarlar#sms" className={cn("inline-flex min-h-9 items-center rounded-full border px-3 text-xs font-semibold", balance !== null && balance <= 10 ? "border-red-300 bg-red-50 text-red-300" : "border-slate-300 bg-surface text-slate-800")} aria-label={t("sms.chip", { n: balance ?? "…" })}>
       <span aria-hidden>✉</span>&nbsp;{balance ?? "…"} SMS
     </Link>
   );
@@ -49,11 +49,11 @@ function MobileMenu() {
   const alert = tenant.status === "past_due" || tenant.status === "suspended" || (tenant.status === "trial" && tenant.daysLeft !== null && tenant.daysLeft <= 3);
   return (
     <details className="relative">
-      <summary aria-label={t("panel.menu")} className="relative flex h-9 w-9 cursor-pointer list-none items-center justify-center rounded-full border border-slate-300 bg-white text-lg font-bold leading-none text-slate-800 [&::-webkit-details-marker]:hidden">
+      <summary aria-label={t("panel.menu")} className="relative flex h-9 w-9 cursor-pointer list-none items-center justify-center rounded-full border border-slate-300 bg-surface text-lg font-bold leading-none text-slate-800 [&::-webkit-details-marker]:hidden">
         <span aria-hidden>⋯</span>
-        {alert ? <span aria-hidden className="absolute right-0 top-0 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-white" /> : null}
+        {alert ? <span aria-hidden className="absolute right-0 top-0 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-paper" /> : null}
       </summary>
-      <div className="absolute right-0 top-11 z-50 w-60 space-y-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-lg">
+      <div className="absolute right-0 top-11 z-50 w-60 space-y-3 rounded-2xl border border-slate-200 bg-surface p-3 shadow-lg">
         <StatusBadge />
         <div><LangSwitcher /></div>
         <LogoutButton label={t("panel.logoutShort")} compact />
@@ -70,7 +70,7 @@ function Inner({ children }: { children: React.ReactNode }) {
   const active = (href: string) => (href === "/panel" ? path === "/panel" : path.startsWith(href));
   return (
     <div className="min-h-dvh bg-paper md:flex">
-      <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:left-2 focus:top-2 focus:z-[80] focus:rounded-lg focus:bg-white focus:px-3 focus:py-2">{t("common.skipToContent")}</a>
+      <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:left-2 focus:top-2 focus:z-[80] focus:rounded-lg focus:bg-surface focus:px-3 focus:py-2">{t("common.skipToContent")}</a>
       <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col border-r border-line bg-paper md:flex">
         <div className="border-b border-slate-200 px-5 py-4">
           <p className="display-heading truncate text-xl font-semibold">{tenant.name}</p>
@@ -89,7 +89,7 @@ function Inner({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 border-b border-line bg-white/95 px-3 py-1.5 backdrop-blur md:flex md:items-center md:justify-end md:gap-3 md:px-4 md:py-2">
+        <header className="sticky top-0 z-30 border-b border-line bg-surface/95 px-3 py-1.5 backdrop-blur md:flex md:items-center md:justify-end md:gap-3 md:px-4 md:py-2">
           {/* mobil: tek kompakt satır — salon adı · SMS · menü (durum rozeti, dil, çıkış menüde) */}
           <div className="flex items-center gap-2 md:hidden">
             <h1 className="min-w-0 flex-1 truncate text-base font-extrabold">{tenant.name}</h1>
@@ -105,7 +105,7 @@ function Inner({ children }: { children: React.ReactNode }) {
         {tenant.status === "suspended" ? <p role="alert" className="bg-red-700 px-4 py-2 text-sm font-medium text-white">{t("sub.suspendedNote")}</p> : null}
         <main id="main" className="flex-1 px-3 py-4 pb-28 md:px-6 md:pb-8">{children}</main>
       </div>
-      <nav aria-label={t("nav.label")} style={{ gridTemplateColumns: `repeat(${nav.length}, minmax(0, 1fr))` }} className="fixed inset-x-0 bottom-0 z-40 grid border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)] md:hidden">
+      <nav aria-label={t("nav.label")} style={{ gridTemplateColumns: `repeat(${nav.length}, minmax(0, 1fr))` }} className="fixed inset-x-0 bottom-0 z-40 grid border-t border-slate-200 bg-surface pb-[env(safe-area-inset-bottom)] md:hidden">
         {nav.map((n) => (
           <Link key={n.href} href={n.href} aria-current={active(n.href) ? "page" : undefined} className={cn("flex min-h-14 flex-col items-center justify-center gap-0.5 px-0.5 text-[11px] font-semibold", active(n.href) ? "text-brand" : "text-slate-600")}>
             <Icon d={n.icon} />

@@ -34,7 +34,7 @@ export function CancelPanel({ token, cancellable, hours, phone }: { token: strin
       {err ? <Alert className="mb-3">{err}</Alert> : null}
       {asking ? (
         <div role="alertdialog" aria-label={t("r.cancel")} className="rounded-xl border border-red-200 bg-red-50 p-4">
-          <p className="text-sm font-medium text-red-900">{t("r.cancelAsk")}</p>
+          <p className="text-sm font-medium text-red-200">{t("r.cancelAsk")}</p>
           <div className="mt-3 flex gap-3">
             <Button variant="danger" onClick={cancel} disabled={busy} data-testid="cancel-confirm">{busy ? <><Spinner />{t("r.cancelling")}</> : t("r.cancelYes")}</Button>
             <Button variant="secondary" onClick={() => setAsking(false)} disabled={busy}>{t("r.cancelNo")}</Button>
