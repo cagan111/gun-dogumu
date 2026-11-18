@@ -154,7 +154,7 @@ Biçim: `- [ ] T-NNN | sahip: claude|codex|- | açıklama`. Başlamadan sahip ya
 - [x] T-111 | sahip: codex | (Yüksek 3) OTP: salon başına maliyet tavanı + yeniden gönderim bekleme süresi; kayıtlı/kayıtsız numarada aynı HTTP yanıtı
 - [x] T-112 | sahip: codex | (Yüksek 2) Mesaj gönderiminde işçi kesintisi: askıda `queued` kayıtları uzlaştırma (süreli sahiplik + iade/yeniden deneme) + kesinti enjekte eden test
 - [x] T-113 | sahip: codex | (Orta 4) OTP: salon+telefon başına tek kullanılmamış kod (kısıt/kilit) + paralel test
-- [ ] T-114 | sahip: codex | (Orta 5) Abonelik taraması ile ödeme yarışı: kilit altında yeniden okuma / koşullu güncelleme
+- [x] T-114 | sahip: codex | (Orta 5) Abonelik taraması ile ödeme yarışı: kilit altında yeniden okuma / koşullu güncelleme
 - [ ] T-115 | sahip: codex | (Orta 6) İptal kontrolünde okunan startsAt ile koşullu güncelleme
 - [ ] T-116 | sahip: codex | (Orta 7) Kampanya: kalıcı kampanya/alıcı kaydı, kredi rezervasyonu, yeniden denemede yalnız kalanlar
 - [ ] T-117 | sahip: codex | (Orta 8) Manuel ödemede idempotency anahtarı
@@ -197,3 +197,5 @@ Biçim: `- [ ] T-NNN | sahip: claude|codex|- | açıklama`. Başlamadan sahip ya
 - [ ] T-145 | sahip: codex | ORTA: giriş kilidi yalnız başarısız denemeleri saysın (DoS önleme)
 - [ ] T-146 | sahip: codex | ORTA: güvenilir proxy IP'si (TRUST_PROXY), OTP zamanlama eşitleme, salon OTP kotasının tek müşteriyi kilitlememesi, JWT iptali (sürüm/tokenVersion), Caddy HSTS+CSP+gövde sınırı, erişim logunda token maskeleme
 - [ ] T-147 | sahip: codex | DÜŞÜK: personel müşteri araması joker kaçışı, NUL bayt/bozuk Bearer 500'leri, gövde boyut sınırı, .env.example SUPERADMIN_EMAIL, yedek dosya izinleri 0600, SMS başlığı doğrulaması
+
+- T114 (18Kasım): ödemeyle aynı tenant kilidi altında yeniden okuma; durum ve uyarı/audit aynı transaction. Yeni ortamda önce2regresyonFAIL, sonra tamCI257/build+panel/flow/isolationPASS. Luna karşılıklı inceleme, önemli hata yok.

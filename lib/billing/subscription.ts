@@ -72,27 +72,35 @@ export async function applySubscriptionTick(now: Date = new Date(), opts: { clie
   const client = opts.client ?? prisma;
   const tenants = await client.tenant.findMany({
     where: { status: { in: ["trial", "active", "past_due"] }, ...(opts.tenantIds ? { id: { in: opts.tenantIds } } : {}) },
-    select: { id: true, status: true, trialEndsAt: true, subscriptionEndsAt: true, pastDueSince: true },
+    select: { id: true },
   });
   const result: TickResult = { checked: tenants.length, transitions: [], notices: [] };
-  for (const t of tenants) {
-    const next = nextStatus(t, now);
-    if (next.changed) {
-      const r = await client.tenant.updateMany({ where: { id: t.id, status: t.status }, data: { status: next.status, pastDueSince: next.pastDueSince } });
-      if (r.count === 1) {
-        await writeAudit(client, { actorRole: "system", tenantId: t.id, action: "subscription.status_changed", details: { from: t.status, to: next.status, at: now.toISOString() } });
-        result.transitions.push({ tenantId: t.id, from: t.status, to: next.status });
+  for (const candidate of tenants) {
+    // Same row lock as manual payment; scan is only a list of candidates.
+    const applied = await client.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "Tenant" WHERE id = ${candidate.id} FOR UPDATE`;
+      const t = await tx.tenant.findUnique({ where: { id: candidate.id }, select: { id: true, status: true, trialEndsAt: true, subscriptionEndsAt: true, pastDueSince: true } });
+      if (!t || t.status === "suspended") return null;
+      const next = nextStatus(t, now);
+      let transition: TickResult["transitions"][number] | null = null;
+      if (next.changed) {
+        await tx.tenant.update({ where: { id: t.id }, data: { status: next.status, pastDueSince: next.pastDueSince } });
+        await writeAudit(tx, { actorRole: "system", tenantId: t.id, action: "subscription.status_changed", details: { from: t.status, to: next.status, at: now.toISOString() } });
+        transition = { tenantId: t.id, from: t.status, to: next.status };
       }
-    }
-    for (const n of noticesFor(t.id, t, next, now)) {
-      const dup = await client.auditLog.findFirst({
-        where: { tenantId: n.tenantId, action: `subscription.notice.${n.kind}`, details: { path: ["anchor"], equals: n.anchor.toISOString() } },
-        select: { id: true },
-      });
-      if (dup) continue;
-      await writeAudit(client, { actorRole: "system", tenantId: n.tenantId, action: `subscription.notice.${n.kind}`, details: { anchor: n.anchor.toISOString() } });
-      result.notices.push(n);
-    }
+      const notices: Notice[] = [];
+      for (const n of noticesFor(t.id, t, next, now)) {
+        const dup = await tx.auditLog.findFirst({
+          where: { tenantId: n.tenantId, action: `subscription.notice.${n.kind}`, details: { path: ["anchor"], equals: n.anchor.toISOString() } }, select: { id: true },
+        });
+        if (dup) continue;
+        await writeAudit(tx, { actorRole: "system", tenantId: n.tenantId, action: `subscription.notice.${n.kind}`, details: { anchor: n.anchor.toISOString() } });
+        notices.push(n);
+      }
+      return { transition, notices };
+    });
+    if (applied?.transition) result.transitions.push(applied.transition);
+    if (applied) result.notices.push(...applied.notices);
   }
   return result;
 }

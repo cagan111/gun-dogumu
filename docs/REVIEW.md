@@ -34,3 +34,6 @@
 - Worker gerçek pg-boss ile açıldı; message-recovery dakika cron kaydı DBden doğrulandı. Gerçek sağlayıcı/gerçekSMS denenmedi; SMSmock kaldı. Uzlaştırma iadeyle kapatır, otomatik içerikyenilemesi yapmaz.
 
 - T113: Luna önce directparallelinsert regresyonunu kırmızı çalıştırdı (2kayıt kabul edildi); root SQLmigration+deterministik tie-order ekledi. Üç DBtesti index/P2002, farklıtenant ve gerçekmigration SQLini tempfixture üzerinde doğrular; mevcut5test routecooldown/paralelgönderimi kapsar. Luna kilit/index/cleanup diffini inceleyip önemli sorun bulmadı. TamCI254/build+booking/flow/isolation yeşil.
+
+## T114 — 18 Kasım yeniden kurulan ortam
+Root923b6a0 tabanında tarama→gerçek manuelödeme→taramanın devamı deterministik DBtestini yeniden çalıştırdı: önce2FAIL/1PASS. Kilitli yeniden okuma ve transactioniçi audit/notice dedupe sonrası CI257/257, build ve panel/flow/isolation e2ePASS. Tekhafifajan GPT-6 Luna kod/testdiffini inceledi, kalıcı durum/audit assertlerini önerdi, root ekledi; önemli açık kalmadı. Önceki kayıp yereltest/patch teslim sayılmadı.
