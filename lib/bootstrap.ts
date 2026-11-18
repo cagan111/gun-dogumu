@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "./db";
 import { createLoginToken, setPasswordLink } from "./login-token";
 import { sendAuthEmail } from "./messaging/auth-mail";
+import { logger } from "./logger";
 import { normalizeEmail } from "./login";
 
 /**
@@ -30,6 +31,9 @@ export async function ensureSuperadmin(env: Record<string, string | undefined> =
     result = "relinked";
   }
   const token = await createLoginToken(user.id, "set_password");
-  await sendAuthEmail(email, "set_password", setPasswordLink(token)); // e-posta sağlayıcı Mock iken bağlantı loga düşer
+  const link = setPasswordLink(token);
+  // Brief'in tek log istisnası: yalnız ilk kurulumda şifresiz superadmin için.
+  logger.warn({ link }, "ilk kurulum: tek kullanımlık süper-admin şifre bağlantısı");
+  await sendAuthEmail(email, "set_password", link);
   return result;
 }

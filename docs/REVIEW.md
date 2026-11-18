@@ -21,3 +21,7 @@
 ### Tenant kapsamı
 
 `lib/tenant.ts:10` ve `:17` üst düzey işlem argümanlarını sınırlar. İlişki mutasyonları, `updateManyAndReturn` ve ham SQL bu kapsama otomatik girmez. İncelenen çağrılardan doğrulanmış bir salonlar arası veri sızıntısı çıkarılmadı. Yeni çağrıların korumayı varsaymaması için desteklenmeyen işlemleri açıkça reddetmek ve ilişki kimliklerinin tenant eşleşmesini veritabanına taşıyan kısıtlar eklemek değerlendirilmeli.
+
+## 18 Kasım 2026 — Codex alt ajanları / karşılıklı inceleme
+- Root, T110/T119 auth_security diffini inceledi: üretim kapısı isteme/tüketmede, mock e-posta gövdesi sağlayıcıya verilmez; bootstrap istisnası yalnız ensureSuperadmin. Gerçek Pino testleri ilk kırmızı çalışmadan sonra yeşil.
+- auth_security, T122 medya/polish akışını salt-okunur inceledi; önemli hata yok. Hero test düzeneği CSS yüklemediğinden görsel kanıt ayrı390/1280 gerçek uygulama ekranlarıdır. Flow/isolation parola ile çalışır; üretim magic-link kapısı test için gevşetilmedi.

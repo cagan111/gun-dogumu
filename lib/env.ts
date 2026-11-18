@@ -15,7 +15,10 @@ export function assertEnv(log: { error: (o: object, m: string) => void; warn: (o
   const problems = envProblems(env);
   if (problems.length === 0) return problems;
   const prod = env.NODE_ENV === "production";
-  for (const p of problems) (prod ? log.error : log.warn)({ key: p.key }, `ortam değişkeni hatası: ${p.key} ${p.message}`);
+  for (const p of problems) {
+    if (prod) log.error({ key: p.key }, `ortam değişkeni hatası: ${p.key} ${p.message}`);
+    else log.warn({ key: p.key }, `ortam değişkeni hatası: ${p.key} ${p.message}`);
+  }
   if (prod) exit(1);
   return problems;
 }

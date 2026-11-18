@@ -3,7 +3,7 @@ import type { Role } from "@prisma/client";
 import { prisma } from "./db";
 import { consumeLoginToken, createLoginToken, magicLink } from "./login-token";
 import { logger } from "./logger";
-import { sendAuthEmail } from "./messaging/auth-mail";
+import { canSendMagicLink, sendAuthEmail } from "./messaging/auth-mail";
 import { MINUTE, rateLimit } from "./ratelimit";
 
 export const BCRYPT_ROUNDS = 10;
@@ -46,6 +46,7 @@ export async function authenticatePassword(emailRaw: string, password: string, i
 
 /** Sihirli bağlantı token'ını tüketip kullanıcıyı döndürür. */
 export async function authenticateMagicToken(token: string, ip: string): Promise<SessionUser | null> {
+  if (!canSendMagicLink()) return null;
   const rl = await rateLimit(`login:magic:${ip}`, LOGIN_PER_IP.limit, LOGIN_PER_IP.windowMs);
   if (!rl.ok) return null;
   const userId = await consumeLoginToken(token, "magic_link");
@@ -55,10 +56,11 @@ export async function authenticateMagicToken(token: string, ip: string): Promise
 }
 
 /**
- * Sihirli bağlantı ister. E-posta sağlayıcı yok: bağlantı e-posta yerine loga yazılır (TODO_INSAN).
+ * Sihirli bağlantı ister. Üretimde gerçek e-posta sağlayıcı yoksa kapalıdır.
  * Kullanıcı olsun olmasın aynı sonuç döner (hesap sızdırılmaz).
  */
 export async function requestMagicLink(emailRaw: string, ip: string): Promise<void> {
+  if (!canSendMagicLink()) return;
   const email = normalizeEmail(emailRaw);
   const [byEmail, byIp] = await Promise.all([
     rateLimit(`magic:email:${email}`, 3, 15 * MINUTE),
@@ -68,5 +70,5 @@ export async function requestMagicLink(emailRaw: string, ip: string): Promise<vo
   const user = await prisma.user.findUnique({ where: { email }, select: { id: true } });
   if (!user) return;
   const token = await createLoginToken(user.id, "magic_link");
-  await sendAuthEmail(email, "magic_link", magicLink(token)); // e-posta sağlayıcı Mock iken bağlantı loga düşer
+  await sendAuthEmail(email, "magic_link", magicLink(token));
 }
