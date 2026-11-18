@@ -153,7 +153,7 @@ Biçim: `- [ ] T-NNN | sahip: claude|codex|- | açıklama`. Başlamadan sahip ya
 - [x] T-110 | sahip: codex | (Yüksek 1) Üretimde e-posta sağlayıcı yoksa sihirli bağlantıyı kapat; token/URL'yi loglardan çıkar (ilk açılış süper-admin şifre bağlantısı istisna, brief gereği) + log yakalayan test
 - [x] T-111 | sahip: codex | (Yüksek 3) OTP: salon başına maliyet tavanı + yeniden gönderim bekleme süresi; kayıtlı/kayıtsız numarada aynı HTTP yanıtı
 - [x] T-112 | sahip: codex | (Yüksek 2) Mesaj gönderiminde işçi kesintisi: askıda `queued` kayıtları uzlaştırma (süreli sahiplik + iade/yeniden deneme) + kesinti enjekte eden test
-- [ ] T-113 | sahip: codex | (Orta 4) OTP: salon+telefon başına tek kullanılmamış kod (kısıt/kilit) + paralel test
+- [x] T-113 | sahip: codex | (Orta 4) OTP: salon+telefon başına tek kullanılmamış kod (kısıt/kilit) + paralel test
 - [ ] T-114 | sahip: codex | (Orta 5) Abonelik taraması ile ödeme yarışı: kilit altında yeniden okuma / koşullu güncelleme
 - [ ] T-115 | sahip: codex | (Orta 6) İptal kontrolünde okunan startsAt ile koşullu güncelleme
 - [ ] T-116 | sahip: codex | (Orta 7) Kampanya: kalıcı kampanya/alıcı kaydı, kredi rezervasyonu, yeniden denemede yalnız kalanlar
@@ -182,3 +182,5 @@ Biçim: `- [ ] T-NNN | sahip: claude|codex|- | açıklama`. Başlamadan sahip ya
 - [ ] T-129 | sahip: codex | 2–3 salonla pilot kullanım için senaryo, ölçüm ve geribildirim planı hazırla; gerçek salon katılımı/iletişimi sahip tarafından sağlanır, sonuç uydurulmaz
 
 - 2026-11-18 T112+T123: iki dakikalık sahiplik, ağ çağrısı öncesi işaret, tenant kilidi altında koşullu tek iade; başlangıç/dakikalık sınırlı uzlaştırma. Belirsiz teslim otomatik tekrarlanmaz. İlk4kesinti testi kırmızı; sonCI251/build yeşil, worker açılışı ve pg-boss dakika kaydı doğrulandı. TR/EN kişisel veri başlığı nötrleştirildi.
+
+- 2026-11-18 T113: transaction içi yazma kilidi + deterministik eskiunused temizliği + salon/telefon partialuniqueindex. Önce paralelinsert2/2başarılı testi kırmızı; sonra üç kısıt/migration testi ve mevcut beşOTPbütçe testi yeşil. TamCI254/build, booking/flow/isolation e2e PASS.

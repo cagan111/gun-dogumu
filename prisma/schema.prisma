@@ -336,6 +336,7 @@ model SmsPackageRequest {
   createdAt DateTime      @default(now())
 }
 
+// SQL partial unique index enforces one unused row per tenant/phone (20261118191500).
 model Otp {
   id        String   @id @default(cuid())
   tenantId  String

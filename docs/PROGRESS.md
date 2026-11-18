@@ -21,3 +21,4 @@
 
 - 2026-11-18 T112/T123 root+tekLuna: ilk4/4regresyon kırmızı, sonCI251/251+build yeşil. Lease120sn/fencedrefund/workercron ve nötrTR+EN başlık hazır. Dört e2e sonkoşusu teslimden önce tamamlanır; gerçekSMS yok.
 - T112/T123 son booking/panel/flow/isolation e2e tamamı PASS; gerçek mock ortam.
+- T112/T12385d65cf Claude6988727859 ile onaylandı (Claude ayrıca CI251 bildirdi). T113partialindex+legacycleanup root/Luna teslimi: CI254/build+booking/flow/isolationPASS; gerçekSMS yok.

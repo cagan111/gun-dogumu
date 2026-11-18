@@ -9,7 +9,7 @@ Aktif proje KıbrısRandevu; repo cagan111/gun-dogumu, yalnız claude/kibris-ran
 - T122 final cila/medya regresyonu ve T111 rezervasyon bütçesi bu kontrol noktasının commit'leriyle teslim edilir; gerçek remote SHA'yı her çalışmada git/connector üzerinden doğrula.
 
 ## Sonraki sıra
-T113 → T114 → T115 → T116 → T117 → T118 → T104 → T105. docs/TASKS ve en yeni Claude PR mesajı öncelikli. T112 artık recovery.ts/send/jobs ile uygulanmıştır; T112-NOTES.md tarihli ilk taslak ve son uygulama notunu birlikte oku. T113 tenant kilidine ek tek unused OTP partialuniqueindex+legacyduplicatecleanup+paralleltest gerekir.
+T114 → T115 → T116 → T117 → T118 → T104 → T105. docs/TASKS ve en yeni Claude PR mesajı öncelikli. T112 artık recovery.ts/send/jobs ile uygulanmıştır; T112-NOTES.md tarihli ilk taslak ve son uygulama notunu birlikte oku. T113 tenant kilidine ek tek unused OTP partialuniqueindex+legacyduplicatecleanup+paralleltest gerekir.
 
 ## Ortam ve doğrulama
 Çalışma dizini /workspace/work/kibris-randevu. pnpm10 helper /tmp/kr-pnpm; yoksa packageManager ile yeniden kur. PostgreSQL16 docker kibris-dev-db, gerçek yerel DB; .env gitignore, asla yazdırma. SMS_PROVIDER mock ve ALLOW_REAL_SMS false kalmalı. Üretim sunucusu3000, JOBS_QUEUE=pgboss. Başka süreçleri rastgele sonlandırma. E2E: NODE_PATH=/opt/codex/runtimes/codex-primary-runtime/dependencies/node/node_modules, CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium. Signup IP limit5/h; aynı suite tekrarında yalnız bizim appserverı yeniden başlat.
@@ -18,3 +18,5 @@ Son T112/T123 paketi CI251/251 ve build geçti; booking/panel/flow/isolation dö
 
 ## Devam kuralları
 Önce PR1 son yorumları/remote head/AGENTS ve gerekli proje belgelerini oku; kilit ve çalışma ağacını doğrula. Başka aktörün aktif dosyasına girme; kendi PRyorumuna cevap döngüsü kurma. Alt ajanlar bu sohbetin işçileridir, Claude veya ayrı GitHubCodexbotu değildir. Güvenlikte önce başarısız regresyon testi, sonra düzeltme; tam CI+build+ilgili e2e olmadan tamamlandı deme. docs TASKS/REVIEW/PROGRESS ve SHA ile PR teslimi. GerçekSMS/ücretliAPI/sırcommit/yapaymüşteriyorumu yok; merge/deploy yok. Bekleyen yeni görev yoksa onaylı sıradaki kilitsiz işi ilerlet; anlamsız ping üretme. Kota/ortam engelini kanıtıyla yaz. Her tetikte sınırlı somut çıktı, aktif çalışma varsa ikinci yürütme başlatma. Tüm kapsam bittiğinde sonözet ve zamanlanmış görevi kapat.
+
+T113 tamam: partialunusedOTPindex+deterministiklegacycleanup transaction/write-lock altında; CI254/build/booking-flow-isolation geçti. T112/T12385d65cf Claude6988727859 onaylı. Sonraki T114kilitlireread abonelik/ödeme yarışıdır. Tekhafifaltajan GPT-6 Luna tercihi kullanıcı tarafından verildi; daha ağır alt model seçme.

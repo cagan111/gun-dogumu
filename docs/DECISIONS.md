@@ -69,3 +69,6 @@
 - 2026-11-18 T111: OTP güvenlik bütçesi30segment/UTCgün ve60sn bekleme. Başarısız denemeler de bütçeyi tüketir; kredi ayrıca düşülmez, gerçek SMS bedeli sendMessage defterinden alınır. Eski reservedSegments=0 kayıtları güncel konservatif maliyetle sayılır. Bekleme/tavan/eksikmüşteri/teslimhatası aynı HTTP200; dil seçiminde TR/EN maksimumu rezervasyon için kullanılır.
 
 - 2026-11-18 T112: MessageLog lease120sn, provider timeout30sn. Süresi dolmuş queued kayıtlar bir kez failed+iade; dispatchişareti/legacyownerless => delivery_unknown. Aynıkey ile otomatikyenidengönderim yok; maskeli OTPgövdesi replayedilmez. Network/throw/HTTP5xx/408 belirsizdir, kanal fallbacki durur. Sağlayıcı kabul etmişse olası maliyeti platform üstlenir; exactly-once teslim garantisi yok. Kurtarma başlangıçta ve dakikalık pg-boss işinde100satırlıkpartiyle çalışır. T123 TR+EN ifadeleri yasal uyumluluk garantisi vermeden kişiselverikoruma olarak güncellendi.
+
+- T112 sağlayıcı görüşmesi özeti: belirsiz teslimde kredi bir kez iade edilir; otomatik tekrar gönderilmez ve tam bir kez teslim garantisi verilmez (Claude6988727859 onayı).
+- T113: kullanılmamış OTPbenzersizliği SQLpartialindex ile yönetilir (Prisma şemasında yorum); migration transaction+SHARE ROW EXCLUSIVE kilidi altında, createdAt/id azalan sırasıyla yalnız en yeniyi tutar. requestOtp tenant kilidi korunur.

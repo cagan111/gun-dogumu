@@ -96,7 +96,7 @@ export async function requestOtp(
     // Bütçe + bekleme süresi çoklu web süreçlerinde de aynı kilit altında.
     // Tenant kilidi alt tablo INSERT'lerinden önce alınmalı (FK deadlock önlemi).
     await lockTenant(tx, tenantId);
-    const latest = await tx.otp.findFirst({ where: { phone }, orderBy: { createdAt: "desc" }, select: { createdAt: true } });
+    const latest = await tx.otp.findFirst({ where: { phone }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], select: { createdAt: true } });
     if (latest && now.getTime() - latest.createdAt.getTime() < OTP_RESEND_WAIT_MS) return false;
     const dayStart = new Date(now); dayStart.setUTCHours(0, 0, 0, 0);
     const dayEnd = new Date(dayStart.getTime() + 86_400_000);
@@ -133,7 +133,7 @@ export async function verifyOtp(
   const phone = normalizePhone(rawPhone);
   if (!phone) throw new InvalidPhoneError();
   const db = withTenant(tenantId);
-  const row = await db.otp.findFirst({ where: { phone, usedAt: null }, orderBy: { createdAt: "desc" } });
+  const row = await db.otp.findFirst({ where: { phone, usedAt: null }, orderBy: [{ createdAt: "desc" }, { id: "desc" }] });
   if (!row) throw new OtpError("otp_invalid", "Kod geçersiz");
   if (row.expiresAt.getTime() <= now.getTime()) throw new OtpError("otp_expired", "Kodun süresi doldu");
 
