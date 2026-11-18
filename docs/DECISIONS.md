@@ -64,3 +64,4 @@
 
 
 - 2026-11-18 – T-100R: salon varsayılanı #465635 (zeytin), ikinci demo #9b4835 (kiremit); Staff.color ve salonun seçtiği marka rengi korunur. Booking başlık odağı yalnız focus-visible ile çizilir. E2E betikleri CHROMIUM_EXECUTABLE_PATH destekler; panel tamamlandı sonrası ağdan yenilenen blok beklenir.
+- 2026-11-18 – T-122: stok katalogları 403 nedeniyle doğrulanamadı; Claude PR6987735407 kararıyla fotoğraf yerine kodla üretilmiş sıcak SVG doku/degrade kullanılır. Gerçek klip sahip tarafından sağlanana kadar config/hero.ts yolları null; video ve üç kare bekleyen insan işi olarak açık tutulur. Yeni tasarım dili yok; kart/uyarı çizgileri ve takvim saatleri aynı sıcak palete hizalandı.

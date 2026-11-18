@@ -242,7 +242,7 @@ export function CalendarView() {
       {cols.length ? (
         <div className={cn("mt-3 max-h-[calc(100dvh-16rem)] min-h-80 overflow-auto rounded-lg border border-line bg-white md:max-h-[calc(100dvh-15rem)]", apptsQ.loading && "opacity-70")} data-testid="cal-scroll" tabIndex={0} aria-label={t("cal.grid")}>
           <div style={{ display: "grid", gridTemplateColumns: `${GUTTER}px repeat(${cols.length}, minmax(${MIN_COL}px, 1fr))` }}>
-            <div className="sticky left-0 top-0 z-30 border-b border-r border-slate-200 bg-white" />
+            <div className="sticky left-0 top-0 z-30 border-b border-r border-line bg-white" />
             {cols.map((c) => (
               <div key={c.key} className="sticky top-0 z-20 border-b border-r border-line bg-paper px-2 py-2 text-center">
                 <div className="flex items-center justify-center gap-1.5 text-sm font-bold">
@@ -252,9 +252,9 @@ export function CalendarView() {
                 {c.sub ? <div className="text-xs text-slate-600">{c.sub}</div> : null}
               </div>
             ))}
-            <div className="sticky left-0 z-20 border-r border-slate-200 bg-white" style={{ height }}>
+            <div className="sticky left-0 z-20 border-r border-line bg-white" style={{ height }}>
               {Array.from({ length: Math.ceil((gridEnd - gridStart) / 60) + 1 }, (_, i) => gridStart + i * 60).filter((m) => m < gridEnd + 1).map((m) => (
-                <span key={m} className="absolute right-1 -translate-y-1/2 text-[11px] font-medium tabular-nums text-slate-600" style={{ top: (m - gridStart) * PPM + (m === gridStart ? 8 : 0) }}>{fmtMin(m)}</span>
+                <span key={m} className="absolute right-1 -translate-y-1/2 text-xs font-medium tabular-nums text-slate-700" style={{ top: (m - gridStart) * PPM + (m === gridStart ? 8 : 0) }}>{fmtMin(m)}</span>
               ))}
             </div>
             {cols.map((c, ci) => {
@@ -279,7 +279,7 @@ export function CalendarView() {
                   key={c.key}
                   ref={(el) => { colRefs.current[ci] = el; }}
                   data-testid="cal-col"
-                  className="relative cursor-cell border-r border-slate-200"
+                  className="relative cursor-cell border-r border-line"
                   style={{
                     height,
                     backgroundImage: `repeating-linear-gradient(to bottom, #cbd5e1 0, #cbd5e1 1px, transparent 1px, transparent ${60 * PPM}px), repeating-linear-gradient(to bottom, #f1f5f9 0, #f1f5f9 1px, transparent 1px, transparent ${snap * PPM}px)`,
@@ -367,7 +367,7 @@ function Block({ p, color, gridStart, locale, ghost, onClick, ...ptr }: {
         <span className="truncate">{h >= 34 ? service : `${a.customer.name} · ${service}`}</span>
       </span>
       {h >= 34 ? <span className="block truncate text-slate-700">{a.customer.name}</span> : null}
-      {h >= 52 ? <span className="block truncate text-[11px] font-medium tabular-nums text-slate-600">{fmtMin(p.start)} · {t(`st.${a.status}` as Key)}</span> : null}
+      {h >= 52 ? <span className="block truncate text-xs font-medium tabular-nums text-slate-700">{fmtMin(p.start)} · {t(`st.${a.status}` as Key)}</span> : null}
     </button>
   );
 }
@@ -463,7 +463,7 @@ function ApptSheet({ appt, staff, services, onClose, onChanged }: { appt: Appt |
               {ACTIVE.includes(appt.status) ? <Button variant="secondary" onClick={() => { setMoving(true); setMDate(cur.date); setMTime(cur.time); setMStaff(appt.staffId); }}>{t("act.move")}</Button> : null}
             </div>
           ) : (
-            <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+            <div className="space-y-3 rounded-xl border border-line bg-slate-50 p-3">
               <h3 className="font-bold">{t("act.move")}</h3>
               <Field label={t("cal.pickDate")} type="date" value={mDate} onChange={(e) => setMDate(e.target.value)} />
               <Field label={t("appt.time")} type="time" step={tenant.slotMinutes * 60} value={mTime} onChange={(e) => setMTime(e.target.value)} />

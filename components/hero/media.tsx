@@ -21,7 +21,11 @@ export function HeroMedia() {
   return <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 overflow-hidden bg-olive">
     {/* Dekoratif yerel poster; gerçek klibin seçimi LICENSES.md'de bekliyor. */}
     <img src={HERO_MEDIA.poster} alt="" fetchPriority="high" className="h-full w-full object-cover object-[65%_center]" />
-    {play ? <video ref={ref} autoPlay muted loop playsInline preload="metadata" poster={HERO_MEDIA.poster} onError={() => setFailed(true)} className="absolute inset-0 h-full w-full object-cover object-[65%_center]">
+    {play ? <video ref={ref} autoPlay muted loop playsInline preload="metadata" poster={HERO_MEDIA.poster} onError={(event) => {
+      // Chromium emits source errors for a skipped media query too; only a selected source failure is fatal.
+      const source = event.target;
+      if (source === event.currentTarget || (source instanceof HTMLSourceElement && (!source.media || window.matchMedia(source.media).matches))) setFailed(true);
+    }} className="absolute inset-0 h-full w-full object-cover object-[65%_center]">
       {HERO_MEDIA.mobile ? <source src={HERO_MEDIA.mobile} type="video/mp4" media="(max-width: 767px)" /> : null}
       <source src={HERO_MEDIA.desktop!} type="video/mp4" />
     </video> : null}

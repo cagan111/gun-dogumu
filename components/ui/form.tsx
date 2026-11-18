@@ -58,13 +58,13 @@ export function CheckField({ label, hint, className, ...props }: Omit<React.Inpu
 }
 
 export function Card({ children, className, as: As = "section", ...props }: React.HTMLAttributes<HTMLElement> & { as?: "section" | "div" | "article" }) {
-  return <As className={cn("rounded-2xl border border-slate-200 bg-white p-4 shadow-sm", className)} {...props}>{children}</As>;
+  return <As className={cn("rounded-2xl border border-line bg-white p-4 shadow-sm", className)} {...props}>{children}</As>;
 }
 
 type Tone = "slate" | "green" | "amber" | "red" | "sky" | "violet";
 const TONES: Record<Tone, string> = {
   slate: "bg-slate-100 text-slate-800", green: "bg-emerald-100 text-emerald-900", amber: "bg-amber-100 text-amber-900",
-  red: "bg-red-100 text-red-900", sky: "bg-sky-100 text-sky-900", violet: "bg-violet-100 text-violet-900",
+  red: "bg-red-100 text-red-900", sky: "bg-sand text-olive", violet: "bg-violet-100 text-violet-900",
 };
 export function Badge({ tone = "slate", children, className }: { tone?: Tone; children: React.ReactNode; className?: string }) {
   return <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold", TONES[tone], className)}>{children}</span>;

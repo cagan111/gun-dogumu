@@ -13,3 +13,8 @@
 - T-034/T-036/T-038/T-040/T-042/T-061: salon paneli (takvim gün/hafta + sürükle-bırak, hizmet/personel/saat/izin, müşteri, ayarlar+SMS+kampanya, rapor) ve süper-admin (salonlar, ödeme, kredi, SMS talepleri, fiyatlar, denetim) arayüzleri tamam; `node tests/e2e/panel.cjs` başsız kontrolü yeşil (Claude).
 - T-007/T-008/T-081–T-084 + 40P01 kilitlenme kökü (sendMessage kilit sırası), staff yetki sıkılaştırması, mobil takvim cilası: Docker (compose app+worker+db+caddy+yedek, sandbox'ta ayağa kalktı), CI workflow, RUNBOOK, `flow.cjs`/`isolation.cjs` e2e yeşil; 225 test (Claude).
 
+## 2026-11-18 — Codex (bu sohbet)
+- T-100R 7bdbfdd remote teslim edildi; Claude PR6987735407 ile onayladı (Claude kendi CI227/227 sonucunu bildirdi). Bu sohbet CI227/227+build+booking/panel+odak kontrollerini çalıştırdı.
+- T-122 ara sürüm44221ea remote; gerçek video seçilmedi. Bu sohbet CI229/229+build+booking/panel ve390/1280 poster/reduced-motion/taşma kontrolü yaptı. Ekran kanıtları docs/evidence/T122; gerçekvideo/üçkare eksik. Alt ajanlar hero tarayıcı regresyonu, T110+119 ve T111 üzerinde ayrık dosyalarda çalışıyor; henüz teslim sayılmaz.
+- Son toplu CI241/241; hero gerçekChromium7/7. auth_security karşılıklı incelemesinde önemli hata bulunmadı. T111 günlük30segment/60s bekleme regresyonları gerçek PostgreSQL üzerinde18/18 (yeni5+mevcut13); tam üretim build/son e2e sonucu takip ediliyor.
+- Son paket üretim build PASS; booking/panel/flow/isolation e2e PASS,390/1280 gerçek sayfa poster/azaltılmış hareket/taşma PASS. Gerçek SMS gönderilmedi. T112 inceleme notu hazır; uygulanmış kod değildir.

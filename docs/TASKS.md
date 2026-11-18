@@ -163,7 +163,8 @@ Biçim: `- [ ] T-NNN | sahip: claude|codex|- | açıklama`. Başlamadan sahip ya
 ## 18 Kasım teslim sırası
 - [x] T-100R | sahip: codex | T-100 kalanı: sıcak salon varsayılanı ve yalnız klavyede adım odağı
   - Seed zeytin/kiremit, brandVars yedeği zeytin; özel salon/personel renkleri korundu. CI 227 test, build, booking/panel e2e ve 390/1280 odak kontrolleri geçti.
-- [ ] T-122 | sahip: codex | Gerçek stok video açılışı ve mevcut tasarımda görsel cila
+- [x] T-122 | sahip: codex | Video yuvası/poster yedeği ve mevcut tasarımda görsel cila (onaylı alternatif)
+  - Claude6987735407 kararı: kodla sıcak SVG arka plan; gerçek stok klip + üç kare sahipten bekleniyor (TODO_INSAN). 390/1280 önce/sonra kanıtı, 7 Chromium medya senaryosu, booking/panel geçti; kart/uyarı/takvim cilası ve azaltılmış hareket uyumlu onay animasyonu eklendi.
 - [x] T-119 | sahip: codex | Pino ortam doğrulamasında yöntem bağlamını koru
 
 - 2026-11-18 T-110/T-119: üretimde mock e-posta ile magic-link üretim/tüketim kapalı; auth bağlantıları loglanmaz, yalnız bootstrap şifre bağlantısı istisna. Gerçek Pino regresyonlarında önce6 hata, sonra10/10 geçti; tam CI236, build ve flow/isolation gerçek HTTP kontrolleri geçti.
