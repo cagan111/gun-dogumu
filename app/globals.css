@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 :root {
-  --brand: 38 85 92;
+  --brand: 70 86 53;
   --brand-fg: 255 255 255;
 }
 
@@ -35,3 +35,6 @@
     border-radius: 58% 48% 55% 46% / 48% 56% 46% 60%;
   }
 }
+
+/* Fare/dokunmada programatik odak çerçevesiz; klavyede global focus-visible korunur. */
+.booking-step-heading:focus:not(:focus-visible) { outline: none; box-shadow: none; }

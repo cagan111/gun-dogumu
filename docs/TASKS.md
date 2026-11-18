@@ -161,6 +161,7 @@ Biçim: `- [ ] T-NNN | sahip: claude|codex|- | açıklama`. Başlamadan sahip ya
 - [ ] T-118 | sahip: codex | Tenant kapsamı: desteklenmeyen işlemleri (ilişki mutasyonu, ham SQL vb.) withTenant'ta açıkça reddet
 
 ## 18 Kasım teslim sırası
-- [ ] T-100R | sahip: codex | T-100 kalanı: sıcak salon varsayılanı ve yalnız klavyede adım odağı
+- [x] T-100R | sahip: codex | T-100 kalanı: sıcak salon varsayılanı ve yalnız klavyede adım odağı
+  - Seed zeytin/kiremit, brandVars yedeği zeytin; özel salon/personel renkleri korundu. CI 227 test, build, booking/panel e2e ve 390/1280 odak kontrolleri geçti.
 - [ ] T-122 | sahip: codex | Gerçek stok video açılışı ve mevcut tasarımda görsel cila
 - [ ] T-119 | sahip: codex | Pino ortam doğrulamasında yöntem bağlamını koru

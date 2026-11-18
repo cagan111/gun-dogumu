@@ -164,7 +164,7 @@ export function BookingFlow({ slug, salonName, timeZone, today, maxAdvanceDays, 
             <path d="m33 37 8 8 15-17" stroke="#465635" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
             <path d="m9 22-4-4m6 17-6 1m66-17 5-5m1 20 6-2M21 8l-2-4" stroke="#9b4835" strokeWidth="2" strokeLinecap="round" />
           </svg>
-          <h2 ref={headingRef} tabIndex={-1} className="display-heading mt-3 text-3xl font-semibold outline-none">{t("b.success.title")}</h2>
+          <h2 ref={headingRef} tabIndex={-1} className="booking-step-heading display-heading mt-3 text-3xl font-semibold">{t("b.success.title")}</h2>
           <p className="mt-1 text-slate-700">{t("b.success.sub", { name: name.trim().split(/\s+/)[0] ?? "" })}</p>
           <dl className="mt-5 divide-y divide-line rounded-lg bg-paper text-left text-sm">
             <Row k={t("b.summary.service")} v={svcName(service)} />
@@ -194,7 +194,7 @@ export function BookingFlow({ slug, salonName, timeZone, today, maxAdvanceDays, 
           {Array.from({ length: STEPS }, (_, i) => <span key={i} className={cn("h-1.5 flex-1 rounded-full", i < step ? "bg-brand" : "bg-slate-200")} />)}
         </div>
       </div>
-      <h2 ref={headingRef} tabIndex={-1} className="display-heading text-2xl font-semibold outline-none">{titles[step - 1]}</h2>
+      <h2 ref={headingRef} tabIndex={-1} className="booking-step-heading display-heading text-2xl font-semibold">{titles[step - 1]}</h2>
       {step === 1 ? <p className="mt-1 text-sm text-slate-700">{t("b.service.sub")}</p> : null}
       {banner ? <Alert className="mt-3">{banner}</Alert> : null}
 

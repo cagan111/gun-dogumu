@@ -41,7 +41,7 @@ async function gotoDayWithAppointments(page) {
 }
 
 (async () => {
-  const browser = await chromium.launch();
+  const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_EXECUTABLE_PATH || undefined });
   const problems = [];
   const watch = (page) => {
     // beklenen 4xx (ör. mesai dışı walk-in → 422) tarayıcı konsoluna "Failed to load resource" düşer; yok sayılır
@@ -79,7 +79,7 @@ async function gotoDayWithAppointments(page) {
   await dlg.getByRole("button", { name: "Tamamlandı" }).click();
   await page.getByText("Randevu güncellendi.").first().waitFor();
   await dlg.waitFor({ state: "detached" });
-  assert.ok(await page.locator('[data-testid="appt-block"][data-status="completed"]').count() >= 1, "tamamlanan blok");
+  await page.locator('[data-testid="appt-block"][data-status="completed"]').first().waitFor();
   step("randevu onaylandı → Tamamlandı");
 
   // yeni randevu

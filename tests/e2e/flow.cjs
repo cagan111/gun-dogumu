@@ -28,7 +28,7 @@ const PASSWORD = "sifre12345";
 
 (async () => {
   const prisma = new PrismaClient();
-  const browser = await chromium.launch();
+  const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_EXECUTABLE_PATH || undefined });
   const ctx = await browser.newContext({ viewport: { width: 375, height: 812 }, deviceScaleFactor: 1, locale: "tr-TR" });
   const page = await ctx.newPage();
   const problems = [];

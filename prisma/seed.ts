@@ -24,7 +24,7 @@ interface SalonDef {
 const SALONS: SalonDef[] = [
   {
     slug: "lefkosa-usta-berber", name: "Lefkoşa Usta Berber", city: "Lefkoşa",
-    address: "Girne Caddesi No:42", phone: "+905338001001", color: "#1d4ed8", plan: "pro",
+    address: "Girne Caddesi No:42", phone: "+905338001001", color: "#465635", plan: "pro",
     staff: [
       { name: "Hasan Usta", color: "#1d4ed8" },
       { name: "Mert Kaya", color: "#0f766e" },
@@ -41,7 +41,7 @@ const SALONS: SalonDef[] = [
   },
   {
     slug: "girne-glow-kuafor", name: "Girne Glow Kuaför", city: "Girne",
-    address: "Ecevit Caddesi No:8", phone: "+905428002002", color: "#be185d", plan: "salon_plus",
+    address: "Ecevit Caddesi No:8", phone: "+905428002002", color: "#9b4835", plan: "salon_plus",
     staff: [
       { name: "Ayşe Karaca", color: "#be185d" },
       { name: "Elif Yılmaz", color: "#7c3aed" },

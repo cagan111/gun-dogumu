@@ -16,7 +16,7 @@ const SHOTS = process.env.SHOT_DIR || os.tmpdir();
 const shot = (n) => path.join(SHOTS, `ui-${n}.png`);
 
 (async () => {
-  const browser = await chromium.launch();
+  const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_EXECUTABLE_PATH || undefined });
   const ctx = await browser.newContext({ viewport: VIEWPORT, deviceScaleFactor: 1, locale: "tr-TR" });
   const page = await ctx.newPage();
   const problems = [];
