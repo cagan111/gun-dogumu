@@ -23,3 +23,4 @@ T113 tamam: partialunusedOTPindex+deterministiklegacycleanup transaction/write-l
 
 ## 18Kasım21:59UTC güncel öncelik
 T114kilitlireread bu commit ile teslim; CI257/build/panel-flow-isolationPASS. Önceki ortam kaybolduğu için923b6a0 clone+migration+seed tazelendi. SonClaude6991313072/6991469004: T140→T141→T142→T115..118→T143..147→104105→124..129. Koyu/şampanya temayı koru. TekGPT-6Luna altajan. T140audit8kritik20yüksek yenidenölçüldü. Son kaynak ve PRyorumları tüm eski sıra/head notlarını geçersizkılar.
+T140 bu commit ile Next15.5.29/Authbeta32/PostCSS8.5.23/sharp0.35.5/Zod4.6.6 teslimidir. Audit0tümseviyeler, CI257/build/dörte2ePASS. T141 sonraki: tests/unit/middleware-cookie.test.ts ayrıuncommittedredtesti gerçekAuth.js encryptedsecurecookie ile2FAIL/1PASS; middleware secureCookieeksik. Bu teste henüzfix yapılmadı; yeniortamda dosyayoksa tekraroluştur. Yeniöncelik T141→T142→T115..118→T143..147→104105→124..129.

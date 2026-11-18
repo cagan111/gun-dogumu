@@ -74,3 +74,5 @@
 - T113: kullanılmamış OTPbenzersizliği SQLpartialindex ile yönetilir (Prisma şemasında yorum); migration transaction+SHARE ROW EXCLUSIVE kilidi altında, createdAt/id azalan sırasıyla yalnız en yeniyi tutar. requestOtp tenant kilidi korunur.
 
 - T114: subscription scan yalnız aday IDlerini bulur; manualpayment ile aynı Tenant FORUPDATE kilidi altında güncel alanlar okunur. Geçiş ve uyarı AuditLogları aynı transactionda; stale snapshot ödeme durumunu ezemez. 923b6a0 mevcut koyu/şampanya tema korunur (Claude6991469004); T140→141→142 yeni öncelik sırası.
+
+- T140: güvenli15.x Next veAuthbeta32; transitifPostCSS/sharp override, Zod4.6.6. Üretimaudit0tümseviyeler. Zodrefine açıkboolean ile mevcutpartialplanprice APIkorundu; Node22 sürer. SECURITY-DEPENDENCIES.md.

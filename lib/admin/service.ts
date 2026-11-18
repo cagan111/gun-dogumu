@@ -162,7 +162,7 @@ export async function resolveSmsRequest(actor: Actor, requestId: string, input: 
 /* ───────────── Plan fiyatları ───────────── */
 
 export const planPricesSchema = z
-  .object({ prices: z.record(z.string().refine(isPlanId, "invalid_plan"), z.number().min(0).max(1_000_000).nullable()) })
+  .object({ prices: z.record(z.string().refine((value): boolean => isPlanId(value), "invalid_plan"), z.number().min(0).max(1_000_000).nullable()) })
   .refine((o) => Object.keys(o.prices).length > 0, "empty");
 
 export async function getPlanPrices() {
