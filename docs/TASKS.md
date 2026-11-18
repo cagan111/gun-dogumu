@@ -184,3 +184,6 @@ Biçim: `- [ ] T-NNN | sahip: claude|codex|- | açıklama`. Başlamadan sahip ya
 - 2026-11-18 T112+T123: iki dakikalık sahiplik, ağ çağrısı öncesi işaret, tenant kilidi altında koşullu tek iade; başlangıç/dakikalık sınırlı uzlaştırma. Belirsiz teslim otomatik tekrarlanmaz. İlk4kesinti testi kırmızı; sonCI251/build yeşil, worker açılışı ve pg-boss dakika kaydı doğrulandı. TR/EN kişisel veri başlığı nötrleştirildi.
 
 - 2026-11-18 T113: transaction içi yazma kilidi + deterministik eskiunused temizliği + salon/telefon partialuniqueindex. Önce paralelinsert2/2başarılı testi kırmızı; sonra üç kısıt/migration testi ve mevcut beşOTPbütçe testi yeşil. TamCI254/build, booking/flow/isolation e2e PASS.
+
+- [x] T-130 | sahip: claude | Küçük arayüz düzeltmeleri (adım 4 hata gösterimi, e2e salon temizliği, takvim iskeleti, dile uyumlu tarih/ay seçici, ayarlar kaydet düzeni)
+  - Admin salon detayı hatası yeniden üretilemedi (test zamanlaması).
