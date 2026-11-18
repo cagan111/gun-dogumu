@@ -212,7 +212,8 @@ describe.skipIf(!HAS_DB)("kayıt, izolasyon, public API, OTP (gerçek DB)", () =
     // doğru kod bile artık kilitli
     await expect(S.otp.verifyOtp(S.a.tenantId, phone, sent)).rejects.toMatchObject({ code: "otp_locked" });
     // yeni kod → eskisi geçersiz, yenisi çalışır
-    await S.otp.requestOtp(S.a.tenantId, phone, { send });
+    const resendAt = new Date(Date.now() + 61_000);
+    await S.otp.requestOtp(S.a.tenantId, phone, { send, now: resendAt });
     expect(await S.otp.verifyOtp(S.a.tenantId, phone, sent)).toEqual({ phone });
     await expect(S.otp.verifyOtp(S.a.tenantId, phone, sent)).rejects.toMatchObject({ code: "otp_invalid" }); // tek kullanım
     // Randevularım
@@ -222,7 +223,8 @@ describe.skipIf(!HAS_DB)("kayıt, izolasyon, public API, OTP (gerçek DB)", () =
     expect(mine[0]).toMatchObject({ cancelUrl: `/r/${mine[0]!.cancelToken}`, staffName: "Ali" });
     expect(await S.otp.upcomingForCustomer(S.b.tenantId, phone, new Date(0))).toHaveLength(0);
     // süresi dolmuş kod
-    await S.otp.requestOtp(S.a.tenantId, phone, { send, now: new Date(Date.now() - 10 * 60_000) });
+    await S.otp.requestOtp(S.a.tenantId, phone, { send, now: new Date(+resendAt + 61_000) });
+    await S.db.prisma.otp.updateMany({ where: { tenantId: S.a.tenantId, phone, usedAt: null }, data: { expiresAt: new Date(Date.now() - 1) } });
     await expect(S.otp.verifyOtp(S.a.tenantId, phone, sent)).rejects.toMatchObject({ code: "otp_expired" });
   });
 

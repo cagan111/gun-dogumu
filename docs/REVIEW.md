@@ -25,3 +25,5 @@
 ## 18 Kasım 2026 — Codex alt ajanları / karşılıklı inceleme
 - Root, T110/T119 auth_security diffini inceledi: üretim kapısı isteme/tüketmede, mock e-posta gövdesi sağlayıcıya verilmez; bootstrap istisnası yalnız ensureSuperadmin. Gerçek Pino testleri ilk kırmızı çalışmadan sonra yeşil.
 - auth_security, T122 medya/polish akışını salt-okunur inceledi; önemli hata yok. Hero test düzeneği CSS yüklemediğinden görsel kanıt ayrı390/1280 gerçek uygulama ekranlarıdır. Flow/isolation parola ile çalışır; üretim magic-link kapısı test için gevşetilmedi.
+
+- Root T111 incelemesi: tenant kilidi alt tablolardan önce, bütçe sorgusu tenant kapsamlı, providerI/O transaction dışında. Eski0rezervasyon güvenli sayılır; ham exception/OTP requestcatch loguna girmez. Paralel35telefon ve paralelresend gerçek PostgreSQL regresyonları var. Partialuniqueindex T113 kapsamında bekler.

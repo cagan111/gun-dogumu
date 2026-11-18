@@ -4,6 +4,8 @@ import { OtpError, RateLimitedError } from "./errors";
 import { sendMessage } from "./messaging/send";
 import { asLocale, renderTemplate } from "./messaging/templates";
 import { logger } from "./logger";
+import { lockTenant } from "./ledger";
+import { smsSegments } from "./messaging/segments";
 import { normalizePhone } from "./phone";
 import { HOUR, rateLimit } from "./ratelimit";
 import { getAuthSecret, safeEqualHex, sha256Hex } from "./secret";
@@ -12,6 +14,14 @@ import { BookingError, InvalidPhoneError } from "./booking";
 export const OTP_TTL_MS = 5 * 60_000;
 export const OTP_MAX_ATTEMPTS = 5;
 export const OTP_REQUESTS_PER_HOUR = 5;
+export const OTP_RESEND_WAIT_MS = 60_000;
+/** UTC günü başına salonun OTP bütçesi; başarısız girişimler de rezervasyonu tüketir. */
+export const OTP_DAILY_SEGMENT_CAP = 30;
+
+/** TR/EN arasında ayar değişse de ayrılan bütçe gönderimi kapsasın. */
+export function otpReservedSegments(): number {
+  return Math.max(...(["tr", "en"] as const).map((locale) => smsSegments(renderTemplate("otp", locale, { code: "000000" })).segments));
+}
 
 // ---- saf kısım ----
 
@@ -82,14 +92,34 @@ export async function requestOtp(
   if (!customer) return { sent: true };
 
   const code = generateOtpCode();
-  await db.$transaction(async (tx) => {
-    // eski kullanılmamış kodlar geçersiz olsun
+  const reserved = await db.$transaction(async (tx) => {
+    // Bütçe + bekleme süresi çoklu web süreçlerinde de aynı kilit altında.
+    // Tenant kilidi alt tablo INSERT'lerinden önce alınmalı (FK deadlock önlemi).
+    await lockTenant(tx, tenantId);
+    const latest = await tx.otp.findFirst({ where: { phone }, orderBy: { createdAt: "desc" }, select: { createdAt: true } });
+    if (latest && now.getTime() - latest.createdAt.getTime() < OTP_RESEND_WAIT_MS) return false;
+    const dayStart = new Date(now); dayStart.setUTCHours(0, 0, 0, 0);
+    const dayEnd = new Date(dayStart.getTime() + 86_400_000);
+    const budget = await tx.otp.aggregate({ where: { createdAt: { gte: dayStart, lt: dayEnd } }, _sum: { reservedSegments: true } });
+    const segments = otpReservedSegments();
+    // Eski kayıtlardaki 0 rezervasyon ilk gün tavanı delmesin; güncel en yüksek
+    // OTP maliyetiyle sayılır (eski başarısız girişimler de muhafazakâr sayılır).
+    const legacyCount = await tx.otp.count({ where: { createdAt: { gte: dayStart, lt: dayEnd }, reservedSegments: 0 } });
+    if ((budget._sum.reservedSegments ?? 0) + legacyCount * segments + segments > OTP_DAILY_SEGMENT_CAP) return false;
     await tx.otp.updateMany({ where: { phone, usedAt: null }, data: { usedAt: now } });
     await tx.otp.create({
-      data: { tenantId, phone, codeHash: hashOtp(code, getAuthSecret()), expiresAt: new Date(now.getTime() + OTP_TTL_MS) },
+      data: { tenantId, phone, codeHash: hashOtp(code, getAuthSecret()), expiresAt: new Date(now.getTime() + OTP_TTL_MS), createdAt: now, reservedSegments: segments },
     });
+    return true;
   });
-  await (opts.send ?? sendOtp)(tenantId, phone, code);
+  if (!reserved) return { sent: true };
+  try {
+    await (opts.send ?? sendOtp)(tenantId, phone, code);
+  } catch {
+    // Sağlayıcı/kredi sonucu kayıtlı müşteri varlığını HTTP yanıtından sızdırmamalı.
+    // Ham hata, telefon, kod veya mesaj gövdesi telemetriye eklenmez.
+    logger.warn({ tenantId, reason: "delivery_failed" }, "OTP isteği teslim edilemedi");
+  }
   return { sent: true };
 }
 

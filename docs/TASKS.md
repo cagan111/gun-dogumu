@@ -151,7 +151,7 @@ Biçim: `- [ ] T-NNN | sahip: claude|codex|- | açıklama`. Başlamadan sahip ya
 
 ## REVIEW.md T-101 bulgularından düzeltmeler (öncelik sırasıyla)
 - [x] T-110 | sahip: codex | (Yüksek 1) Üretimde e-posta sağlayıcı yoksa sihirli bağlantıyı kapat; token/URL'yi loglardan çıkar (ilk açılış süper-admin şifre bağlantısı istisna, brief gereği) + log yakalayan test
-- [ ] T-111 | sahip: codex | (Yüksek 3) OTP: salon başına maliyet tavanı + yeniden gönderim bekleme süresi; kayıtlı/kayıtsız numarada aynı HTTP yanıtı
+- [x] T-111 | sahip: codex | (Yüksek 3) OTP: salon başına maliyet tavanı + yeniden gönderim bekleme süresi; kayıtlı/kayıtsız numarada aynı HTTP yanıtı
 - [ ] T-112 | sahip: codex | (Yüksek 2) Mesaj gönderiminde işçi kesintisi: askıda `queued` kayıtları uzlaştırma (süreli sahiplik + iade/yeniden deneme) + kesinti enjekte eden test
 - [ ] T-113 | sahip: codex | (Orta 4) OTP: salon+telefon başına tek kullanılmamış kod (kısıt/kilit) + paralel test
 - [ ] T-114 | sahip: codex | (Orta 5) Abonelik taraması ile ödeme yarışı: kilit altında yeniden okuma / koşullu güncelleme
@@ -168,3 +168,5 @@ Biçim: `- [ ] T-NNN | sahip: claude|codex|- | açıklama`. Başlamadan sahip ya
 - [x] T-119 | sahip: codex | Pino ortam doğrulamasında yöntem bağlamını koru
 
 - 2026-11-18 T-110/T-119: üretimde mock e-posta ile magic-link üretim/tüketim kapalı; auth bağlantıları loglanmaz, yalnız bootstrap şifre bağlantısı istisna. Gerçek Pino regresyonlarında önce6 hata, sonra10/10 geçti; tam CI236, build ve flow/isolation gerçek HTTP kontrolleri geçti.
+
+- 2026-11-18 T-111: salon kilidi altında kalıcı60sn bekleme ve UTCgünlük30segment konservatif rezervasyon tavanı; başarısız denemeler sayılır, kayıtlı/kayıtsız HTTP200 aynı. Migration uygulandı. Önce3 regresyon kırmızı, sonra yeni5+mevcut13 DBtesti yeşil; tamCI241/build ve dört e2e yeşil. T113benzersizkısıt ayrı kaldı.
