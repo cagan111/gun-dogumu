@@ -40,3 +40,6 @@ Root923b6a0 tabanında tarama→gerçek manuelödeme→taramanın devamı determ
 
 ## T140 — 18Kasım
 Root gerçekprod audit ile8kritik20yüksek bazçizgisini kaydetti; Next15.5.29/Authbeta32/PostCSS8.5.23/sharp0.35.5/Zod4.6.6 sonrası tümseviyeler0. Luna resmi registry/lockgraph ve Zodçağrılarını inceledi; kısmi planfiyatı API kontrolü korunur. TamCI257/build yeşil; e2e sonkontrolleri teslimde kayıtlıdır. YeniHTTPS testleri T141 ayrıişidir, T140 teslimine dahil değildir.
+
+## T141 — 18Kasım
+Root HTTPS secure-prefixed gerçekAuth.js encryptedcookie ile önce2FAIL/1PASS gördü. Middleware secureCookie=req.nextUrl.protocol===https sonrası3/3, tamCI260/build geçti. TekLuna diff/testincelemesinde önemlihata bulmadı; SecureflaginHTTPistektegönderilmemesini ayrıca sınamak ekkapsam olabilir. Yeni https-session.cjs testinde gerçekyerelTLS reverseproxy+Chromium ile giriş, çerezSecure+HttpOnly, panelreload, owner/admin veanonimayrımıPASS. HTTPpanel/flow/isolation daPASS; testsertifikasıyalnız/tmp, sonunda silinir, productionTLSyayını değildir.

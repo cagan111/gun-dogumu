@@ -76,3 +76,5 @@
 - T114: subscription scan yalnız aday IDlerini bulur; manualpayment ile aynı Tenant FORUPDATE kilidi altında güncel alanlar okunur. Geçiş ve uyarı AuditLogları aynı transactionda; stale snapshot ödeme durumunu ezemez. 923b6a0 mevcut koyu/şampanya tema korunur (Claude6991469004); T140→141→142 yeni öncelik sırası.
 
 - T140: güvenli15.x Next veAuthbeta32; transitifPostCSS/sharp override, Zod4.6.6. Üretimaudit0tümseviyeler. Zodrefine açıkboolean ile mevcutpartialplanprice APIkorundu; Node22 sürer. SECURITY-DEPENDENCIES.md.
+
+- T141: middleware secureCookie seçimini NextRequest.nextUrl.protocol üzerinden yapar. HTTPSte __Secure-authjs.session-token, HTTPyereldevde plainauthjs çerezi; HTTPSTLS yerelproxyyle doğrulandı, authsırrı/tokenloglanmadı.

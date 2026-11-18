@@ -5,7 +5,7 @@ import { getAuthSecret } from "@/lib/auth-secret";
 /** /panel/** → owner|staff, /admin/** → superadmin; aksi hâlde /giris'e yönlendirir. */
 export async function middleware(req: NextRequest) {
   const { pathname, search } = req.nextUrl;
-  const token = await getToken({ req, secret: getAuthSecret() });
+  const token = await getToken({ req, secret: getAuthSecret(), secureCookie: req.nextUrl.protocol === "https:" });
   const role = typeof token?.role === "string" ? token.role : null;
   const allowed = pathname.startsWith("/admin")
     ? role === "superadmin"
