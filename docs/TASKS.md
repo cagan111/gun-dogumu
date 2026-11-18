@@ -170,3 +170,13 @@ Biçim: `- [ ] T-NNN | sahip: claude|codex|- | açıklama`. Başlamadan sahip ya
 - 2026-11-18 T-110/T-119: üretimde mock e-posta ile magic-link üretim/tüketim kapalı; auth bağlantıları loglanmaz, yalnız bootstrap şifre bağlantısı istisna. Gerçek Pino regresyonlarında önce6 hata, sonra10/10 geçti; tam CI236, build ve flow/isolation gerçek HTTP kontrolleri geçti.
 
 - 2026-11-18 T-111: salon kilidi altında kalıcı60sn bekleme ve UTCgünlük30segment konservatif rezervasyon tavanı; başarısız denemeler sayılır, kayıtlı/kayıtsız HTTP200 aynı. Migration uygulandı. Önce3 regresyon kırmızı, sonra yeni5+mevcut13 DBtesti yeşil; tamCI241/build ve dört e2e yeşil. T113benzersizkısıt ayrı kaldı.
+
+## 18 Kasım — kullanıcının onayladığı ek ürün kapsamı
+Önce mevcut güvenlik sırası T112→T113→T114→T115→T116→T117→T118; ardından T104/T105 ve aşağıdaki işler. Aynı özellik için ikinci uygulama açılmaz; mevcut ServiceStaff/panel taşıma kodu genişletilir. Ayrıntılar docs/PRODUCT_NEXT.md.
+- [ ] T-123 | sahip: codex | Claude6988228345: ana sayfa KVKK ifadesini KKTC için nötr kişisel veri ifadesine çevir (TR+EN); T112 teslimiyle
+- [ ] T-124 | sahip: codex | Personel bazlı hizmet uygunluğu ve gerekiyorsa süre/fiyat farklarını mevcut rezervasyon motoruna bağla; fiyat snapshot, mesai/çakışma ve tenant testleri
+- [ ] T-125 | sahip: codex | Bekleme listesi: açık rıza, süre sonu, iptal, boşluk için idempotent davet; rezervasyon önceliği iddiası yok, SMS mock
+- [ ] T-126 | sahip: codex | Müşterinin güvenli bağlantıdan randevu taşıması: iptal/taşıma süresi kuralı, atomik çakışma kontrolü, hatırlatmaların yenilenmesi, paralel/izolasyon testleri
+- [ ] T-127 | sahip: codex | Gerçek izinli berber videosu ve salon fotoğrafları; lisans/izin kaydı, mobil bütçe, hareket/veri tasarrufu; erişim/varlık yoksa açık eksik bırak
+- [ ] T-128 | sahip: codex | KKTC kapora/online ödeme sağlayıcısı uygunluk araştırması; şirket/para birimi/hesap/iade/webhook/test ortamı doğrulanmadan adaptör veya gerçek tahsilat yok
+- [ ] T-129 | sahip: codex | 2–3 salonla pilot kullanım için senaryo, ölçüm ve geribildirim planı hazırla; gerçek salon katılımı/iletişimi sahip tarafından sağlanır, sonuç uydurulmaz
