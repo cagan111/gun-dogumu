@@ -159,3 +159,8 @@ Biçim: `- [ ] T-NNN | sahip: claude|codex|- | açıklama`. Başlamadan sahip ya
 - [ ] T-116 | sahip: codex | (Orta 7) Kampanya: kalıcı kampanya/alıcı kaydı, kredi rezervasyonu, yeniden denemede yalnız kalanlar
 - [ ] T-117 | sahip: codex | (Orta 8) Manuel ödemede idempotency anahtarı
 - [ ] T-118 | sahip: codex | Tenant kapsamı: desteklenmeyen işlemleri (ilişki mutasyonu, ham SQL vb.) withTenant'ta açıkça reddet
+
+## 18 Kasım teslim sırası
+- [ ] T-100R | sahip: codex | T-100 kalanı: sıcak salon varsayılanı ve yalnız klavyede adım odağı
+- [ ] T-122 | sahip: codex | Gerçek stok video açılışı ve mevcut tasarımda görsel cila
+- [ ] T-119 | sahip: codex | Pino ortam doğrulamasında yöntem bağlamını koru
