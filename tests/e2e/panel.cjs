@@ -73,6 +73,23 @@ async function gotoDayWithAppointments(page) {
   await page.screenshot({ path: shot("panel-calendar") });
   step("takvim açıldı, randevular görünüyor");
 
+  // tarih seçici: TR biçimi, klavye (ok/PageDown/Esc) ve odak dönüşü
+  {
+    const dbtn = page.getByRole("button", { name: /^Tarih/ }).first();
+    assert.match(await dbtn.innerText(), /^\d{2}\.\d{2}\.\d{4}$/, "tarih GG.AA.YYYY");
+    await dbtn.focus(); await page.keyboard.press("Enter");
+    const dd = page.getByRole("dialog");
+    await dd.waitFor();
+    const lab = () => page.evaluate(() => document.activeElement?.getAttribute("aria-label") || "");
+    const l0 = await lab(); await page.keyboard.press("ArrowRight");
+    assert.notEqual(await lab(), l0, "ArrowRight odağı kaydırır");
+    await page.keyboard.press("PageDown");
+    assert.match(await dd.locator("[aria-live]").innerText(), /^(Ocak|Şubat|Mart|Nisan|Mayıs|Haziran|Temmuz|Ağustos|Eylül|Ekim|Kasım|Aralık) \d{4}$/, "ay başlığı Türkçe");
+    await page.keyboard.press("Escape");
+    assert.equal(await page.evaluate(() => document.activeElement?.getAttribute("aria-haspopup")), "dialog", "Esc sonrası odak düğmede");
+    step("tarih seçici klavye + TR biçimi");
+  }
+
   // bir randevuyu aç → Onayla (bekleyense) → Tamamlandı
   const block = page.locator('[data-testid="appt-block"][data-status="pending"], [data-testid="appt-block"][data-status="confirmed"]').first();
   await block.scrollIntoViewIfNeeded();

@@ -64,6 +64,15 @@ export function DatePicker({ label, value, onChange, mode = "date", hideLabel, c
   const cells = Array.from({ length: 42 }, (_, i) => addDays(start, i));
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
 
+  // Tab odağı iletişim kutusunda kalsın (arkadaki sayfaya kaçmasın)
+  function trapTab(e: React.KeyboardEvent) {
+    if (e.key !== "Tab") return;
+    const els = Array.from(popRef.current?.querySelectorAll<HTMLElement>("button:not([tabindex='-1'])") ?? []);
+    if (!els.length) return;
+    const first = els[0]!, last = els[els.length - 1]!, a = document.activeElement;
+    if (e.shiftKey && a === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && a === last) { e.preventDefault(); first.focus(); }
+  }
   function onGridKey(e: React.KeyboardEvent) {
     const d: Record<string, number> = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 };
     let next: string | null = null;
@@ -82,9 +91,17 @@ export function DatePicker({ label, value, onChange, mode = "date", hideLabel, c
   }
   function onMonthKey(e: React.KeyboardEvent, m: number) {
     const d: Record<string, number> = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -3, ArrowDown: 3 };
-    if (!(e.key in d)) return;
+    if (e.key === "PageUp" || e.key === "PageDown") {
+      e.preventDefault(); kb.current = true;
+      const y = view.y + (e.key === "PageUp" ? -1 : 1);
+      setView({ ...view, y }); setFocus(`${y}-${pad(m)}-01`); return;
+    }
+    let n: number;
+    if (e.key === "Home") n = m - ((m - 1) % 3);
+    else if (e.key === "End") n = m + (2 - ((m - 1) % 3));
+    else if (e.key in d) n = Math.min(12, Math.max(1, m + d[e.key]!));
+    else return;
     e.preventDefault(); kb.current = true;
-    const n = Math.min(12, Math.max(1, m + d[e.key]!));
     setFocus(`${view.y}-${pad(n)}-01`);
   }
 
@@ -103,7 +120,7 @@ export function DatePicker({ label, value, onChange, mode = "date", hideLabel, c
         {open ? (
           <>
             <div className="fixed inset-0 z-[60] bg-slate-900/40 md:bg-transparent" onClick={() => close()} aria-hidden />
-            <div ref={popRef} role="dialog" aria-label={label}
+            <div ref={popRef} role="dialog" aria-modal="true" aria-label={label} onKeyDown={trapTab}
               className="fixed inset-x-0 bottom-0 z-[61] rounded-t-2xl border border-line bg-white p-3 pb-6 shadow-xl md:absolute md:inset-x-auto md:bottom-auto md:left-0 md:top-full md:mt-1 md:w-72 md:rounded-xl md:pb-3">
               <div className="mb-2 flex items-center justify-between">
                 <button type="button" className={nav} aria-label={t(mode === "date" ? "pick.prevMonth" : "pick.prevYear")} onClick={() => (mode === "date" ? shiftMonth(-1) : setView({ ...view, y: view.y - 1 }))}><span aria-hidden>‹</span></button>

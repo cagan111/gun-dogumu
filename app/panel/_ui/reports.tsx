@@ -9,7 +9,7 @@ import { useI18n } from "@/lib/i18n/client";
 import type { Key } from "@/lib/i18n/shared";
 import { utcToLocal } from "@/lib/time";
 import { usePanel } from "./ctx";
-import { money, statusTone, svcName, useLoader, type StatusTone } from "./util";
+import { money, svcName, useLoader, type StatusTone } from "./util";
 
 interface Report {
   month: string; total: number; byStatus: Record<string, number>; revenueTry: number; revenueAppointments: number;
@@ -18,14 +18,19 @@ interface Report {
   noShowRate: number;
 }
 
-const BAR: Record<StatusTone, string> = { slate: "bg-slate-500", green: "bg-emerald-600", amber: "bg-amber-500", red: "bg-red-600", sky: "bg-sky-600", violet: "bg-violet-600" };
+const BAR: Record<StatusTone, string> = { slate: "bg-[#8a7a68]", green: "bg-olive", amber: "bg-[#b08a3e]", red: "bg-clay", sky: "bg-[#7d8f5f]", violet: "bg-sea" };
+// Durum çubukları sıcak palet: zeytin = olumlu, pirinç/kum = bekleyen, kil = olumsuz.
+const STATUS_BAR: Record<string, string> = {
+  completed: "bg-olive", confirmed: "bg-[#7d8f5f]", pending: "bg-[#b08a3e]",
+  no_show: "bg-clay", cancelled_by_customer: "bg-[#c98f7e]", cancelled_by_salon: "bg-[#8a7a68]",
+};
 const STATUSES = ["completed", "confirmed", "pending", "no_show", "cancelled_by_customer", "cancelled_by_salon"] as const;
 
-function Bar({ label, value, max, text, tone = "sky" }: { label: string; value: number; max: number; text: string; tone?: StatusTone }) {
+function Bar({ label, value, max, text, tone = "violet", barClass }: { label: string; value: number; max: number; text: string; tone?: StatusTone; barClass?: string }) {
   return (
-    <li className="py-1.5">
-      <div className="flex justify-between gap-3 text-sm"><span className="min-w-0 truncate font-medium">{label}</span><span className="shrink-0 tabular-nums text-slate-700">{text}</span></div>
-      <div className="mt-1 h-2.5 overflow-hidden rounded-full bg-slate-100" role="presentation"><div className={`h-full rounded-full ${BAR[tone]}`} style={{ width: `${max > 0 ? Math.max((value / max) * 100, value > 0 ? 3 : 0) : 0}%` }} /></div>
+    <li className="py-1.5" aria-label={`${label}: ${text}`}>
+      <div className="flex justify-between gap-3 text-sm"><span className="min-w-0 truncate font-medium">{label}</span><span className="shrink-0 tabular-nums text-slate-800">{text}</span></div>
+      <div className="mt-1 h-2.5 overflow-hidden rounded-full bg-sand/60" role="presentation"><div className={`h-full rounded-full ${barClass ?? BAR[tone]}`} style={{ width: `${max > 0 ? Math.max((value / max) * 100, value > 0 ? 3 : 0) : 0}%` }} /></div>
     </li>
   );
 }
@@ -60,7 +65,7 @@ export function ReportsView() {
           </div>
           <Card className="mt-4">
             <h3 className="font-bold">{t("rep.byStatus")}</h3>
-            <ul className="mt-1">{STATUSES.map((s) => <Bar key={s} label={t(`st.${s}` as Key)} value={r.byStatus[s] ?? 0} max={maxStatus} text={String(r.byStatus[s] ?? 0)} tone={statusTone(s)} />)}</ul>
+            <ul className="mt-1">{STATUSES.map((s) => <Bar key={s} label={t(`st.${s}` as Key)} value={r.byStatus[s] ?? 0} max={maxStatus} text={`${r.byStatus[s] ?? 0}${r.total > 0 ? ` · ${Math.round(((r.byStatus[s] ?? 0) / r.total) * 100)}%` : ""}`} barClass={STATUS_BAR[s]} />)}</ul>
           </Card>
           <div className="mt-4 grid gap-4 md:grid-cols-2">
             <Card>
@@ -72,7 +77,7 @@ export function ReportsView() {
             <Card>
               <h3 className="font-bold">{t("rep.topStaff")}</h3>
               {r.topStaff.length === 0 ? <p className="mt-1 text-sm text-slate-600">{t("common.empty")}</p> : (
-                <ul className="mt-1">{r.topStaff.map((s) => <Bar key={s.staffId} label={s.name} value={s.count} max={maxStaff} text={`${s.count} · ${money(s.revenueTry, locale)}`} tone="violet" />)}</ul>
+                <ul className="mt-1">{r.topStaff.map((s) => <Bar key={s.staffId} label={s.name} value={s.count} max={maxStaff} text={`${s.count} · ${money(s.revenueTry, locale)}`} />)}</ul>
               )}
             </Card>
           </div>

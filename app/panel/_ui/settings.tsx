@@ -21,7 +21,7 @@ interface Settings {
   maxAdvanceDays: number; brandColor: string | null; logoUrl: string | null; coverUrl: string | null; locale: "tr" | "en"; timeZone: string;
 }
 const OFFSETS = [10080, 2880, 1440, 720, 240, 120, 60, 30];
-const ZONES = ["Asia/Famagusta", "Europe/Istanbul", "Europe/Nicosia", "Europe/London", "Europe/Athens"];
+const ZONES = ["Asia/Famagusta", "Asia/Nicosia", "Europe/Istanbul", "Europe/London"];
 const SLOTS = [5, 10, 15, 20, 30, 60];
 const offsetLabel = (m: number, t: ReturnType<typeof useI18n>["t"]) => (m % 1440 === 0 ? t("set.offDays", { n: m / 1440 }) : m % 60 === 0 ? t("set.offHours", { n: m / 60 }) : t("common.minutes", { n: m }));
 
@@ -223,7 +223,7 @@ function SettingsForm() {
           <Field label={t("set.maxAdvance")} hint={t("set.maxAdvanceHint")} type="number" inputMode="numeric" min={1} max={365} value={Number.isNaN(f.maxAdvanceDays) ? "" : f.maxAdvanceDays} onChange={(e) => set({ maxAdvanceDays: num(e.target.value) })} error={fe.maxAdvanceDays} />
         </div>
         <SelectField label={t("set.tz")} value={f.timeZone} onChange={(e) => set({ timeZone: e.target.value })}>
-          {zones.map((z) => <option key={z} value={z}>{z}</option>)}
+          {zones.map((z) => <option key={z} value={z}>{ZONES.includes(z) ? t(`tz.${z}` as Key) : z}</option>)}
         </SelectField>
       </Card>
 
