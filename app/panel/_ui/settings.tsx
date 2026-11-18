@@ -240,7 +240,7 @@ function SettingsForm() {
         <Field label={t("set.logo")} optional={t("common.optional")} type="url" inputMode="url" placeholder="https://…" value={f.logoUrl ?? ""} onChange={(e) => set({ logoUrl: e.target.value })} error={fe.logoUrl} />
         <Field label={t("set.cover")} optional={t("common.optional")} type="url" inputMode="url" placeholder="https://…" value={f.coverUrl ?? ""} onChange={(e) => set({ coverUrl: e.target.value })} error={fe.coverUrl} />
       </Card>
-      <div className="sticky bottom-20 z-20 flex justify-end md:bottom-4"><Button type="submit" disabled={busy} className="shadow-lg">{t("common.save")}</Button></div>
+      <div className="flex justify-end pb-2"><Button type="submit" disabled={busy} className="w-full sm:w-auto">{t("common.save")}</Button></div>
     </form>
   );
 }

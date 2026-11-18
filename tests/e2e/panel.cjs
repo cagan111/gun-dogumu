@@ -36,7 +36,14 @@ async function gotoDayWithAppointments(page) {
     return a ? new Intl.DateTimeFormat("en-CA", { timeZone: r.timeZone }).format(new Date(a.startsAt)) : null;
   });
   assert.ok(date, "yakın günlerde randevu var");
-  await page.locator("#cal-date").fill(date);
+  // özel tarih seçici: düğmeyi aç, ayı hedef aya getir, günü ISO tarihinden bulunan etiketle seç
+  await page.getByRole("button", { name: /^(Tarih|Date)/ }).first().click();
+  for (let i = 0; i < 3; i++) {
+    const cell = page.getByRole("dialog").locator("button[role=gridcell]").filter({ hasText: new RegExp(`^${Number(date.slice(8))}$`) });
+    const n = await cell.count();
+    if (n) { const d = new Date(`${date}T12:00:00Z`); const lab = new Intl.DateTimeFormat("tr-TR", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }).format(d); const t = page.getByRole("dialog").getByLabel(lab, { exact: true }); if (await t.count()) { await t.click(); break; } }
+    await page.getByRole("button", { name: "Sonraki ay" }).click();
+  }
   assert.ok(await has(), "seçilen günde randevu blokları");
 }
 

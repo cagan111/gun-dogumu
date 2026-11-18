@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Alert, Field } from "@/components/ui/field";
 import { Badge, CheckField, SelectField, TextareaField } from "@/components/ui/form";
 import { Sheet, ConfirmDialog } from "@/components/ui/sheet";
@@ -23,6 +24,39 @@ const ACTIVE: ApptStatus[] = ["pending", "confirmed"];
 
 interface Col { key: string; date: string; staff: Staff; label: string; sub?: string }
 interface Placed { a: Appt; start: number; dur: number; lane: number; lanes: number }
+
+/** Takvim ızgarasının iskeleti: personel başlıkları + saat satırları; yüklenirken gösterilir. */
+function CalSkeleton({ label, cols }: { label: string; cols: number }) {
+  const blocks = [[1, 2], [3, 1], [0, 2], [2, 2], [4, 1], [1, 1]];
+  return (
+    <div role="status" aria-busy="true" aria-label={label} className="mt-3 overflow-hidden rounded-lg border border-line bg-white" data-testid="cal-skeleton">
+      <span className="sr-only">{label}</span>
+      <div aria-hidden style={{ display: "grid", gridTemplateColumns: `${GUTTER}px repeat(${cols}, minmax(${cols > 3 ? 72 : MIN_COL}px, 1fr))` }} className="overflow-hidden">
+        <div className="border-b border-r border-line bg-white" />
+        {Array.from({ length: cols }, (_, i) => (
+          <div key={i} className="flex items-center justify-center gap-1.5 border-b border-r border-line bg-paper px-2 py-3">
+            <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-sand motion-reduce:animate-none" />
+            <span className="h-3 w-16 animate-pulse rounded bg-sand motion-reduce:animate-none" />
+          </div>
+        ))}
+        {Array.from({ length: 6 }, (_, r) => (
+          <div key={`r${r}`} className="contents">
+            <div className="flex h-16 items-start justify-end border-b border-r border-line pr-1 pt-1"><span className="h-2.5 w-7 rounded bg-sand/70" /></div>
+            {Array.from({ length: cols }, (_, c) => {
+              const b = blocks[(r + c * 2) % blocks.length]!;
+              const show = (r * 3 + c * 5) % 4 !== 0;
+              return (
+                <div key={c} className="relative h-16 border-b border-r border-line">
+                  {show ? <span className="absolute inset-x-2 top-2 animate-pulse rounded-md bg-sand/80 motion-reduce:animate-none" style={{ height: 14 + b[1]! * 10, animationDelay: `${(r + c) * 90}ms` }} /> : null}
+                </div>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 const mondayOf = (date: string) => addDays(date, -((weekdayOf(date) + 6) % 7));
 
@@ -202,8 +236,7 @@ export function CalendarView() {
           <Button variant="secondary" onClick={() => setDate(today)}>{t("cal.today")}</Button>
           <Button variant="secondary" className="!px-3" aria-label={t("cal.next")} onClick={() => setDate(addDays(date, step))}><span aria-hidden>›</span></Button>
         </div>
-        <label className="sr-only" htmlFor="cal-date">{t("cal.pickDate")}</label>
-        <input id="cal-date" type="date" value={date} onChange={(e) => e.target.value && setDate(e.target.value)} className="min-h-11 rounded-xl border border-slate-300 bg-white px-3 text-base" />
+        <DatePicker label={t("cal.pickDate")} hideLabel value={date} onChange={(v) => v && setDate(v)} className="w-40" />
         <div role="group" aria-label={t("cal.view")} className="inline-flex rounded-xl border border-slate-300 bg-white p-0.5">
           {(["day", "week"] as const).map((v) => (
             <button key={v} type="button" aria-pressed={view === v} onClick={() => setView(v)} className={cn("min-h-10 rounded-lg px-4 text-sm font-semibold", view === v ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-100")}>{t(v === "day" ? "cal.day" : "cal.week")}</button>
@@ -228,8 +261,8 @@ export function CalendarView() {
         <Alert tone="info" className="mt-3">{t("cal.noStaff")} <Link href="/panel/personel" className="font-semibold underline">{t("nav.staff")}</Link></Alert>
       ) : null}
 
-      {base.loading || apptsQ.loading ? (
-        <p role="status" className="mt-3 rounded-lg border border-line bg-white px-4 py-3 text-sm text-slate-700">{t("cal.loading")}</p>
+      {base.loading ? (
+        <CalSkeleton label={t("cal.loading")} cols={view === "day" ? 3 : 7} />
       ) : cols.length > 0 && visible.length === 0 && !base.error && !apptsQ.error ? (
         <div className="mt-3 flex items-center gap-3 rounded-lg border border-line bg-paper p-3">
           <svg aria-hidden viewBox="0 0 48 48" className="h-12 w-12 shrink-0 text-olive" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -465,7 +498,7 @@ function ApptSheet({ appt, staff, services, onClose, onChanged }: { appt: Appt |
           ) : (
             <div className="space-y-3 rounded-xl border border-line bg-slate-50 p-3">
               <h3 className="font-bold">{t("act.move")}</h3>
-              <Field label={t("cal.pickDate")} type="date" value={mDate} onChange={(e) => setMDate(e.target.value)} />
+              <DatePicker label={t("cal.pickDate")} value={mDate} onChange={setMDate} />
               <Field label={t("appt.time")} type="time" step={tenant.slotMinutes * 60} value={mTime} onChange={(e) => setMTime(e.target.value)} />
               <SelectField label={t("appt.staff")} value={mStaff} onChange={(e) => setMStaff(e.target.value)}>
                 {stf.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
@@ -550,7 +583,7 @@ function CreateSheet({ init, staff, services, onClose, onCreated }: { init: { da
           {staffOpts.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
         </SelectField>
         <div className="grid grid-cols-2 gap-3">
-          <Field label={t("cal.pickDate")} type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
+          <DatePicker label={t("cal.pickDate")} value={date} onChange={setDate} required />
           <Field label={t("appt.time")} type="time" step={300} value={time} onChange={(e) => setTime(e.target.value)} required />
         </div>
         <CheckField label={t("appt.walkIn")} checked={walkIn} onChange={(e) => toggleWalkIn(e.target.checked)} />

@@ -1,6 +1,7 @@
 "use client";
 import { useMemo, useState } from "react";
-import { Alert, Field } from "@/components/ui/field";
+import { DatePicker } from "@/components/ui/date-picker";
+import { Alert } from "@/components/ui/field";
 import { Card } from "@/components/ui/form";
 import { errorMessage, isCode } from "@/lib/client-api";
 import { api } from "@/lib/client-api";
@@ -44,7 +45,7 @@ export function ReportsView() {
     <div className="mx-auto max-w-3xl">
       <div className="flex flex-wrap items-end gap-3">
         <h2 className="flex-1 text-xl font-extrabold">{t("nav.reports")}</h2>
-        <Field label={t("rep.month")} type="month" value={month} onChange={(e) => e.target.value && setMonth(e.target.value)} className="w-44" />
+        <DatePicker mode="month" label={t("rep.month")} value={month} onChange={(v) => v && setMonth(v)} className="w-44" />
       </div>
       {!isOwner ? <Alert tone="info" className="mt-3">{t("ownerOnly")}</Alert> : null}
       {isOwner && locked ? <Alert tone="info" className="mt-3">{t("rep.pro")}</Alert> : null}
