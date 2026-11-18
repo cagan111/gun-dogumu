@@ -38,3 +38,7 @@
 
 /* Fare/dokunmada programatik odak çerçevesiz; klavyede global focus-visible korunur. */
 .booking-step-heading:focus:not(:focus-visible) { outline: none; box-shadow: none; }
+
+@keyframes booking-settle { from { opacity: 0; transform: translateY(5px) scale(.96); } to { opacity: 1; transform: none; } }
+.booking-success-mark { animation: booking-settle 240ms ease-out both; }
+@media (prefers-reduced-motion: reduce) { .booking-success-mark { animation: none; } }

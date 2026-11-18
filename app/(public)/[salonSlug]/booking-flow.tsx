@@ -159,7 +159,7 @@ export function BookingFlow({ slug, salonName, timeZone, today, maxAdvanceDays, 
     return (
       <main className="mx-auto max-w-2xl px-4 py-8">
         <div className="rounded-t-[3rem] rounded-b-xl border border-line bg-white p-6 text-center">
-          <svg aria-hidden viewBox="0 0 88 72" className="mx-auto h-[72px] w-[88px]" fill="none">
+          <svg aria-hidden viewBox="0 0 88 72" className="booking-success-mark mx-auto h-[72px] w-[88px]" fill="none">
             <path d="M18 37C18 22 28 11 44 11c14 0 26 10 26 25S61 62 44 62 18 52 18 37Z" fill="#e7ecde" />
             <path d="m33 37 8 8 15-17" stroke="#465635" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
             <path d="m9 22-4-4m6 17-6 1m66-17 5-5m1 20 6-2M21 8l-2-4" stroke="#9b4835" strokeWidth="2" strokeLinecap="round" />

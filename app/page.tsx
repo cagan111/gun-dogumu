@@ -1,3 +1,4 @@
+import { HeroMedia } from "@/components/hero/media";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { brand } from "@/config/brand";
@@ -41,26 +42,20 @@ export default async function Home() {
       <a href="#icerik" className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded focus:bg-white focus:px-3 focus:py-2">{t("common.skipToContent")}</a>
       <SiteHeader />
       <main id="icerik">
-        <section className="border-b border-line bg-paper">
+        <section className="relative isolate overflow-hidden border-b border-line bg-olive">
+          <HeroMedia />
           <div className="mx-auto grid max-w-6xl items-center gap-9 px-4 py-12 md:grid-cols-[1.2fr_1fr] md:py-20">
             <div>
-              <p className="text-xs font-bold uppercase tracking-[.16em] text-clay">{t("home.badge")}</p>
-              <h1 className="display-heading mt-3 max-w-xl text-[2.5rem] font-semibold leading-[1.08] tracking-tight text-slate-900 sm:text-[3.6rem]">{t("home.heroTitle")}</h1>
-              <p className="mt-5 max-w-lg text-base leading-relaxed text-slate-700 sm:text-lg">{t("home.heroSub")}</p>
+              <p className="text-xs font-bold uppercase tracking-[.16em] text-sand">{t("home.badge")}</p>
+              <h1 className="display-heading mt-3 max-w-xl text-[2.5rem] font-semibold leading-[1.08] tracking-tight text-white sm:text-[3.6rem]">{t("home.heroTitle")}</h1>
+              <p className="mt-5 max-w-lg text-base leading-relaxed text-white sm:text-lg">{t("home.heroSub")}</p>
               <div className="mt-7 flex flex-wrap gap-3">
                 <Link href="/kayit" className={buttonClass("primary", "px-6")}>{t("home.ctaPrimary")}</Link>
                 <a href="#fiyatlar" className={buttonClass("secondary", "px-6")}>{t("home.ctaSecondary")}</a>
               </div>
-              <p className="mt-3 text-sm text-slate-600">{t("home.heroNote")}</p>
+              <p className="mt-3 text-sm text-white">{t("home.heroNote")}</p>
             </div>
-            <div aria-hidden className="relative isolate mx-auto flex min-h-64 w-full max-w-sm items-center justify-center overflow-hidden rounded-t-[7rem] rounded-b-xl bg-sand p-7 md:min-h-96">
-              <svg viewBox="0 0 360 340" className="absolute inset-0 h-full w-full" preserveAspectRatio="xMidYMid slice" fill="none">
-                <circle cx="284" cy="96" r="32" fill="#bd694e" />
-                <path d="M-20 246C55 164 113 180 186 223S304 270 384 193V350H-20Z" fill="#d8c6a0" />
-                <path d="M-20 286C68 222 114 224 200 272S312 312 384 245V350H-20Z" fill="#8b9d80" />
-                <path d="M-20 317C51 279 115 276 176 307S315 352 384 283V350H-20Z" fill="#42747a" />
-                <path d="M38 108c25-33 51-42 80-44M33 124c21-12 35-16 55-16M305 155c13-7 23-7 36-5" stroke="#465635" strokeWidth="2" strokeLinecap="round" />
-              </svg>
+            <div aria-hidden className="relative isolate mx-auto flex min-h-64 w-full max-w-sm items-center justify-center p-4 md:min-h-96">
               <div className="relative w-full max-w-60 rotate-[-3deg] rounded-lg border border-line bg-white p-5 shadow-lg">
                 <p className="text-xs font-bold uppercase tracking-wider text-clay">{t("home.nicosia")}</p>
                 <p className="display-heading mt-1 text-xl font-semibold">{t("home.mockSalon")}</p>

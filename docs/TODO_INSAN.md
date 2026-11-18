@@ -12,3 +12,5 @@
 - [ ] GitHub Actions workflow'u (`.github/workflows/ci.yml`) repo GitHub'a taşınınca ilk çalıştırmada yeşil mi bak.
 
 - [ ] Gerçek salon sahiplerinden izinli kısa yorumlar/alıntılar topla (ana sayfada kullanılacak; o zamana kadar alıntı yok).
+
+- T-122 medya: izinli stok siteleri bu ortamda403 döndü. Gerçek berber POV (giriş/koltuk/örtü) veya en yakın uygun klip seçilip lisansı/üreticisi doğrulanmalı; `config/hero.ts` desktop/mobile yolları ve `docs/LICENSES.md` güncellenmeli. Geçici poster üretilmiş görseldir. Sonradan sahibin kendi çekimiyle değiştirilebilir. Gerçek video ve üç karesi henüz yok.
