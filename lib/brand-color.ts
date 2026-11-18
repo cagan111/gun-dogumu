@@ -1,6 +1,6 @@
 /** "#rrggbb" → "R G B" (Tailwind alfa destekli CSS değişkeni) ve okunur ön plan rengi. */
 const HEX = /^#[0-9a-fA-F]{6}$/;
-export const DEFAULT_BRAND = "#465635";
+export const DEFAULT_BRAND = "#C9A96E";
 
 export function brandVars(hex: string | null | undefined): Record<string, string> {
   const h = hex && HEX.test(hex) ? hex : DEFAULT_BRAND;

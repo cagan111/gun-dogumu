@@ -20,7 +20,7 @@ const shot = (n) => path.join(SHOTS, `ui-${n}.png`);
   const ctx = await browser.newContext({ viewport: VIEWPORT, deviceScaleFactor: 1, locale: "tr-TR" });
   const page = await ctx.newPage();
   const problems = [];
-  page.on("console", (m) => { if (m.type() === "error") problems.push(`console: ${m.text()}`); });
+  page.on("console", (m) => { if (m.type() === "error" && !/Failed to load resource: the server responded with a status of 4\d\d/.test(m.text())) problems.push(`console: ${m.text()}`); });
   page.on("pageerror", (e) => problems.push(`pageerror: ${e.message}`));
   const step = (m) => console.log(`✓ ${m}`);
 

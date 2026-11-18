@@ -24,7 +24,7 @@ interface SalonDef {
 const SALONS: SalonDef[] = [
   {
     slug: "lefkosa-usta-berber", name: "Lefkoşa Usta Berber", city: "Lefkoşa",
-    address: "Girne Caddesi No:42", phone: "+905338001001", color: "#465635", plan: "pro",
+    address: "Girne Caddesi No:42", phone: "+905338001001", color: "#C9A96E", plan: "pro",
     staff: [
       { name: "Hasan Usta", color: "#1d4ed8" },
       { name: "Mert Kaya", color: "#0f766e" },
