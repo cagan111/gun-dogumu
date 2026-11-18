@@ -5,13 +5,15 @@
 import { Prisma, type Channel, type MessageStatus } from "@prisma/client";
 import { prisma, withTenant } from "../db";
 import { InsufficientCreditsError, ValidationError } from "../errors";
-import { debitTx, getBalance, lockTenant, refundTx, type DebitReason } from "../ledger";
+import { debitTx, getBalance, lockTenant, type DebitReason } from "../ledger";
 import { logger } from "../logger";
 import { hasFeature } from "../plan";
 import { getEmailProvider, getSmsProvider, getWhatsAppProvider, whatsappConfigured } from "./registry";
 import { smsSegments } from "./segments";
 import { asLocale, renderTemplate, templateSubject, type TemplateName, type TemplateVars } from "./templates";
 import type { ProviderDeps } from "./types";
+import { messageLease, startDispatch, settleMessage, PROVIDER_TIMEOUT_MS } from "./recovery";
+export { reconcileQueuedMessages } from "./recovery";
 
 export interface SendInput {
   tenantId: string;
@@ -27,6 +29,8 @@ export interface SendInput {
   fallback?: { whatsapp?: boolean; email?: string | null; subject?: string };
   deps?: Partial<ProviderDeps>;
   now?: Date;
+  /** Internal fault-injection seam. Never populated from an HTTP request. */
+  hooks?: { afterReserved?: () => Promise<void>; afterDispatch?: () => Promise<void> };
 }
 export type SendOutcome = {
   status: "sent" | "failed" | "skipped" | "duplicate";
@@ -40,17 +44,30 @@ function isUniqueViolation(e: unknown): boolean {
   return e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002";
 }
 
-async function finish(tenantId: string, id: string, status: MessageStatus, res: { providerId?: string; error?: string }) {
-  await withTenant(tenantId).messageLog.updateMany({ where: { id }, data: { status, providerId: res.providerId ?? null, providerResult: res.error ?? null } });
+/** Bound even custom providers; a timed-out/ambiguous dispatch is never replayed. */
+async function dispatch(fn: () => Promise<{ ok: boolean; providerId?: string; error?: string }>) {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const result = await Promise.race([fn(), new Promise<{ ok: boolean; error: string }>((resolve) => {
+      timer = setTimeout(() => resolve({ ok: false, error: "delivery_unknown" }), PROVIDER_TIMEOUT_MS);
+    })]);
+    return !result.ok && result.error && (/^network:/.test(result.error) || /^(?:netgsm|iletimerkezi|generic|whatsapp):(?:5\d\d|408):/.test(result.error)) ? { ok: false, error: "delivery_unknown" } : result;
+  } catch { return { ok: false, error: "delivery_unknown" }; }
+  finally { if (timer) clearTimeout(timer); }
+}
+async function finish(input: Pick<SendInput, "tenantId" | "now">, id: string, owner: string, status: MessageStatus, res: { providerId?: string; error?: string }) {
+  return settleMessage(input.tenantId, id, owner, status, res, input.now ?? new Date());
 }
 
 /** Ücretsiz kanal kaydı (WhatsApp/e-posta/atlandı): kredi düşmez. Benzersiz anahtar çakışırsa null. */
 async function logFree(input: SendInput, channel: Channel, recipient: string, provider: string, status: MessageStatus, key: string | null, error?: string) {
+  const lease = messageLease(input.now ?? new Date());
   try {
     const row = await withTenant(input.tenantId).messageLog.create({
-      data: { channel, recipient, template: input.template, content: input.logContent ?? input.text, provider, status, providerResult: error ?? null, cost: 0, idempotencyKey: key, appointmentId: input.appointmentId ?? null } as never,
+      data: { channel, recipient, template: input.template, content: input.logContent ?? input.text, provider, status, providerResult: error ?? null, ...(status === "queued" ? lease : {}), cost: 0, idempotencyKey: key, appointmentId: input.appointmentId ?? null } as never,
     });
-    return row.id;
+    if (status === "queued") await input.hooks?.afterReserved?.();
+    return { id: row.id, owner: lease.leaseOwner };
   } catch (e) {
     if (isUniqueViolation(e)) return null;
     throw e;
@@ -70,13 +87,14 @@ export async function sendMessage(input: SendInput): Promise<SendOutcome> {
   if (segments === 0) throw new ValidationError("Boş mesaj", "text");
 
   // 1) kredi düşümü + MessageLog (queued) tek transaction
+  const lease = messageLease(input.now ?? new Date());
   let logId: string;
   try {
     logId = await withTenant(tenantId).$transaction(async (tx) => {
       // kilit sırası: önce tenant FOR UPDATE, sonra MessageLog INSERT (FK KEY SHARE) — tersi eşzamanlı gönderimde 40P01
       await lockTenant(tx, tenantId);
       const log = await tx.messageLog.create({
-        data: { channel: "sms", recipient: input.to, template: input.template, content: input.logContent ?? input.text, provider: sms.name, status: "queued", cost: segments, idempotencyKey: key, appointmentId: input.appointmentId ?? null } as never,
+        data: { channel: "sms", recipient: input.to, template: input.template, content: input.logContent ?? input.text, provider: sms.name, status: "queued", ...lease, cost: segments, idempotencyKey: key, appointmentId: input.appointmentId ?? null } as never,
       });
       await debitTx(tx, tenantId, segments, { reason: input.reason, messageId: log.id, note: input.template });
       return log.id;
@@ -87,24 +105,15 @@ export async function sendMessage(input: SendInput): Promise<SendOutcome> {
     throw e;
   }
 
-  // 2) gönderim (ağ çağrısı transaction dışında)
-  let res: { ok: boolean; providerId?: string; error?: string };
-  try {
-    res = await sms.send(input.to, input.text, { sender: tenant.smsSenderName });
-  } catch (e) {
-    res = { ok: false, error: e instanceof Error ? e.message : String(e) };
-  }
-  if (res.ok) {
-    await finish(tenantId, logId, "sent", res);
-    return { status: "sent", channel: "sms", messageId: logId, segments };
-  }
-  // 3) başarısız: iade + kayıt
-  await withTenant(tenantId).$transaction(async (tx) => {
-    await refundTx(tx, tenantId, segments, { messageId: logId, note: `iade:${input.template}` });
-    await tx.messageLog.updateMany({ where: { id: logId }, data: { status: "failed", providerResult: res.error ?? "error", cost: 0 } });
-  });
-  logger.warn({ tenantId, provider: sms.name, error: res.error }, "SMS gönderilemedi, kredi iade edildi");
-  return { status: "failed", channel: "sms", messageId: logId, segments, reason: res.error };
+  await input.hooks?.afterReserved?.();
+  // Dispatch marker fences workers whose reservation was already recovered.
+  if (!(await startDispatch(tenantId, logId, lease.leaseOwner, input.now ?? new Date()))) return { status: "failed", messageId: logId, segments, reason: "lease_lost" };
+  const res = await dispatch(() => sms.send(input.to, input.text, { sender: tenant.smsSenderName }));
+  await input.hooks?.afterDispatch?.();
+  const won = await finish(input, logId, lease.leaseOwner, res.ok ? "sent" : "failed", res);
+  if (!won) return { status: "failed", channel: "sms", messageId: logId, segments, reason: "lease_lost" };
+  if (!res.ok) logger.warn({ tenantId, provider: sms.name }, "SMS gönderilemedi, kredi iade edildi");
+  return { status: res.ok ? "sent" : "failed", channel: "sms", messageId: logId, segments, ...(res.ok ? {} : { reason: res.error }) };
 }
 
 async function fallback(input: SendInput, plan: string, segments: number): Promise<SendOutcome> {
@@ -120,20 +129,26 @@ async function fallback(input: SendInput, plan: string, segments: number): Promi
     const wa = getWhatsAppProvider(input.deps);
     const id = await logFree(input, "whatsapp", input.to, wa.name, "queued", nextKey("email"));
     if (id === null) return { status: "duplicate", segments: 0 };
-    const r = await wa.send(input.to, input.text, { params: [input.text] }).catch((e) => ({ ok: false, providerId: undefined, error: String(e) }));
-    await finish(tenantId, id, r.ok ? "sent" : "failed", r);
-    if (r.ok) return { status: "sent", channel: "whatsapp", messageId: id, segments };
+    if (!(await startDispatch(tenantId, id.id, id.owner, input.now ?? new Date()))) return { status: "failed", segments, reason: "lease_lost" };
+    const r = await dispatch(() => wa.send(input.to, input.text, { params: [input.text] }));
+    await input.hooks?.afterDispatch?.();
+    if (!(await finish(input, id.id, id.owner, r.ok ? "sent" : "failed", r))) return { status: "failed", segments, reason: "lease_lost" };
+    if (r.ok) return { status: "sent", channel: "whatsapp", messageId: id.id, segments };
+    if (r.error === "delivery_unknown") return { status: "failed", segments, reason: r.error };
   }
   if (fb.email) {
     const em = getEmailProvider();
     const id = await logFree(input, "email", fb.email, em.name, "queued", nextKey("skip"));
     if (id === null) return { status: "duplicate", segments: 0 };
-    const r = await em.send(fb.email, fb.subject ?? "KıbrısRandevu", input.text).catch((e) => ({ ok: false, providerId: undefined, error: String(e) }));
-    await finish(tenantId, id, r.ok ? "sent" : "failed", r);
-    if (r.ok) return { status: "sent", channel: "email", messageId: id, segments };
+    if (!(await startDispatch(tenantId, id.id, id.owner, input.now ?? new Date()))) return { status: "failed", segments, reason: "lease_lost" };
+    const r = await dispatch(() => em.send(fb.email!, fb.subject ?? "KıbrısRandevu", input.text));
+    await input.hooks?.afterDispatch?.();
+    if (!(await finish(input, id.id, id.owner, r.ok ? "sent" : "failed", r))) return { status: "failed", segments, reason: "lease_lost" };
+    if (r.ok) return { status: "sent", channel: "email", messageId: id.id, segments };
+    if (r.error === "delivery_unknown") return { status: "failed", segments, reason: r.error };
   }
   const id = await logFree(input, "sms", input.to, "none", "skipped", keyLeft, "insufficient_credits");
-  return { status: "skipped", channel: "sms", messageId: id ?? undefined, segments, reason: "insufficient_credits" };
+  return { status: "skipped", channel: "sms", messageId: id?.id, segments, reason: "insufficient_credits" };
 }
 
 /** Salon sahibinin e-postası (ilk owner). */
@@ -144,18 +159,18 @@ export async function ownerEmail(tenantId: string): Promise<string | null> {
 
 /** Salona e-posta bildirimi (MessageLog'lu, anahtarla tekrarsız). Kredi düşmez. */
 export async function sendTenantEmail(tenantId: string, template: TemplateName, vars: TemplateVars, key: string, opts: { now?: Date } = {}): Promise<"sent" | "duplicate" | "no_recipient" | "failed"> {
-  void opts;
   const t = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { name: true, locale: true } });
   const to = await ownerEmail(tenantId);
   if (!t || !to) return "no_recipient";
   const locale = asLocale(t.locale);
   const text = renderTemplate(template, locale, { salon: t.name, ...vars });
   const em = getEmailProvider();
-  const input = { tenantId, to, text, template, reason: "notification" as const };
+  const input = { tenantId, to, text, template, reason: "notification" as const, now: opts.now };
   const id = await logFree(input, "email", to, em.name, "queued", key);
   if (id === null) return "duplicate";
-  const r = await em.send(to, templateSubject(template, locale), text).catch((e) => ({ ok: false, providerId: undefined, error: String(e) }));
-  await finish(tenantId, id, r.ok ? "sent" : "failed", r);
+  if (!(await startDispatch(tenantId, id.id, id.owner, opts.now ?? new Date()))) return "failed";
+  const r = await dispatch(() => em.send(to, templateSubject(template, locale), text));
+  if (!(await finish(input, id.id, id.owner, r.ok ? "sent" : "failed", r))) return "failed";
   return r.ok ? "sent" : "failed";
 }
 

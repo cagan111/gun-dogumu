@@ -152,7 +152,7 @@ Biçim: `- [ ] T-NNN | sahip: claude|codex|- | açıklama`. Başlamadan sahip ya
 ## REVIEW.md T-101 bulgularından düzeltmeler (öncelik sırasıyla)
 - [x] T-110 | sahip: codex | (Yüksek 1) Üretimde e-posta sağlayıcı yoksa sihirli bağlantıyı kapat; token/URL'yi loglardan çıkar (ilk açılış süper-admin şifre bağlantısı istisna, brief gereği) + log yakalayan test
 - [x] T-111 | sahip: codex | (Yüksek 3) OTP: salon başına maliyet tavanı + yeniden gönderim bekleme süresi; kayıtlı/kayıtsız numarada aynı HTTP yanıtı
-- [ ] T-112 | sahip: codex | (Yüksek 2) Mesaj gönderiminde işçi kesintisi: askıda `queued` kayıtları uzlaştırma (süreli sahiplik + iade/yeniden deneme) + kesinti enjekte eden test
+- [x] T-112 | sahip: codex | (Yüksek 2) Mesaj gönderiminde işçi kesintisi: askıda `queued` kayıtları uzlaştırma (süreli sahiplik + iade/yeniden deneme) + kesinti enjekte eden test
 - [ ] T-113 | sahip: codex | (Orta 4) OTP: salon+telefon başına tek kullanılmamış kod (kısıt/kilit) + paralel test
 - [ ] T-114 | sahip: codex | (Orta 5) Abonelik taraması ile ödeme yarışı: kilit altında yeniden okuma / koşullu güncelleme
 - [ ] T-115 | sahip: codex | (Orta 6) İptal kontrolünde okunan startsAt ile koşullu güncelleme
@@ -173,10 +173,12 @@ Biçim: `- [ ] T-NNN | sahip: claude|codex|- | açıklama`. Başlamadan sahip ya
 
 ## 18 Kasım — kullanıcının onayladığı ek ürün kapsamı
 Önce mevcut güvenlik sırası T112→T113→T114→T115→T116→T117→T118; ardından T104/T105 ve aşağıdaki işler. Aynı özellik için ikinci uygulama açılmaz; mevcut ServiceStaff/panel taşıma kodu genişletilir. Ayrıntılar docs/PRODUCT_NEXT.md.
-- [ ] T-123 | sahip: codex | Claude6988228345: ana sayfa KVKK ifadesini KKTC için nötr kişisel veri ifadesine çevir (TR+EN); T112 teslimiyle
+- [x] T-123 | sahip: codex | Claude6988228345: ana sayfa KVKK ifadesini KKTC için nötr kişisel veri ifadesine çevir (TR+EN); T112 teslimiyle
 - [ ] T-124 | sahip: codex | Personel bazlı hizmet uygunluğu ve gerekiyorsa süre/fiyat farklarını mevcut rezervasyon motoruna bağla; fiyat snapshot, mesai/çakışma ve tenant testleri
 - [ ] T-125 | sahip: codex | Bekleme listesi: açık rıza, süre sonu, iptal, boşluk için idempotent davet; rezervasyon önceliği iddiası yok, SMS mock
 - [ ] T-126 | sahip: codex | Müşterinin güvenli bağlantıdan randevu taşıması: iptal/taşıma süresi kuralı, atomik çakışma kontrolü, hatırlatmaların yenilenmesi, paralel/izolasyon testleri
 - [ ] T-127 | sahip: codex | Gerçek izinli berber videosu ve salon fotoğrafları; lisans/izin kaydı, mobil bütçe, hareket/veri tasarrufu; erişim/varlık yoksa açık eksik bırak
 - [ ] T-128 | sahip: codex | KKTC kapora/online ödeme sağlayıcısı uygunluk araştırması; şirket/para birimi/hesap/iade/webhook/test ortamı doğrulanmadan adaptör veya gerçek tahsilat yok
 - [ ] T-129 | sahip: codex | 2–3 salonla pilot kullanım için senaryo, ölçüm ve geribildirim planı hazırla; gerçek salon katılımı/iletişimi sahip tarafından sağlanır, sonuç uydurulmaz
+
+- 2026-11-18 T112+T123: iki dakikalık sahiplik, ağ çağrısı öncesi işaret, tenant kilidi altında koşullu tek iade; başlangıç/dakikalık sınırlı uzlaştırma. Belirsiz teslim otomatik tekrarlanmaz. İlk4kesinti testi kırmızı; sonCI251/build yeşil, worker açılışı ve pg-boss dakika kaydı doğrulandı. TR/EN kişisel veri başlığı nötrleştirildi.

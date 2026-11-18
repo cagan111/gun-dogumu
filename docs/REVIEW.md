@@ -27,3 +27,8 @@
 - auth_security, T122 medya/polish akışını salt-okunur inceledi; önemli hata yok. Hero test düzeneği CSS yüklemediğinden görsel kanıt ayrı390/1280 gerçek uygulama ekranlarıdır. Flow/isolation parola ile çalışır; üretim magic-link kapısı test için gevşetilmedi.
 
 - Root T111 incelemesi: tenant kilidi alt tablolardan önce, bütçe sorgusu tenant kapsamlı, providerI/O transaction dışında. Eski0rezervasyon güvenli sayılır; ham exception/OTP requestcatch loguna girmez. Paralel35telefon ve paralelresend gerçek PostgreSQL regresyonları var. Partialuniqueindex T113 kapsamında bekler.
+
+## T112/T123 — 18 Kasım / root + GPT-6 Luna alt ajanı
+- Root, kesinti regresyonlarını önce4/4başarısız çalıştırdı; lease+dispatchmarker+fencedsettle/reconcile sonrası sonCI251test geçti. Yeni10DBtesti paraleluzlaştırma, tek iade, kabulsonrası çöküş, geçbaşarı/hata, dispatchöncesi kaybedilenlease, legacy/free kayıtlar, tenantkey ve belirsizkanal fallbackini kapsar.
+- Luna salt-okunur incelemede network/throw veHTTP5xx belirsizliğinin kanal fallbackini durdurmasını istedi; root uygulayıp ayrı varyant testleri ekledi. Diğer lease/iade yollarında somut hata bulunmadı. T123 TR+EN metnini Luna değiştirdi; root diff veCI ile inceledi.
+- Worker gerçek pg-boss ile açıldı; message-recovery dakika cron kaydı DBden doğrulandı. Gerçek sağlayıcı/gerçekSMS denenmedi; SMSmock kaldı. Uzlaştırma iadeyle kapatır, otomatik içerikyenilemesi yapmaz.

@@ -5,6 +5,7 @@ export const JOB = {
   notice: "send-notice",
   subscriptionTick: "subscription-tick",
   monthlyCredits: "monthly-credits",
+  messageRecovery: "message-recovery",
 } as const;
 export type JobName = (typeof JOB)[keyof typeof JOB];
 

@@ -35,3 +35,6 @@ Yeni kayıt için, gönderim işareti yazılmadan gerçekleşen kesinti gönderi
 - Maskeli OTP ve ücretsiz kanal kayıtları güvenli kapanır; tenantlar arası anahtar çakışması başka salona ait kaydı sahiplenmez.
 
 Kapsam: sonraki görev için tasarım notu. Şema, gönderim kodu ve işçi bu incelemede değiştirilmedi; yeni test çalıştırılmadı.
+
+## Son uygulama — 18 Kasım 2026
+İlk statik taslak yukarıdadır; artık recovery.ts/send.ts ve worker integrasyonu ile T112 uygulandı. Otomatikyenidengönderim yerine tek iade+terminalfailed politikası seçildi. Yeni10gerçekDBtesti ve tamCI251/build/dört e2e geçti; sağlayıcıgerçekteslim testiyok. Root ve tekLuna incelemesi docs/REVIEW içinde.

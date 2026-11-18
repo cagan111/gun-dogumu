@@ -22,6 +22,9 @@ async function main() {
   await boss.work(JOB.notice, wrap(JOB.notice, (d: Parameters<typeof h.handleSendNotice>[0]) => h.handleSendNotice(d)));
   await boss.work(JOB.subscriptionTick, wrap(JOB.subscriptionTick, () => h.handleSubscriptionTick()));
   await boss.work(JOB.monthlyCredits, wrap(JOB.monthlyCredits, () => h.handleMonthlyCredits()));
+  await h.handleMessageRecovery();
+  await boss.work(JOB.messageRecovery, wrap(JOB.messageRecovery, () => h.handleMessageRecovery()));
+  await boss.schedule(JOB.messageRecovery, "* * * * *", {}, { tz: "Asia/Famagusta" });
   // günlük, idempotent (tekrar çalışması zararsız)
   await boss.schedule(JOB.subscriptionTick, "10 3 * * *", {}, { tz: "Asia/Famagusta" });
   await boss.schedule(JOB.monthlyCredits, "20 3 * * *", {}, { tz: "Asia/Famagusta" });

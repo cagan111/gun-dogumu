@@ -294,8 +294,12 @@ model MessageLog {
   idempotencyKey String?       @unique
   appointmentId  String?
   createdAt      DateTime      @default(now())
+  leaseOwner     String?
+  leaseUntil     DateTime?
+  dispatchStartedAt DateTime?
 
   @@index([tenantId, createdAt])
+  @@index([status, leaseUntil])
 }
 
 model Invoice {

@@ -60,7 +60,6 @@ export async function handleSendReminder(data: { appointmentId: string; offsetMi
   if (a.startsAt.getTime() <= now.getTime()) return skip("past");
   if (a.tenant.status === "suspended") return skip("suspended");
   const key = reminderKey(a.id, data.offsetMin, a.startsAt);
-  if (await prisma.messageLog.findUnique({ where: { idempotencyKey: key }, select: { id: true } })) return { status: "duplicate" };
   return deliver(a, reminderTemplateFor(data.offsetMin), key, deps);
 }
 
@@ -99,4 +98,10 @@ export async function handleMonthlyCredits(deps: Deps = {}) {
   const r = await grantMonthlyCredits(deps.now ?? new Date());
   logger.info(r, "monthly-credits");
   return r;
+}
+
+/** Periodic bounded recovery; never resends stored (potentially masked) content. */
+export async function handleMessageRecovery() {
+  const { reconcileQueuedMessages } = await import("../lib/messaging/recovery");
+  return { recovered: await reconcileQueuedMessages() };
 }

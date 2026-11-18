@@ -18,3 +18,6 @@
 - T-122 ara sürüm44221ea remote; gerçek video seçilmedi. Bu sohbet CI229/229+build+booking/panel ve390/1280 poster/reduced-motion/taşma kontrolü yaptı. Ekran kanıtları docs/evidence/T122; gerçekvideo/üçkare eksik. Alt ajanlar hero tarayıcı regresyonu, T110+119 ve T111 üzerinde ayrık dosyalarda çalışıyor; henüz teslim sayılmaz.
 - Son toplu CI241/241; hero gerçekChromium7/7. auth_security karşılıklı incelemesinde önemli hata bulunmadı. T111 günlük30segment/60s bekleme regresyonları gerçek PostgreSQL üzerinde18/18 (yeni5+mevcut13); tam üretim build/son e2e sonucu takip ediliyor.
 - Son paket üretim build PASS; booking/panel/flow/isolation e2e PASS,390/1280 gerçek sayfa poster/azaltılmış hareket/taşma PASS. Gerçek SMS gönderilmedi. T112 inceleme notu hazır; uygulanmış kod değildir.
+
+- 2026-11-18 T112/T123 root+tekLuna: ilk4/4regresyon kırmızı, sonCI251/251+build yeşil. Lease120sn/fencedrefund/workercron ve nötrTR+EN başlık hazır. Dört e2e sonkoşusu teslimden önce tamamlanır; gerçekSMS yok.
+- T112/T123 son booking/panel/flow/isolation e2e tamamı PASS; gerçek mock ortam.

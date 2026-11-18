@@ -5,7 +5,7 @@ import type { EmailProvider, MessageProvider, ProviderDeps } from "./types";
 export const SMS_PROVIDER_NAMES = ["mock", "netgsm", "iletimerkezi", "generic_http"] as const;
 
 export function defaultDeps(): ProviderDeps {
-  return { env: process.env, fetch: (url, init) => fetch(url, init as RequestInit) };
+  return { env: process.env, fetch: (url, init) => fetch(url, { ...init, signal: AbortSignal.timeout(30_000) } as RequestInit) };
 }
 
 const mockSms = new MockProvider("sms");
