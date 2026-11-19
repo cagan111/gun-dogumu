@@ -1,13 +1,12 @@
 import bcrypt from "bcryptjs";
+import {loginFailureKey,loginPairBlocked,recordLoginResult,pruneLoginFailures} from "./login-failures";
 import type { Role } from "@prisma/client";
 import { prisma } from "./db";
 import { consumeLoginToken, createLoginToken, magicLink } from "./login-token";
-import { logger } from "./logger";
 import { canSendMagicLink, sendAuthEmail } from "./messaging/auth-mail";
 import { MINUTE, rateLimit } from "./ratelimit";
 
 export const BCRYPT_ROUNDS = 10;
-export const LOGIN_PER_EMAIL = { limit: 8, windowMs: 15 * MINUTE };
 export const LOGIN_PER_IP = { limit: 30, windowMs: 15 * MINUTE };
 
 export interface SessionUser { id: string; email: string; name: string; role: Role; tenantId: string | null }
@@ -25,21 +24,20 @@ const pick = (u: { id: string; email: string; name: string; role: Role; tenantId
   id: u.id, email: u.email, name: u.name, role: u.role, tenantId: u.tenantId,
 });
 
-/** E-posta + şifre doğrular. Hız sınırı e-posta ve IP başına; aşılırsa null (sessizce reddeder). */
+/** IP attempt cap + durable failed email/IP cooldown; other clients cannot lock the account. */
 export async function authenticatePassword(emailRaw: string, password: string, ip: string): Promise<SessionUser | null> {
   const email = normalizeEmail(emailRaw);
+  const byIp = await rateLimit(`login:ip:${ip}`, LOGIN_PER_IP.limit, LOGIN_PER_IP.windowMs);
+  if (!byIp.ok) return null;
   if (!email || !password || password.length > 200) return null;
-  const [byEmail, byIp] = await Promise.all([
-    rateLimit(`login:email:${email}`, LOGIN_PER_EMAIL.limit, LOGIN_PER_EMAIL.windowMs),
-    rateLimit(`login:ip:${ip}`, LOGIN_PER_IP.limit, LOGIN_PER_IP.windowMs),
-  ]);
-  if (!byEmail.ok || !byIp.ok) {
-    logger.warn({ email, ip }, "giriş hız sınırına takıldı");
-    return null;
-  }
+  const startedAt = new Date();
+  const failureKey = loginFailureKey(email, ip);
+  await pruneLoginFailures(startedAt);
+  if (await loginPairBlocked(failureKey, startedAt)) return null;
   const user = await prisma.user.findUnique({ where: { email } });
   const ok = await bcrypt.compare(password, user?.passwordHash ?? DUMMY_HASH);
-  if (!user || !user.passwordHash || !ok) return null;
+  if (!user || !user.passwordHash || !ok) { await recordLoginResult(failureKey, false, startedAt); return null; }
+  await recordLoginResult(failureKey, true, startedAt);
   await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
   return pick(user);
 }

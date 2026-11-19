@@ -433,3 +433,13 @@ model CampaignRecipient {
   @@unique([campaignId, customerId])
   @@index([tenantId, campaignId, status])
 }
+
+// Auth-only state. withTenant intentionally denies this global model.
+model LoginFailure {
+  key           String   @id
+  failedCount   Int      @default(0)
+  windowStart   DateTime @default(now())
+  lastSuccessAt DateTime?
+  updatedAt     DateTime @updatedAt
+  @@index([updatedAt])
+}
