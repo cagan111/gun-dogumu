@@ -323,9 +323,9 @@ describe.skipIf(!HAS_DB)("mesajlaşma, işler, kampanya, kredi (gerçek DB)", ()
     const s = await mkSalon("pro");
     const future = new Date(Date.UTC(new Date().getUTCFullYear() + 2, 5, 10));
     const before = await balance(s);
-    await M.pay.recordManualPayment({ id: s.userId }, { tenantId: s.tenantId, amountTry: 1250, months: 1 }, future);
+    await M.pay.recordManualPayment({ id: s.userId }, { idempotencyKey: crypto.randomUUID(), tenantId: s.tenantId, amountTry: 1250, months: 1 }, future);
     expect(await balance(s)).toBe(before + 300);
-    await M.pay.recordManualPayment({ id: s.userId }, { tenantId: s.tenantId, amountTry: 1250, months: 1 }, new Date(future.getTime() + 86_400_000));
+    await M.pay.recordManualPayment({ id: s.userId }, { idempotencyKey: crypto.randomUUID(), tenantId: s.tenantId, amountTry: 1250, months: 1 }, new Date(future.getTime() + 86_400_000));
     expect(await balance(s)).toBe(before + 300);
   });
 

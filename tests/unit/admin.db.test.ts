@@ -85,14 +85,14 @@ describe.skipIf(!HAS_DB)("süper-admin, defter ve abonelik (gerçek DB)", () => 
     const now = new Date("2026-12-10T09:00:00Z");
     // 1) süresi geçmiş salon: now'dan uzar
     await prisma.tenant.update({ where: { id: M.A.tenantId }, data: { status: "past_due", pastDueSince: new Date(now.getTime() - 3 * DAY), subscriptionEndsAt: new Date(now.getTime() - 5 * DAY) } });
-    const r1 = await M.pay.recordManualPayment({ id: M.adminId }, M.pay.paymentSchema.parse({ tenantId: M.A.tenantId, amountTry: 1250, months: 1, plan: "pro", note: "Elden" }), now);
+    const r1 = await M.pay.recordManualPayment({ id: M.adminId }, M.pay.paymentSchema.parse({ idempotencyKey: crypto.randomUUID(), tenantId: M.A.tenantId, amountTry: 1250, months: 1, plan: "pro", note: "Elden" }), now);
     expect(r1.subscriptionEndsAt.toISOString()).toBe("2027-01-10T09:00:00.000Z");
     let t = await prisma.tenant.findUniqueOrThrow({ where: { id: M.A.tenantId } });
     expect(t.status).toBe("active");
     expect(t.pastDueSince).toBeNull();
     expect(t.plan).toBe("pro");
     // 2) süresi sürüyor: mevcut bitişten uzar (kayıp yok)
-    const r2 = await M.pay.recordManualPayment({ id: M.adminId }, M.pay.paymentSchema.parse({ tenantId: M.A.tenantId, amountTry: 2500, months: 2 }), now);
+    const r2 = await M.pay.recordManualPayment({ id: M.adminId }, M.pay.paymentSchema.parse({ idempotencyKey: crypto.randomUUID(), tenantId: M.A.tenantId, amountTry: 2500, months: 2 }), now);
     expect(r2.subscriptionEndsAt.toISOString()).toBe("2027-03-10T09:00:00.000Z");
     t = await prisma.tenant.findUniqueOrThrow({ where: { id: M.A.tenantId } });
     expect(t.plan).toBe("pro");
@@ -104,10 +104,10 @@ describe.skipIf(!HAS_DB)("süper-admin, defter ve abonelik (gerçek DB)", () => 
     // 3) geçersiz girdi / var olmayan salon
     expect(M.pay.paymentSchema.safeParse({ tenantId: "x", amountTry: 10, months: 13 }).success).toBe(false);
     expect(M.pay.paymentSchema.safeParse({ tenantId: "x", amountTry: 10, months: 1, plan: "yok" }).success).toBe(false);
-    await expect(M.pay.recordManualPayment({ id: M.adminId }, { tenantId: "yok", amountTry: 10, months: 1 }, now)).rejects.toMatchObject({ code: "not_found" });
+    await expect(M.pay.recordManualPayment({ id: M.adminId }, { idempotencyKey: crypto.randomUUID(), tenantId: "yok", amountTry: 10, months: 1 }, now)).rejects.toMatchObject({ code: "not_found" });
     // askıdaki salon ödemeyle açılır
     await prisma.tenant.update({ where: { id: M.A.tenantId }, data: { status: "suspended" } });
-    await M.pay.recordManualPayment({ id: M.adminId }, { tenantId: M.A.tenantId, amountTry: 1, months: 1 }, now);
+    await M.pay.recordManualPayment({ id: M.adminId }, { idempotencyKey: crypto.randomUUID(), tenantId: M.A.tenantId, amountTry: 1, months: 1 }, now);
     expect((await prisma.tenant.findUniqueOrThrow({ where: { id: M.A.tenantId } })).status).toBe("active");
   });
 
@@ -205,7 +205,7 @@ describe.skipIf(!HAS_DB)("süper-admin, defter ve abonelik (gerçek DB)", () => 
     expect(t2.notices.map((n) => n.kind)).toEqual(["suspended"]);
     expect((await prisma.tenant.findUniqueOrThrow({ where: { id: M.B.tenantId } })).status).toBe("suspended");
     expect(await prisma.auditLog.count({ where: { tenantId: M.B.tenantId, action: "subscription.status_changed" } })).toBe(2);
-    await M.pay.recordManualPayment({ id: M.adminId }, { tenantId: M.B.tenantId, amountTry: 2000, months: 1 }, new Date(now.getTime() + 11 * DAY));
+    await M.pay.recordManualPayment({ id: M.adminId }, { idempotencyKey: crypto.randomUUID(), tenantId: M.B.tenantId, amountTry: 2000, months: 1 }, new Date(now.getTime() + 11 * DAY));
     expect((await prisma.tenant.findUniqueOrThrow({ where: { id: M.B.tenantId } })).status).toBe("active");
   });
 });

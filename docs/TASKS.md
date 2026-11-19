@@ -158,7 +158,8 @@ Biçim: `- [ ] T-NNN | sahip: claude|codex|- | açıklama`. Başlamadan sahip ya
 - [x] T-115 | sahip: codex | (Orta 6) İptal kontrolünde okunan startsAt ile koşullu güncelleme
 - [x] T-116 | sahip: codex | (Orta 7) Kampanya: kalıcı kampanya/alıcı kaydı, kredi rezervasyonu, yeniden denemede yalnız kalanlar
   - Kalıcı alıcı/içerik snapshot, zorunlu işlem anahtarı ve tenant kilitli kredi hold; güvenli kalanları worker sürdürür, belirsiz teslim yeniden gönderilmez. CI283/build ve gerçek tarayıcı kampanya testi geçti.
-- [ ] T-117 | sahip: codex | (Orta 8) Manuel ödemede idempotency anahtarı
+- [x] T-117 | sahip: codex | (Orta 8) Manuel ödemede idempotency anahtarı
+  - Tenant+UUID, ilk sonuç snapshot, değişen içerikte409; kayıp yanıtta panel aynı niyeti sürdürür. Test/teslim: REVIEW.md.
 - [ ] T-118 | sahip: codex | Tenant kapsamı: desteklenmeyen işlemleri (ilişki mutasyonu, ham SQL vb.) withTenant'ta açıkça reddet
 
 ## 18 Kasım teslim sırası

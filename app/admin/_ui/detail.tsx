@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Alert, Field } from "@/components/ui/field";
 import { Badge, Card, SelectField } from "@/components/ui/form";
@@ -20,7 +20,9 @@ interface Detail {
   smsRequests: { id: string; size: number; status: string; createdAt: string }[];
 }
 
-type Confirm = null | "suspend" | "unsuspend" | "plan" | "payment" | "credit";
+type PaymentPayload = { tenantId: string; amountTry: number; months: number; plan?: string; note?: string };
+type PaymentIntent = { idempotencyKey: string; payload: PaymentPayload };
+type Confirm = null | "suspend" | "unsuspend" | "plan" | "payment" | "credit" | "newPayment";
 
 export function TenantDetailView({ id }: { id: string }) {
   const { t, locale } = useI18n();
@@ -38,10 +40,58 @@ export function TenantDetailView({ id }: { id: string }) {
   const [creditNote, setCreditNote] = useState("");
   const [newPlan, setNewPlan] = useState("");
   const [err, setErr] = useState<string | null>(null);
+  const paymentStorageKey = `admin-payment:${id}`;
+  const [paymentIntent, setPaymentIntent] = useState<PaymentIntent | null>(null);
+  const [paymentIntentLoaded, setPaymentIntentLoaded] = useState(false);
+  useEffect(() => {
+    setPaymentIntentLoaded(false);
+    setPaymentIntent(null);
+    try {
+      const raw = sessionStorage.getItem(paymentStorageKey);
+      if (raw) {
+        const saved = JSON.parse(raw) as PaymentIntent;
+        if (saved?.payload?.tenantId === id && typeof saved.idempotencyKey === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(saved.idempotencyKey) && Number.isFinite(saved.payload.amountTry) && Number.isInteger(saved.payload.months)) {
+          setPaymentIntent(saved);
+          setAmount(String(saved.payload.amountTry)); setMonths(String(saved.payload.months));
+          setPayPlan(saved.payload.plan ?? ""); setNote(saved.payload.note ?? "");
+        }
+      }
+    } catch { setErr(t("adm.paymentStorageError")); }
+    finally { setPaymentIntentLoaded(true); }
+  }, [id, paymentStorageKey, t]);
 
   async function run(fn: () => Promise<unknown>, after?: () => void) {
     setBusy(true); setErr(null);
     try { await fn(); toast(t("common.saved"), "success"); after?.(); q.reload(); } catch (e) { setErr(errorMessage(e, t)); toast(errorMessage(e, t), "error"); } finally { setBusy(false); setConfirm(null); }
+  }
+
+  async function submitPayment() {
+    setBusy(true); setErr(null);
+    const intent = paymentIntent ?? {
+      idempotencyKey: crypto.randomUUID(),
+      payload: { tenantId: id, amountTry: amountNum, months: Number(months), ...(payPlan ? { plan: payPlan } : {}), ...(note.trim() ? { note: note.trim() } : {}) },
+    };
+    try {
+      sessionStorage.setItem(paymentStorageKey, JSON.stringify(intent));
+    } catch {
+      setErr(t("adm.paymentStorageError")); setBusy(false); setConfirm(null); return;
+    }
+    setPaymentIntent(intent);
+    try {
+      await api("/api/admin/payments", { method: "POST", body: { ...intent.payload, idempotencyKey: intent.idempotencyKey } });
+      sessionStorage.removeItem(paymentStorageKey);
+      setPaymentIntent(null);
+      toast(t("common.saved"), "success");
+      setAmount(""); setNote(""); setPayPlan(""); q.reload();
+    } catch (e) {
+      setErr(errorMessage(e, t)); toast(errorMessage(e, t), "error");
+    } finally { setBusy(false); setConfirm(null); }
+  }
+
+  function startNewPaymentIntent() {
+    try { sessionStorage.removeItem(paymentStorageKey); }
+    catch { setErr(t("adm.paymentStorageError")); setConfirm(null); return; }
+    setPaymentIntent(null); setErr(null); setConfirm(null);
   }
 
   const amountNum = Number(amount.replace(",", "."));
@@ -85,17 +135,18 @@ export function TenantDetailView({ id }: { id: string }) {
       <div className="grid gap-4 md:grid-cols-2">
         <Card aria-labelledby="pay-h">
           <h3 id="pay-h" className="font-bold">{t("adm.manualPay")}</h3>
-          <form className="mt-2 space-y-3" noValidate onSubmit={(e) => { e.preventDefault(); if (payValid) setConfirm("payment"); }}>
+          <form className="mt-2 space-y-3" noValidate onSubmit={(e) => { e.preventDefault(); if (paymentIntent ? paymentIntentLoaded : payValid && paymentIntentLoaded) setConfirm("payment"); }}>
             <div className="grid grid-cols-2 gap-3">
-              <Field label={t("adm.amount")} type="number" inputMode="decimal" min={0} step="any" value={amount} onChange={(e) => setAmount(e.target.value)} required />
-              <Field label={t("adm.months")} type="number" inputMode="numeric" min={1} max={12} value={months} onChange={(e) => setMonths(e.target.value)} required />
+              <Field label={t("adm.amount")} type="number" inputMode="decimal" min={0} step="any" value={amount} onChange={(e) => setAmount(e.target.value)} required disabled={!!paymentIntent} />
+              <Field label={t("adm.months")} type="number" inputMode="numeric" min={1} max={12} value={months} onChange={(e) => setMonths(e.target.value)} required disabled={!!paymentIntent} />
             </div>
-            <SelectField label={t("adm.payPlan")} value={payPlan} onChange={(e) => setPayPlan(e.target.value)}>
+            <SelectField label={t("adm.payPlan")} value={payPlan} onChange={(e) => setPayPlan(e.target.value)} disabled={!!paymentIntent}>
               <option value="">{t("adm.keepPlan")}</option>
               {PLAN_IDS.map((p) => <option key={p} value={p}>{t(`adm.plan.${p}` as Key)}</option>)}
             </SelectField>
-            <Field label={t("adm.note")} optional={t("common.optional")} value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} />
-            <Button type="submit" disabled={!payValid || busy}>{t("adm.recordPay")}</Button>
+            <Field label={t("adm.note")} optional={t("common.optional")} value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} disabled={!!paymentIntent} />
+            <Button type="submit" disabled={(!paymentIntent && !payValid) || busy || !paymentIntentLoaded}>{paymentIntent ? t("adm.retryPayment") : t("adm.recordPay")}</Button>
+            {paymentIntent ? <Button type="button" variant="secondary" disabled={busy || !paymentIntentLoaded} onClick={() => setConfirm("newPayment")}>{t("adm.newPaymentIntent")}</Button> : null}
           </form>
         </Card>
 
@@ -143,7 +194,8 @@ export function TenantDetailView({ id }: { id: string }) {
       <ConfirmDialog open={confirm === "plan"} danger={false} title={t("adm.planTitle")} body={t("adm.planBody", { from: t(`adm.plan.${tn.plan}` as Key), to: t(`adm.plan.${plan}` as Key) })} confirmLabel={t("adm.apply")} busy={busy} onCancel={() => setConfirm(null)}
         onConfirm={() => run(() => api(`/api/admin/tenants/${id}/plan`, { method: "POST", body: { plan } }), () => setNewPlan(""))} />
       <ConfirmDialog open={confirm === "payment"} danger={false} title={t("adm.payTitle")} body={t("adm.payBody", { amount: money(amountNum, locale), months })} confirmLabel={t("adm.recordPay")} busy={busy} onCancel={() => setConfirm(null)}
-        onConfirm={() => run(() => api("/api/admin/payments", { method: "POST", body: { tenantId: id, amountTry: amountNum, months: Number(months), plan: payPlan || undefined, note: note.trim() || undefined } }), () => { setAmount(""); setNote(""); setPayPlan(""); })} />
+        onConfirm={submitPayment} />
+      <ConfirmDialog open={confirm === "newPayment"} title={t("adm.newPaymentIntentTitle")} body={t("adm.newPaymentIntentBody")} confirmLabel={t("adm.newPaymentIntent")} busy={busy} onCancel={() => setConfirm(null)} onConfirm={startNewPaymentIntent} />
       <ConfirmDialog open={confirm === "credit"} danger={false} title={t("adm.creditTitle")} body={t("adm.creditBody", { n: creditNum })} confirmLabel={t("adm.credit")} busy={busy} onCancel={() => setConfirm(null)}
         onConfirm={() => run(() => api("/api/admin/sms-credits", { method: "POST", body: { tenantId: id, amount: creditNum, note: creditNote.trim() || undefined } }), () => { setCredit(""); setCreditNote(""); })} />
     </div>

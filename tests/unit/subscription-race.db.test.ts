@@ -13,7 +13,7 @@ function paidAfterScan(tenantId: string) {
   let armed = true;
   return prisma.$extends({ query: { tenant: { async findMany({ args, query }) {
     const rows = await query(args);
-    if (armed) { armed = false; await recordManualPayment({ id: "fixture-admin" }, { tenantId, amountTry: 100, months: 1 }, now); }
+    if (armed) { armed = false; await recordManualPayment({ id: "fixture-admin" }, { idempotencyKey: crypto.randomUUID(), tenantId, amountTry: 100, months: 1 }, now); }
     return rows;
   } } } }) as unknown as typeof prisma;
 }

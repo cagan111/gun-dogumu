@@ -331,6 +331,12 @@ model Payment {
   note      String?
   createdBy String?
   createdAt DateTime      @default(now())
+  idempotencyKey String?
+  requestHash String?
+  appliedPlan String?
+  appliedEndsAt DateTime?
+  @@unique([tenantId, idempotencyKey])
+
 }
 
 model SmsPackageRequest {
