@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { safeNext } from "@/lib/safe-next";
 import { signIn } from "next-auth/react";
 import { useState } from "react";
 import { Alert, Field, Spinner } from "@/components/ui/field";
@@ -8,7 +9,8 @@ import { useT } from "@/lib/i18n/client";
 
 /** Girişten sonra hedef: ?next= varsa o, yoksa role göre /admin ya da /panel. */
 export async function landingFor(next: string | null): Promise<string> {
-  if (next) return next;
+  const target = safeNext(next);
+  if (target) return target;
   try {
     const s = (await (await fetch("/api/auth/session", { cache: "no-store" })).json()) as { user?: { role?: string } } | null;
     return s?.user?.role === "superadmin" ? "/admin" : "/panel";

@@ -195,7 +195,8 @@ Biçim: `- [ ] T-NNN | sahip: claude|codex|- | açıklama`. Başlamadan sahip ya
 - [x] T-140 | sahip: codex | KRİTİK: next ≥15.5.x güvenli sürüm + next-auth ≥5.0.0-beta.32'ye yükselt (pnpm audit 8 kritik); tüm testler/e2e yeşil
 - [x] T-141 | sahip: codex | YÜKSEK: middleware getToken secureCookie (HTTPS'te __Secure- çerezi) — yayın engelleyici; HTTPS senaryolu test
 - [x] T-142 | sahip: codex | YÜKSEK: anonim rezervasyon SMS kötüye kullanımı — telefon/salon başına günlük onay SMS tavanı, yabancı numara politikası (ülke izin listesi ayarı), şüpheli desende SMS'siz onay
-- [ ] T-143 | sahip: codex | ORTA: safeNext TAB/kontrol karakteri açık yönlendirmesi
+- [x] T-143 | sahip: codex | ORTA: safeNext TAB/kontrol karakteri açık yönlendirmesi
+  - Kontrol/boşluk/ters slash reddi, URL origin kontrolü ve landingFor yeniden doğrulaması; CI321/build + safe-next/booking/panel/flow/isolation e2e geçti.
 - [ ] T-144 | sahip: codex | ORTA: anonim rezervasyon mevcut müşterinin ad/e-posta/pazarlama iznini ezmesin; izin geri çekme (opt-out) yolu
 - [ ] T-145 | sahip: codex | ORTA: giriş kilidi yalnız başarısız denemeleri saysın (DoS önleme)
 - [ ] T-146 | sahip: codex | ORTA: güvenilir proxy IP'si (TRUST_PROXY), OTP zamanlama eşitleme, salon OTP kotasının tek müşteriyi kilitlememesi, JWT iptali (sürüm/tokenVersion), Caddy HSTS+CSP+gövde sınırı, erişim logunda token maskeleme

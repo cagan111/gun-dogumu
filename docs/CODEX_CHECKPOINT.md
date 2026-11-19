@@ -53,3 +53,9 @@ Mevcut ham SQL kullanımını dar sabit-sorgulu yardımcılar taşır: tenant sa
 Son Luna incelemesi: User varsayılan okuması ve Staff.user include passwordHash taşıyabileceğinden User scoped istemciden tamamen kaldırıldı; auth/admin global prisma kullanır. User/nested-user erişimi reddedilir. Subscription sistem satır kilidi de sabit lockTenantRow helperına taşındı.
 
 T118 son karşılıklı inceleme: Luna User hash okuma yolunu buldu, root User erişimini tamamen kapattı; Luna tekrar incelemesinde bu yolun kapandığını ve mevcut çağrılarda önemli regresyon görmediğini bildirdi. SonCI303/build ve altı e2e PASS. TENANT-BOUNDARY.md sözleşmesi eklendi; sonrakiT143→144..147→104105→124..129.
+
+## 19 Kasım — T143 giriş yönlendirmesi
+safeNext tek slash ile başlayan site içi yolu kabul eder; boşluk/kontrol karakterleri (TAB/LF/CR, C0/C1/DEL) ve ters slash reddedilir, tarayıcı URL ayrıştırmasıyla aynı-origin ayrıca doğrulanır. landingFor istemci sınırında tekrar doğrular; geçersiz hedefte oturum rolüne göre yerel admin/panel hedefi kullanılır. Literal boşluklu yol/query reddedilir, yüzde kodlu boşluk ve geçerli query/hash korunur. Yeni UI metni/tasarım yok.
+Önce18regresyonda7FAIL/11PASS; düzeltme sonrası tamCI321/321PASS. Üretim build ve safe-next/booking/panel/controlled-flow/isolation e2e PASS. Gerçek Chromium TAB/LF/CR ile girişin yerelde kaldığını ve geçerli yerel path/query hedefinin korunduğunu doğruladı; dış origin istekleri testte engellendi. TekGPT-6Luna salt-okunur incelemede somut bypass bulmadı; root kod/test sahibi. Claude7005831507 T118 onayını bildirdi; bu T143 onayı değildir. GerçekSMS/dağıtım yok.
+
+T143 tamam; sonraki T144 anonim rezervasyonda müşteri kimliği/rıza ve opt-out → T145..147 → T104105 → T124..129.
