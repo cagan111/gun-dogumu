@@ -97,9 +97,9 @@ const shot = (n) => path.join(SHOTS, `ui-${n}.png`);
   await page.getByLabel("Telefon").fill("+90 533 999 00 11");
   await page.getByRole("button", { name: "Randevuyu onayla" }).click();
   await page.getByText("aydınlatma metnini onaylamanız gerekir").waitFor();
-  const marketing = page.getByLabel(/Kampanya ve duyuru/);
-  assert.equal(await marketing.isChecked(), false, "pazarlama izni varsayılan işaretsiz");
-  step("KVKK işaretlenmeden gönderim engellendi; pazarlama kutusu işaretsiz");
+  assert.equal(await page.getByRole("checkbox").count(), 1, "anonim form pazarlama izni açamaz; yalnız zorunlu aydınlatma kutusu var");
+  await page.getByRole("link", { name: "Randevularım sayfasında tercihleri yönet" }).waitFor();
+  step("Aydınlatma onayı zorunlu; pazarlama tercihi doğrulanmış oturuma taşındı");
   await page.getByRole("checkbox", { name: /Aydınlatma metnini/ }).check();
   await page.getByRole("button", { name: "Randevuyu onayla" }).click();
 

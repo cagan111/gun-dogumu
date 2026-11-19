@@ -31,3 +31,5 @@ node tests/e2e/isolation.cjs    # T-081: gerçek HTTP; A sahibi B'nin randevu/m�
 Ortam değişkenleri: `BASE_URL` (varsayılan `http://localhost:3000`), `SLUG` (varsayılan `lefkosa-usta-berber`), `SHOT_DIR` (ekran görüntüleri `ui-*.png`). Demo girişleri: `owner@lefkosa-usta-berber.test` / `demo12345`, `admin@kibrisrandevu.test` / `admin12345`.
 
 Tenant kapsamlı veri erişiminin desteklediği işlemler ve güvenilir SQL yardımcıları: [TENANT-BOUNDARY](docs/TENANT-BOUNDARY.md).
+
+Doğrulanmış pazarlama tercihi ve eski izinlerin geçişi: [MARKETING-CONSENT](docs/MARKETING-CONSENT.md).

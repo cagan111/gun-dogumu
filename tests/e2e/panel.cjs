@@ -26,7 +26,7 @@ async function login(page, email, password) {
 /** Bugün randevu yoksa (seed bazı günleri boş bırakır) randevusu olan ilk güne gider. */
 async function gotoDayWithAppointments(page) {
   await page.getByTestId("cal-col").first().waitFor();
-  const has = () => page.waitForFunction(() => document.querySelectorAll('[data-testid="appt-block"]').length > 0, null, { timeout: 4000 }).then(() => true, () => false);
+  const has = () => page.waitForFunction(() => document.querySelectorAll('[data-testid="appt-block"][data-status="pending"], [data-testid="appt-block"][data-status="confirmed"]').length > 0, null, { timeout: 4000 }).then(() => true, () => false);
   if (await has()) return;
   const date = await page.evaluate(async () => {
     const d0 = new Date(); const f = (d) => d.toISOString().slice(0, 10);

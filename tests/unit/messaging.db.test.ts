@@ -94,6 +94,7 @@ describe.skipIf(!HAS_DB)("mesajlaşma, işler, kampanya, kredi (gerçek DB)", ()
 
   it("segment: 2 segmentlik mesaj 2 kredi düşer", async () => {
     const s = await mkSalon();
+    await M.db.prisma.customer.create({ data: { tenantId: s.tenantId, phone: "+905331119999", name: "Verified fixture", marketingConsent: true } });
     const before = await balance(s);
     const o = await M.send.sendMessage({ tenantId: s.tenantId, to: "+905331119999", text: "a".repeat(200), template: "campaign", reason: "campaign" });
     expect(o).toMatchObject({ status: "sent", segments: 2 });
@@ -119,6 +120,7 @@ describe.skipIf(!HAS_DB)("mesajlaşma, işler, kampanya, kredi (gerçek DB)", ()
 
   it("aynı salona farklı anahtarlarla eşzamanlı gönderimler kilitlenmez (40P01 regresyonu)", async () => {
     const s = await mkSalon();
+    await M.db.prisma.customer.create({ data: { tenantId: s.tenantId, phone: "+905331119999", name: "Verified fixture", marketingConsent: true } });
     for (let round = 0; round < 5; round++) {
       const before = await balance(s);
       const res = await Promise.all(Array.from({ length: 8 }, (_, i) =>

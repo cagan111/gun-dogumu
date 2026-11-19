@@ -102,15 +102,19 @@ function ApptList({ title, list }: { title: string; list: Slim[] }) {
 function DetailSheet({ id, onClose }: { id: string | null; onClose: () => void }) {
   const { t, locale } = useI18n();
   const toast = useToast();
-  const { tenant } = usePanel();
+  const { tenant, isOwner } = usePanel();
+  const currentId = useRef(id);
+  currentId.current = id;
   const [d, setD] = useState<Detail | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
   const [noteErr, setNoteErr] = useState<string | null>(null);
+  const [consentErr, setConsentErr] = useState<string | null>(null);
+  const [consentBusy, setConsentBusy] = useState(false);
 
   useEffect(() => {
-    setD(null); setErr(null); setNoteErr(null);
+    setD(null); setErr(null); setNoteErr(null); setConsentErr(null); setBusy(false); setConsentBusy(false);
     if (!id) return;
     let live = true;
     api<Detail>(`/api/panel/customers/${id}`).then((r) => { if (live) { setD(r); setNotes(r.notes ?? ""); } }, (e) => { if (live) setErr(errorMessage(e, t)); });
@@ -119,12 +123,27 @@ function DetailSheet({ id, onClose }: { id: string | null; onClose: () => void }
 
   async function saveNotes() {
     if (!d) return;
+    const targetId = d.id;
     setBusy(true); setNoteErr(null);
     try {
-      const r = await api<Detail>(`/api/panel/customers/${d.id}`, { method: "PATCH", body: { notes: notes.trim() || null } });
+      const r = await api<Detail>(`/api/panel/customers/${targetId}`, { method: "PATCH", body: { notes: notes.trim() || null } });
+      if (currentId.current !== targetId) return;
       setD(r);
       toast(t("common.saved"), "success");
-    } catch (e) { setNoteErr(isCode(e, "plan_feature") ? t("cust.notesPro") : errorMessage(e, t)); } finally { setBusy(false); }
+    } catch (e) { if (currentId.current === targetId) setNoteErr(isCode(e, "plan_feature") ? t("cust.notesPro") : errorMessage(e, t)); } finally { if (currentId.current === targetId) setBusy(false); }
+  }
+
+  async function optOut() {
+    if (!d || !isOwner || !d.marketingConsent) return;
+    const targetId = d.id;
+    setConsentBusy(true); setConsentErr(null);
+    try {
+      const result = await api<Detail>(`/api/panel/customers/${targetId}/marketing-consent`, { method: "PATCH", body: { marketingConsent: false } });
+      if (currentId.current !== targetId) return;
+      setD(result);
+      toast(t("cust.optOutSaved"), "success");
+    } catch (e) { if (currentId.current === targetId) setConsentErr(errorMessage(e, t)); }
+    finally { if (currentId.current === targetId) setConsentBusy(false); }
   }
 
   return (
@@ -138,7 +157,9 @@ function DetailSheet({ id, onClose }: { id: string | null; onClose: () => void }
             {d.email ? <span className="text-sm text-slate-600">{d.email}</span> : null}
             <Badge tone={d.noShowCount > 0 ? "red" : "slate"}>{t("cust.noShows", { n: d.noShowCount })}</Badge>
             {d.marketingConsent ? <Badge tone="green">{t("cust.consent")}</Badge> : null}
+            {isOwner && d.marketingConsent ? <Button variant="secondary" data-testid="customer-opt-out" disabled={consentBusy} onClick={optOut}>{consentBusy ? t("cust.optOutBusy") : t("cust.optOut")}</Button> : null}
           </div>
+          {consentErr ? <Alert className="mt-2">{consentErr}</Alert> : null}
           <p className="mt-1 text-xs text-slate-600">{t("cust.since", { date: fmtDateTime(d.createdAt, locale, tenant.timeZone) })}</p>
           <div className="mt-4">
             {d.notesEnabled ? (

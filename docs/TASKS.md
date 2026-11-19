@@ -197,7 +197,8 @@ Biçim: `- [ ] T-NNN | sahip: claude|codex|- | açıklama`. Başlamadan sahip ya
 - [x] T-142 | sahip: codex | YÜKSEK: anonim rezervasyon SMS kötüye kullanımı — telefon/salon başına günlük onay SMS tavanı, yabancı numara politikası (ülke izin listesi ayarı), şüpheli desende SMS'siz onay
 - [x] T-143 | sahip: codex | ORTA: safeNext TAB/kontrol karakteri açık yönlendirmesi
   - Kontrol/boşluk/ters slash reddi, URL origin kontrolü ve landingFor yeniden doğrulaması; CI321/build + safe-next/booking/panel/flow/isolation e2e geçti.
-- [ ] T-144 | sahip: codex | ORTA: anonim rezervasyon mevcut müşterinin ad/e-posta/pazarlama iznini ezmesin; izin geri çekme (opt-out) yolu
+- [x] T-144 | sahip: codex | ORTA: anonim rezervasyon mevcut müşterinin ad/e-posta/pazarlama iznini ezmesin; izin geri çekme (opt-out) yolu
+  - Anonim müşteri kaydı değişmez/izin açılmaz; OTP bağlı tercih, owner opt-out, audit+legacy reset ve claim/dispatch yarışı koruması. CI329/build + yedi e2e geçti.
 - [ ] T-145 | sahip: codex | ORTA: giriş kilidi yalnız başarısız denemeleri saysın (DoS önleme)
 - [ ] T-146 | sahip: codex | ORTA: güvenilir proxy IP'si (TRUST_PROXY), OTP zamanlama eşitleme, salon OTP kotasının tek müşteriyi kilitlememesi, JWT iptali (sürüm/tokenVersion), Caddy HSTS+CSP+gövde sınırı, erişim logunda token maskeleme
 - [ ] T-147 | sahip: codex | DÜŞÜK: personel müşteri araması joker kaçışı, NUL bayt/bozuk Bearer 500'leri, gövde boyut sınırı, .env.example SUPERADMIN_EMAIL, yedek dosya izinleri 0600, SMS başlığı doğrulaması

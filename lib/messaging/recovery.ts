@@ -9,11 +9,26 @@ export function messageLease(now: Date) {
   return { leaseOwner: randomUUID(), leaseUntil: new Date(+now + MESSAGE_LEASE_MS) };
 }
 export async function startDispatch(tenantId: string, id: string, owner: string, now: Date): Promise<boolean> {
-  const r = await withTenant(tenantId).messageLog.updateMany({
-    where: { id, status: "queued", leaseOwner: owner, leaseUntil: { gt: now }, dispatchStartedAt: null },
-    data: { dispatchStartedAt: now },
+  return withTenant(tenantId).$transaction(async tx => {
+    await lockTenant(tx, tenantId);
+    const where = { id, status: "queued" as const, leaseOwner: owner, leaseUntil: { gt: now }, dispatchStartedAt: null };
+    const row = await tx.messageLog.findFirst({ where });
+    if (!row) return false;
+    if (row.channel === "sms" && row.template === "campaign") {
+      const recipient = await tx.campaignRecipient.findFirst({ where: { messageId: id }, include: { campaign: true } });
+      const customer = await tx.customer.findFirst({ where: { ...(recipient ? { id: recipient.customerId } : {}), phone: row.recipient, marketingConsent: true } });
+      const cancelledCampaign = recipient && recipient.campaign.status !== "active";
+      if (!customer || cancelledCampaign) {
+        const cancelled = await tx.messageLog.updateMany({ where, data: { status: "failed", providerResult: cancelledCampaign ? "campaign_cancelled" : "consent_withdrawn", cost: 0, leaseOwner: null, leaseUntil: null } });
+        if (cancelled.count === 1) {
+          if (row.cost > 0) await refundTx(tx, tenantId, row.cost, { messageId: id, note: cancelledCampaign ? "kampanya iptal edildi" : "izin geri çekildi" });
+          await tx.campaignRecipient.updateMany({ where: { messageId: id, status: "processing" }, data: { status: "skipped" } });
+        }
+        return false;
+      }
+    }
+    return (await tx.messageLog.updateMany({ where, data: { dispatchStartedAt: now } })).count === 1;
   });
-  return r.count === 1;
 }
 /** Winner of the fenced transition owns the refund; late workers cannot overwrite it. */
 export async function settleMessage(tenantId: string, id: string, owner: string, status: MessageStatus, result: { providerId?: string; error?: string }, now: Date): Promise<boolean> {

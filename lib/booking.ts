@@ -1,4 +1,4 @@
-import { lockTenantKey } from "./db";
+import { lockTenantKey, lockTenantRow } from "./db";
 import { randomBytes } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { prisma, type TenantDb } from "./db";
@@ -78,6 +78,7 @@ async function attempt(db: TenantDb, input: CreateAppointmentInput) {
   if (!phone) throw new InvalidPhoneError();
 
   return db.$transaction(async (tx) => {
+    await lockTenantRow(tx, input.tenantId);
     const tenant = await tx.tenant.findUnique({ where: { id: input.tenantId } });
     if (!tenant) throw new NotFoundError("Salon");
     const tz = tenant.timeZone;
@@ -145,12 +146,13 @@ async function attempt(db: TenantDb, input: CreateAppointmentInput) {
     }
 
     const c = input.customer;
-    const consent = c.marketingConsent === true;
+    // A phone number supplied by an anonymous booking is not proof of consent.
+    const consent = false;
     const kvkk = c.kvkkAccepted === true;
     const customer = await tx.customer.upsert({
       where: { tenantId_phone: { tenantId: input.tenantId, phone } },
       create: { name: c.name.trim(), phone, email: c.email ?? null, locale: c.locale ?? tenant.locale, marketingConsent: consent, marketingConsentAt: consent ? now : null, kvkkAcceptedAt: kvkk ? now : null } as Prisma.CustomerUncheckedCreateInput,
-      update: { name: c.name.trim(), ...(c.email ? { email: c.email } : {}), ...(consent ? { marketingConsent: true, marketingConsentAt: now } : {}), ...(kvkk ? { kvkkAcceptedAt: now } : {}) },
+      update: {},
     });
 
     const endsAt = new Date(t + service.durationMin * 60_000);

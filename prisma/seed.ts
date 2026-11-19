@@ -138,7 +138,7 @@ async function seedSalon(def: SalonDef, now: Date, passwordHash: string) {
   }
   const customers: Customer[] = [];
   for (const c of CUSTOMERS) {
-    const optIn: boolean = customers.length % 3 === 0;
+    const optIn: boolean = false; // Demo verisi doğrulanmış rıza üretmez.
     customers.push(await prisma.customer.create({
       data: {
         tenantId: tenant.id, name: c.name, phone: c.phone, locale: c.locale,

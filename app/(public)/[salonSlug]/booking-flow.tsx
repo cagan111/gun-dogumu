@@ -40,7 +40,6 @@ export function BookingFlow({ slug, salonName, timeZone, today, maxAdvanceDays, 
   const [phone, setPhone] = useState("+90 ");
   const [email, setEmail] = useState("");
   const [kvkk, setKvkk] = useState(false);
-  const [marketing, setMarketing] = useState(false);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [submitted, setSubmitted] = useState(false);
   const [serverErrors, setServerErrors] = useState<Record<string, string>>({});
@@ -120,7 +119,7 @@ export function BookingFlow({ slug, salonName, timeZone, today, maxAdvanceDays, 
         body: JSON.stringify({
           serviceId: service.id, staffId: chosen, startsAt: slot.startsAt,
           customer: { name: name.trim(), phone: phone.trim(), ...(email.trim() ? { email: email.trim() } : {}), locale },
-          kvkkAccepted: true, marketingConsent: marketing,
+          kvkkAccepted: true, marketingConsent: false,
         }),
       });
       if (res.status === 201) {
@@ -329,10 +328,7 @@ export function BookingFlow({ slug, salonName, timeZone, today, maxAdvanceDays, 
             </label>
             {errors.kvkk ? <p id="kvkk-err" role="alert" className="mt-1 text-sm font-medium text-red-400">{errors.kvkk}</p> : null}
           </div>
-          <label className="flex items-start gap-3 text-sm">
-            <input type="checkbox" name="marketing" checked={marketing} onChange={(e) => setMarketing(e.target.checked)} className="mt-0.5 h-5 w-5 shrink-0 accent-[rgb(var(--brand))]" />
-            <span>{t("b.details.marketing")}</span>
-          </label>
+          <p className="text-sm text-slate-700">{t("b.details.marketingInfo")} <Link href={`/${slug}/randevularim`} className="font-semibold text-brand underline">{t("b.details.marketingManage")}</Link></p>
         </form>
       ) : null}
 
