@@ -73,7 +73,7 @@ export function ServicesView() {
     <div className="mx-auto max-w-3xl">
       <div className="flex items-center gap-3">
         <h2 className="flex-1 text-xl font-extrabold">{t("nav.services")}</h2>
-        {isOwner ? <Button onClick={() => open()}>+ {t("svc.add")}</Button> : null}
+        {isOwner ? <Button disabled={q.loading || !q.data} onClick={() => open()}>+ {t("svc.add")}</Button> : null}
       </div>
       {!isOwner ? <Alert tone="info" className="mt-3">{t("ownerOnly")}</Alert> : null}
       {q.error ? <Alert className="mt-3">{errorMessage(q.error, t)}</Alert> : null}

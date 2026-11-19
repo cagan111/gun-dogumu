@@ -17,7 +17,7 @@ export function CancelPanel({ token, cancellable, hours, phone }: { token: strin
       const res = await fetch(`/api/r/${token}/cancel`, { method: "POST" });
       if (res.ok) { setDone(true); return; }
       const j = (await res.json().catch(() => ({}))) as { error?: { code?: string } };
-      setErr(j.error?.code === "cancel_window" ? (phone ? t("r.tooLate", { phone }) : t("r.tooLateNoPhone")) : res.status === 429 ? t("common.rateLimited") : t("common.genericError"));
+      setErr(j.error?.code === "cancel_window" ? (phone ? t("r.tooLate", { phone }) : t("r.tooLateNoPhone")) : j.error?.code === "conflict" ? t("err.conflict") : res.status === 429 ? t("common.rateLimited") : t("common.genericError"));
       setAsking(false);
     } catch {
       setErr(t("common.genericError"));

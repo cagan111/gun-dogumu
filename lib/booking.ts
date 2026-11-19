@@ -190,10 +190,16 @@ export async function cancelByToken(token: string, now: Date = new Date(), clien
   const hours = appt.tenant.cancelHoursBefore;
   if (appt.startsAt.getTime() - now.getTime() < hours * 3_600_000) throw new CancelWindowError(hours);
   const res = await client.appointment.updateMany({
-    where: { id: appt.id, status: { in: ["pending", "confirmed"] } },
+    where: { id: appt.id, tenantId: appt.tenantId, cancelToken: token, startsAt: appt.startsAt, tenant: { cancelHoursBefore: hours }, status: { in: ["pending", "confirmed"] } },
     data: { status: "cancelled_by_customer", cancelledAt: now },
   });
-  if (res.count === 0) throw new AlreadyClosedError();
+  if (res.count === 0) {
+    // Do not apply a stale decision to a different start time, even if still cancellable.
+    const current = await client.appointment.findUnique({ where: { cancelToken: token }, select: { status: true } });
+    if (!current) throw new NotFoundError("Randevu");
+    if (current.status === "pending" || current.status === "confirmed") throw new BookingError("conflict", "Randevu değişti; bilgileri yenileyip tekrar deneyin");
+    throw new AlreadyClosedError();
+  }
   await appointmentChanged(appt.id, "cancelled_by_customer");
   return client.appointment.findUniqueOrThrow({ where: { id: appt.id } });
 }

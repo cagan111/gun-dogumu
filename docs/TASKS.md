@@ -155,7 +155,7 @@ Biçim: `- [ ] T-NNN | sahip: claude|codex|- | açıklama`. Başlamadan sahip ya
 - [x] T-112 | sahip: codex | (Yüksek 2) Mesaj gönderiminde işçi kesintisi: askıda `queued` kayıtları uzlaştırma (süreli sahiplik + iade/yeniden deneme) + kesinti enjekte eden test
 - [x] T-113 | sahip: codex | (Orta 4) OTP: salon+telefon başına tek kullanılmamış kod (kısıt/kilit) + paralel test
 - [x] T-114 | sahip: codex | (Orta 5) Abonelik taraması ile ödeme yarışı: kilit altında yeniden okuma / koşullu güncelleme
-- [ ] T-115 | sahip: codex | (Orta 6) İptal kontrolünde okunan startsAt ile koşullu güncelleme
+- [x] T-115 | sahip: codex | (Orta 6) İptal kontrolünde okunan startsAt ile koşullu güncelleme
 - [ ] T-116 | sahip: codex | (Orta 7) Kampanya: kalıcı kampanya/alıcı kaydı, kredi rezervasyonu, yeniden denemede yalnız kalanlar
 - [ ] T-117 | sahip: codex | (Orta 8) Manuel ödemede idempotency anahtarı
 - [ ] T-118 | sahip: codex | Tenant kapsamı: desteklenmeyen işlemleri (ilişki mutasyonu, ham SQL vb.) withTenant'ta açıkça reddet
@@ -205,3 +205,7 @@ Biçim: `- [ ] T-NNN | sahip: claude|codex|- | açıklama`. Başlamadan sahip ya
 - T141: secureCookie istekşemasından seçilir. GerçekAuth.js şifreliçerez regresyonu önce2FAIL/1PASS→3PASS; CI260/build+HTTPpanel/flow/isolationPASS. YerelgerçekTLSproxy+Chromium giriş, Secure/HttpOnlyçerez, panelreload, owner/admin veanonimsınırlarPASS.
 
 - 19Kasım T142: tümrandevu+OTP SMSlerinde ülkeizinlistesi/segmentkotası; varsayılan90, salon200/gün(owner1–2000), telefonplatformgeneli6/gün, UTC. İlk4regresyon ve panelatlama testi önceFAIL; yeni7DBtesti, CI267/build+dört e2ePASS. Yabancıbooking açık, blockednofallback/nodebit; ayarlarUI→API→DB→reloadPASS. SMS-POLICY.md.
+
+- 19Kasım T115: okunan startsAt+iptalkuralı+tenant+token+openstatus koşullugüncelleme; aradadeğişirse409/UIyenileme, kapalı/missing ayrımıkorunur. Saatyarışları önce2FAIL/1PASS, ayrıpolicytesti1FAIL/3PASS; son4DBtesti/CI271/build+booking/flow/isolationPASS.
+- [x] T-150 | sahip: codex | Hizmetekleme personelverisi yüklenmeden açılmasın (flow e2e bulgusu)
+  - İlkflow0personelbağıFAIL, staffAPIgate ileAdddisabled regresyonuFAIL; loaderhazırolana dekbuttondisabled. Soncontrolledflowpersonelbağı1PASS; CI271/build ve diğer ilgili e2elerPASS.

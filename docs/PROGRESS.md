@@ -28,3 +28,5 @@
 - T141: CI260/build/HTTPpanel-flow-isolation+gerçekTLSChromiumPASS. T114402f06f veT1401e4fb84remote; yeniöncelikte sıradakiT142anonimrezervasyonSMSbütçesi/ülkepolitikası.
 
 - 19Kasım T142: CI267/267, üretimbuild, booking/panel/flow/isolationPASS. PolicysettingsUIkalıcılığı ve yeni7DBtesti tamam. TekLunaUI+inceleme, rootgüvenlikuygulaması. GerçekSMSyok. SıradakiT115→116→117→118→143..147→104105→124..129.
+
+- 19Kasım T115+T150: CI271/build+booking/controlledflow/isolationPASS. İptalsaati/policyrace kapandı; testtebulunanAddservice yüklemeyarışı da düzeltildi. Rootuygulama, tekLunainceleme. T116-NOTES yalnızhazırlık; sıradakiT116kalıcıkampanya+rezervasyon.

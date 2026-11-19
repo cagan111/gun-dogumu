@@ -60,8 +60,17 @@ const PASSWORD = "sifre12345";
     step(`kayıt tamam → /panel (salon ${SLUG})`);
 
     // ── 2) panelde hizmet ekle
+    // Hold staff data to reproduce the loading race without timing-based sleeps.
+    let releaseStaff;
+    const staffReady = new Promise((resolve) => { releaseStaff = resolve; });
+    await page.route("**/api/panel/staff", async (route) => { await staffReady; await route.continue(); });
     await page.goto(`${BASE}/panel/hizmetler`);
-    await page.getByRole("button", { name: /Hizmet ekle/ }).first().click();
+    const addService = page.getByRole("button", { name: /Hizmet ekle/ }).first();
+    await addService.waitFor();
+    try { assert.equal(await addService.isDisabled(), true, "personel yüklenmeden hizmet formu açılmaz"); }
+    finally { releaseStaff(); }
+    await addService.click();
+    await page.unroute("**/api/panel/staff");
     await page.getByLabel("Hizmet adı (Türkçe)").fill("Saç Kesimi");
     await page.getByLabel("Süre (dk)", { exact: true }).fill("30");
     await page.getByLabel("Fiyat (TL)").fill("450");

@@ -29,3 +29,6 @@ T141 bu commit ile tamam: middlewareşema göresecureCookie; CI260/build/HTTPpan
 
 ## 19Kasım T142 teslimi — eskiT142bekleme notlarını geçersizkılar
 T142 tamam: migration20261119000000_sms_safety, sms-policy.ts, send.ts ve ownerUI. Ülke90default/ownerizinlistesi, tenant200(owner1..2000), globaltelefon6segment/UTCgün; tümrandevularpaneldahil+OTP/kampanyadışını kapsar. Immutableattemptbudget, refundresetlemez. SMS-POLICY.md. CI267/build/dörte2ePASS; panelsettingspersist edildi. Migration yeniappbaşlamadan uygulanmalı; gerçekproductionDB/deployyapılmadı. Önceki iştaslağındaki panelbypass artıkgeçerli değil, sonkodpanelikorur. SıradakiT115→T116→T117→T118→T143..147→T104→T105→T124..129; kaynak/PRdan yeniden doğrula.
+
+## 19Kasım T115+T150 teslimi
+T115tamam: cancelByTokenokunanstartsAt+cancelHoursBefore+token/tenant/openstatusCAS; activechanged409+UIrefresh, closedalready_closed, missing404. T150ekUIloadracefix servicesAdddisabledloaderhazırolanadek; flowstaffAPIgateilekanıtlı. SonCI271/build/booking-controlledflow-isolationPASS. GerçekSMS/deployyok. T116-NOTES yalnızsaltokunurplan; uygulanmışsayma. SıradakiT116→117→118→143..147→104105→124..129. Sonhead/PRyorumlarıylagüncelle.
