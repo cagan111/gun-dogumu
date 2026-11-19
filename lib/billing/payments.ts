@@ -1,3 +1,4 @@
+import { lockTenantRow } from "../db";
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { writeAudit } from "../audit";
@@ -37,7 +38,7 @@ export async function recordManualPayment(actor: { id: string }, input: z.output
   const db = withTenant(input.tenantId);
   let replayed = false;
   const result = await db.$transaction(async (tx) => {
-    await tx.$queryRaw`SELECT id FROM "Tenant" WHERE id = ${input.tenantId} FOR UPDATE`;
+    await lockTenantRow(tx, input.tenantId);
     const existing = await tx.payment.findFirst({ where: { idempotencyKey: input.idempotencyKey } });
     if (existing) {
       if (existing.requestHash !== requestHash || !existing.appliedPlan || !existing.appliedEndsAt) throw new ConflictError("idempotencyKey", "İşlem anahtarı farklı bir ödeme için kullanıldı");

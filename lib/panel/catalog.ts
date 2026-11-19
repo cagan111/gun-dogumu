@@ -1,3 +1,4 @@
+import { lockTenantRow } from "../db";
 import { z } from "zod";
 import { PlanLimitError, ValidationError } from "../errors";
 import { NotFoundError } from "../booking";
@@ -111,7 +112,7 @@ export async function listStaff(ctx: PanelCtx) {
 
 /** Plan personel limiti: tenant satırı kilitlenir, aktif personel sayısı maxStaff'a ulaştıysa plan_limit (402). */
 async function assertStaffRoom(ctx: PanelCtx, tx: Parameters<Parameters<PanelCtx["db"]["$transaction"]>[0]>[0], excludeId?: string) {
-  await tx.$queryRaw`SELECT id FROM "Tenant" WHERE id = ${ctx.tenantId} FOR UPDATE`;
+  await lockTenantRow(tx, ctx.tenantId);
   const t = await tx.tenant.findUnique({ where: { id: ctx.tenantId }, select: { plan: true } });
   const max = planOf(t?.plan ?? "baslangic").maxStaff;
   if (max === null) return;

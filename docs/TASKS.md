@@ -160,7 +160,8 @@ Biçim: `- [ ] T-NNN | sahip: claude|codex|- | açıklama`. Başlamadan sahip ya
   - Kalıcı alıcı/içerik snapshot, zorunlu işlem anahtarı ve tenant kilitli kredi hold; güvenli kalanları worker sürdürür, belirsiz teslim yeniden gönderilmez. CI283/build ve gerçek tarayıcı kampanya testi geçti.
 - [x] T-117 | sahip: codex | (Orta 8) Manuel ödemede idempotency anahtarı
   - Tenant+UUID, ilk sonuç snapshot, değişen içerikte409; kayıp yanıtta panel aynı niyeti sürdürür. Test/teslim: REVIEW.md.
-- [ ] T-118 | sahip: codex | Tenant kapsamı: desteklenmeyen işlemleri (ilişki mutasyonu, ham SQL vb.) withTenant'ta açıkça reddet
+- [x] T-118 | sahip: codex | Tenant kapsamı: desteklenmeyen işlemleri (ilişki mutasyonu, ham SQL vb.) withTenant'ta açıkça reddet
+  - 19 Kasım: izin listesi/nested write/ham SQL ve parent escape reddi; User kapalı, sabit kilit yardımcıları. CI303/build ve altı e2e geçti.
 
 ## 18 Kasım teslim sırası
 - [x] T-100R | sahip: codex | T-100 kalanı: sıcak salon varsayılanı ve yalnız klavyede adım odağı

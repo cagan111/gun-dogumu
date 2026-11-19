@@ -29,3 +29,5 @@ node tests/e2e/isolation.cjs    # T-081: gerçek HTTP; A sahibi B'nin randevu/m�
 `docker compose up -d --build` (app, worker, Postgres 16, Caddy, günlük yedek). Kurulum, güncelleme, yedek/geri yükleme ve sorun giderme: `docs/RUNBOOK.md`. CI: `.github/workflows/ci.yml`.
 
 Ortam değişkenleri: `BASE_URL` (varsayılan `http://localhost:3000`), `SLUG` (varsayılan `lefkosa-usta-berber`), `SHOT_DIR` (ekran görüntüleri `ui-*.png`). Demo girişleri: `owner@lefkosa-usta-berber.test` / `demo12345`, `admin@kibrisrandevu.test` / `admin12345`.
+
+Tenant kapsamlı veri erişiminin desteklediği işlemler ve güvenilir SQL yardımcıları: [TENANT-BOUNDARY](docs/TENANT-BOUNDARY.md).

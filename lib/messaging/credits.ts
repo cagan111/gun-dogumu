@@ -1,3 +1,4 @@
+import { lockTenantKey } from "../db";
 /** Aylık plan SMS kredisi: aktif/deneme her salona takvim ayında bir kez (UTC ayı). */
 import { prisma, withTenant } from "../db";
 import { creditTx } from "../ledger";
@@ -16,7 +17,7 @@ export async function grantMonthlyCreditsFor(tenantId: string, now: Date): Promi
   const monthStart = new Date(`${key}-01T00:00:00.000Z`);
   return withTenant(tenantId).$transaction(async (tx) => {
     // aynı salon için eşzamanlı çağrıları sıraya sok
-    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${"monthly:" + tenantId}))::text`;
+    await lockTenantKey(tx, tenantId, "monthly");
     const already = await tx.smsLedger.findFirst({
       where: { reason: "plan_monthly", OR: [{ note: { startsWith: `monthly:${key}` } }, { createdAt: { gte: monthStart } }] },
       select: { id: true },

@@ -7,7 +7,7 @@
 import type { TenantStatus } from "@prisma/client";
 import { PAST_DUE_GRACE_DAYS } from "@/config/plans";
 import { writeAudit } from "../audit";
-import { prisma } from "../db";
+import { prisma, lockTenantRow } from "../db";
 
 export const DAY_MS = 86_400_000;
 export const TRIAL_WARN_DAYS = 3;
@@ -78,7 +78,7 @@ export async function applySubscriptionTick(now: Date = new Date(), opts: { clie
   for (const candidate of tenants) {
     // Same row lock as manual payment; scan is only a list of candidates.
     const applied = await client.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT id FROM "Tenant" WHERE id = ${candidate.id} FOR UPDATE`;
+      await lockTenantRow(tx, candidate.id);
       const t = await tx.tenant.findUnique({ where: { id: candidate.id }, select: { id: true, status: true, trialEndsAt: true, subscriptionEndsAt: true, pastDueSince: true } });
       if (!t || t.status === "suspended") return null;
       const next = nextStatus(t, now);

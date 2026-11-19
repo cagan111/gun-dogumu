@@ -1,3 +1,4 @@
+import { lockTenantKey } from "./db";
 import { randomBytes } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { prisma, type TenantDb } from "./db";
@@ -95,7 +96,7 @@ async function attempt(db: TenantDb, input: CreateAppointmentInput) {
     const staffIds = staffRows.map((s) => s.id);
 
     // Aynı telefondaki eşzamanlı rezervasyonları sıraya sok (müşteri upsert yarışı + deterministik kontrol)
-    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${input.tenantId + ":" + phone}))::text`;
+    await lockTenantKey(tx, input.tenantId, phone);
 
     const local = utcToLocal(input.startsAt, tz);
     const range = dayRangeUtc(local.date, tz);

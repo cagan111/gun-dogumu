@@ -1,3 +1,4 @@
+import { lockTenantRow } from "./db";
 /**
  * SMS defteri — bakiye için TEK kanonik yer.
  * Bakiye = defterdeki delta toplamı (balanceAfter her satırda aynı değeri anlık görüntü olarak saklar).
@@ -24,7 +25,7 @@ function assertAmount(n: number): void {
 
 /** Tenant satırı kilidi. Aynı transaction'da bu satıra FK veren bir INSERT (KEY SHARE) yapılacaksa kilit ÖNCE alınmalı, yoksa iki işlem birbirini bekleyip 40P01 olur. */
 export async function lockTenant(tx: LedgerTx, tenantId: string): Promise<void> {
-  await tx.$queryRaw`SELECT id FROM "Tenant" WHERE id = ${tenantId} FOR UPDATE`;
+  await lockTenantRow(tx, tenantId);
 }
 
 /** Güncel bakiye (delta toplamı). */

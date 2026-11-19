@@ -1,3 +1,4 @@
+import { lockSmsRecipient as lockRecipientBudget, smsRecipientUsage } from "../db";
 /** Durable anonymous-SMS spend guard; reservations are never replenished by refunds. */
 import { parsePhoneNumberFromString } from "libphonenumber-js";
 import type { LedgerTx } from "../ledger";
@@ -7,7 +8,7 @@ export class SmsPolicyBlocked extends Error {
 }
 /** Global recipient lock MUST precede tenant lock. No other path acquires it after tenant. */
 export async function lockSmsRecipient(tx: LedgerTx, phone: string) {
-  await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${"kr-sms-safety:" + phone}, 0))::text`;
+  await lockRecipientBudget(tx, phone);
 }
 /** Both global-phone and tenant locks are held. This trusted system query reveals no data to tenants. */
 export async function checkSmsPolicy(tx: LedgerTx, tenantId: string, phone: string, segments: number, now: Date) {
@@ -17,7 +18,7 @@ export async function checkSmsPolicy(tx: LedgerTx, tenantId: string, phone: stri
   const start = new Date(now); start.setUTCHours(0, 0, 0, 0);
   const end = new Date(+start + 86_400_000);
   // Deliberately global: one recipient cannot be pumped by rotating target salons.
-  const totals = await tx.$queryRaw<{ used: number }[]>`SELECT COALESCE(SUM("smsSafetySegments"),0)::integer AS used FROM "MessageLog" WHERE "recipient" = ${phone} AND "createdAt" >= ${start} AND "createdAt" < ${end}`;
+  const totals = await smsRecipientUsage(tx, phone, start, end);
   if ((totals[0]?.used ?? 0) + segments > SMS_PHONE_DAILY_SEGMENTS) throw new SmsPolicyBlocked("sms_phone_daily_limit");
   const local = await tx.messageLog.aggregate({ where: { createdAt: { gte: start, lt: end } }, _sum: { smsSafetySegments: true } });
   if ((local._sum.smsSafetySegments ?? 0) + segments > tenant.smsDailySegmentLimit) throw new SmsPolicyBlocked("sms_tenant_daily_limit");
