@@ -12,6 +12,8 @@ const httpsUrl = z.string().trim().max(500).url().refine((u) => u.startsWith("ht
 
 export const settingsSchema = z
   .object({
+    smsAllowedCallingCodes: z.array(z.string().regex(/^[1-9]\d{0,2}$/)).max(30).refine((a) => new Set(a).size === a.length, "duplicate_codes"),
+    smsDailySegmentLimit: z.number().int().min(1).max(2000),
     smsSenderName: z.string().regex(/^[A-Za-z0-9 .-]{1,11}$/, "invalid_sender").nullable(),
     reminderOffsets: z
       .array(z.number().int().min(30).max(10_080))
@@ -34,7 +36,7 @@ export const settingsSchema = z
 export type SettingsInput = z.output<typeof settingsSchema>;
 
 const PUBLIC_FIELDS = {
-  smsSenderName: true, reminderOffsets: true, cancelHoursBefore: true, slotMinutes: true, minLeadMinutes: true,
+  smsAllowedCallingCodes: true, smsDailySegmentLimit: true, smsSenderName: true, reminderOffsets: true, cancelHoursBefore: true, slotMinutes: true, minLeadMinutes: true,
   maxAdvanceDays: true, brandColor: true, logoUrl: true, coverUrl: true, locale: true, timeZone: true, plan: true, name: true, status: true,
 } as const;
 

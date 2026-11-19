@@ -96,6 +96,8 @@ model Tenant {
   pastDueSince       DateTime?
   smsSenderName      String?      @db.VarChar(11)
   smsProvider        String?
+  smsAllowedCallingCodes String[] @default(["90"])
+  smsDailySegmentLimit Int @default(200)
   // randevu kuralları
   slotMinutes        Int          @default(15)
   minLeadMinutes     Int          @default(60)
@@ -291,6 +293,7 @@ model MessageLog {
   providerId     String?
   providerResult String?
   cost           Int           @default(0)
+  smsSafetySegments Int @default(0)
   idempotencyKey String?       @unique
   appointmentId  String?
   createdAt      DateTime      @default(now())
@@ -300,6 +303,7 @@ model MessageLog {
 
   @@index([tenantId, createdAt])
   @@index([status, leaseUntil])
+  @@index([recipient, createdAt])
 }
 
 model Invoice {

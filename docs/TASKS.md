@@ -191,7 +191,7 @@ Biçim: `- [ ] T-NNN | sahip: claude|codex|- | açıklama`. Başlamadan sahip ya
 ## Güvenlik incelemesi 2 (docs/REVIEW-GUVENLIK-2.md) — öncelik sırasıyla
 - [x] T-140 | sahip: codex | KRİTİK: next ≥15.5.x güvenli sürüm + next-auth ≥5.0.0-beta.32'ye yükselt (pnpm audit 8 kritik); tüm testler/e2e yeşil
 - [x] T-141 | sahip: codex | YÜKSEK: middleware getToken secureCookie (HTTPS'te __Secure- çerezi) — yayın engelleyici; HTTPS senaryolu test
-- [ ] T-142 | sahip: codex | YÜKSEK: anonim rezervasyon SMS kötüye kullanımı — telefon/salon başına günlük onay SMS tavanı, yabancı numara politikası (ülke izin listesi ayarı), şüpheli desende SMS'siz onay
+- [x] T-142 | sahip: codex | YÜKSEK: anonim rezervasyon SMS kötüye kullanımı — telefon/salon başına günlük onay SMS tavanı, yabancı numara politikası (ülke izin listesi ayarı), şüpheli desende SMS'siz onay
 - [ ] T-143 | sahip: codex | ORTA: safeNext TAB/kontrol karakteri açık yönlendirmesi
 - [ ] T-144 | sahip: codex | ORTA: anonim rezervasyon mevcut müşterinin ad/e-posta/pazarlama iznini ezmesin; izin geri çekme (opt-out) yolu
 - [ ] T-145 | sahip: codex | ORTA: giriş kilidi yalnız başarısız denemeleri saysın (DoS önleme)
@@ -203,3 +203,5 @@ Biçim: `- [ ] T-NNN | sahip: claude|codex|- | açıklama`. Başlamadan sahip ya
 - T140: Next15.5.29/Authbeta32+transitivepatchler, Zod4 uyumu. Prod audit önce8kritik20yüksek→sonra0tümseviyeler. CI257/build geçti; ayrıntı SECURITY-DEPENDENCIES.md ve PRtestsonuçları.
 
 - T141: secureCookie istekşemasından seçilir. GerçekAuth.js şifreliçerez regresyonu önce2FAIL/1PASS→3PASS; CI260/build+HTTPpanel/flow/isolationPASS. YerelgerçekTLSproxy+Chromium giriş, Secure/HttpOnlyçerez, panelreload, owner/admin veanonimsınırlarPASS.
+
+- 19Kasım T142: tümrandevu+OTP SMSlerinde ülkeizinlistesi/segmentkotası; varsayılan90, salon200/gün(owner1–2000), telefonplatformgeneli6/gün, UTC. İlk4regresyon ve panelatlama testi önceFAIL; yeni7DBtesti, CI267/build+dört e2ePASS. Yabancıbooking açık, blockednofallback/nodebit; ayarlarUI→API→DB→reloadPASS. SMS-POLICY.md.

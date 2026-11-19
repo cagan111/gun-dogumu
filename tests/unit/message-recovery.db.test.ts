@@ -11,7 +11,10 @@ async function salon() {
   const t = await prisma.tenant.create({ data: { slug: `recovery-${crypto.randomUUID()}`, name: "Recovery fixture", city: "Girne" } });
   ids.push(t.id); await credit(t.id, 10); return t.id;
 }
-const input = (tenantId: string, key = crypto.randomUUID()) => ({ tenantId, to: "+905331234567", text: "Test", template: "otp", logContent: "******", reason: "notification" as const, idempotencyKey: key, now });
+let recipientN = 0;
+const recipients = new Map<string, string>();
+const recipient = (id: string) => { if (!recipients.has(id)) recipients.set(id, `+90533555${String(++recipientN).padStart(4, "0")}`); return recipients.get(id)!; };
+const input = (tenantId: string, key = crypto.randomUUID()) => ({ tenantId, to: recipient(tenantId), text: "Test", template: "otp", logContent: "******", reason: "notification" as const, idempotencyKey: key, now });
 const crash = async () => { throw new Error("injected_worker_exit"); };
 beforeAll(() => { MockProvider.sent.length = 0; });
 afterEach(() => vi.restoreAllMocks());

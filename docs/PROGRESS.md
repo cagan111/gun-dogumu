@@ -26,3 +26,5 @@
 - 18Kasım21:52UTC: çalışma ortamı yenilenmiş, önceki/workspace/work dizini yoktu. Güncel923b6a0 yenidenclone edildi; pnpm+Postgres16+migration+seed yenidenkuruldu. T114 yerelteslim tamamlandı: CI257/build/panel-flow-isolationPASS; remoteöncesi rebase güncel. T140audit yeniden doğrulandı:8kritik20yüksek, sıradaki iş.
 - T140: prod audit8kritik20yüksek22orta3düşük→0tümseviyeler; CI257/build ve booking/panel/flow/isolationPASS. Panel ilkkoşuda güngeçişiyle seedrandevuları eski günde kaldı; seed güncellenince geçti, ürünkodu/test gevşetilmedi. sharpnative libvips yükleme kontrolü geçti. T141HTTPSregresyonları ayrıhazır (henüz düzeltme yok).
 - T141: CI260/build/HTTPpanel-flow-isolation+gerçekTLSChromiumPASS. T114402f06f veT1401e4fb84remote; yeniöncelikte sıradakiT142anonimrezervasyonSMSbütçesi/ülkepolitikası.
+
+- 19Kasım T142: CI267/267, üretimbuild, booking/panel/flow/isolationPASS. PolicysettingsUIkalıcılığı ve yeni7DBtesti tamam. TekLunaUI+inceleme, rootgüvenlikuygulaması. GerçekSMSyok. SıradakiT115→116→117→118→143..147→104105→124..129.

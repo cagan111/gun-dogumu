@@ -18,6 +18,7 @@ import { fmtDateTime, useLoader } from "./util";
 
 interface Settings {
   smsSenderName: string | null; reminderOffsets: number[]; cancelHoursBefore: number; slotMinutes: number; minLeadMinutes: number;
+  smsAllowedCallingCodes: string[]; smsDailySegmentLimit: number;
   maxAdvanceDays: number; brandColor: string | null; logoUrl: string | null; coverUrl: string | null; locale: "tr" | "en"; timeZone: string;
 }
 const OFFSETS = [10080, 2880, 1440, 720, 240, 120, 60, 30];
@@ -153,7 +154,13 @@ function SettingsForm() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [fe, setFe] = useState<Record<string, string>>({});
-  useEffect(() => { if (q.data) setF(q.data); }, [q.data]);
+  const [callingCodesText, setCallingCodesText] = useState("");
+  useEffect(() => {
+    if (q.data) {
+      setF(q.data);
+      setCallingCodesText(q.data.smsAllowedCallingCodes.join(", "));
+    }
+  }, [q.data]);
 
   if (q.error) return <Alert>{errorMessage(q.error, t)}</Alert>;
   if (!f) return <p className="text-slate-600">{t("common.loading")}</p>;
@@ -165,6 +172,13 @@ function SettingsForm() {
     e.preventDefault();
     if (!f) return;
     const errs: Record<string, string> = {};
+    const callingCodes = callingCodesText.split(",").map((code) => code.trim()).filter(Boolean);
+    if (callingCodes.length > 30 || callingCodes.some((code) => !/^[1-9]\d{0,2}$/.test(code)) || new Set(callingCodes).size !== callingCodes.length) {
+      errs.smsAllowedCallingCodes = t("set.errCallingCodes");
+    }
+    if (!Number.isInteger(f.smsDailySegmentLimit) || f.smsDailySegmentLimit < 1 || f.smsDailySegmentLimit > 2000) {
+      errs.smsDailySegmentLimit = t("set.errDailySmsLimit");
+    }
     if (f.smsSenderName && !/^[A-Za-z0-9 .-]{1,11}$/.test(f.smsSenderName)) errs.smsSenderName = t("set.errSender");
     if (f.reminderOffsets.length < 1 || f.reminderOffsets.length > 3) errs.reminderOffsets = t("set.errOffsets");
     for (const k of ["logoUrl", "coverUrl"] as const) if (f[k] && !f[k]!.startsWith("https://")) errs[k] = t("set.errHttps");
@@ -177,6 +191,7 @@ function SettingsForm() {
     try {
       const body: Settings = {
         smsSenderName: f.smsSenderName?.trim() || null, reminderOffsets: [...f.reminderOffsets].sort((a, b) => b - a), cancelHoursBefore: f.cancelHoursBefore,
+        smsAllowedCallingCodes: callingCodes, smsDailySegmentLimit: f.smsDailySegmentLimit,
         slotMinutes: f.slotMinutes, minLeadMinutes: f.minLeadMinutes, maxAdvanceDays: f.maxAdvanceDays, brandColor: f.brandColor, logoUrl: f.logoUrl?.trim() || null,
         coverUrl: f.coverUrl?.trim() || null, locale: f.locale, timeZone: f.timeZone,
       };
@@ -193,6 +208,8 @@ function SettingsForm() {
       <Card aria-labelledby="rem-h" className="space-y-3">
         <h3 id="rem-h" className="font-bold">{t("set.messages")}</h3>
         <Field label={t("set.sender")} hint={t("set.senderHint")} value={f.smsSenderName ?? ""} onChange={(e) => set({ smsSenderName: e.target.value })} maxLength={11} error={fe.smsSenderName} />
+        <Field label={t("set.allowedCallingCodes")} hint={t("set.allowedCallingCodesHint")} value={callingCodesText} onChange={(e) => setCallingCodesText(e.target.value)} placeholder="90, 44" error={fe.smsAllowedCallingCodes} />
+        <Field label={t("set.dailySmsLimit")} hint={t("set.dailySmsLimitHint")} type="number" inputMode="numeric" min={1} max={2000} value={Number.isNaN(f.smsDailySegmentLimit) ? "" : f.smsDailySegmentLimit} onChange={(e) => set({ smsDailySegmentLimit: num(e.target.value) })} error={fe.smsDailySegmentLimit} />
         <fieldset>
           <legend className="text-sm font-medium text-slate-800">{t("set.reminders")}</legend>
           <p className="text-xs text-slate-600">{t("set.remindersHint")}</p>

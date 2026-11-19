@@ -2,6 +2,8 @@
  * Mesaj gönderimi: segment sayısı kadar kredi düşümü MessageLog satırıyla AYNI transaction'da yapılır;
  * sağlayıcı hatasında iade edilir. Kredi yetmezse WhatsApp (Salon+ ve yapılandırılmışsa) → e-posta → atla.
  */
+import { normalizePhone } from "../phone";
+import { checkSmsPolicy, lockSmsRecipient, SmsPolicyBlocked } from "./sms-policy";
 import { Prisma, type Channel, type MessageStatus } from "@prisma/client";
 import { prisma, withTenant } from "../db";
 import { InsufficientCreditsError, ValidationError } from "../errors";
@@ -86,21 +88,34 @@ export async function sendMessage(input: SendInput): Promise<SendOutcome> {
   const segments = smsSegments(input.text, sms.segmentProfile).segments;
   if (segments === 0) throw new ValidationError("Boş mesaj", "text");
 
+  const appointment = input.appointmentId ? await withTenant(tenantId).appointment.findFirst({ where: { id: input.appointmentId }, select: { id: true } }) : null;
+  if (input.appointmentId && !appointment) throw new ValidationError("Randevu bulunamadı", "appointmentId");
+  const restricted = input.template === "otp" || !!appointment || input.reason !== "campaign";
+  if (restricted) {
+    const phone = normalizePhone(input.to);
+    if (!phone) return { status: "skipped", segments, reason: "sms_country_policy" };
+    input = { ...input, to: phone };
+  }
+
   // 1) kredi düşümü + MessageLog (queued) tek transaction
   const lease = messageLease(input.now ?? new Date());
   let logId: string;
   try {
     logId = await withTenant(tenantId).$transaction(async (tx) => {
       // kilit sırası: önce tenant FOR UPDATE, sonra MessageLog INSERT (FK KEY SHARE) — tersi eşzamanlı gönderimde 40P01
+      // Recipient lock first across salons; then canonical tenant/FK lock order.
+      if (restricted) await lockSmsRecipient(tx, input.to);
       await lockTenant(tx, tenantId);
+      if (restricted) await checkSmsPolicy(tx, tenantId, input.to, segments, input.now ?? new Date());
       const log = await tx.messageLog.create({
-        data: { channel: "sms", recipient: input.to, template: input.template, content: input.logContent ?? input.text, provider: sms.name, status: "queued", ...lease, cost: segments, idempotencyKey: key, appointmentId: input.appointmentId ?? null } as never,
+        data: { channel: "sms", recipient: input.to, template: input.template, content: input.logContent ?? input.text, provider: sms.name, status: "queued", ...lease, cost: segments, smsSafetySegments: restricted ? segments : 0, createdAt: input.now ?? new Date(), idempotencyKey: key, appointmentId: input.appointmentId ?? null } as never,
       });
       await debitTx(tx, tenantId, segments, { reason: input.reason, messageId: log.id, note: input.template });
       return log.id;
     });
   } catch (e) {
     if (isUniqueViolation(e)) return { status: "duplicate", segments: 0 };
+    if (e instanceof SmsPolicyBlocked) return { status: "skipped", segments, reason: e.reason };
     if (e instanceof InsufficientCreditsError) return fallback(input, tenant.plan, segments);
     throw e;
   }

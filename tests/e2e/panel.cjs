@@ -157,11 +157,15 @@ async function gotoDayWithAppointments(page) {
   await page.goto(`${BASE}/panel/ayarlar`);
   await page.getByLabel("İptal kuralı (saat)").waitFor();
   await page.getByLabel("İptal kuralı (saat)").fill("6");
+  await page.getByLabel("SMS gönderilebilen ülke kodları", { exact: true }).fill("90, 44");
+  await page.getByLabel("Randevu ve doğrulama SMS günlük sınırı (segment)", { exact: true }).fill("150");
   await page.getByRole("button", { name: "Kaydet" }).last().click();
   await page.getByText("Kaydedildi.").first().waitFor();
   await page.reload();
   await page.getByLabel("İptal kuralı (saat)").waitFor();
   assert.equal(await page.getByLabel("İptal kuralı (saat)").inputValue(), "6");
+  assert.equal(await page.getByLabel("SMS gönderilebilen ülke kodları", { exact: true }).inputValue(), "90, 44");
+  assert.equal(await page.getByLabel("Randevu ve doğrulama SMS günlük sınırı (segment)", { exact: true }).inputValue(), "150");
   assert.ok((await page.getByTestId("public-url").innerText()).endsWith(`/${SLUG}`), "public link");
   await page.getByTestId("sms-balance").scrollIntoViewIfNeeded();
   await page.screenshot({ path: shot("panel-settings") });

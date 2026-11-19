@@ -78,3 +78,5 @@
 - T140: güvenli15.x Next veAuthbeta32; transitifPostCSS/sharp override, Zod4.6.6. Üretimaudit0tümseviyeler. Zodrefine açıkboolean ile mevcutpartialplanprice APIkorundu; Node22 sürer. SECURITY-DEPENDENCIES.md.
 
 - T141: middleware secureCookie seçimini NextRequest.nextUrl.protocol üzerinden yapar. HTTPSte __Secure-authjs.session-token, HTTPyereldevde plainauthjs çerezi; HTTPSTLS yerelproxyyle doğrulandı, authsırrı/tokenloglanmadı.
+
+- 19Kasım T142: kampanyadışı bildirimler, tümrandevuSMSleri(paneldahil) veOTPtekmerkezkapıdankontrol edilir; randevusuzauthenticatedcampaign ayrıT116kapsamında. Ülkevarsayılan90, ownerliste30kod/boşlistekapalı; bookingengellenmez. Salon200segment/UTCgün owner1–2000, telefon6segment/gün tümtenantlarda ortak. Sayım MessageLog.smsSafetySegments ile immutablegirişimdir; refund/failed sıfırlamaz. Kilit sırası globaltelefonadvisory→Tenant→log/ledger; diğer yollar tenant-only. Özel rawSUMyalnız güvenilirsistemyordamında, tenantlararasıveri dönmez. Kotaülkeengeli typedskipped/nocharge/nofallback. Ülkekapsamını paneldenbookingyaparak atlama testi eklenip kapatıldı. Bu maliyet/hacim sınırıdır, telefon sahipliği kanıtı değildir.
