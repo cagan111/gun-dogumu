@@ -8,3 +8,6 @@
 - Harcanmayan rezervasyon bir kez serbest bırakılmalı; T112 iadeleri ile çifte iade yapılmamalı. Muhasebe tasarımı uygulanmadan önce açıkça seçilip test edilmeli.
 - `delivery_unknown` / dispatch sonrası çöküş otomatik tekrar gönderilmez. Güvenli, gönderim başlamamış durum ancak eski girişim kapatılıp muhasebesi uzlaştırıldıktan sonra yeni attempt anahtarıyla denenebilir.
 - T142 randevu/OTP koruması kampanyayı ayrı bırakır; kampanyanın bütçe ve rıza politikası ayrıca belgelenmeli. Bu not yeni model/API/migration/işçi veya test sonucu değildir.
+
+## Son uygulama — 19 Kasım
+Yukarıdaki hazırlık artık tarihsel taslaktır. T116 uygulandı: rezervasyon borç değil hold olarak tutulur; debit yalnız alıcı claim sırasında normal MessageLog akışındadır. Son uygulama/kanıt docs/REVIEW.md ve CODEX_CHECKPOINT.md içindedir.

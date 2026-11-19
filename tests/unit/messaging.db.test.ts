@@ -259,7 +259,7 @@ describe.skipIf(!HAS_DB)("mesajlaşma, işler, kampanya, kredi (gerçek DB)", ()
     await mkAppt(s, { consent: false, phone: "+905331120003" });
     const noon = M.time.zonedToUtc(M.time.utcToLocal(new Date(), TZ).date, 12 * 60, TZ);
     const before = await balance(s);
-    const r = await M.camp.sendCampaign(s.tenantId, "Bu hafta %20 indirim!", noon);
+    const r = await M.camp.sendCampaign(s.tenantId, "Bu hafta %20 indirim!", noon, undefined, { idempotencyKey: crypto.randomUUID() });
     expect(r).toMatchObject({ recipients: 2, sent: 2, failed: 0, skipped: 0 });
     const rows = await logs(s, { template: "campaign" });
     expect(rows.map((x) => x.recipient).sort()).toEqual(["+905331120001", "+905331120002"]);
@@ -269,7 +269,7 @@ describe.skipIf(!HAS_DB)("mesajlaşma, işler, kampanya, kredi (gerçek DB)", ()
     expect(led).toHaveLength(2);
 
     const p = await mkSalon("pro");
-    await expect(M.camp.sendCampaign(p.tenantId, "merhaba dünya", noon)).rejects.toMatchObject({ code: "plan_feature" });
+    await expect(M.camp.sendCampaign(p.tenantId, "merhaba dünya", noon, undefined, { idempotencyKey: crypto.randomUUID() })).rejects.toMatchObject({ code: "plan_feature" });
   });
 
   it("kampanya sessiz saatlerde reddedilir (22–08), mesaj gitmez; kredi yetmezse upfront reddedilir", async () => {
@@ -278,14 +278,14 @@ describe.skipIf(!HAS_DB)("mesajlaşma, işler, kampanya, kredi (gerçek DB)", ()
     await mkAppt(s, { consent: true, phone: "+905331130002" });
     const date = M.time.utcToLocal(new Date(), TZ).date;
     for (const min of [22 * 60, 23 * 60 + 30, 3 * 60, 7 * 60 + 59]) {
-      await expect(M.camp.sendCampaign(s.tenantId, "merhaba dünya", M.time.zonedToUtc(date, min, TZ))).rejects.toMatchObject({ code: "quiet_hours" });
+      await expect(M.camp.sendCampaign(s.tenantId, "merhaba dünya", M.time.zonedToUtc(date, min, TZ), undefined, { idempotencyKey: crypto.randomUUID() })).rejects.toMatchObject({ code: "quiet_hours" });
     }
     expect(await logs(s, { template: "campaign" })).toHaveLength(0);
     const ok = M.time.zonedToUtc(date, 8 * 60, TZ);
     // kredi 1'e düşür: 2 alıcı × ≥1 segment > 1 → hiçbiri gönderilmez
     await drain(s);
     await M.ledger.credit(s.tenantId, 1, "adjustment", "test");
-    await expect(M.camp.sendCampaign(s.tenantId, "merhaba dünya", ok)).rejects.toMatchObject({ code: "insufficient_credits" });
+    await expect(M.camp.sendCampaign(s.tenantId, "merhaba dünya", ok, undefined, { idempotencyKey: crypto.randomUUID() })).rejects.toMatchObject({ code: "insufficient_credits" });
     expect(await logs(s, { template: "campaign" })).toHaveLength(0);
     expect(await balance(s)).toBe(1);
   });

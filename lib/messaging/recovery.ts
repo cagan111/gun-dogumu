@@ -31,9 +31,9 @@ export async function settleMessage(tenantId: string, id: string, owner: string,
   });
 }
 /** Bounded cross-tenant system sweep. Old ownerless queued rows are delivery-unknown. */
-export async function reconcileQueuedMessages(now: Date = new Date(), limit = 100): Promise<number> {
+export async function reconcileQueuedMessages(now: Date = new Date(), limit = 100, tenantId?: string): Promise<number> {
   const expired = { OR: [{ leaseUntil: null }, { leaseUntil: { lte: now } }] };
-  const rows = await prisma.messageLog.findMany({ where: { status: "queued", ...expired }, orderBy: [{ leaseUntil: "asc" }, { id: "asc" }], take: Math.max(1, Math.min(500, limit)) });
+  const rows = await prisma.messageLog.findMany({ where: { status: "queued", ...expired, ...(tenantId ? { tenantId } : {}) }, orderBy: [{ leaseUntil: "asc" }, { id: "asc" }], take: Math.max(1, Math.min(500, limit)) });
   let recovered = 0;
   for (const row of rows) {
     recovered += await withTenant(row.tenantId).$transaction(async (tx) => {

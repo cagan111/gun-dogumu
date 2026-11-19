@@ -5,7 +5,7 @@ import { writeAudit } from "../audit";
 import { NotFoundError } from "../booking";
 import { prisma, withTenant } from "../db";
 import { ConflictError, ValidationError } from "../errors";
-import { creditTx, getBalance } from "../ledger";
+import { creditTx, getAvailableBalance } from "../ledger";
 import { getAllPlanPrices } from "../plan-price";
 import { isPlanId } from "../plan";
 import { dayRangeUtc, utcToLocal } from "../time";
@@ -58,7 +58,7 @@ export async function getTenantDetail(tenantId: string) {
   if (!t) throw new NotFoundError("Salon");
   const db = withTenant(tenantId);
   const [smsBalance, staffCount, serviceCount, appointmentCount, payments, requests] = await Promise.all([
-    getBalance(db), db.staff.count({ where: { active: true } }), db.service.count({ where: { active: true } }), db.appointment.count(),
+    getAvailableBalance(db), db.staff.count({ where: { active: true } }), db.service.count({ where: { active: true } }), db.appointment.count(),
     db.payment.findMany({ orderBy: { createdAt: "desc" }, take: 20 }),
     db.smsPackageRequest.findMany({ orderBy: { createdAt: "desc" }, take: 20 }),
   ]);

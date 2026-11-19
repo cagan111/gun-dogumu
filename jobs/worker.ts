@@ -23,6 +23,9 @@ async function main() {
   await boss.work(JOB.subscriptionTick, wrap(JOB.subscriptionTick, () => h.handleSubscriptionTick()));
   await boss.work(JOB.monthlyCredits, wrap(JOB.monthlyCredits, () => h.handleMonthlyCredits()));
   await h.handleMessageRecovery();
+  await h.handleCampaignRecovery();
+  await boss.work(JOB.campaign, wrap(JOB.campaign, (d: Parameters<typeof h.handleCampaignRecovery>[0]) => h.handleCampaignRecovery(d)));
+  await boss.schedule(JOB.campaign, "* * * * *", {}, { tz: "Asia/Famagusta" });
   await boss.work(JOB.messageRecovery, wrap(JOB.messageRecovery, () => h.handleMessageRecovery()));
   await boss.schedule(JOB.messageRecovery, "* * * * *", {}, { tz: "Asia/Famagusta" });
   // günlük, idempotent (tekrar çalışması zararsız)

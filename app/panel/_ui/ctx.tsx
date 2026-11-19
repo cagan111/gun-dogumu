@@ -14,6 +14,7 @@ export interface PanelInfo {
 interface Ctx extends PanelInfo {
   isOwner: boolean;
   balance: number | null;
+  reserved: number;
   refreshBalance: () => void;
 }
 
@@ -21,11 +22,12 @@ const C = createContext<Ctx | null>(null);
 
 export function PanelProvider({ info, children }: { info: PanelInfo; children: React.ReactNode }) {
   const [balance, setBalance] = useState<number | null>(null);
+  const [reserved, setReserved] = useState(0);
   const refreshBalance = useCallback(() => {
-    api<{ balance: number }>("/api/panel/sms/balance").then((r) => setBalance(r.balance)).catch(() => {});
+    api<{ balance: number; reserved?: number }>("/api/panel/sms/balance").then((r) => { setBalance(r.balance); setReserved(r.reserved ?? 0); }).catch(() => {});
   }, []);
   useEffect(refreshBalance, [refreshBalance]);
-  const value = useMemo(() => ({ ...info, isOwner: info.role === "owner", balance, refreshBalance }), [info, balance, refreshBalance]);
+  const value = useMemo(() => ({ ...info, isOwner: info.role === "owner", balance, reserved, refreshBalance }), [info, balance, reserved, refreshBalance]);
   return <C.Provider value={value}>{children}</C.Provider>;
 }
 

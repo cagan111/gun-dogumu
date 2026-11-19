@@ -2,12 +2,13 @@
  * Mesaj gönderimi: segment sayısı kadar kredi düşümü MessageLog satırıyla AYNI transaction'da yapılır;
  * sağlayıcı hatasında iade edilir. Kredi yetmezse WhatsApp (Salon+ ve yapılandırılmışsa) → e-posta → atla.
  */
+import { consumeCampaignHold, CampaignClaimDuplicate } from "./campaign-reservation";
 import { normalizePhone } from "../phone";
 import { checkSmsPolicy, lockSmsRecipient, SmsPolicyBlocked } from "./sms-policy";
 import { Prisma, type Channel, type MessageStatus } from "@prisma/client";
 import { prisma, withTenant } from "../db";
 import { InsufficientCreditsError, ValidationError } from "../errors";
-import { debitTx, getBalance, lockTenant, type DebitReason } from "../ledger";
+import { debitTx, getAvailableBalance, lockTenant, type DebitReason } from "../ledger";
 import { logger } from "../logger";
 import { hasFeature } from "../plan";
 import { getEmailProvider, getSmsProvider, getWhatsAppProvider, whatsappConfigured } from "./registry";
@@ -26,6 +27,8 @@ export interface SendInput {
   template: string;
   reason: DebitReason;
   appointmentId?: string | null;
+  /** Internal durable campaign claim. HTTP callers cannot supply this directly. */
+  campaignRecipientId?: string;
   idempotencyKey?: string | null;
   /** Kredi yetmezse: WhatsApp (varsayılan açık) ve/veya e-posta. */
   fallback?: { whatsapp?: boolean; email?: string | null; subject?: string };
@@ -99,7 +102,7 @@ export async function sendMessage(input: SendInput): Promise<SendOutcome> {
 
   // 1) kredi düşümü + MessageLog (queued) tek transaction
   const lease = messageLease(input.now ?? new Date());
-  let logId: string;
+  let logId: string | null;
   try {
     logId = await withTenant(tenantId).$transaction(async (tx) => {
       // kilit sırası: önce tenant FOR UPDATE, sonra MessageLog INSERT (FK KEY SHARE) — tersi eşzamanlı gönderimde 40P01
@@ -107,19 +110,28 @@ export async function sendMessage(input: SendInput): Promise<SendOutcome> {
       if (restricted) await lockSmsRecipient(tx, input.to);
       await lockTenant(tx, tenantId);
       if (restricted) await checkSmsPolicy(tx, tenantId, input.to, segments, input.now ?? new Date());
+      if (input.campaignRecipientId) {
+        if (input.reason !== "campaign" || input.template !== "campaign" || input.appointmentId) throw new ValidationError("Geçersiz kampanya gönderimi");
+        if (!(await consumeCampaignHold(tx, tenantId, input.campaignRecipientId, { to: input.to, text: input.text, segments, provider: sms.name, key }))) return null;
+      }
       const log = await tx.messageLog.create({
         data: { channel: "sms", recipient: input.to, template: input.template, content: input.logContent ?? input.text, provider: sms.name, status: "queued", ...lease, cost: segments, smsSafetySegments: restricted ? segments : 0, createdAt: input.now ?? new Date(), idempotencyKey: key, appointmentId: input.appointmentId ?? null } as never,
       });
       await debitTx(tx, tenantId, segments, { reason: input.reason, messageId: log.id, note: input.template });
+      if (input.campaignRecipientId) await tx.campaignRecipient.update({ where: { id: input.campaignRecipientId }, data: { messageId: log.id } });
       return log.id;
     });
   } catch (e) {
-    if (isUniqueViolation(e)) return { status: "duplicate", segments: 0 };
+    if (isUniqueViolation(e) || e instanceof CampaignClaimDuplicate) return { status: "duplicate", segments: 0 };
     if (e instanceof SmsPolicyBlocked) return { status: "skipped", segments, reason: e.reason };
-    if (e instanceof InsufficientCreditsError) return fallback(input, tenant.plan, segments);
+    if (e instanceof InsufficientCreditsError) {
+      if (input.campaignRecipientId) return { status: "skipped", segments, reason: "reservation_unavailable" };
+      return fallback(input, tenant.plan, segments);
+    }
     throw e;
   }
 
+  if (!logId) return { status: "skipped", segments, reason: "campaign_recipient_skipped" };
   await input.hooks?.afterReserved?.();
   // Dispatch marker fences workers whose reservation was already recovered.
   if (!(await startDispatch(tenantId, logId, lease.leaseOwner, input.now ?? new Date()))) return { status: "failed", messageId: logId, segments, reason: "lease_lost" };
@@ -193,6 +205,6 @@ export async function sendTenantEmail(tenantId: string, template: TemplateName, 
 export async function notifyLowCredit(tenantId: string, now: Date, _deps?: Partial<ProviderDeps>) {
   void _deps;
   const day = now.toISOString().slice(0, 10);
-  const balance = await getBalance(withTenant(tenantId));
+  const balance = await getAvailableBalance(withTenant(tenantId));
   return sendTenantEmail(tenantId, "low_credit", { balance }, `low:${tenantId}:${day}`);
 }

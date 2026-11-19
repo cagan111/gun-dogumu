@@ -64,7 +64,12 @@ export async function updateSettings(ctx: PanelCtx, input: SettingsInput) {
 /* ───────────── SMS ───────────── */
 
 export async function getSmsBalance(ctx: PanelCtx) {
-  return { balance: await ledger.getBalance(ctx.db) };
+  return ctx.db.$transaction(async (tx) => {
+    await ledger.lockTenant(tx, ctx.tenantId);
+    const raw = await ledger.getBalance(tx, ctx.tenantId);
+    const balance = await ledger.getAvailableBalance(tx, ctx.tenantId);
+    return { balance, reserved: raw - balance };
+  });
 }
 
 export const smsRequestSchema = z.object({ size: z.number().int().refine((n) => (SMS_PACKAGES as readonly number[]).includes(n), "invalid_package") });

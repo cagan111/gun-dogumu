@@ -3,7 +3,7 @@
  * Saf fonksiyon (scopeArgs) birim testlidir; withTenant() bunu Prisma extension olarak uygular.
  */
 export const TENANT_MODELS = new Set([
-  "Staff", "Service", "ServiceStaff", "WorkingHours", "TimeOff", "Customer", "Appointment",
+  "Campaign", "CampaignRecipient", "Staff", "Service", "ServiceStaff", "WorkingHours", "TimeOff", "Customer", "Appointment",
   "SmsLedger", "MessageLog", "Invoice", "Payment", "SmsPackageRequest", "Otp",
 ]);
 

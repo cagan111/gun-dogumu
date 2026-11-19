@@ -105,3 +105,12 @@ export async function handleMessageRecovery() {
   const { reconcileQueuedMessages } = await import("../lib/messaging/recovery");
   return { recovered: await reconcileQueuedMessages() };
 }
+
+/** Durable campaign work; cron repairs lost prepare→enqueue transitions. */
+export async function handleCampaignRecovery(data: { tenantId?: string; campaignId?: string } = {}) {
+  const { recoverCampaigns, processCampaign } = await import("../lib/messaging/campaign");
+  if (data.tenantId && data.campaignId) {
+    if (!(await prisma.campaign.findFirst({ where: { id: data.campaignId, tenantId: data.tenantId }, select: { id: true } }))) return { checked: 0 };
+    await processCampaign(data.tenantId, data.campaignId, new Date(), undefined, { maxRecipients: 5 }); return { checked: 1 }; }
+  return recoverCampaigns();
+}

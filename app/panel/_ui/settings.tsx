@@ -63,7 +63,7 @@ interface Req { id: string; size: number; status: "open" | "fulfilled" | "reject
 function SmsCard() {
   const { t, locale } = useI18n();
   const toast = useToast();
-  const { balance, isOwner, tenant } = usePanel();
+  const { balance, reserved, isOwner, tenant } = usePanel();
   const reqs = useLoader(() => api<Req[]>("/api/panel/sms/requests"), []);
   const [pick, setPick] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
@@ -82,6 +82,7 @@ function SmsCard() {
       <h3 id="sms-h" className="font-bold">{t("sms.title")}</h3>
       <p className="mt-1 text-3xl font-extrabold tabular-nums" data-testid="sms-balance">{balance ?? "…"} <span className="text-base font-semibold text-slate-600">{t("sms.credits")}</span></p>
       <p className="text-sm text-slate-600">{t("sms.note")}</p>
+      {reserved > 0 ? <p className="text-sm text-slate-600">{t("sms.reserved", { n: reserved })}</p> : null}
       {isOwner ? (
         <div className="mt-3">
           <p className="text-sm font-medium">{t("sms.request")}</p>
@@ -114,28 +115,74 @@ function Campaign() {
   const [confirm, setConfirm] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const [res, setRes] = useState<{ recipients: number; sent: number; failed: number; skipped: number } | null>(null);
+  const [active, setActive] = useState<{ idempotencyKey: string; text: string } | null>(null);
+  const [res, setRes] = useState<{ campaignId: string; recipients: number; segmentsPerMessage: number; sent: number; failed: number; skipped: number; pending: number; unknown: number } | null>(null);
+  const storageKey = `campaign:${tenant.slug}`;
+  useEffect(() => {
+    try {
+      const saved = sessionStorage.getItem(storageKey);
+      if (!saved) return;
+      const parsed = JSON.parse(saved) as { idempotencyKey?: string; text?: string };
+      if (typeof parsed.idempotencyKey === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(parsed.idempotencyKey) && typeof parsed.text === "string" && parsed.text.trim().length >= 3 && parsed.text.length <= 500) { setActive({ idempotencyKey: parsed.idempotencyKey, text: parsed.text }); setText(parsed.text); }
+    } catch { /* Ignore damaged local session data. */ }
+  }, [storageKey]);
+  useEffect(() => { if (active) { try { sessionStorage.setItem(storageKey, JSON.stringify(active)); } catch { /* send() reports storage failures before dispatch */ } } }, [active, storageKey]);
   const info = smsSegments(withFooter(text, locale), undefined);
+
+  async function refresh(key = active?.idempotencyKey) {
+    if (!key) return;
+    setBusy(true); setErr(null);
+    try { setRes(await api<typeof res>(`/api/panel/campaigns?idempotencyKey=${encodeURIComponent(key)}`)); refreshBalance(); }
+    catch (e) { setErr(errorMessage(e, t)); } finally { setBusy(false); }
+  }
 
   async function send() {
     setBusy(true); setErr(null); setRes(null);
+    const attempt = active ?? { idempotencyKey: crypto.randomUUID(), text: text.trim() };
+    try { sessionStorage.setItem(storageKey, JSON.stringify(attempt)); }
+    catch { setErr(t("camp.sessionError")); setBusy(false); setConfirm(false); return; }
+    setActive(attempt);
     try {
-      setRes(await api("/api/panel/campaigns", { method: "POST", body: { text: text.trim() } }));
-      setText("");
+      setRes(await api<typeof res>("/api/panel/campaigns", { method: "POST", body: { text: attempt.text, idempotencyKey: attempt.idempotencyKey } }));
       refreshBalance();
     } catch (e) { setErr(errorMessage(e, t)); } finally { setBusy(false); setConfirm(false); }
   }
 
+  async function cancelRemaining() {
+    if (!active) return;
+    setBusy(true); setErr(null);
+    try { setRes(await api<typeof res>(`/api/panel/campaigns?idempotencyKey=${encodeURIComponent(active.idempotencyKey)}`, { method: "DELETE" })); refreshBalance(); }
+    catch (e) { setErr(errorMessage(e, t)); } finally { setBusy(false); }
+  }
+
+  const finished = !!res && res.pending === 0;
+  function newCampaign() {
+    try { sessionStorage.removeItem(storageKey); }
+    catch { setErr(t("camp.sessionError")); return; }
+    setActive(null); setRes(null); setErr(null); setText("");
+  }
+
   return (
-    <Card aria-labelledby="camp-h">
+    <Card aria-labelledby="camp-h" data-testid="campaign-card">
       <h3 id="camp-h" className="font-bold">{t("camp.title")}</h3>
-      {!tenant.features.campaigns ? <Alert tone="info" className="mt-2">{t("camp.plus")}</Alert> : (
+      {!tenant.features.campaigns && !active ? <Alert tone="info" className="mt-2">{t("camp.plus")}</Alert> : (
         <div className="mt-2 space-y-2">
           <p className="text-sm text-slate-600">{t("camp.note")}</p>
           {err ? <Alert>{err}</Alert> : null}
-          {res ? <Alert tone="success">{t("camp.result", { sent: res.sent, n: res.recipients, failed: res.failed + res.skipped })}</Alert> : null}
-          <TextareaField label={t("camp.text")} value={text} onChange={(e) => setText(e.target.value)} maxLength={500} hint={t("camp.counter", { chars: text.trim().length, seg: text.trim() ? info.segments : 0 })} />
-          <Button disabled={busy || text.trim().length < 3} onClick={() => setConfirm(true)}>{t("camp.send")}</Button>
+          {res ? <div className="space-y-2 rounded-lg border border-slate-700 p-3 text-sm" aria-live="polite">
+            <p>{t("camp.result", { sent: res.sent, n: res.recipients, failed: res.failed + res.skipped })}</p>
+            {res.pending ? <p>{t("camp.pending", { n: res.pending })}</p> : null}
+            {res.unknown ? <p className="font-semibold text-amber-300">{t("camp.unknown", { n: res.unknown })}</p> : null}
+            <div className="flex flex-wrap gap-2">
+              {!finished ? <Button variant="secondary" disabled={busy} data-testid="campaign-refresh" onClick={() => refresh()}>{t("camp.refresh")}</Button> : null}
+              {!finished ? <Button variant="secondary" disabled={busy} data-testid="campaign-resume" onClick={send}>{t("camp.resume")}</Button> : null}
+              {!finished && res.pending > 0 ? <Button variant="secondary" disabled={busy} data-testid="campaign-cancel" onClick={cancelRemaining}>{t("camp.cancelRemaining")}</Button> : null}
+              {finished ? <Button variant="secondary" disabled={busy} data-testid="campaign-new" onClick={newCampaign}>{t("camp.new")}</Button> : null}
+            </div>
+          </div> : null}
+          <TextareaField data-testid="campaign-text" label={t("camp.text")} value={text} onChange={(e) => setText(e.target.value)} maxLength={500} disabled={!!active} hint={t("camp.counter", { chars: text.trim().length, seg: text.trim() ? info.segments : 0 })} />
+          {!active ? <Button disabled={busy || text.trim().length < 3} data-testid="campaign-send" onClick={() => setConfirm(true)}>{t("camp.send")}</Button> : null}
+          {active && !res ? <div className="flex gap-2"><Button variant="secondary" disabled={busy} data-testid="campaign-refresh" onClick={() => refresh()}>{t("camp.refresh")}</Button><Button variant="secondary" disabled={busy} data-testid="campaign-resume" onClick={send}>{t("camp.resume")}</Button></div> : null}
         </div>
       )}
       <ConfirmDialog open={confirm} danger={false} title={t("camp.confirmTitle")} body={t("camp.confirmBody", { seg: info.segments })} confirmLabel={t("camp.send")} busy={busy} onConfirm={send} onCancel={() => setConfirm(false)} />

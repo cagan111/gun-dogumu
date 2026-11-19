@@ -23,11 +23,11 @@ type Out = Response | unknown;
 const toResponse = (r: Out): Response => (r instanceof Response ? r : NextResponse.json(r));
 
 /** Panel route sarmalayıcısı: oturum (owner/staff) → ctx; hatalar JSON'a çevrilir. */
-export function panelRoute(fn: (ctx: PanelCtx, req: Request, params: Params) => Out) {
+export function panelRoute(fn: (ctx: PanelCtx, req: Request, params: Params) => Out, opts: { allowSuspendedWrite?: boolean } = {}) {
   return (req: Request, rc: RouteCtx): Promise<Response> =>
     handle(async () => {
       const ctx = await requireTenantUser();
-      if (!["GET", "HEAD", "OPTIONS"].includes(req.method)) assertWritable(ctx);
+      if (!["GET", "HEAD", "OPTIONS"].includes(req.method) && !opts.allowSuspendedWrite) assertWritable(ctx);
       return toResponse(await fn(ctx, req, await rc.params));
     });
 }

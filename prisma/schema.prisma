@@ -110,6 +110,8 @@ model Tenant {
   updatedAt          DateTime     @updatedAt
   lastLoginAt        DateTime?
 
+  campaigns    Campaign[]
+  campaignRecipients CampaignRecipient[]
   users        User[]
   staff        Staff[]
   services     Service[]
@@ -387,4 +389,41 @@ model LoginToken {
   createdAt DateTime          @default(now())
 
   @@index([userId, purpose])
+}
+
+
+model Campaign {
+  id String @id @default(cuid())
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  requestKey String
+  originalText String
+  body String
+  provider String
+  segmentsPerMessage Int
+  remainingReserved Int @default(0)
+  status String @default("active")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  recipients CampaignRecipient[]
+  @@unique([tenantId, requestKey])
+  @@unique([tenantId, id])
+  @@index([status, createdAt])
+}
+
+model CampaignRecipient {
+  id String @id @default(cuid())
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  campaignId String
+  campaign Campaign @relation(fields: [tenantId, campaignId], references: [tenantId, id], onDelete: Cascade)
+  customerId String
+  phone String
+  status String @default("pending")
+  attempts Int @default(0)
+  messageId String? @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([campaignId, customerId])
+  @@index([tenantId, campaignId, status])
 }

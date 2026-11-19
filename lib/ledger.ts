@@ -28,16 +28,26 @@ export async function lockTenant(tx: LedgerTx, tenantId: string): Promise<void> 
 }
 
 /** Güncel bakiye (delta toplamı). */
-export async function getBalance(db: TenantDb | LedgerTx): Promise<number> {
-  const r = await db.smsLedger.aggregate({ _sum: { delta: true } });
+export async function getBalance(db: TenantDb | LedgerTx, tenantId?: string): Promise<number> {
+  const r = await db.smsLedger.aggregate({ ...(tenantId ? { where: { tenantId } } : {}), _sum: { delta: true } });
   return r._sum.delta ?? 0;
+}
+
+/** Spendable credits exclude durable campaign holds; ledger snapshots remain raw delta sums. */
+export async function getAvailableBalance(db: TenantDb | LedgerTx, tenantId?: string): Promise<number> {
+  const [raw, reserved] = await Promise.all([
+    getBalance(db, tenantId),
+    db.campaign.aggregate({ where: { ...(tenantId ? { tenantId } : {}), remainingReserved: { gt: 0 } }, _sum: { remainingReserved: true } }),
+  ]);
+  return raw - (reserved._sum.remainingReserved ?? 0);
 }
 
 async function entry(tx: LedgerTx, tenantId: string, delta: number, reason: LedgerReason, opts: { messageId?: string | null; note?: string | null; allowNegative?: boolean }) {
   await lockTenant(tx, tenantId);
-  const balance = await getBalance(tx);
+  const balance = await getBalance(tx, tenantId);
+  const available = delta < 0 ? await getAvailableBalance(tx, tenantId) : balance;
   const after = balance + delta;
-  if (delta < 0 && applyDebit(balance, -delta, opts.allowNegative) === null) throw new InsufficientCreditsError(balance, -delta);
+  if (delta < 0 && applyDebit(available, -delta, opts.allowNegative) === null) throw new InsufficientCreditsError(available, -delta);
   const row = await tx.smsLedger.create({
     data: { delta, reason, balanceAfter: after, messageId: opts.messageId ?? null, note: opts.note ?? null } as never,
   });
