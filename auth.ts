@@ -1,10 +1,11 @@
+import { sessionTokenCurrent, revokeSessionToken } from "@/lib/session-revocation";
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { authenticateMagicToken, authenticatePassword } from "@/lib/login";
 import { clientIp } from "@/lib/http";
 import { getAuthSecret } from "@/lib/auth-secret";
 
-const asUser = (u: { id: string; email: string; name: string; role: "owner" | "staff" | "superadmin"; tenantId: string | null }) => u;
+const asUser = (u: { id: string; email: string; name: string; role: "owner" | "staff" | "superadmin"; tenantId: string | null; tokenVersion: number }) => u;
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   secret: getAuthSecret(),
@@ -31,16 +32,23 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       },
     }),
   ],
+  events: {
+    async signOut(message) {
+      if ("token" in message && message.token) await revokeSessionToken(message.token);
+    },
+  },
   callbacks: {
-    jwt({ token, user }) {
+    async jwt({ token, user }) {
       if (user) {
         token.userId = user.id;
+        token.tokenVersion = user.tokenVersion;
         token.role = user.role;
         token.tenantId = user.tenantId ?? null;
       }
-      return token;
+      return await sessionTokenCurrent(token) ? token : null;
     },
     session({ session, token }) {
+      session.user.tokenVersion = token.tokenVersion;
       session.user.id = token.userId ?? "";
       session.user.role = token.role ?? "staff";
       session.user.tenantId = token.tenantId ?? null;

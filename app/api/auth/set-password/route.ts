@@ -18,7 +18,7 @@ export function POST(req: Request) {
     if (!body.ok) return body.response;
     const userId = await consumeLoginToken(body.data.token, "set_password");
     if (!userId) throw new InvalidTokenError();
-    await prisma.user.update({ where: { id: userId }, data: { passwordHash: await hashPassword(body.data.password) } });
+    await prisma.user.update({ where: { id: userId }, data: { passwordHash: await hashPassword(body.data.password), tokenVersion: { increment: 1 } } });
     return NextResponse.json({ ok: true });
   });
 }

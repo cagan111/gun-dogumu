@@ -15,7 +15,7 @@ async function run(name,env){const child=start(process.execPath,[`tests/e2e/${na
  start(process.env.CADDY_EXECUTABLE_PATH||'/tmp/kr-caddy',['run','--config',path.join(dir,'Caddyfile'),'--adapter','caddyfile'],{PATH:process.env.PATH,CADDY_SITE:BASE,PROXY_SHARED_SECRET:secret,XDG_DATA_HOME:dir,XDG_CONFIG_HOME:dir},'caddy.log');await ready(`${BASE}/api/health`);
  await fetch(`${BASE}/api/health`,{headers:{authorization:'Bearer kr-auth-marker',cookie:'kr=kr-cookie-marker','x-kr-proxy-token':'kr-token-marker'}});
  const env={...process.env,BASE_URL:BASE};delete env.PROXY_SHARED_SECRET;
- for(const name of ['login-dos','otp-queue','booking','panel','flow','isolation'])await run(name,env);
+ for(const name of ['session-revocation','login-dos','otp-queue','booking','panel','flow','isolation'])await run(name,env);
  const logs=fs.readFileSync(path.join(dir,'caddy.log'),'utf8');for(const value of [secret,'kr-auth-marker','kr-cookie-marker','kr-token-marker'])assert.equal(logs.includes(value),false,'Proxy log leaked a credential marker');
  console.log('PASS real Caddy overwrites forged IP/token headers; private headers absent from access logs');
  }finally{stop()}})().catch(e=>{console.error(e.name,e.message,`private fixture directory: ${dir}`);process.exitCode=1});

@@ -207,6 +207,8 @@ Biçim: `- [ ] T-NNN | sahip: claude|codex|- | açıklama`. Başlamadan sahip ya
     - [x] T146B1: HTTP kayıtlı/kayıtsız aynı kuyruk makbuzu; OTP üretimi/gönderimi işçide, eski işler atlanır. CI344/build ve gerçek Caddy altı e2e geçti.
     - [x] T146B2: günlük telefon payı ve geçerli kodu koruma; CI349/build ve gerçek Caddy altı e2e geçti.
   - [ ] T146C: JWT tokenVersion/oturum iptali.
+    - [x] T146C1: DB sürüm doğrulaması, şifre değişimi+sağlıklı DB altında çıkış CAS; CI352/build/gerçek Caddy yedi e2e geçti.
+    - [ ] T146C2: Auth.js çıkış event DB hatasının güvenilir kullanıcı bildirimi ve kesinti testi (yerel çerez silinmesi server iptal kanıtı değildir).
   - [ ] T146D: Caddy HSTS/CSP/gövde sınırı ve URL içindeki tokenların log maskelemesi.
 
 - [ ] T-147 | sahip: codex | DÜŞÜK: personel müşteri araması joker kaçışı, NUL bayt/bozuk Bearer 500'leri, gövde boyut sınırı, .env.example SUPERADMIN_EMAIL, yedek dosya izinleri 0600, SMS başlığı doğrulaması

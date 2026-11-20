@@ -9,7 +9,7 @@ import { MINUTE, rateLimit } from "./ratelimit";
 export const BCRYPT_ROUNDS = 10;
 export const LOGIN_PER_IP = { limit: 30, windowMs: 15 * MINUTE };
 
-export interface SessionUser { id: string; email: string; name: string; role: Role; tenantId: string | null }
+export interface SessionUser { id: string; email: string; name: string; role: Role; tenantId: string | null; tokenVersion: number }
 
 // Kullanıcı yokken de bcrypt çalıştır (zamanlama farkıyla e-posta sızdırmamak için)
 const DUMMY_HASH = bcrypt.hashSync("dummy-password-for-timing", BCRYPT_ROUNDS);
@@ -20,8 +20,8 @@ export function normalizeEmail(e: string): string {
   return e.trim().toLowerCase();
 }
 
-const pick = (u: { id: string; email: string; name: string; role: Role; tenantId: string | null }): SessionUser => ({
-  id: u.id, email: u.email, name: u.name, role: u.role, tenantId: u.tenantId,
+const pick = (u: { id: string; email: string; name: string; role: Role; tenantId: string | null; tokenVersion: number }): SessionUser => ({
+  id: u.id, email: u.email, name: u.name, role: u.role, tenantId: u.tenantId, tokenVersion: u.tokenVersion,
 });
 
 /** IP attempt cap + durable failed email/IP cooldown; other clients cannot lock the account. */
