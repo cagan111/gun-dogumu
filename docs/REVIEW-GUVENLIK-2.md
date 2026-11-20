@@ -115,6 +115,8 @@ Not (staff yetkileri) [DOĞRULANDI]: ayarlar/hizmet/personel/izin/çalışma saa
 `curl -H "Authorization: Bearer %%%" /panel` → 500; `/api/panel/*` 401, `/giris` 200. next-auth `getToken` advisory'si (GHSA-xmf8-cvqr-rfgj). Fail-closed; yükseltmeyle kapanır (#1).
 
 ### 15. Üretimde bootstrap/seed riskleri [KOD]
+Güncelleme (20 Kasım, T147c1): aşağıdaki seed bulguları giderildi; production koşulsuz reddedilir, e2e-prefix silme kaldırıldı, .env.example SUPERADMIN_EMAIL boştur. Mevcut hesaplar otomatik silinmez; operatör eski demo hesaplarını ayrıca denetlemelidir. İlk yönetici bağlantısının yetkili log istisnası sürer.
+
 - `prisma/seed.ts:210-231`: `SEED_DEMO=true` üretimde yanlışlıkla açılırsa `admin@kibrisrandevu.test / admin12345` süper-admin'i (`upsert` ile her açılışta parola sıfırlanır) ve `demo12345` salon sahipleri oluşur. Ayrıca `seed.ts:218-220` slug'ı `e2e-` ile başlayan **tüm gerçek salonları siler** (SEED_DEMO açıkken). Düzeltme: seed'i `NODE_ENV=production` iken tamamen reddet; `e2e-` silmesini sınırla.
 - `lib/bootstrap.ts:36`: ilk kurulumda parola belirleme bağlantısı app loguna düz yazılıyor (brief'in belgelenmiş istisnası). Parola belirlenmediği sürece her açılışta yenisi üretilip loglanır; `.env.example:8` varsayılanı `SUPERADMIN_EMAIL=admin@example.com` — değiştirilmeden dağıtılırsa ve logları okuyan biri varsa süper-admin ele geçirilir. Canlı DB'de `admin@example.com` parolasız süper-admin satırı mevcut. Düzeltme: gerçek bir e-posta zorunlu kıl (örnek değerle başlamayı reddet), bağlantıyı yalnız stdout'a bir kez ve kısa TTL ile yaz.
 

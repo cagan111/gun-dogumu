@@ -40,7 +40,7 @@ Tenant, User (owner/staff/superadmin), Staff, Service (tr/en ad, süre, fiyat, t
 Zod (istemci+sunucu); rate limit (OTP 5/saat/telefon, giriş, randevu/IP); OTP hash'li 5 dk; CSRF, güvenli çerez, güvenlik başlıkları; tenant izolasyon testi (başka salon ID → 404); günlük pg_dump 14 gün + RUNBOOK geri yükleme; erişilebilirlik; Lighthouse mobil > 85.
 
 ## 6. Deploy
-`docker compose up -d --build`; Caddy (`APP_DOMAIN` → HTTPS, yoksa :80); ilk açılışta migration (+ `SEED_DEMO=true` ise seed); `SUPERADMIN_EMAIL` ile süper-admin, şifre bağlantısı loga; RUNBOOK (başlatma, güncelleme, yedek, log, SMS sağlayıcı değiştirme).
+`docker compose up -d --build`; Caddy (`APP_DOMAIN` → HTTPS, yoksa :80); ilk açılışta migration (üretimde demo seed yasak; `SEED_DEMO=true` başlangıcı durdurur); `SUPERADMIN_EMAIL` ile süper-admin, şifre bağlantısı loga; RUNBOOK (başlatma, güncelleme, yedek, log, SMS sağlayıcı değiştirme).
 
 ## 7. MVP bitti tanımı
 10 dk'da salon yayında; 4 adımda randevu, çift rezervasyon imkânsız; mesajlar mock'ta doğru zaman/tek sefer/doğru kredi; panel ekranları; süper-admin ödeme+kredi; TR/EN tam; testler yeşil + e2e (kayıt → hizmet → randevu → hatırlatma kuyrukta → iptal); `docker compose up` + RUNBOOK. → PROGRESS'e "MVP TAMAM".

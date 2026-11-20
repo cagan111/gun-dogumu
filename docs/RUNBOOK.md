@@ -31,7 +31,7 @@ Hedef: tek bir Ubuntu VPS üzerinde Docker Compose ile çalıştırmak. Servisle
    | `APP_DOMAIN` | `randevu.ornek.com` → Caddy otomatik HTTPS (Let's Encrypt) alır. **Boş bırakılırsa** yalnız HTTP, `:80` (deneme/IP ile erişim). `NEXTAUTH_URL` boşsa `https://APP_DOMAIN` (alan adı yoksa `http://localhost`) olur; IP ile HTTP denerken `NEXTAUTH_URL=http://SUNUCU_IP` yazın. |
    | `SUPERADMIN_EMAIL` | İlk süper-yönetici e-postası (bkz. 3). |
    | `SMS_PROVIDER`, `ALLOW_REAL_SMS` | Başlangıçta `mock` / `false` bırakın (bkz. 7). |
-   | `SEED_DEMO` | Üretimde **`false`**. `true` demo salonları ve bilinen şifreli (`admin12345`, `demo12345`) hesaplar yükler. |
+   | `SEED_DEMO` | Üretimde **`false`**. `true` verilirse seed güvenlik hatasıyla durur; üretim seed hiçbir durumda çalışmaz. |
 
    `.env` dosyasını asla git'e eklemeyin (`.gitignore`'dadır).
 
@@ -42,7 +42,7 @@ docker compose up -d --build
 docker compose ps          # app (healthy), worker, db (healthy), caddy, backup çalışmalı
 curl -s https://APP_DOMAIN/api/health     # {"ok":true,"db":"up",...}
 ```
-`app` açılırken sırayla `prisma migrate deploy` çalışır; demo verisi yalnız `SEED_DEMO=true` ise yüklenir. `worker` ve `caddy`, `app` sağlıklı olunca başlar. İlk derleme birkaç dakika sürer. Sunucu yeniden başlarsa servisler `restart: unless-stopped` ile kendiliğinden kalkar.
+`app` açılırken sırayla `prisma migrate deploy` çalışır; `SEED_DEMO=true` üretim başlangıcını güvenlik hatasıyla durdurur. Demo seed yalnız ayrı geliştirme/test veritabanında kullanılmalıdır. `worker` ve `caddy`, `app` sağlıklı olunca başlar. İlk derleme birkaç dakika sürer. Sunucu yeniden başlarsa servisler `restart: unless-stopped` ile kendiliğinden kalkar.
 
 ## 3. Süper-yönetici ilk şifre bağlantısı
 

@@ -13,7 +13,7 @@ pnpm run ci                # lint + typecheck + test
 ## Demo veri ve tarayıcı kontrolü
 
 ```bash
-pnpm db:seed                    # 2 demo salon + süper-admin (üretimde yalnız SEED_DEMO=true ile)
+pnpm db:seed                    # 2 demo salon + süper-admin (yalnız geliştirme/test; üretimde reddedilir)
 pnpm build && pnpm start        # NEXTAUTH_SECRET ve DATABASE_URL tanımlı olmalı
 node tests/e2e/booking.cjs      # 375×812 başsız Playwright: ana sayfa, giriş, kayıt, tam randevu + iptal, 404
 node tests/e2e/panel.cjs        # salon paneli (takvim, hizmet, müşteri, rapor, ayar) + süper-admin (ödeme, kredi, denetim); ödeme/hizmet ekler → önce `pnpm db:seed`

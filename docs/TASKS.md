@@ -13,7 +13,7 @@ Biçim: `- [ ] T-NNN | sahip: claude|codex|- | açıklama`. Başlamadan sahip ya
   - DB ping, 503 düşüş; pino.
 - [x] T-005 | sahip: claude | `config/brand.ts`, `config/plans.ts`, `.env.example`
 - [x] T-006 | sahip: claude | Seed: 2 salon × 3 personel, 6 hizmet, 30 randevu (`SEED_DEMO`)
-  - `prisma/seed.ts` (`pnpm db:seed`): 2 salon × 3 personel × 6 hizmet, 30 randevu/salon (çakışmasız, karışık durum), owner@<slug>.test/demo12345, SEED_DEMO/NODE_ENV korumalı süper-admin; tekrar çalıştırılabilir (demo içeriği sıfırlanıp bugüne göre üretilir).
+  - `prisma/seed.ts` (`pnpm db:seed`): 2 salon × 3 personel × 6 hizmet, 30 randevu/salon (çakışmasız, karışık durum), owner@<slug>.test/demo12345, yalnız geliştirme/test süper-admin (üretimde seed koşulsuz reddedilir); tekrar çalıştırılabilir (demo içeriği sıfırlanıp bugüne göre üretilir).
 - [x] T-007 | sahip: claude | Dockerfile + docker-compose (app, postgres, caddy, yedek) + Caddyfile
   - `Dockerfile` (deps/build/runner, standalone, kullanıcı `node`), `docker-entrypoint.sh` (migrate deploy → SEED_DEMO ise seed → web; `worker` rolü), `docker-compose.yml` (app, worker, db, caddy, backup), `Caddyfile` (`CADDY_SITE`); `lib/env.ts` açılış doğrulaması. Sandbox'ta daemon başlatılıp compose ayağa kalktı, `/api/health` Caddy :80 üzerinden 200 (bkz. DECISIONS).
 - [x] T-008 | sahip: claude | GitHub Actions CI (lint, typecheck, test, Postgres servisli)
@@ -218,6 +218,7 @@ Biçim: `- [ ] T-NNN | sahip: claude|codex|- | açıklama`. Başlamadan sahip ya
 - [ ] T-147 | sahip: codex | DÜŞÜK: personel müşteri araması joker kaçışı, NUL bayt/bozuk Bearer 500'leri, gövde boyut sınırı, .env.example SUPERADMIN_EMAIL, yedek dosya izinleri 0600, SMS başlığı doğrulaması
   - [x] T147a: custom JSON okuyucusu1MiB gerçekbayt sınırı/lockedbody400; CI362/build+on iki e2e geçti.
   - [x] BozukBearer: T140core0.41.3fix kaynak+HTTP307 ile yeniden doğrulandı; yeni middlewarefix yok.
+  - [x] T147c1: örnek bootstrap e-postası boş; üretim demo seed koşulsuz reddedilir, geniş e2e-prefix silme kaldırıldı.
   - [x] T147b: NUL input/URL/login ve literalLIKE müşteri araması; CI371/build+on üç e2e geçti.
   - [ ] Kalan: bootstrapörnekayarlar, yedek0600 ve SMSbaşlıkdoğrulaması.
   - [ ] REVIEW-GUVENLIK-2#11: ortak takvim/Staff.userId erişim kararı; jokerfix tam tarama önleme garantisi değildir.
