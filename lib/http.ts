@@ -83,13 +83,41 @@ export function parseWith<S extends ZodTypeAny>(schema: S, input: unknown): Pars
   };
 }
 
-/** İstek gövdesini JSON okuyup doğrular. */
+/** Match the Caddy perimeter cap, including direct/chunked requests. */
+export const MAX_JSON_BODY_BYTES = 1048576;
+const bodyTooLarge = () => ({ ok: false as const, response: jsonError(413, "payload_too_large", "İstek gövdesi çok büyük") });
+/** Read at most the allowed bytes before JSON decoding/schema validation. */
 export async function parseJson<S extends ZodTypeAny>(req: Request, schema: S): Promise<ParseResult<z.output<S>>> {
+  const declared = req.headers.get("content-length");
+  if (declared !== null) {
+    if (!/^\d+$/.test(declared)) return { ok: false, response: jsonError(400, "validation", "Geçersiz istek gövdesi") };
+    if (Number(declared) > MAX_JSON_BODY_BYTES) return bodyTooLarge();
+  }
+  let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
+  try { reader = req.body?.getReader(); }
+  catch { return { ok: false, response: jsonError(400, "validation", "Geçersiz JSON") }; }
+  if (!reader) return { ok: false, response: jsonError(400, "validation", "Geçersiz JSON") };
+  let bytes = new Uint8Array(4096), size = 0;
   let body: unknown;
   try {
-    body = await req.json();
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (size + value.byteLength > MAX_JSON_BODY_BYTES) {
+        void reader.cancel().catch(() => {});
+        return bodyTooLarge();
+      }
+      if (size + value.byteLength > bytes.length) {
+        const grown = new Uint8Array(Math.min(MAX_JSON_BODY_BYTES, Math.max(bytes.length * 2, size + value.byteLength)));
+        grown.set(bytes.subarray(0, size)); bytes = grown;
+      }
+      bytes.set(value, size); size += value.byteLength;
+    }
+    body = JSON.parse(new TextDecoder().decode(bytes.subarray(0, size)));
   } catch {
     return { ok: false, response: jsonError(400, "validation", "Geçersiz JSON") };
+  } finally {
+    reader.releaseLock();
   }
   return parseWith(schema, body);
 }

@@ -13,3 +13,7 @@ Yerel gerçek proxy testi: derlenmiş uygulama, pnpm helper, Chromium ve resmi C
 
 ## HTTPS ve gövde sınırı (T146D2a)
 Caddy TLS bağlantılarında bir yıllık HSTS başlığı gönderir; HTTP veya sahte X-Forwarded-Proto bunu açmaz. includeSubDomains/preload yoktur. APP_DOMAIN/DNS ve güvenilir sertifika kurulumu mevcut RUNBOOK'a göre operatörün işidir; bu değişiklik üretim yayını yapmaz. Site handler'ı istek gövdesini1048576baytla sınırlar; tam sınır geçer, fazlası Content-Length/chunked fark etmeden413 alır. Yeni büyük upload uçları eklenirse açıkça ayrı değerlendirilmelidir. Doğrudan Next portu bu Caddy sınırını uygulamaz; üretimde appportu yayımlanmamalıdır. CSP, HTML isteklerinde Next middleware tarafından üretilen istek başına nonce ile uygulanır (T146D2b); ayrıntı için CSP.md. HTML nonce üretimini atlayan cache veya response CSP başlığını kaldıran proxy kuralı eklenmemelidir. YerelTLS testi selfsignedfixture ile response/protokolü doğrular; gerçek alan adı CA zinciri doğrulaması değildir.
+
+
+## Custom JSON gövde okuyucusu (T147a)
+parseJson, Caddy'ye ek olarak doğrudan Next customJSON uçlarında1048576bayt sınırı uygular. Gerçek streamboyutu sayılır, uzunluk beyanı tekbaşına güvenilir değildir;413payload_too_large döner. Bu helper Auth.js'in kendi formparser'ını kapsamaz; Caddy perimeter ve yayımlanmayan appportu kuralı sürer. Limit gövde byte sayısıdır, bütün process belleği veya transporttimeout garantisi değildir.

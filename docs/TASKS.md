@@ -216,6 +216,9 @@ Biçim: `- [ ] T-NNN | sahip: claude|codex|- | açıklama`. Başlamadan sahip ya
       - [x] T146D2b: nonce CSP/Next renderer; CI357/build ve gerçek Caddy on bir e2e geçti. T146 kabul listesi tamam, T147 ayrı açık.
 
 - [ ] T-147 | sahip: codex | DÜŞÜK: personel müşteri araması joker kaçışı, NUL bayt/bozuk Bearer 500'leri, gövde boyut sınırı, .env.example SUPERADMIN_EMAIL, yedek dosya izinleri 0600, SMS başlığı doğrulaması
+  - [x] T147a: custom JSON okuyucusu1MiB gerçekbayt sınırı/lockedbody400; CI362/build+on iki e2e geçti.
+  - [x] BozukBearer: T140core0.41.3fix kaynak+HTTP307 ile yeniden doğrulandı; yeni middlewarefix yok.
+  - [ ] Kalan: NUL/jokerarama, bootstrapörnekayarlar, yedek0600 ve SMSbaşlıkdoğrulaması.
 
 - T114 (18Kasım): ödemeyle aynı tenant kilidi altında yeniden okuma; durum ve uyarı/audit aynı transaction. Yeni ortamda önce2regresyonFAIL, sonra tamCI257/build+panel/flow/isolationPASS. Luna karşılıklı inceleme, önemli hata yok.
 
