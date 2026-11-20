@@ -33,3 +33,5 @@ Ortam değişkenleri: `BASE_URL` (varsayılan `http://localhost:3000`), `SLUG` (
 Tenant kapsamlı veri erişiminin desteklediği işlemler ve güvenilir SQL yardımcıları: [TENANT-BOUNDARY](docs/TENANT-BOUNDARY.md).
 
 Doğrulanmış pazarlama tercihi ve eski izinlerin geçişi: [MARKETING-CONSENT](docs/MARKETING-CONSENT.md).
+
+Docker/Caddy kurulumu için oturum sırrından farklı, en az 32 karakter rastgele `PROXY_SHARED_SECRET` doldurulmalıdır. Compose proxy güvenini açar; doğrudan başlatmada güven varsayılan kapalıdır. Ayrıntı: [PROXY-TRUST](docs/PROXY-TRUST.md).

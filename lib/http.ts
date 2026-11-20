@@ -1,3 +1,5 @@
+import { isIP } from "node:net";
+import { safeEqualHex } from "./secret";
 import { NextResponse } from "next/server";
 import type { ZodTypeAny, z } from "zod";
 import { BookingError } from "./booking";
@@ -92,11 +94,12 @@ export async function parseJson<S extends ZodTypeAny>(req: Request, schema: S): 
   return parseWith(schema, body);
 }
 
-/** İstemci IP'si (Caddy/proxy arkasında x-forwarded-for'un ilk değeri). */
+/** Only the authenticated reverse proxy may assert a client IP. Direct requests share a safe fallback. */
 export function clientIp(req: Request): string {
-  const xff = req.headers.get("x-forwarded-for");
-  const first = xff?.split(",")[0]?.trim();
-  return first || req.headers.get("x-real-ip") || "unknown";
+  const secret = process.env.PROXY_SHARED_SECRET;
+  if (process.env.TRUST_PROXY !== "true" || !secret || secret.length < 32 || !safeEqualHex(req.headers.get("x-kr-proxy-token") ?? "", secret)) return "unknown";
+  const ip = req.headers.get("x-real-ip")?.trim();
+  return ip && isIP(ip) ? ip.toLowerCase() : "unknown";
 }
 
 /** Hız sınırını uygular; aşılırsa RateLimitedError fırlatır. */

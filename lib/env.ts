@@ -7,6 +7,9 @@ export function envProblems(env: Record<string, string | undefined> = process.en
   if (!env.DATABASE_URL) out.push({ key: "DATABASE_URL", message: "tanımlı değil" });
   if (!secret) out.push({ key: "NEXTAUTH_SECRET", message: "tanımlı değil (üretir: openssl rand -base64 32)" });
   else if (secret.length < 16) out.push({ key: "NEXTAUTH_SECRET", message: "en az 16 karakter olmalı (önerilen: openssl rand -base64 32)" });
+  if (env.TRUST_PROXY && !["true", "false"].includes(env.TRUST_PROXY)) out.push({ key: "TRUST_PROXY", message: "true veya false olmalı" });
+  if (env.TRUST_PROXY === "true" && (!env.PROXY_SHARED_SECRET || env.PROXY_SHARED_SECRET.length < 32)) out.push({ key: "PROXY_SHARED_SECRET", message: "proxy güveni açıkken en az 32 karakter gerekli" });
+  if (env.TRUST_PROXY === "true" && env.PROXY_SHARED_SECRET === secret) out.push({ key: "PROXY_SHARED_SECRET", message: "oturum sırrından farklı olmalı" });
   return out;
 }
 

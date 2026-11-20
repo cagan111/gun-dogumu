@@ -17,6 +17,8 @@ services:
     env_file: .env
     environment:
       <<: *app-env
+      TRUST_PROXY: "true"
+      PROXY_SHARED_SECRET: ${PROXY_SHARED_SECRET:?ayrı en az32karakter proxy sırrı gerekli}
     depends_on:
       db: { condition: service_healthy }
     expose: ["3000"]
@@ -30,6 +32,8 @@ services:
     environment:
       <<: *app-env
       SEED_DEMO: "false"
+      TRUST_PROXY: "false"
+      PROXY_SHARED_SECRET: ""
     depends_on:
       db: { condition: service_healthy }
       app: { condition: service_healthy }
@@ -56,6 +60,7 @@ services:
     environment:
       # APP_DOMAIN doluysa otomatik HTTPS, boşsa :80 (HTTP)
       CADDY_SITE: ${APP_DOMAIN:-:80}
+      PROXY_SHARED_SECRET: ${PROXY_SHARED_SECRET:?ayrı proxy sırrı gerekli}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data

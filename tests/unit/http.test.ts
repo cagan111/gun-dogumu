@@ -48,8 +48,8 @@ describe("parseWith", () => {
 });
 
 describe("clientIp", () => {
-  it("x-forwarded-for ilk değeri", () => {
-    expect(clientIp(new Request("http://x", { headers: { "x-forwarded-for": "1.2.3.4, 5.6.7.8" } }))).toBe("1.2.3.4");
+  it("güven kapalıyken x-forwarded-for yok sayılır", () => {
+    expect(clientIp(new Request("http://x", { headers: { "x-forwarded-for": "1.2.3.4, 5.6.7.8" } }))).toBe("unknown");
     expect(clientIp(new Request("http://x"))).toBe("unknown");
   });
 });

@@ -202,6 +202,11 @@ Biçim: `- [ ] T-NNN | sahip: claude|codex|- | açıklama`. Başlamadan sahip ya
 - [x] T-145 | sahip: codex | ORTA: giriş kilidi yalnız başarısız denemeleri saysın (DoS önleme)
   - E-posta genelindeki kilit kaldırıldı; DB e-posta+IP failure8/15dk, başarıreset/yarışkoruması ve IP30 sınırı. CI335/build/login-dos+booking/panel/flow/isolation geçti.
 - [ ] T-146 | sahip: codex | ORTA: güvenilir proxy IP'si (TRUST_PROXY), OTP zamanlama eşitleme, salon OTP kotasının tek müşteriyi kilitlememesi, JWT iptali (sürüm/tokenVersion), Caddy HSTS+CSP+gövde sınırı, erişim logunda token maskeleme
+  - [x] T146A: proxy/IP güven sınırı; default ignore, ayrı paylaşımlı sır, Caddy overwrite/log header filtresi, CI339/build ve gerçek Caddy+beş e2e geçti.
+  - [ ] T146B: OTP zamanlama eşitleme ve salon OTP kotasında müşteri adaleti.
+  - [ ] T146C: JWT tokenVersion/oturum iptali.
+  - [ ] T146D: Caddy HSTS/CSP/gövde sınırı ve URL içindeki tokenların log maskelemesi.
+
 - [ ] T-147 | sahip: codex | DÜŞÜK: personel müşteri araması joker kaçışı, NUL bayt/bozuk Bearer 500'leri, gövde boyut sınırı, .env.example SUPERADMIN_EMAIL, yedek dosya izinleri 0600, SMS başlığı doğrulaması
 
 - T114 (18Kasım): ödemeyle aynı tenant kilidi altında yeniden okuma; durum ve uyarı/audit aynı transaction. Yeni ortamda önce2regresyonFAIL, sonra tamCI257/build+panel/flow/isolationPASS. Luna karşılıklı inceleme, önemli hata yok.
