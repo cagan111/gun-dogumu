@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { clientIp, enforceRateLimit, handle, parseJson } from "@/lib/http";
-import { requestOtp } from "@/lib/otp";
+import { enqueueOtpRequest } from "@/lib/otp";
 import { resolveTenant } from "@/lib/public";
 import { HOUR } from "@/lib/ratelimit";
 
@@ -15,6 +15,6 @@ export function POST(req: Request, { params }: { params: Promise<{ slug: string 
     const body = await parseJson(req, schema);
     if (!body.ok) return body.response;
     const t = await resolveTenant((await params).slug);
-    return NextResponse.json(await requestOtp(t.id, body.data.phone));
+    return NextResponse.json(await enqueueOtpRequest(t.id, body.data.phone));
   });
 }

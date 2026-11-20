@@ -1,3 +1,4 @@
+import { requestOtp, OTP_RESEND_WAIT_MS } from "../lib/otp";
 /** İş işleyicileri (pg-boss'tan bağımsız, doğrudan çağrılabilir/test edilebilir). */
 import { prisma } from "../lib/db";
 import { logger } from "../lib/logger";
@@ -113,4 +114,15 @@ export async function handleCampaignRecovery(data: { tenantId?: string; campaign
     if (!(await prisma.campaign.findFirst({ where: { id: data.campaignId, tenantId: data.tenantId }, select: { id: true } }))) return { checked: 0 };
     await processCampaign(data.tenantId, data.campaignId, new Date(), undefined, { maxRecipients: 5 }); return { checked: 1 }; }
   return recoverCampaigns();
+}
+
+/** A stale request must not replace a newer customer's OTP after a worker outage. */
+export async function handleOtpRequest(data: { tenantId: string; phone: string; requestedAt: string }, opts: { now?: Date; send?: NonNullable<Parameters<typeof requestOtp>[2]>["send"] } = {}) {
+  const now = opts.now ?? new Date();
+  const requestedAt = new Date(data.requestedAt);
+  if (!Number.isFinite(+requestedAt) || +requestedAt > +now + 5000 || +now - +requestedAt >= OTP_RESEND_WAIT_MS) return { status: "skipped" };
+  const tenant = await prisma.tenant.findUnique({ where: { id: data.tenantId }, select: { status: true } });
+  if (!tenant || tenant.status === "suspended") return { status: "skipped" };
+  await requestOtp(data.tenantId, data.phone, { now, send: opts.send });
+  return { status: "processed" };
 }

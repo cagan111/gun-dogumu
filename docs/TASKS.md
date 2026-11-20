@@ -204,6 +204,8 @@ Biçim: `- [ ] T-NNN | sahip: claude|codex|- | açıklama`. Başlamadan sahip ya
 - [ ] T-146 | sahip: codex | ORTA: güvenilir proxy IP'si (TRUST_PROXY), OTP zamanlama eşitleme, salon OTP kotasının tek müşteriyi kilitlememesi, JWT iptali (sürüm/tokenVersion), Caddy HSTS+CSP+gövde sınırı, erişim logunda token maskeleme
   - [x] T146A: proxy/IP güven sınırı; default ignore, ayrı paylaşımlı sır, Caddy overwrite/log header filtresi, CI339/build ve gerçek Caddy+beş e2e geçti.
   - [ ] T146B: OTP zamanlama eşitleme ve salon OTP kotasında müşteri adaleti.
+    - [x] T146B1: HTTP kayıtlı/kayıtsız aynı kuyruk makbuzu; OTP üretimi/gönderimi işçide, eski işler atlanır. CI344/build ve gerçek Caddy altı e2e geçti.
+    - [ ] T146B2: kota adaleti ve geçerli müşteri kodunun kötüye kullanımla değiştirilmesi.
   - [ ] T146C: JWT tokenVersion/oturum iptali.
   - [ ] T146D: Caddy HSTS/CSP/gövde sınırı ve URL içindeki tokenların log maskelemesi.
 

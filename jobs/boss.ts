@@ -38,7 +38,8 @@ export class PgBossQueue implements JobQueue {
     return boss.send(name, data, {
       ...(opts.startAfter ? { startAfter: opts.startAfter } : {}),
       ...(opts.singletonKey ? { singletonKey: opts.singletonKey } : {}),
-      retryLimit: 3, retryDelay: 60, retryBackoff: true,
+      retryLimit: name === JOB.otpRequest ? 0 : 3, retryDelay: 60, retryBackoff: true,
+      ...(name === JOB.otpRequest ? { expireInSeconds: 60, retentionSeconds: 60 } : {}),
     });
   }
 }

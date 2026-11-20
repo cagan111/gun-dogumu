@@ -1,6 +1,7 @@
 import { lockSmsRecipient as lockRecipientBudget, smsRecipientUsage } from "../db";
 /** Durable anonymous-SMS spend guard; reservations are never replenished by refunds. */
-import { parsePhoneNumberFromString } from "libphonenumber-js";
+import { parsePhoneNumberFromString } from "libphonenumber-js/core";
+import phoneMetadata from "libphonenumber-js/metadata.min.json";
 import type { LedgerTx } from "../ledger";
 export const SMS_PHONE_DAILY_SEGMENTS = 6;
 export class SmsPolicyBlocked extends Error {
@@ -13,7 +14,7 @@ export async function lockSmsRecipient(tx: LedgerTx, phone: string) {
 /** Both global-phone and tenant locks are held. This trusted system query reveals no data to tenants. */
 export async function checkSmsPolicy(tx: LedgerTx, tenantId: string, phone: string, segments: number, now: Date) {
   const tenant = await tx.tenant.findUnique({ where: { id: tenantId }, select: { smsAllowedCallingCodes: true, smsDailySegmentLimit: true } });
-  const code = parsePhoneNumberFromString(phone)?.countryCallingCode;
+  const code = parsePhoneNumberFromString(phone, phoneMetadata)?.countryCallingCode;
   if (!tenant || !code || !tenant.smsAllowedCallingCodes.includes(code)) throw new SmsPolicyBlocked("sms_country_policy");
   const start = new Date(now); start.setUTCHours(0, 0, 0, 0);
   const end = new Date(+start + 86_400_000);

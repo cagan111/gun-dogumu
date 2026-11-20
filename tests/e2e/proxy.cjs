@@ -4,18 +4,18 @@ const {spawn}=require('node:child_process');const assert=require('node:assert/st
 try{process.loadEnvFile('.env')}catch{ /* optional local env */ }
 const dir=fs.mkdtempSync(path.join(os.tmpdir(),'kr-proxy-')),secret=crypto.randomBytes(32).toString('hex');
 const BASE='http://localhost:3400',children=[];
-function stop(){for(const child of children){if(child.exitCode!==null||child.signalCode!==null)continue;try{process.kill(-child.pid,'SIGTERM')}catch{ /* exited */ }}}
+function stop(){for(const child of children){try{process.kill(-child.pid,'SIGTERM')}catch{ /* exited */ }try{process.kill(-child.pid,'SIGKILL')}catch{ /* exited */ }}}
 function start(cmd,args,env,log){const fd=fs.openSync(path.join(dir,log),'a',0o600);const child=spawn(cmd,args,{env,detached:true,stdio:['ignore',fd,fd]});children.push(child);child.on('error',()=>{});fs.closeSync(fd);return child}
 async function ready(url){const until=Date.now()+30000;while(Date.now()<until){try{if((await fetch(url)).ok)return}catch{}await new Promise(r=>setTimeout(r,200))}throw new Error('Local test server not ready')}
 async function run(name,env){const child=start(process.execPath,[`tests/e2e/${name}.cjs`],env,`${name}.log`);const code=await new Promise(r=>child.on('exit',r));assert.equal(code,0,`Local ${name} test failed; inspect private test log`);console.log(`PASS ${name}`)}
 (async()=>{try{
  const appEnv={...process.env,TRUST_PROXY:'true',PROXY_SHARED_SECRET:secret,AUTH_URL:BASE,NEXTAUTH_URL:BASE,SMS_PROVIDER:'mock',ALLOW_REAL_SMS:'false',JOBS_QUEUE:'pgboss'};
- start(process.env.KR_PNPM||'/tmp/kr-pnpm',['exec','next','start','-H','127.0.0.1','-p','3401'],appEnv,'app.log');await ready('http://127.0.0.1:3401/api/health');
+ start(process.execPath,['node_modules/next/dist/bin/next','start','-H','127.0.0.1','-p','3401'],appEnv,'app.log');await ready('http://127.0.0.1:3401/api/health');
  const config=fs.readFileSync('Caddyfile','utf8').replace('app:3000','127.0.0.1:3401').replace('{$CADDY_SITE::80} {','{$CADDY_SITE::80} {\n bind 127.0.0.1');fs.writeFileSync(path.join(dir,'Caddyfile'),config,{mode:0o600});
  start(process.env.CADDY_EXECUTABLE_PATH||'/tmp/kr-caddy',['run','--config',path.join(dir,'Caddyfile'),'--adapter','caddyfile'],{PATH:process.env.PATH,CADDY_SITE:BASE,PROXY_SHARED_SECRET:secret,XDG_DATA_HOME:dir,XDG_CONFIG_HOME:dir},'caddy.log');await ready(`${BASE}/api/health`);
  await fetch(`${BASE}/api/health`,{headers:{authorization:'Bearer kr-auth-marker',cookie:'kr=kr-cookie-marker','x-kr-proxy-token':'kr-token-marker'}});
  const env={...process.env,BASE_URL:BASE};delete env.PROXY_SHARED_SECRET;
- for(const name of ['login-dos','booking','panel','flow','isolation'])await run(name,env);
+ for(const name of ['login-dos','otp-queue','booking','panel','flow','isolation'])await run(name,env);
  const logs=fs.readFileSync(path.join(dir,'caddy.log'),'utf8');for(const value of [secret,'kr-auth-marker','kr-cookie-marker','kr-token-marker'])assert.equal(logs.includes(value),false,'Proxy log leaked a credential marker');
  console.log('PASS real Caddy overwrites forged IP/token headers; private headers absent from access logs');
  }finally{stop()}})().catch(e=>{console.error(e.name,e.message,`private fixture directory: ${dir}`);process.exitCode=1});

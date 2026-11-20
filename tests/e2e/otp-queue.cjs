@@ -1,0 +1,14 @@
+/** HTTP OTP request never executes provider delivery; real pg-boss receipt + worker handler. */
+const assert=require('node:assert/strict');const {execFileSync}=require('node:child_process');const {PrismaClient}=require('@prisma/client');const {chromium}=require('playwright');
+try{process.loadEnvFile('.env')}catch{ /* optional env */ }
+const db=new PrismaClient(),BASE=process.env.BASE_URL||'http://localhost:3000';
+(async()=>{let tenant,browser;try{
+ tenant=await db.tenant.create({data:{slug:`otp-queue-${crypto.randomUUID()}`,name:'Fixture',city:'Girne'}});const suffix=String(require('node:crypto').randomInt(1000000,9999999));const known='+90533'+suffix,unknown='+90542'+suffix;await db.customer.create({data:{tenantId:tenant.id,phone:known,name:'Fixture'}});await db.smsLedger.create({data:{tenantId:tenant.id,delta:100,balanceAfter:100,reason:'package_purchase'}});
+ browser=await chromium.launch({executablePath:process.env.CHROMIUM_EXECUTABLE_PATH||undefined});const ctx=await browser.newContext();
+ for(const phone of [known,unknown]){const r=await ctx.request.post(`${BASE}/api/public/${tenant.slug}/otp/request`,{data:{phone}});assert.equal(r.status(),200);assert.deepEqual(await r.json(),{sent:true})}
+ assert.equal(await db.otp.count({where:{tenantId:tenant.id}}),0);assert.equal(await db.messageLog.count({where:{tenantId:tenant.id}}),0);
+ const rows=await db.$queryRaw`SELECT data FROM pgboss.job WHERE name='request-otp' AND data->>'tenantId'=${tenant.id}`;assert.equal(rows.length,2);for(const row of rows)assert.deepEqual(Object.keys(row.data).sort(),['phone','requestedAt','tenantId']);
+ for(const row of rows){const code=`import {handleOtpRequest} from './jobs/handlers';try{process.loadEnvFile('.env')}catch{}handleOtpRequest(${JSON.stringify(row.data)}).then(()=>process.exit(0)).catch(()=>process.exit(1));`;execFileSync('/tmp/kr-pnpm',['exec','tsx','-e',code],{env:{...process.env,NODE_ENV:'production',SMS_PROVIDER:'mock',ALLOW_REAL_SMS:'false',JOBS_QUEUE:'none'},stdio:'pipe'})}
+ assert.equal(await db.otp.count({where:{tenantId:tenant.id,phone:known}}),1);assert.equal(await db.otp.count({where:{tenantId:tenant.id,phone:unknown}}),0);const logs=await db.messageLog.findMany({where:{tenantId:tenant.id,template:'otp'}});assert.equal(logs.length,1);assert.equal(logs[0].status,'sent');assert.ok(logs[0].content.includes('******'));
+ console.log('PASS identical registered/unknown HTTP receipts and queued schema, zero synchronous OTP/provider work, worker-only masked delivery');
+}finally{await browser?.close();if(tenant){await db.$executeRaw`DELETE FROM pgboss.job WHERE name='request-otp' AND data->>'tenantId'=${tenant.id}`;await db.tenant.deleteMany({where:{id:tenant.id}})}await db.$disconnect()}})().catch(e=>{console.error(e.name,String(e.stack).split('\n').filter(x=>x.includes('otp-queue.cjs')).join('\n'));process.exitCode=1});

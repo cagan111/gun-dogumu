@@ -32,8 +32,9 @@ describe.skipIf(!HAS_DB)("OTP kötüye kullanım koruması (gerçek PostgreSQL)"
     const unknown = await otp.requestOtp(s.tenantId, "+905331234568", { now, send });
     expect(known).toEqual({ sent: true }); expect(unknown).toEqual(known);
   });
-  it("gerçek OTP HTTP ucu sağlayıcı hatasında kayıtlı/kayıtsız için aynı yanıtı verir", async () => {
+  it("gerçek OTP HTTP ucu kayıtlı/kayıtsız numarayı sağlayıcıya dokunmadan aynı kuyruğa alır", async () => {
     const s = await salon();
+    const { MemoryQueue, setQueue } = await import("@/jobs/queue"); const queue = new MemoryQueue(); setQueue(queue);
     const route = await import("@/app/api/public/[slug]/otp/request/route");
     const provider = await import("@/lib/messaging/send");
     const spy = vi.spyOn(provider, "sendMessage").mockRejectedValue(new Error("test sağlayıcı hatası"));
@@ -44,7 +45,9 @@ describe.skipIf(!HAS_DB)("OTP kötüye kullanım koruması (gerçek PostgreSQL)"
       const known = await request(s.phone); const unknown = await request("+905331234568");
       expect(known.status).toBe(200); expect(unknown.status).toBe(200);
       expect(await known.json()).toEqual(await unknown.json());
-    } finally { spy.mockRestore(); }
+      expect(queue.jobs).toHaveLength(2); expect(spy).not.toHaveBeenCalled();
+      expect(await db.prisma.otp.count({ where: { tenantId: s.tenantId } })).toBe(0);
+    } finally { spy.mockRestore(); setQueue(null); }
   });
   it("migration öncesi 0 rezervasyonlu OTP kayıtları da günlük tavana sayılır", async () => {
     const s = await salon(); let calls = 0;

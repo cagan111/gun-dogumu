@@ -1,4 +1,5 @@
-import { parsePhoneNumberFromString, type CountryCode } from "libphonenumber-js";
+import { parsePhoneNumberFromString, type CountryCode } from "libphonenumber-js/core";
+import phoneMetadata from "libphonenumber-js/metadata.min.json";
 import { z } from "zod";
 
 export const DEFAULT_COUNTRY: CountryCode = "TR";
@@ -9,7 +10,7 @@ export function normalizePhone(input: string, defaultCountry: CountryCode = DEFA
   if (!raw || raw.length > 32) return null;
   if (raw.startsWith("00")) raw = "+" + raw.slice(2); // 0090… → +90…
   if (!/^[+\d\s().-]+$/.test(raw)) return null; // harf vb. reddedilir
-  const p = parsePhoneNumberFromString(raw, defaultCountry);
+  const p = parsePhoneNumberFromString(raw, defaultCountry, phoneMetadata);
   if (!p || !p.isValid()) return null;
   return p.number;
 }

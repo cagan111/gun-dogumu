@@ -1,3 +1,4 @@
+import {getQueue, JOB} from "../jobs/queue";
 import { randomInt } from "node:crypto";
 import { prisma, withTenant } from "./db";
 import { OtpError, RateLimitedError } from "./errors";
@@ -74,6 +75,21 @@ export async function sendOtp(tenantId: string, phone: string, code: string): Pr
 }
 
 // ---- servis ----
+
+/** HTTP request path: same durable enqueue for registered/unknown phones, never waits for a provider. */
+export async function enqueueOtpRequest(tenantId: string, rawPhone: string): Promise<{ sent: true }> {
+  const phone = normalizePhone(rawPhone);
+  if (!phone) throw new InvalidPhoneError();
+  const rl = await rateLimit(`otp:http:${tenantId}:${phone}`, OTP_REQUESTS_PER_HOUR, HOUR);
+  if (!rl.ok) throw new RateLimitedError(rl.retryAfterSec);
+  try {
+    const id = await (await getQueue()).enqueue(JOB.otpRequest, { tenantId, phone, requestedAt: new Date().toISOString() });
+    if (!id) throw new Error("queue unavailable");
+  } catch {
+    throw new OtpDeliveryError();
+  }
+  return { sent: true };
+}
 
 /** OTP ister. Müşteri yoksa da aynı yanıt verilir (numara sızdırılmaz) ama kod üretilmez/gönderilmez. */
 export async function requestOtp(

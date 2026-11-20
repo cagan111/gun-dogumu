@@ -1,5 +1,6 @@
 /** İş kuyruğu adaptörü. Üretimde pg-boss; testlerde MemoryQueue; JOBS_QUEUE=none ile hiçbir şey yapmaz. */
 export const JOB = {
+  otpRequest: "request-otp",
   campaign: "campaign-recovery",
   confirmation: "send-confirmation",
   reminder: "send-reminder",

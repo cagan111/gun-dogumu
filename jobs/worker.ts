@@ -17,6 +17,7 @@ async function main() {
       catch (err) { logger.error({ err, job: name }, "iş hatası"); throw err; }
     }
   };
+  await boss.work(JOB.otpRequest, wrap(JOB.otpRequest, (d: Parameters<typeof h.handleOtpRequest>[0]) => h.handleOtpRequest(d)));
   await boss.work(JOB.confirmation, wrap(JOB.confirmation, (d: Parameters<typeof h.handleSendConfirmation>[0]) => h.handleSendConfirmation(d)));
   await boss.work(JOB.reminder, wrap(JOB.reminder, (d: Parameters<typeof h.handleSendReminder>[0]) => h.handleSendReminder(d)));
   await boss.work(JOB.notice, wrap(JOB.notice, (d: Parameters<typeof h.handleSendNotice>[0]) => h.handleSendNotice(d)));
