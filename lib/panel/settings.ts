@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { skipPendingReviewInvitations } from "../messaging/review-intent";
 import { isGoogleReviewUrl } from "../review-link";
 import { writeAudit } from "../audit";
 import { approvedSmsSender } from "../messaging/sender-policy";
@@ -78,6 +79,8 @@ export async function updateSettings(ctx: PanelCtx, input: SettingsInput) {
       const url = data.reviewInviteUrl !== undefined ? data.reviewInviteUrl : current.reviewInviteUrl;
       if (enabled && (!url || !isGoogleReviewUrl(url))) throw new ValidationError("Yorum daveti için geçerli Google yorum bağlantısı gerekli", "reviewInviteUrl");
       await tx.tenant.update({ where: { id: ctx.tenantId }, data });
+      if (!enabled) await skipPendingReviewInvitations(tx, {}, "settings_disabled");
+      else if (url !== current.reviewInviteUrl) await skipPendingReviewInvitations(tx, {}, "url_changed");
       await writeAudit(tx, { actorId: ctx.user.id, actorRole: ctx.user.role, tenantId: ctx.tenantId, action: "settings.update", details: { fields: Object.keys(data) } });
     });
   } else {

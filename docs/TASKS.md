@@ -151,6 +151,8 @@ Biçim: `- [ ] T-NNN | sahip: claude|codex|- | açıklama`. Başlamadan sahip ya
 - [ ] T-105 | sahip: codex | Google yorum isteği SMS'i (varsayılan kapalı)
   - [x] T105a: default-off API ayarları/Google direct URL/tenant-lock invariant+audit/ilk completedAt; CI402/build/gerçek Caddy15e2e.
   - [ ] T105b: kalıcı tek davet intent/worker, gecikme/sessiz saat ve current consent/status/URL/kota/startDispatch kontrolleri.
+    - [x] T105b1: ilk uygun completion ile atomik tek snapshot/2saatdue/24saatbekleme metadata; pendingreopen/optout/configchange kalıcıskip; CI407/build/Caddy15e2e.
+    - [ ] T105b2: worker/recovery/claim/startDispatch currentgates, expiry/quiet, SMSbudget ve T112 tekrefund/unknownnoReplay.
   - [ ] T105c: worker hazırken panel TR+EN açık opt-in/URL/maliyet akışı.
 - [ ] T-106 | sahip: codex | Panel PWA + yeni randevu bildirimi
 

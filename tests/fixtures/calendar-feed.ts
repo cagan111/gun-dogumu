@@ -26,3 +26,15 @@ export async function setCalendarFixtureStatus(f: { tenantId: string; email: str
   if (!f.email.startsWith("ical-") || !await prisma.user.findFirst({ where: { tenantId: f.tenantId, email: f.email, role: "owner" } })) throw new Error("fixture mismatch");
   await prisma.tenant.update({ where: { id: f.tenantId }, data: { status } });
 }
+
+export async function setCalendarFixtureConsent(f: { tenantId: string; email: string; appointmentId: string }) {
+  if (!f.email.startsWith("ical-") || !await prisma.user.findFirst({ where: { tenantId: f.tenantId, email: f.email, role: "owner" } })) throw new Error("fixture mismatch");
+  const appointment = await prisma.appointment.findFirstOrThrow({ where: { id: f.appointmentId, tenantId: f.tenantId }, select: { customer: { select: { phone: true } } } });
+  const { updateVerifiedConsent } = await import("../../lib/customer-consent");
+  await updateVerifiedConsent(f.tenantId, appointment.customer.phone, true);
+}
+export async function inspectCalendarFixtureReview(f: { tenantId: string; email: string; appointmentId: string }) {
+  if (!f.email.startsWith("ical-") || !await prisma.user.findFirst({ where: { tenantId: f.tenantId, email: f.email, role: "owner" } })) throw new Error("fixture mismatch");
+  const rows = await prisma.reviewInvitation.findMany({ where: { tenantId: f.tenantId, appointmentId: f.appointmentId }, select: { id: true, status: true, finishedReason: true } });
+  return { rows, messages: await prisma.messageLog.count({ where: { tenantId: f.tenantId } }), ledgerRows: await prisma.smsLedger.count({ where: { tenantId: f.tenantId } }) };
+}

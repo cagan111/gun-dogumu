@@ -1,4 +1,5 @@
 import {z} from 'zod';
+import {skipPendingReviewInvitations} from './messaging/review-intent';
 import {withTenant} from './db';
 import {NotFoundError} from './booking';
 import {lockTenant} from './ledger';
@@ -15,6 +16,7 @@ async function change(tenantId:string,where:{id:string}|{phone:string},enabled:b
  await withTenant(tenantId).$transaction(async tx=>{
   await lockTenant(tx,tenantId);
   const c=await tx.customer.findFirst({where});if(!c)throw new NotFoundError('Müşteri');
+  if(!enabled)await skipPendingReviewInvitations(tx,{customerId:c.id},'consent_withdrawn');
   if(c.marketingConsent===enabled)return;
   await tx.customer.update({where:{id:c.id},data:{marketingConsent:enabled,marketingConsentAt:new Date()}});
   await writeAudit(tx,{tenantId,actorId:actor.id,actorRole:actor.role,action:'customer.marketing_consent',details:{customerId:c.id,enabled,source:actor.role==='customer'?'verified_phone':'owner_opt_out'}});

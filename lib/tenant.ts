@@ -1,7 +1,7 @@
 /** Explicit supported operations; nested writes are not scoped by Prisma query extensions. */
 import { Prisma } from '@prisma/client';
 export const TENANT_MODELS = new Set([
- 'Campaign','CampaignRecipient','Staff','Service','ServiceStaff','WorkingHours','TimeOff','Customer','Appointment',
+ 'ReviewInvitation','Campaign','CampaignRecipient','Staff','Service','ServiceStaff','WorkingHours','TimeOff','Customer','Appointment',
  'SmsLedger','MessageLog','Invoice','Payment','SmsPackageRequest','Otp','AuditLog',
 ]);
 const READ = new Set(['findUnique','findUniqueOrThrow','findFirst','findFirstOrThrow','findMany','count','aggregate','groupBy']);

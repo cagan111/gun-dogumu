@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { lockTenant } from "../ledger";
+import { prepareReviewInvitation, skipPendingReviewInvitations } from "../messaging/review-intent";
 import { appointmentChanged } from "../appointment-hook";
 import { computeAvailability, type StaffAvailabilityInput } from "../availability";
 import { AlreadyClosedError, createAppointment, isOverlapError, NotFoundError, SlotTakenError, SlotUnavailableError } from "../booking";
@@ -156,6 +158,10 @@ export async function setAppointmentStatus(ctx: PanelCtx, id: string, status: z.
   assertWritable(ctx);
   try {
     await ctx.db.$transaction(async (tx) => {
+      await lockTenant(tx, ctx.tenantId);
+      const currentTenant = await tx.tenant.findUnique({ where: { id: ctx.tenantId }, select: { status: true } });
+      if (!currentTenant) throw new NotFoundError("Salon");
+      assertWritable({ tenantStatus: currentTenant.status });
       const a = await tx.appointment.findFirst({ where: { id } });
       if (!a) throw new NotFoundError("Randevu");
       if (a.status === status) return;
@@ -165,6 +171,13 @@ export async function setAppointmentStatus(ctx: PanelCtx, id: string, status: z.
         data: { status, cancelledAt: status === "cancelled_by_salon" ? now : null, ...(status === "completed" && !a.completedAt ? { completedAt: now } : {}) },
       });
       if (r.count === 0) throw new ConflictError("status", "Randevu eşzamanlı olarak değiştirildi");
+      if (status === "completed" && !a.completedAt) {
+        // The UPDATE now owns the row lock; read the actual times if a move won before it.
+        const completed = await tx.appointment.findFirstOrThrow({ where: { id } });
+        await prepareReviewInvitation(tx, ctx.tenantId, completed);
+      } else if (status !== "completed") {
+        await skipPendingReviewInvitations(tx, { appointmentId: id }, "appointment_changed");
+      }
       if (status === "no_show") {
         await tx.customer.updateMany({ where: { id: a.customerId }, data: { noShowCount: { increment: 1 } } });
       } else if (a.status === "no_show") {
