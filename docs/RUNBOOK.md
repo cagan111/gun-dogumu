@@ -63,14 +63,16 @@ Migration'lar `app` açılırken otomatik uygulanır. Güncellemeden önce elle 
 
 ## 5. Yedekler (T-083)
 
-`backup` servisi açılışta ve ardından her 24 saatte `pg_dump -Fc` alır: `./backups/randevu-YYYYMMDD-HHMMSS.dump`. **14 günden** eski dosyalar silinir (`BACKUP_KEEP_DAYS`, `BACKUP_INTERVAL_SECONDS` ile değişir).
+`backup` servisi açılışta ve ardından her 24 saatte `pg_dump -Fc` alır: `./backups/randevu-YYYYMMDD-HHMMSS-XXXXXX.dump`. Dizin `0700`, yeni geçici/tamamlanan dump dosyaları `0600` oluşturulur; mevcut düzenli `randevu-*.dump` dosyalarının izinleri başlangıçta `0600` yapılır. Her deneme benzersiz `.part` kullanır, hata yalnız kendi geçici dosyasını siler. İzin ayarı başarısızsa servis durur. **14 günden** eski dosyalar silinir (`BACKUP_KEEP_DAYS`, `BACKUP_INTERVAL_SECONDS` ile değişir).
 
 ```bash
-ls -lh backups/                          # yedekler
+sudo ls -lh backups/                          # yedekler
 docker compose logs backup | tail        # son yedek başarılı mı? ("yedek alindi" / "YEDEK BASARISIZ")
 docker compose restart backup            # anlık yedek: servis açılışta hemen bir yedek alır
 ```
-Önemli: yedekler aynı sunucudadır. Diske zarar gelirse kaybolur; `./backups` klasörünü düzenli olarak başka yere kopyalayın (ör. `rsync -a backups/ kullanici@baska-sunucu:/yedek/randevu/`).
+Compose backup servisi image varsayılan kullanıcısıyla özel `sh` entrypoint çalıştırır; dizin/dosyaların sahibi bu süreçtir. Hostta okuma/kopyalama yetkili `sudo` gerektirebilir. Compose `user:` ile özelleştirilirse dedicated backups dizinini önceden o UID/GID sahipliğinde hazırlayın; izin hatasında geniş izin vererek devam etmeyin.
+
+Önemli: yedekler aynı sunucudadır. Diske zarar gelirse kaybolur; `./backups` klasörünü düzenli olarak başka yere kopyalayın (ör. `sudo rsync -a backups/ kullanici@baska-sunucu:/yedek/randevu/`).
 
 ### Geri yükleme
 
@@ -79,7 +81,7 @@ docker compose restart backup            # anlık yedek: servis açılışta hem
 docker compose stop app worker caddy
 # 2) Veritabanını sıfırdan oluşturup yedeği yükleyin
 docker compose exec -T db psql -U randevu -d postgres -c 'DROP DATABASE IF EXISTS randevu WITH (FORCE)' -c 'CREATE DATABASE randevu'
-docker compose exec -T db pg_restore -U randevu -d randevu --no-owner < backups/randevu-YYYYMMDD-HHMMSS.dump
+sudo cat backups/randevu-YYYYMMDD-HHMMSS-XXXXXX.dump | docker compose exec -T db pg_restore -U randevu -d randevu --no-owner
 # 3) Servisleri kaldırın
 docker compose up -d
 docker compose exec -T db psql -U randevu -c 'select count(*) from "Tenant"'   # kontrol

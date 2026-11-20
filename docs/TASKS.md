@@ -218,6 +218,7 @@ Biçim: `- [ ] T-NNN | sahip: claude|codex|- | açıklama`. Başlamadan sahip ya
 - [ ] T-147 | sahip: codex | DÜŞÜK: personel müşteri araması joker kaçışı, NUL bayt/bozuk Bearer 500'leri, gövde boyut sınırı, .env.example SUPERADMIN_EMAIL, yedek dosya izinleri 0600, SMS başlığı doğrulaması
   - [x] T147a: custom JSON okuyucusu1MiB gerçekbayt sınırı/lockedbody400; CI362/build+on iki e2e geçti.
   - [x] BozukBearer: T140core0.41.3fix kaynak+HTTP307 ile yeniden doğrulandı; yeni middlewarefix yok.
+  - [x] T147c2: backup dizini0700/dump0600, eski dump izinleri ve yalnız kendi geçici dosyasını temizleme.
   - [x] T147c1: örnek bootstrap e-postası boş; üretim demo seed koşulsuz reddedilir, geniş e2e-prefix silme kaldırıldı.
   - [x] T147b: NUL input/URL/login ve literalLIKE müşteri araması; CI371/build+on üç e2e geçti.
   - [ ] Kalan: bootstrapörnekayarlar, yedek0600 ve SMSbaşlıkdoğrulaması.

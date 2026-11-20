@@ -131,6 +131,8 @@ Güncelleme (20 Kasım, T147c1): aşağıdaki seed bulguları giderildi; product
 `lib/panel/settings.ts:17` `smsSenderName` `^[A-Za-z0-9 .-]{1,11}$` — tenant "BANKA", "TURKCELL" gibi marka adını serbestçe seçip `sms.send(..., {sender})` ile sağlayıcıya iletiyor (`lib/messaging/send.ts` `sender: tenant.smsSenderName`). Operatör başlık onayı koruyabilir ama platform tarafında izin listesi yok.
 
 ### 18. Yedekler [KOD]
+20 Kasım T147c2: yerel dosya izinleri giderildi (dizin0700, dump0600, eski düzenli dump izinleri daraltılır). Şifreleme/uzak kopya bu teslim kapsamında uygulanmadı. Aşağıdaki metin ilk bulgudur.
+
 `scripts/backup-loop.sh`: `pg_dump -Fc -f /backups/...` varsayılan umask ile; ana makinedeki `./backups` (docker root) altındaki dosyalar 0644 ⇒ ana makinedeki her yerel kullanıcı tüm kiracı PII'sini (telefon, ad) okuyabilir. Şifreleme/uzak kopya yok. Düzeltme: `umask 077`, dizin 0700, şifreli uzak kopya.
 
 ---
