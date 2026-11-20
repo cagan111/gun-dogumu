@@ -8,5 +8,12 @@ const securityHeaders = [
 export default {
   output: "standalone",
   poweredByHeader: false,
-  async headers() { return [{ source: "/(.*)", headers: securityHeaders }]; },
+  async headers() {
+    const privateCalendarHeaders = [{ key: "Referrer-Policy", value: "no-referrer" }];
+    return [
+      { source: "/(.*)", headers: securityHeaders },
+      { source: "/api/calendar/:path*", headers: privateCalendarHeaders },
+      { source: "/api/panel/staff/:id/calendar", headers: privateCalendarHeaders },
+    ];
+  },
 };

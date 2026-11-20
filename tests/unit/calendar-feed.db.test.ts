@@ -1,0 +1,33 @@
+import { afterAll, expect, it } from "vitest";
+try { process.loadEnvFile(".env"); } catch { /* local fixture */ }
+import { prisma, withTenant } from "@/lib/db";
+import { readCalendarFeed, rotateCalendarFeed, revokeCalendarFeed } from "@/lib/calendar-feed";
+import { resolveTenantUser } from "@/lib/session";
+const ids: string[] = [];
+afterAll(async () => { await prisma.tenant.deleteMany({ where: { id: { in: ids } } }); });
+it.skipIf(!process.env.DATABASE_URL)("owner-only scoped hash capability: minimal feed, rotation/revocation, suspension and secret boundary", async () => {
+  const t = await prisma.tenant.create({ data: { slug: `ical-${crypto.randomUUID()}`, name: "Fixture", city: "Girne", status: "active" } }); ids.push(t.id);
+  const u = await prisma.user.create({ data: { email: `${crypto.randomUUID()}@example.test`, name: "Owner", tenantId: t.id, role: "owner" } });
+  const ctx = await resolveTenantUser({ user: { id: u.id } });
+  const staff = await prisma.staff.create({ data: { tenantId: t.id, name: "Staff" } });
+  const other = await prisma.staff.create({ data: { tenantId: t.id, name: "Other" } });
+  const service = await prisma.service.create({ data: { tenantId: t.id, nameTr: "Private service", durationMin: 30, priceTry: "100" } });
+  const customer = await prisma.customer.create({ data: { tenantId: t.id, name: "PRIVATE_CUSTOMER", phone: "+905339999999", notes: "PRIVATE_NOTES" } });
+  for (const s of [staff, other]) await prisma.appointment.create({ data: { tenantId: t.id, staffId: s.id, serviceId: service.id, customerId: customer.id, startsAt: new Date(), endsAt: new Date(Date.now()+1800000), blockedUntil: new Date(Date.now()+1800000), priceTry: "100", cancelToken: crypto.randomUUID(), note: "PRIVATE_NOTE" } });
+  await expect(rotateCalendarFeed({ ...ctx, user: { ...ctx.user, role: "staff" } }, staff.id)).rejects.toMatchObject({ code: "forbidden" });
+  await expect(rotateCalendarFeed({ ...ctx, tenantId: "foreign" }, staff.id)).rejects.toMatchObject({ code: "not_found" });
+  const one = await rotateCalendarFeed(ctx, staff.id), token = one.path.split("/").at(-1)!;
+  const row = await prisma.staffCalendarFeed.findUniqueOrThrow({ where: { staffId: staff.id } });
+  expect(row.tokenHash).toHaveLength(64); expect(JSON.stringify(row)).not.toContain(token);
+  const feed = await readCalendarFeed(token); expect(feed?.match(/BEGIN:VEVENT/g)).toHaveLength(1);
+  expect(feed).not.toMatch(/PRIVATE|90533|Private service|cancelToken|priceTry/);
+  await expect(withTenant(t.id).staff.findMany({ include: { calendarFeed: true } })).rejects.toThrow();
+  const two = await rotateCalendarFeed(ctx, staff.id); expect(await readCalendarFeed(token)).toBeNull();
+  const current = two.path.split("/").at(-1)!;
+  await prisma.tenant.update({ where: { id: t.id }, data: { status: "suspended" } });
+  expect(await readCalendarFeed(current)).toBeNull();
+  await revokeCalendarFeed({ ...ctx, tenantStatus: "suspended" }, staff.id);
+  await prisma.tenant.update({ where: { id: t.id }, data: { status: "active" } });
+  expect(await readCalendarFeed(current)).toBeNull(); expect(await readCalendarFeed("bad")).toBeNull();
+  expect(JSON.stringify(await prisma.auditLog.findMany({ where: { tenantId: t.id } }))).not.toContain(token);
+});

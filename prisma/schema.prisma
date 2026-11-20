@@ -160,6 +160,7 @@ model Staff {
   workingHours WorkingHours[]
   timeOff      TimeOff[]
   appointments Appointment[]
+  calendarFeed StaffCalendarFeed?
 
   @@index([tenantId])
 }
@@ -443,4 +444,12 @@ model LoginFailure {
   lastSuccessAt DateTime?
   updatedAt     DateTime @updatedAt
   @@index([updatedAt])
+}
+
+// Capability hashes stay outside generic Staff reads and tenant delegates.
+model StaffCalendarFeed {
+  staffId String @id
+  staff Staff @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  tokenHash String @unique @db.Char(64)
+  createdAt DateTime @default(now())
 }
