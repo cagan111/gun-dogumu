@@ -145,9 +145,9 @@ Biçim: `- [ ] T-NNN | sahip: claude|codex|- | açıklama`. Başlamadan sahip ya
   - Sekiz bulgu, senaryo ve düzeltme önerisi raporlandı.
 - [ ] T-102 | sahip: codex | İngilizce arayüz kontrolü ve düzeltmesi
 - [ ] T-103 | sahip: codex | Lighthouse mobil > 85 (randevu sayfası)
-- [ ] T-104 | sahip: codex | iCal dışa aktarma (personel başına gizli token)
+- [x] T-104 | sahip: codex | iCal dışa aktarma (personel başına gizli token)
   - [x] T104a: hash-only personel token backend/owner rotate+revoke/minimal UTC feed.
-  - [ ] T104b: panel TR+EN token oluşturma/tek seferlik gösterim/döndürme/iptal arayüzü ve tarayıcı akışı.
+  - [x] T104b: owner Personel penceresi TR+EN oluşturma/tek seferlik URL gösterimi/kopyalama/döndürme/iptal; CI400/build ve genişletilmiş gerçek Caddy14e2e geçti. Harici Google/Apple hesap aboneliği denenmedi.
 - [ ] T-105 | sahip: codex | Google yorum isteği SMS'i (varsayılan kapalı)
 - [ ] T-106 | sahip: codex | Panel PWA + yeni randevu bildirimi
 

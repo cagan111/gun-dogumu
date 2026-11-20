@@ -9,6 +9,7 @@ import { api, ApiError, errorMessage } from "@/lib/client-api";
 import { useI18n } from "@/lib/i18n/client";
 import type { Key } from "@/lib/i18n/shared";
 import { utcToLocal, zonedToUtc } from "@/lib/time";
+import { StaffCalendar } from "./staff-calendar";
 import { usePanel } from "./ctx";
 import type { Staff, TimeOff, WH } from "./types";
 import { fmtDateTime, fmtMin, parseHM, useLoader, WEEK_ORDER, weekdayName } from "./util";
@@ -25,6 +26,7 @@ export function StaffView() {
     const [staff, timeOff] = await Promise.all([api<Staff[]>("/api/panel/staff"), api<TimeOff[]>("/api/panel/time-off")]);
     return { staff, timeOff };
   }, []);
+  const [calendarFor, setCalendarFor] = useState<Staff | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [hoursFor, setHoursFor] = useState<Staff | null>(null);
   const [offOpen, setOffOpen] = useState(false);
@@ -97,6 +99,7 @@ export function StaffView() {
                 {isOwner ? (
                   <div className="flex flex-wrap gap-2">
                     <Button variant="secondary" onClick={() => setHoursFor(s)}>{t("staff.hours")}</Button>
+                    <Button variant="secondary" onClick={() => setCalendarFor(s)}>{t("ical.open")}</Button>
                     <Button variant="secondary" onClick={() => open(s)} aria-label={`${t("common.edit")}: ${s.name}`}>{t("common.edit")}</Button>
                     <Button variant="ghost" className="text-red-300" onClick={() => setDelStaff(s)} aria-label={`${t("common.delete")}: ${s.name}`}>{t("common.delete")}</Button>
                   </div>
@@ -116,6 +119,7 @@ export function StaffView() {
         <TimeOffList list={timeOff} staff={staff} canEdit={isOwner} onDelete={setDelOff} />
       </section>
 
+      {isOwner && calendarFor ? <StaffCalendar key={calendarFor.id} staff={calendarFor} onClose={() => setCalendarFor(null)} /> : null}
       <Sheet open={!!draft} onClose={() => setDraft(null)} title={draft?.id ? t("staff.edit") : t("staff.add")}>
         {draft ? (
           <form onSubmit={save} noValidate className="space-y-3">
