@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isValidSmsSender } from "../sms-sender";
 import { appointmentChanged } from "../appointment-hook";
 import { SMS_PACKAGES } from "@/config/plans";
 import { NotFoundError } from "../booking";
@@ -14,7 +15,7 @@ export const settingsSchema = z
   .object({
     smsAllowedCallingCodes: z.array(z.string().regex(/^[1-9]\d{0,2}$/)).max(30).refine((a) => new Set(a).size === a.length, "duplicate_codes"),
     smsDailySegmentLimit: z.number().int().min(1).max(2000),
-    smsSenderName: z.string().regex(/^[A-Za-z0-9 .-]{1,11}$/, "invalid_sender").nullable(),
+    smsSenderName: z.string().refine(isValidSmsSender, "invalid_sender").nullable(),
     reminderOffsets: z
       .array(z.number().int().min(30).max(10_080))
       .min(1)

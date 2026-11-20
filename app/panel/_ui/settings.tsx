@@ -1,4 +1,6 @@
 "use client";
+
+import { isValidSmsSender } from "@/lib/sms-sender";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -226,7 +228,7 @@ function SettingsForm() {
     if (!Number.isInteger(f.smsDailySegmentLimit) || f.smsDailySegmentLimit < 1 || f.smsDailySegmentLimit > 2000) {
       errs.smsDailySegmentLimit = t("set.errDailySmsLimit");
     }
-    if (f.smsSenderName && !/^[A-Za-z0-9 .-]{1,11}$/.test(f.smsSenderName)) errs.smsSenderName = t("set.errSender");
+    if (f.smsSenderName?.trim() && !isValidSmsSender(f.smsSenderName.trim())) errs.smsSenderName = t("set.errSender");
     if (f.reminderOffsets.length < 1 || f.reminderOffsets.length > 3) errs.reminderOffsets = t("set.errOffsets");
     for (const k of ["logoUrl", "coverUrl"] as const) if (f[k] && !f[k]!.startsWith("https://")) errs[k] = t("set.errHttps");
     if (!Number.isInteger(f.cancelHoursBefore) || f.cancelHoursBefore < 0 || f.cancelHoursBefore > 720) errs.cancelHoursBefore = t("err.validation");

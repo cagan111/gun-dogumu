@@ -7,6 +7,9 @@ import { smsRequestSchema } from "@/lib/panel/settings";
 const ok = (o: unknown) => settingsSchema.safeParse(o).success;
 
 describe("settingsSchema", () => {
+  it.each(["   ", "123456", ".- .", "Salon\n", "Salon\r", "Salon\t"])("anlamsız/kontrol karakterli SMS başlığını reddeder: %j", (sender) => {
+    expect(ok({ smsSenderName: sender })).toBe(false);
+  });
   it("SMS başlığı: ≤11 karakter, A-Z a-z 0-9 boşluk . -", () => {
     expect(ok({ smsSenderName: "Glow Kuafor" })).toBe(true);
     expect(ok({ smsSenderName: "A.B-c 1" })).toBe(true);
