@@ -1,5 +1,6 @@
 /** Salon paneli + süper-admin metinleri (tr). tr.ts içine yayılır; en karşılığı panel-en.ts. */
 export const panelTr = {
+  "panel.logoutError": "Çıkış doğrulanamadı. Oturumlarınız hâlâ açık olabilir; lütfen yeniden deneyin.",
   "common.cancel": "Vazgeç",
   "common.save": "Kaydet",
   "common.saved": "Kaydedildi.",

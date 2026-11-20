@@ -2,6 +2,7 @@ import type { panelTr } from "./panel-tr";
 
 /** Panel + super-admin strings (en). Must mirror panel-tr.ts. */
 export const panelEn: Record<keyof typeof panelTr, string> = {
+  "panel.logoutError": "Sign out could not be confirmed. Your sessions may still be active; please try again.",
   "common.cancel": "Cancel",
   "common.save": "Save",
   "common.saved": "Saved.",

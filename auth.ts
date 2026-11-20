@@ -1,4 +1,5 @@
 import { sessionTokenCurrent, revokeSessionToken } from "@/lib/session-revocation";
+import { markLogoutFailure } from "@/lib/logout-confirmation";
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { authenticateMagicToken, authenticatePassword } from "@/lib/login";
@@ -7,7 +8,7 @@ import { getAuthSecret } from "@/lib/auth-secret";
 
 const asUser = (u: { id: string; email: string; name: string; role: "owner" | "staff" | "superadmin"; tenantId: string | null; tokenVersion: number }) => u;
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
+export const { handlers, auth, signIn } = NextAuth({
   secret: getAuthSecret(),
   trustHost: true,
   session: { strategy: "jwt", maxAge: 60 * 60 * 24 * 7 },
@@ -34,7 +35,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   ],
   events: {
     async signOut(message) {
-      if ("token" in message && message.token) await revokeSessionToken(message.token);
+      if ("token" in message && message.token) {
+        try { await revokeSessionToken(message.token); }
+        catch { markLogoutFailure(); throw new Error("Session revocation unavailable"); }
+      }
     },
   },
   callbacks: {

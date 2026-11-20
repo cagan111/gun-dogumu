@@ -1,3 +1,16 @@
+# Runtime proxy warnings can contain upstream request headers as well as access logs.
+{
+ log default {
+  format filter {
+   wrap json
+   fields {
+    request>headers>X-Kr-Proxy-Token delete
+    request>headers>Cookie delete
+    request>headers>Authorization delete
+   }
+  }
+ }
+}
 # Site adresi CADDY_SITE ortam değişkeninden gelir (docker-compose.yml, APP_DOMAIN'den türetir):
 #   APP_DOMAIN=randevu.ornek.com  → CADDY_SITE=randevu.ornek.com  → otomatik HTTPS (Let's Encrypt, 80/443)
 #   APP_DOMAIN boş               → CADDY_SITE=:80                → yalnız HTTP (yerel/deneme, IP ile erişim)
