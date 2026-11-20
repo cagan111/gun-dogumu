@@ -210,6 +210,8 @@ Biçim: `- [ ] T-NNN | sahip: claude|codex|- | açıklama`. Başlamadan sahip ya
     - [x] T146C1: DB sürüm doğrulaması, şifre değişimi+sağlıklı DB altında çıkış CAS; CI352/build/gerçek Caddy yedi e2e geçti.
     - [x] T146C2: request-scoped hata sonucu503/çerez koruma, TR+EN yeniden deneme; CI355/build ve gerçek Caddy sekiz e2e geçti. Runtime warning özel başlık filtresi de regresyonla doğrulandı.
   - [ ] T146D: Caddy HSTS/CSP/gövde sınırı ve URL içindeki tokenların log maskelemesi.
+    - [x] T146D1: access+runtime URI/Referer/Location log alanlarını çıkarma; CI355/build/gerçek Caddy dokuz e2e geçti.
+    - [ ] T146D2: TLS/HSTS/CSP ve gövde boyut sınırı.
 
 - [ ] T-147 | sahip: codex | DÜŞÜK: personel müşteri araması joker kaçışı, NUL bayt/bozuk Bearer 500'leri, gövde boyut sınırı, .env.example SUPERADMIN_EMAIL, yedek dosya izinleri 0600, SMS başlığı doğrulaması
 

@@ -4,6 +4,10 @@
   format filter {
    wrap json
    fields {
+    # Opaque and future token routes: omit the whole URI instead of fragile route matching.
+    request>uri delete
+    request>headers>Referer delete
+    resp_headers>Location delete
     request>headers>X-Kr-Proxy-Token delete
     request>headers>Cookie delete
     request>headers>Authorization delete
@@ -27,6 +31,10 @@
 		format filter {
 			wrap json
 			fields {
+			 # Opaque and future token routes: omit the whole URI instead of fragile route matching.
+			 request>uri delete
+			 request>headers>Referer delete
+			 resp_headers>Location delete
 				request>headers>X-Kr-Proxy-Token delete
 				request>headers>Cookie delete
 				request>headers>Authorization delete
