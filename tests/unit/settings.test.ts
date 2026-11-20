@@ -7,6 +7,12 @@ import { smsRequestSchema } from "@/lib/panel/settings";
 const ok = (o: unknown) => settingsSchema.safeParse(o).success;
 
 describe("settingsSchema", () => {
+  it("review invites accept only explicit booleans and approved Google review links", () => {
+    expect(ok({ reviewInviteEnabled: false, reviewInviteUrl: null })).toBe(true);
+    for (const url of ["https://search.google.com/local/writereview?placeid=ChIJ_fixture-1", "https://g.page/r/C_fixture-1/review"]) expect(ok({ reviewInviteUrl: url })).toBe(true);
+    for (const url of ["https://google.com/url?q=https://evil.example", "https://search.google.com.evil.example/local/writereview?placeid=x", "https://g.page/redirect", "http://g.page/r/example/review", "https://user:pass@g.page/r/example/review", "https://g.page/r/example/review#x", "https://search.google.com/local/writereview?placeid=a&placeid=b"]) expect(ok({ reviewInviteUrl: url })).toBe(false);
+    expect(ok({ reviewInviteEnabled: "true" })).toBe(false);
+  });
   it.each(["   ", "123456", ".- .", "Salon\n", "Salon\r", "Salon\t"])("anlamsız/kontrol karakterli SMS başlığını reddeder: %j", (sender) => {
     expect(ok({ smsSenderName: sender })).toBe(false);
   });

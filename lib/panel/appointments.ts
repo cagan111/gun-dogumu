@@ -162,7 +162,7 @@ export async function setAppointmentStatus(ctx: PanelCtx, id: string, status: z.
       if (a.status === "cancelled_by_customer") throw new AlreadyClosedError();
       const r = await tx.appointment.updateMany({
         where: { id, status: a.status },
-        data: { status, cancelledAt: status === "cancelled_by_salon" ? now : null },
+        data: { status, cancelledAt: status === "cancelled_by_salon" ? now : null, ...(status === "completed" && !a.completedAt ? { completedAt: now } : {}) },
       });
       if (r.count === 0) throw new ConflictError("status", "Randevu eşzamanlı olarak değiştirildi");
       if (status === "no_show") {

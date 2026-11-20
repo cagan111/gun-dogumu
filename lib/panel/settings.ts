@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { isGoogleReviewUrl } from "../review-link";
+import { writeAudit } from "../audit";
 import { approvedSmsSender } from "../messaging/sender-policy";
 import { getSmsProvider } from "../messaging/registry";
 import { ValidationError } from "../errors";
@@ -16,6 +18,8 @@ const httpsUrl = z.string().trim().max(500).url().refine((u) => u.startsWith("ht
 
 export const settingsSchema = z
   .object({
+    reviewInviteEnabled: z.boolean(),
+    reviewInviteUrl: z.string().trim().refine(isGoogleReviewUrl, "invalid_review_url").nullable(),
     smsAllowedCallingCodes: z.array(z.string().regex(/^[1-9]\d{0,2}$/)).max(30).refine((a) => new Set(a).size === a.length, "duplicate_codes"),
     smsDailySegmentLimit: z.number().int().min(1).max(2000),
     smsSenderName: z.string().refine(isValidSmsSender, "invalid_sender").nullable(),
@@ -40,6 +44,7 @@ export const settingsSchema = z
 export type SettingsInput = z.output<typeof settingsSchema>;
 
 const PUBLIC_FIELDS = {
+  reviewInviteEnabled: true, reviewInviteUrl: true,
   smsAllowedCallingCodes: true, smsDailySegmentLimit: true, smsSenderName: true, reminderOffsets: true, cancelHoursBefore: true, slotMinutes: true, minLeadMinutes: true,
   maxAdvanceDays: true, brandColor: true, logoUrl: true, coverUrl: true, locale: true, timeZone: true, plan: true, name: true, status: true,
 } as const;
@@ -62,8 +67,23 @@ export async function updateSettings(ctx: PanelCtx, input: SettingsInput) {
   }
   const data = { ...input };
   if (data.reminderOffsets) data.reminderOffsets = [...data.reminderOffsets].sort((a, b) => b - a);
-  await ctx.db.tenant.update({ where: { id: ctx.tenantId }, data });
-  await auditPanel(ctx, "settings.update", { fields: Object.keys(data) });
+  const reviewChanged = data.reviewInviteEnabled !== undefined || data.reviewInviteUrl !== undefined;
+  if (reviewChanged) {
+    await ctx.db.$transaction(async tx => {
+      await ledger.lockTenant(tx, ctx.tenantId);
+      const current = await tx.tenant.findUnique({ where: { id: ctx.tenantId }, select: { reviewInviteEnabled: true, reviewInviteUrl: true, status: true } });
+      if (!current) throw new NotFoundError("Salon");
+      assertWritable({ tenantStatus: current.status });
+      const enabled = data.reviewInviteEnabled ?? current.reviewInviteEnabled;
+      const url = data.reviewInviteUrl !== undefined ? data.reviewInviteUrl : current.reviewInviteUrl;
+      if (enabled && (!url || !isGoogleReviewUrl(url))) throw new ValidationError("Yorum daveti için geçerli Google yorum bağlantısı gerekli", "reviewInviteUrl");
+      await tx.tenant.update({ where: { id: ctx.tenantId }, data });
+      await writeAudit(tx, { actorId: ctx.user.id, actorRole: ctx.user.role, tenantId: ctx.tenantId, action: "settings.update", details: { fields: Object.keys(data) } });
+    });
+  } else {
+    await ctx.db.tenant.update({ where: { id: ctx.tenantId }, data });
+    await auditPanel(ctx, "settings.update", { fields: Object.keys(data) });
+  }
   if (data.reminderOffsets) {
     // Hatırlatma zamanları değişti: gelecekteki randevuların planı yenilenir (eski anahtarlar işleyicide zaten geçersiz sayılmaz; yeni ofsetler eklenir)
     const ids = await ctx.db.appointment.findMany({ where: { status: { in: ["pending", "confirmed"] }, startsAt: { gt: new Date() } }, select: { id: true }, take: 2000 });

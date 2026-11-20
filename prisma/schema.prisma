@@ -94,6 +94,8 @@ model Tenant {
   trialEndsAt        DateTime?
   subscriptionEndsAt DateTime?
   pastDueSince       DateTime?
+  reviewInviteEnabled Boolean @default(false)
+  reviewInviteUrl String? @db.VarChar(500)
   smsSenderName      String?      @db.VarChar(11)
   smsProvider        String?
   smsAllowedCallingCodes String[] @default(["90"])
@@ -265,6 +267,7 @@ model Appointment {
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
   cancelledAt DateTime?
+  completedAt DateTime?
 
   @@index([tenantId, startsAt])
   @@index([staffId, startsAt])
