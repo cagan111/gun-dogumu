@@ -212,6 +212,8 @@ Biçim: `- [ ] T-NNN | sahip: claude|codex|- | açıklama`. Başlamadan sahip ya
   - [ ] T146D: Caddy HSTS/CSP/gövde sınırı ve URL içindeki tokenların log maskelemesi.
     - [x] T146D1: access+runtime URI/Referer/Location log alanlarını çıkarma; CI355/build/gerçek Caddy dokuz e2e geçti.
     - [ ] T146D2: TLS/HSTS/CSP ve gövde boyut sınırı.
+      - [x] T146D2a: gerçek TLS/HSTS ve1MiB Caddy sınırı; CI355/build ve on e2e geçti.
+      - [ ] T146D2b: CSP nonce, Next.js renderer ve gerçek tarayıcı doğrulaması.
 
 - [ ] T-147 | sahip: codex | DÜŞÜK: personel müşteri araması joker kaçışı, NUL bayt/bozuk Bearer 500'leri, gövde boyut sınırı, .env.example SUPERADMIN_EMAIL, yedek dosya izinleri 0600, SMS başlığı doğrulaması
 

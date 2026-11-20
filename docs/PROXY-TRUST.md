@@ -9,3 +9,7 @@ Caddy gerçek bağlantı peer'ını `X-Real-IP` olarak yazar ve özel proxy baş
 Caddy accesslog filtresi Cookie, Authorization ve proxy token başlığını siler. URL path/query token maskelemesi, HSTS/CSP ve gövde sınırı henüz bu teslimin parçası değildir; T146D açıktır. OTP ve JWT alt maddeleri de T146B/C'de açıktır.
 
 Yerel gerçek proxy testi: derlenmiş uygulama, pnpm helper, Chromium ve resmi Caddy executable gerekir. `CADDY_EXECUTABLE_PATH` ile binary yolu seçilir; `tests/e2e/proxy.cjs` kendine ait loopback3400/3401 süreçleri kurar, rastgele test anahtarı üretir, beş e2e çalıştırır ve yalnız kendi süreçlerini kapatır. `login-dos.cjs` bu harness içinde çalışır. Header ve erişim logu kontrolleri gerçek Caddy'de yapılmıştır; TLS/production dağıtımı yapılmamıştır.
+
+
+## HTTPS ve gövde sınırı (T146D2a)
+Caddy TLS bağlantılarında bir yıllık HSTS başlığı gönderir; HTTP veya sahte X-Forwarded-Proto bunu açmaz. includeSubDomains/preload yoktur. APP_DOMAIN/DNS ve güvenilir sertifika kurulumu mevcut RUNBOOK'a göre operatörün işidir; bu değişiklik üretim yayını yapmaz. Site handler'ı istek gövdesini1048576baytla sınırlar; tam sınır geçer, fazlası Content-Length/chunked fark etmeden413 alır. Yeni büyük upload uçları eklenirse açıkça ayrı değerlendirilmelidir. Doğrudan Next portu bu Caddy sınırını uygulamaz; üretimde appportu yayımlanmamalıdır. CSP henüz tamamlanmadı (T146D2b). YerelTLS testi selfsignedfixture ile response/protokolü doğrular; gerçek alan adı CA zinciri doğrulaması değildir.

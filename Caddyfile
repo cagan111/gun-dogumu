@@ -20,6 +20,12 @@
 #   APP_DOMAIN boş               → CADDY_SITE=:80                → yalnız HTTP (yerel/deneme, IP ile erişim)
 {$CADDY_SITE::80} {
 	encode zstd gzip
+	# Do not infer HTTPS from client-controlled forwarded headers.
+	@tls protocol https
+	header @tls Strict-Transport-Security "max-age=31536000"
+	request_body {
+		max_size 1048576
+	}
 	reverse_proxy app:3000 {
 		header_up X-Real-IP {remote_host}
 		header_up X-KR-Proxy-Token {$PROXY_SHARED_SECRET}
