@@ -8,6 +8,9 @@ import { getLocale } from "@/lib/i18n";
 const bodyFont = DM_Sans({ subsets: ["latin", "latin-ext"], variable: "--font-body" });
 const displayFont = Playfair_Display({ subsets: ["latin", "latin-ext"], variable: "--font-display" });
 
+// Per-request nonce HTML must never become a shared static document.
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: { default: brand.name, template: `%s` },
   description: brand.tagline.tr,

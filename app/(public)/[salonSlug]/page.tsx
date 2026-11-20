@@ -1,3 +1,4 @@
+import { headers } from "next/headers";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { SalonHeader } from "@/components/salon-header";
@@ -69,7 +70,7 @@ export default async function SalonPage({ params }: Props) {
 
   return (
     <div style={brandVars(salon.brandColor) as React.CSSProperties} className="min-h-screen bg-paper">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }} />
+      <script nonce={(await headers()).get("x-nonce") ?? undefined} type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }} />
       <SalonHeader name={salon.name} city={salon.city} address={salon.address} logoUrl={salon.logoUrl} coverUrl={salon.coverUrl} slug={salon.slug} />
       <BookingFlow
         slug={salon.slug}

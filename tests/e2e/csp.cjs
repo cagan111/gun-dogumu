@@ -1,0 +1,24 @@
+/** Production CSP behavior in real Chromium; injected code is a harmless local marker. */
+const assert=require('node:assert/strict');const {chromium}=require('playwright');
+const BASE=process.env.BASE_URL||'http://localhost:3000';
+(async()=>{let browser;const failed=[];async function check(name,fn){try{await fn();console.log('PASS '+name)}catch{failed.push(name);console.log('FAIL '+name)}}try{
+ browser=await chromium.launch({executablePath:process.env.CHROMIUM_EXECUTABLE_PATH||undefined});const ctx=await browser.newContext({viewport:{width:390,height:860}});const page=await ctx.newPage();
+ await page.addInitScript(()=>{window.__krViolations=[];document.addEventListener('securitypolicyviolation',e=>window.__krViolations.push(e.effectiveDirective))});
+ const response=await page.goto(BASE+'/');await page.waitForLoadState('networkidle');const policy=response.headers()['content-security-policy']||'';
+ await check('production CSP uses a nonce and forbids unsafe script evaluation',async()=>{assert.match(policy,/script-src[^;]*'nonce-[A-Za-z0-9+/=]+'/);assert.ok(!policy.includes("'unsafe-eval'"));assert.ok(!/script-src[^;]*'unsafe-inline'/.test(policy));assert.match(policy,/object-src 'none'/);assert.match(policy,/frame-ancestors 'none'/)});
+ await check('Next renderer scripts have the trusted response nonce without initial violations',async()=>{const nonce=policy.match(/'nonce-([^']+)'/)?.[1];assert.ok(nonce);const values=await page.locator('script').evaluateAll(s=>s.filter(x=>x.type!=='application/ld+json').map(x=>x.nonce));assert.ok(values.length);assert.ok(values.every(n=>n===nonce));assert.deepEqual(await page.evaluate(()=>window.__krViolations),[])});
+ await check('untrusted parser-inserted HTML script does not execute',async()=>{
+  const attack=await ctx.newPage();try{
+   await attack.addInitScript(()=>{window.__krViolations=[];document.addEventListener('securitypolicyviolation',e=>window.__krViolations.push(e.effectiveDirective))});
+   const target=BASE+'/?kr-csp-injection-fixture=1';
+   await attack.route(target,async route=>{const upstream=await route.fetch();const headers={...upstream.headers()};delete headers['content-encoding'];delete headers['content-length'];delete headers['transfer-encoding'];const html=(await upstream.text()).replace('</body>','<script>window.__krUntrustedRan=true</script></body>');await route.fulfill({status:upstream.status(),headers,body:html})});
+   await attack.goto(target);await attack.waitForLoadState('networkidle');
+   assert.equal(await attack.evaluate(()=>window.__krUntrustedRan),undefined);assert.ok((await attack.evaluate(()=>window.__krViolations)).some(x=>x.startsWith('script-src')));
+  }finally{await attack.close()}
+ });
+ await check('separate requests use distinct nonces and ignore forged client nonce/CSP',async()=>{const a=await ctx.request.get(BASE+'/',{headers:{'x-nonce':'attacker-marker','content-security-policy':"script-src 'unsafe-inline'"}}),b=await ctx.request.get(BASE+'/');const pa=a.headers()['content-security-policy']||'',pb=b.headers()['content-security-policy']||'';const na=pa.match(/'nonce-([^']+)'/)?.[1],nb=pb.match(/'nonce-([^']+)'/)?.[1];assert.ok(na&&nb&&na!==nb);assert.ok(!pa.includes('attacker-marker'));const html=await a.text();assert.ok(html.includes(`nonce="${na}"`));assert.ok(!html.includes('nonce="attacker-marker"'))});
+ await check('hydrated Next navigation retains the document without CSP violations',async()=>{await page.setViewportSize({width:1280,height:900});await page.evaluate(()=>{window.__krViolations=[];window.__krDocumentMarker='same-document'});await page.locator('a[href="/giris"]').first().click();await page.waitForURL(BASE+'/giris');await page.locator('input[name="email"]').waitFor();await page.waitForLoadState('networkidle');assert.equal(await page.evaluate(()=>window.__krDocumentMarker),'same-document');assert.deepEqual(await page.evaluate(()=>window.__krViolations),[])});
+ await check('salon JSON-LD and not-found rendering retain matching nonces',async()=>{for(const [url,status] of [[BASE+'/'+(process.env.SLUG||'lefkosa-usta-berber'),200],[BASE+'/__kr_csp_missing_fixture__',404]]){const r=await page.goto(url);await page.waitForLoadState('networkidle');assert.equal(r.status(),status);const n=(r.headers()['content-security-policy']||'').match(/'nonce-([^']+)'/)?.[1];assert.ok(n);const values=await page.locator('script').evaluateAll(s=>s.map(x=>x.nonce));assert.ok(values.length);assert.ok(values.every(v=>v===n));if(status===200)assert.equal(await page.locator('script[type="application/ld+json"]').count(),1);assert.deepEqual(await page.evaluate(()=>window.__krViolations),[])}});
+ assert.equal(failed.length,0,'CSP checks failed');
+ }finally{await browser?.close()}
+})().catch(e=>{console.error(e.name,'local CSP check failed');process.exitCode=1});

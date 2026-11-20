@@ -201,7 +201,7 @@ Biçim: `- [ ] T-NNN | sahip: claude|codex|- | açıklama`. Başlamadan sahip ya
   - Anonim müşteri kaydı değişmez/izin açılmaz; OTP bağlı tercih, owner opt-out, audit+legacy reset ve claim/dispatch yarışı koruması. CI329/build + yedi e2e geçti.
 - [x] T-145 | sahip: codex | ORTA: giriş kilidi yalnız başarısız denemeleri saysın (DoS önleme)
   - E-posta genelindeki kilit kaldırıldı; DB e-posta+IP failure8/15dk, başarıreset/yarışkoruması ve IP30 sınırı. CI335/build/login-dos+booking/panel/flow/isolation geçti.
-- [ ] T-146 | sahip: codex | ORTA: güvenilir proxy IP'si (TRUST_PROXY), OTP zamanlama eşitleme, salon OTP kotasının tek müşteriyi kilitlememesi, JWT iptali (sürüm/tokenVersion), Caddy HSTS+CSP+gövde sınırı, erişim logunda token maskeleme
+- [x] T-146 | sahip: codex | ORTA: güvenilir proxy IP'si (TRUST_PROXY), OTP zamanlama eşitleme, salon OTP kotasının tek müşteriyi kilitlememesi, JWT iptali (sürüm/tokenVersion), Caddy HSTS+CSP+gövde sınırı, erişim logunda token maskeleme
   - [x] T146A: proxy/IP güven sınırı; default ignore, ayrı paylaşımlı sır, Caddy overwrite/log header filtresi, CI339/build ve gerçek Caddy+beş e2e geçti.
   - [x] T146B: OTP zamanlama eşitleme ve telefon başına günlük pay ile müşteri adaleti (çok numaralı ortak bütçe DoS garantisi yok).
     - [x] T146B1: HTTP kayıtlı/kayıtsız aynı kuyruk makbuzu; OTP üretimi/gönderimi işçide, eski işler atlanır. CI344/build ve gerçek Caddy altı e2e geçti.
@@ -209,11 +209,11 @@ Biçim: `- [ ] T-NNN | sahip: claude|codex|- | açıklama`. Başlamadan sahip ya
   - [x] T146C: JWT tokenVersion/oturum iptali ve iptal başarısızlığını bildirme.
     - [x] T146C1: DB sürüm doğrulaması, şifre değişimi+sağlıklı DB altında çıkış CAS; CI352/build/gerçek Caddy yedi e2e geçti.
     - [x] T146C2: request-scoped hata sonucu503/çerez koruma, TR+EN yeniden deneme; CI355/build ve gerçek Caddy sekiz e2e geçti. Runtime warning özel başlık filtresi de regresyonla doğrulandı.
-  - [ ] T146D: Caddy HSTS/CSP/gövde sınırı ve URL içindeki tokenların log maskelemesi.
+  - [x] T146D: Caddy HSTS/CSP/gövde sınırı ve URL içindeki tokenların log maskelemesi.
     - [x] T146D1: access+runtime URI/Referer/Location log alanlarını çıkarma; CI355/build/gerçek Caddy dokuz e2e geçti.
-    - [ ] T146D2: TLS/HSTS/CSP ve gövde boyut sınırı.
+    - [x] T146D2: TLS/HSTS/CSP ve gövde boyut sınırı.
       - [x] T146D2a: gerçek TLS/HSTS ve1MiB Caddy sınırı; CI355/build ve on e2e geçti.
-      - [ ] T146D2b: CSP nonce, Next.js renderer ve gerçek tarayıcı doğrulaması.
+      - [x] T146D2b: nonce CSP/Next renderer; CI357/build ve gerçek Caddy on bir e2e geçti. T146 kabul listesi tamam, T147 ayrı açık.
 
 - [ ] T-147 | sahip: codex | DÜŞÜK: personel müşteri araması joker kaçışı, NUL bayt/bozuk Bearer 500'leri, gövde boyut sınırı, .env.example SUPERADMIN_EMAIL, yedek dosya izinleri 0600, SMS başlığı doğrulaması
 
