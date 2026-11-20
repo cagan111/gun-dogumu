@@ -2,12 +2,14 @@
  * Başsız tarayıcı kontrolü: salon paneli + süper-admin (mobil 375×812, takvim için bir de 1280×800).
  *   pnpm db:seed && pnpm build && pnpm start        # ayrı terminalde (varsayılan :3000)
  *   node tests/e2e/panel.cjs                         # BASE_URL, SHOT_DIR, SLUG ortam değişkenleri
- * Not: ödeme/kredi/hizmet ekler (tekrar çalıştırmadan önce `pnpm db:seed` ile sıfırlayın).
+ * Not: takvim randevularını kendi fixture'ı oluşturup temizler; ödeme/kredi/hizmet adımları demo verisini değiştirir.
  */
 const assert = require("node:assert/strict");
 const os = require("node:os");
 const path = require("node:path");
 const { chromium } = require("playwright");
+const { execFileSync } = require("node:child_process");
+const { existsSync } = require("node:fs");
 
 const BASE = process.env.BASE_URL || "http://localhost:3000";
 const SLUG = process.env.SLUG || "lefkosa-usta-berber";
@@ -47,8 +49,18 @@ async function gotoDayWithAppointments(page) {
   assert.ok(await has(), "seçilen günde randevu blokları");
 }
 
+function calendarFixtureCommand(mode, fixture) {
+  const code = `try{process.loadEnvFile('.env')}catch{};import {createPanelCalendarFixture,cleanupPanelCalendarFixture} from './tests/fixtures/panel-calendar';const task=process.env.KR_PANEL_MODE==='create'?createPanelCalendarFixture(process.env.KR_PANEL_SLUG):cleanupPanelCalendarFixture(JSON.parse(process.env.KR_PANEL_FIXTURE));task.then(x=>{console.log(JSON.stringify(x??null));process.exit(0)}).catch(()=>process.exit(1));`;
+  try {
+    const output = execFileSync(process.env.KR_PNPM || (existsSync('/tmp/kr-pnpm') ? '/tmp/kr-pnpm' : 'pnpm'), ['exec','tsx','-e',code], { env: {...process.env, KR_PANEL_MODE:mode, KR_PANEL_SLUG:SLUG, KR_PANEL_FIXTURE:JSON.stringify(fixture??null), SMS_PROVIDER:'mock', ALLOW_REAL_SMS:'false', JOBS_QUEUE:'none'}, stdio:'pipe' });
+    return JSON.parse(String(output).trim().split('\n').at(-1));
+  } catch { throw new Error(`Panel calendar fixture ${mode} failed`); }
+}
 (async () => {
-  const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_EXECUTABLE_PATH || undefined });
+  let browser, calendarFixture;
+  try {
+  calendarFixture = calendarFixtureCommand('create');
+  browser = await chromium.launch({ executablePath: process.env.CHROMIUM_EXECUTABLE_PATH || undefined });
   const problems = [];
   const watch = (page) => {
     // beklenen 4xx (ör. mesai dışı walk-in → 422) tarayıcı konsoluna "Failed to load resource" düşer; yok sayılır
@@ -244,7 +256,10 @@ async function gotoDayWithAppointments(page) {
   step("SMS talepleri + fiyatlar açıldı");
   await actx.close();
 
-  await browser.close();
+  await browser.close(); browser = undefined;
   assert.deepEqual(problems, [], `konsol hataları:\n${problems.join("\n")}`);
   step("konsol hatası yok");
+  } finally {
+    try { await browser?.close(); } finally { if(calendarFixture) calendarFixtureCommand('cleanup',calendarFixture); }
+  }
 })().catch((e) => { console.error(e); process.exit(1); });

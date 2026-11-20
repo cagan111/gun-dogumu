@@ -29,7 +29,7 @@ export async function authenticatePassword(emailRaw: string, password: string, i
   const email = normalizeEmail(emailRaw);
   const byIp = await rateLimit(`login:ip:${ip}`, LOGIN_PER_IP.limit, LOGIN_PER_IP.windowMs);
   if (!byIp.ok) return null;
-  if (!email || !password || password.length > 200) return null;
+  if (!email || email.includes("\0") || !password || password.length > 200) return null;
   const startedAt = new Date();
   const failureKey = loginFailureKey(email, ip);
   await pruneLoginFailures(startedAt);

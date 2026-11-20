@@ -1,3 +1,4 @@
+import { literalLike } from "../input-text";
 import { z } from "zod";
 import { NotFoundError } from "../booking";
 import { ValidationError } from "../errors";
@@ -19,7 +20,7 @@ async function planOfTenant(ctx: PanelCtx): Promise<string> {
 /**
  * Yetki kararı (staff): müşteri listesi/ayrıntısı/notları ve raporlar YALNIZ owner'a açıktır.
  * Personel yalnızca randevu oluştururken müşteriyi bulmak için ad/telefon araması yapabilir:
- * en az 3 karakterlik sorgu zorunlu (listeleme/tarama yok), en çok 8 sonuç, sayfalama yok,
+ * en az 3 karakterlik sorgu zorunlu (boş sorguyla listeleme yok), en çok 8 sonuç, sayfalama yok,
  * ve yalnız {id, name, phone} döner (e-posta, gelmedi sayısı, izin, not yok).
  */
 export const STAFF_SEARCH_MIN = 3;
@@ -30,16 +31,16 @@ export async function searchCustomers(ctx: PanelCtx, q: z.output<typeof customer
   if (ctx.user.role !== "owner") {
     if (term.length < STAFF_SEARCH_MIN) throw new ValidationError(`En az ${STAFF_SEARCH_MIN} karakter girin`, "q");
     const digits = term.replace(/[^\d+]/g, "");
-    const or: object[] = [{ name: { contains: term, mode: "insensitive" } }];
+    const or: object[] = [{ name: { contains: literalLike(term), mode: "insensitive" } }];
     if (digits.length >= STAFF_SEARCH_MIN) or.push({ phone: { contains: digits } });
     const rows = await ctx.db.customer.findMany({ where: { OR: or }, orderBy: [{ name: "asc" }, { id: "asc" }], take: STAFF_SEARCH_MAX, select: { id: true, name: true, phone: true } });
     return { page: 1, pageSize: STAFF_SEARCH_MAX, total: rows.length, customers: rows };
   }
   const digits = term.replace(/[^\d+]/g, "");
   const or: object[] = [];
-  if (term) or.push({ name: { contains: term, mode: "insensitive" } });
+  if (term) or.push({ name: { contains: literalLike(term), mode: "insensitive" } });
   if (digits.length >= 3) or.push({ phone: { contains: digits } });
-  const where = term ? { OR: or.length ? or : [{ name: { contains: term, mode: "insensitive" as const } }] } : {};
+  const where = term ? { OR: or.length ? or : [{ name: { contains: literalLike(term), mode: "insensitive" as const } }] } : {};
   const [total, rows] = await Promise.all([
     ctx.db.customer.count({ where }),
     ctx.db.customer.findMany({ where, orderBy: [{ name: "asc" }, { id: "asc" }], skip: (q.page - 1) * q.pageSize, take: q.pageSize }),

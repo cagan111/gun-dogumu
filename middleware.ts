@@ -1,3 +1,4 @@
+import { invalidUrlText } from "@/lib/input-text";
 import { NextResponse, type NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
 import { getAuthSecret } from "@/lib/auth-secret";
@@ -6,6 +7,8 @@ import { contentSecurityPolicy, createCspNonce } from "@/lib/csp";
 /** HTML CSP uses a trusted request nonce; protected page roles remain a coarse prefilter. */
 export async function middleware(req: NextRequest) {
   const { pathname, search } = req.nextUrl;
+  if (invalidUrlText(pathname, req.nextUrl.searchParams.entries())) return NextResponse.json({ error: { code: "validation", message: "Girdi geçersiz" } }, { status: 400 });
+  if (pathname === "/api" || pathname.startsWith("/api/")) return NextResponse.next();
   const nonce = createCspNonce(), policy = contentSecurityPolicy(nonce, process.env.NODE_ENV === "development");
   const requestHeaders = new Headers(req.headers);
   requestHeaders.set("x-nonce", nonce);
@@ -25,4 +28,4 @@ export async function middleware(req: NextRequest) {
   response.headers.set("Content-Security-Policy", policy);
   return response;
 }
-export const config = { matcher: ["/((?!api/|api$|_next/static|_next/image|favicon.ico).*)"] };
+export const config = { matcher: ["/((?!_next/static/|_next/image$|favicon\\.ico$).*)"] };

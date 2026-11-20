@@ -1,3 +1,4 @@
+import { hasNul } from "./input-text";
 import { isIP } from "node:net";
 import { safeEqualHex } from "./secret";
 import { NextResponse } from "next/server";
@@ -74,8 +75,9 @@ export type ParseResult<T> = { ok: true; data: T } | { ok: false; response: Next
 
 /** Zod ile doğrular; hatada alan hatalarıyla 400 yanıtı döner. */
 export function parseWith<S extends ZodTypeAny>(schema: S, input: unknown): ParseResult<z.output<S>> {
+  if (hasNul(input)) return { ok: false, response: jsonError(400, "validation", "Girdi geçersiz") };
   const r = schema.safeParse(input);
-  if (r.success) return { ok: true, data: r.data };
+  if (r.success) return hasNul(r.data) ? { ok: false, response: jsonError(400, "validation", "Girdi geçersiz") } : { ok: true, data: r.data };
   const flat = r.error.flatten();
   return {
     ok: false,
