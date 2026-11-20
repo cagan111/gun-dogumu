@@ -3,6 +3,7 @@
  * sağlayıcı hatasında iade edilir. Kredi yetmezse WhatsApp (Salon+ ve yapılandırılmışsa) → e-posta → atla.
  */
 import { consumeCampaignHold, CampaignClaimDuplicate } from "./campaign-reservation";
+import { approvedSmsSender } from "./sender-policy";
 import { normalizePhone } from "../phone";
 import { checkSmsPolicy, lockSmsRecipient, SmsPolicyBlocked } from "./sms-policy";
 import { Prisma, type Channel, type MessageStatus } from "@prisma/client";
@@ -88,6 +89,9 @@ export async function sendMessage(input: SendInput): Promise<SendOutcome> {
   const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { plan: true, smsProvider: true, smsSenderName: true } });
   if (!tenant) throw new ValidationError("Salon bulunamadı", "tenantId");
   const sms = getSmsProvider(tenant.smsProvider, input.deps);
+  if (!approvedSmsSender(tenantId, sms.name, tenant.smsSenderName, input.deps?.env ?? process.env)) {
+    return { status: "skipped", segments: 0, reason: "sms_sender_not_approved" };
+  }
   const segments = smsSegments(input.text, sms.segmentProfile).segments;
   if (segments === 0) throw new ValidationError("Boş mesaj", "text");
 

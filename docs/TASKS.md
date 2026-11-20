@@ -219,7 +219,7 @@ Biçim: `- [ ] T-NNN | sahip: claude|codex|- | açıklama`. Başlamadan sahip ya
   - [x] T147a: custom JSON okuyucusu1MiB gerçekbayt sınırı/lockedbody400; CI362/build+on iki e2e geçti.
   - [x] BozukBearer: T140core0.41.3fix kaynak+HTTP307 ile yeniden doğrulandı; yeni middlewarefix yok.
   - [x] T147c3a: SMS başlığında API/panel ortak ASCII1..11+en az bir harf kuralı.
-  - [ ] T147c3b: tenant’a bağlı operatör onaylı başlık ve eski kayıtların dispatch kontrolü; biçim denetimi marka sahipliği sağlamaz.
+  - [x] T147c3b: operatör config ile tenant/sağlayıcı/tam başlık onayı; eski kayıtlar debit öncesi denetlenir, onaysız kampanya hold serbest. Gerçek provider onayı operatör sorumluluğu.
   - [x] T147c2: backup dizini0700/dump0600, eski dump izinleri ve yalnız kendi geçici dosyasını temizleme.
   - [x] T147c1: örnek bootstrap e-postası boş; üretim demo seed koşulsuz reddedilir, geniş e2e-prefix silme kaldırıldı.
   - [x] T147b: NUL input/URL/login ve literalLIKE müşteri araması; CI371/build+on üç e2e geçti.

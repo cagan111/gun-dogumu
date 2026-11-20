@@ -220,7 +220,7 @@ export const panelTr = {
   "camp.sessionError": "Kampanya bilgisi bu oturumda saklanamadı. Gönderim güvenli biçimde başlatılmadı; tarayıcı depolama ayarlarını kontrol edin.",
   "set.messages": "Mesajlar",
   "set.sender": "SMS gönderen adı",
-  "set.senderHint": "En çok 11 ASCII karakter ve en az bir harf; boşsa varsayılan.",
+  "set.senderHint": "Operatörün bu salon ve sağlayıcı için onayladığı başlık; en çok 11 ASCII karakter ve en az bir harf. Boşsa varsayılan.",
   "set.errSender": "En çok 11 karakter ve en az bir A–Z harfi; rakam, boşluk, nokta ve tire kullanılabilir.",
   "set.allowedCallingCodes": "SMS gönderilebilen ülke kodları",
   "set.allowedCallingCodesHint": "Ülke arama kodlarını virgülle ayırın (örn. 90, 44). Randevu ve doğrulama SMS’leri etkilenir; sınırlar UTC gününe göredir. Telefon başına tüm salonlarda toplam 6 segment/gün. Boş liste bu SMS’leri kapatır; randevu almayı engellemez.",

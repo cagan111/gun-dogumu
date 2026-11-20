@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 try { process.loadEnvFile(".env"); } catch { /* .env yok */ }
 const HAS_DB = Boolean(process.env.DATABASE_URL);
@@ -227,10 +227,15 @@ describe.skipIf(!HAS_DB)("panel API servisleri (gerçek DB)", () => {
   });
 
   it("ayarlar: owner günceller, hatırlatmalar büyükten küçüğe sıralanır; SMS talebi ve bakiye", async () => {
-    const r = await M.set.updateSettings(M.ownerA, M.set.settingsSchema.parse({ smsSenderName: "Glow Kuafor", reminderOffsets: [120, 1440], slotMinutes: 30, brandColor: "#112233", cancelHoursBefore: 6 }));
-    expect(r.reminderOffsets).toEqual([1440, 120]);
-    expect(r.slotMinutes).toBe(30);
-    expect(r.smsSenderName).toBe("Glow Kuafor");
+    await expect(M.set.updateSettings(M.ownerA, { smsSenderName: "BANKA" })).rejects.toMatchObject({ code: "validation", field: "smsSenderName" });
+    expect((await M.set.getSettings(M.ownerA)).smsSenderName).toBeNull();
+    vi.stubEnv("SMS_APPROVED_SENDERS_JSON", JSON.stringify({ [M.A.tenantId]: { mock: ["Glow Kuafor"] } }));
+    try {
+      const r = await M.set.updateSettings(M.ownerA, M.set.settingsSchema.parse({ smsSenderName: "Glow Kuafor", reminderOffsets: [120, 1440], slotMinutes: 30, brandColor: "#112233", cancelHoursBefore: 6 }));
+      expect(r.reminderOffsets).toEqual([1440, 120]);
+      expect(r.slotMinutes).toBe(30);
+      expect(r.smsSenderName).toBe("Glow Kuafor");
+    } finally { vi.unstubAllEnvs(); }
     const req = await M.set.createSmsRequest(M.ownerA, { size: 1000 });
     expect(req.status).toBe("open");
     await expect(M.set.createSmsRequest(M.ownerA, { size: 1000 })).rejects.toMatchObject({ code: "conflict" });

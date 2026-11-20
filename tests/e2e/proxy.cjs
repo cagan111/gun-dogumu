@@ -9,7 +9,7 @@ function start(cmd,args,env,log){const fd=fs.openSync(path.join(dir,log),'a',0o6
 async function ready(url){const until=Date.now()+30000;while(Date.now()<until){try{if((await fetch(url)).ok)return}catch{}await new Promise(r=>setTimeout(r,200))}throw new Error('Local test server not ready')}
 async function run(name,env){const child=start(process.execPath,[`tests/e2e/${name}.cjs`],env,`${name}.log`);const code=await new Promise(r=>child.on('exit',r));assert.equal(code,0,`Local ${name} test failed; inspect private test log`);console.log(`PASS ${name}`)}
 (async()=>{try{
- const appEnv={...process.env,TRUST_PROXY:'true',PROXY_SHARED_SECRET:secret,AUTH_URL:BASE,NEXTAUTH_URL:BASE,SMS_PROVIDER:'mock',ALLOW_REAL_SMS:'false',JOBS_QUEUE:'pgboss'};
+ const appEnv={...process.env,TRUST_PROXY:'true',PROXY_SHARED_SECRET:secret,AUTH_URL:BASE,NEXTAUTH_URL:BASE,SMS_PROVIDER:'mock',ALLOW_REAL_SMS:'false',SMS_APPROVED_SENDERS_JSON:'{}',JOBS_QUEUE:'pgboss'};
  start(process.execPath,['node_modules/next/dist/bin/next','start','-H','127.0.0.1','-p','3401'],appEnv,'app.log');await ready('http://127.0.0.1:3401/api/health');
  start(process.execPath,['tests/e2e/proxy-log-fixture.cjs'],process.env,'upstream.log');await ready('http://127.0.0.1:3412/api/health');
  const config=fs.readFileSync('Caddyfile','utf8').replace('app:3000','127.0.0.1:3401').replace('{$CADDY_SITE::80} {','{$CADDY_SITE::80} {\n bind 127.0.0.1');fs.writeFileSync(path.join(dir,'Caddyfile'),config+`\nhttp://localhost:3413 {\n bind 127.0.0.1\n reverse_proxy 127.0.0.1:3412 {\n header_up X-KR-Proxy-Token {$PROXY_SHARED_SECRET}\n }\n}\n`,{mode:0o600});

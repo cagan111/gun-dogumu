@@ -126,3 +126,5 @@ Salon bazında farklı sağlayıcı gerekiyorsa `Tenant.smsProvider` alanı `SMS
 | `/api/health` 503 (`db: down`) | `docker compose ps db`, `docker compose logs db`; disk dolu mu (`df -h`). |
 | Disk doluyor | `docker system df`; `docker image prune -f`; `./backups` ve `docker compose logs` boyutu. |
 | Her şeyi sıfırdan kurmak (VERİ SİLİNİR) | `docker compose down -v` (hacimler silinir). Önce yedek alın. |
+
+SMS özel başlıkları operatörün tenant/sağlayıcı bazlı onay kaydına bağlıdır; app ve worker için [SMS-SENDER.md](SMS-SENDER.md) yapılandırmasını uygulayın. Boş kayıt özel başlıkları reddeder; mevcut DB değeri izin sayılmaz.

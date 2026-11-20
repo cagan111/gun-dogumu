@@ -128,7 +128,7 @@ Güncelleme (20 Kasım, T147c1): aşağıdaki seed bulguları giderildi; product
 - Kayıt (`/api/auth/signup`): e-posta doğrulaması yok; 409 `field:"email"` ile e-posta kullanımı sızar (`lib/signup.ts:60`); her kayıt 100 ücretsiz SMS kredisi veriyor (`signupSalon`) → IP başına 5/saat ile kredi çiftliği (XFF atlatması #7 ile sınırsız).
 
 ### 17. SMS gönderen adı [KOD]
-20 Kasım T147c3a: biçim denetimi API/panel ortak helper ile1..11 ASCII/en az bir harf olarak sıkılaştırıldı. Aşağıdaki tenant-bağlı onay/marka taklidi bulgusu AÇIK (T147c3b); biçim değişikliği bunu çözmez.
+20 Kasım T147c3a: biçim denetimi API/panel ortak helper ile1..11 ASCII/en az bir harf olarak sıkılaştırıldı. Biçim değişikliği tek başına tenant onayı sağlamaz. T147c3b güncellemesi: özel başlık operatör config ile tenant/gerçekte kullanılan sağlayıcı/tam başlık eşleştirmesine bağlandı; owner API ve legacy dispatch denetlenir. Sağlayıcıdaki marka/kullanım hakkını operatör doğrular; otomatik doğrulama iddiası yok.
 
 `lib/panel/settings.ts:17` `smsSenderName` `^[A-Za-z0-9 .-]{1,11}$` — tenant "BANKA", "TURKCELL" gibi marka adını serbestçe seçip `sms.send(..., {sender})` ile sağlayıcıya iletiyor (`lib/messaging/send.ts` `sender: tenant.smsSenderName`). Operatör başlık onayı koruyabilir ama platform tarafında izin listesi yok.
 

@@ -1,4 +1,7 @@
 import { z } from "zod";
+import { approvedSmsSender } from "../messaging/sender-policy";
+import { getSmsProvider } from "../messaging/registry";
+import { ValidationError } from "../errors";
 import { isValidSmsSender } from "../sms-sender";
 import { appointmentChanged } from "../appointment-hook";
 import { SMS_PACKAGES } from "@/config/plans";
@@ -50,6 +53,13 @@ export async function getSettings(ctx: PanelCtx) {
 export async function updateSettings(ctx: PanelCtx, input: SettingsInput) {
   assertOwner(ctx);
   assertWritable(ctx);
+  if (typeof input.smsSenderName === "string") {
+    const tenant = await ctx.db.tenant.findUnique({ where: { id: ctx.tenantId }, select: { smsProvider: true } });
+    if (!tenant) throw new NotFoundError("Salon");
+    if (!approvedSmsSender(ctx.tenantId, getSmsProvider(tenant.smsProvider).name, input.smsSenderName)) {
+      throw new ValidationError("SMS başlığı operatör tarafından onaylanmalı", "smsSenderName");
+    }
+  }
   const data = { ...input };
   if (data.reminderOffsets) data.reminderOffsets = [...data.reminderOffsets].sort((a, b) => b - a);
   await ctx.db.tenant.update({ where: { id: ctx.tenantId }, data });

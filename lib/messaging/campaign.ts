@@ -132,8 +132,9 @@ export async function processCampaign(tenantId: string, campaignId: string, now 
     try { allowed(fresh, at); } catch { break; }
     const currentProvider = getSmsProvider(fresh.smsProvider, deps);
     if (currentProvider.name !== c.provider || smsSegments(c.body, currentProvider.segmentProfile).segments !== c.segmentsPerMessage) { await cancelCampaign(tenantId, c.requestKey); break; }
-    await sendMessage({ tenantId, to: r.phone, text: c.body, template: "campaign", reason: "campaign", campaignRecipientId: r.id,
+    const outcome = await sendMessage({ tenantId, to: r.phone, text: c.body, template: "campaign", reason: "campaign", campaignRecipientId: r.id,
       idempotencyKey: `camp:${c.id}:${r.id}:${r.attempts + 1}`, fallback: { whatsapp: false }, deps, now: at, hooks: opts.sendHooks });
+    if (outcome.reason === "sms_sender_not_approved") { await cancelCampaign(tenantId, c.requestKey); break; }
     await reconcileRecipients(tenantId, campaignId);
     await opts.hooks?.afterRecipient?.();
   }

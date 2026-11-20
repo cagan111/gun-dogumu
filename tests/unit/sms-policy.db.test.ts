@@ -22,6 +22,22 @@ const input = (tenantId: string, to: string, appointmentId?: string) => ({ tenan
 afterEach(() => vi.restoreAllMocks());
 afterAll(async () => { await prisma.tenant.deleteMany({ where: { id: { in: ids } } }); });
 describe.skipIf(!process.env.DATABASE_URL)("T142 anonymous SMS policy (real DB)", () => {
+  it("legacy sender requires exact tenant/provider approval before debit/log/provider", async () => {
+    const t = await salon();
+    await prisma.tenant.update({ where: { id: t.id }, data: { smsSenderName: "BANKA" } });
+    const sms = vi.spyOn(MockProvider.prototype, "send");
+    for (const approvals of [undefined, "{bad", "{}", JSON.stringify({ other: { mock: ["BANKA"] } }), JSON.stringify({ [t.id]: { netgsm: ["BANKA"] } }), JSON.stringify({ [t.id]: { mock: ["Banka"] } })]) {
+      const outcome = await sendMessage({ ...input(t.id, phone()), deps: { env: { SMS_PROVIDER: "mock", ALLOW_REAL_SMS: "false", SMS_APPROVED_SENDERS_JSON: approvals } } });
+      expect(outcome).toMatchObject({ status: "skipped", reason: "sms_sender_not_approved" });
+      expect(await getBalance(withTenant(t.id))).toBe(100);
+      expect(await prisma.messageLog.count({ where: { tenantId: t.id } })).toBe(0);
+      expect(sms).not.toHaveBeenCalled();
+    }
+    const approved = JSON.stringify({ [t.id]: { mock: ["BANKA"] } });
+    expect(await sendMessage({ ...input(t.id, phone()), deps: { env: { SMS_PROVIDER: "mock", ALLOW_REAL_SMS: "false", SMS_APPROVED_SENDERS_JSON: approved } } })).toMatchObject({ status: "sent" });
+    expect(sms).toHaveBeenCalledTimes(1);
+    expect(await getBalance(withTenant(t.id))).toBe(99);
+  });
   it("default country policy blocks foreign SMS before debit/provider and all fallbacks", async () => {
     const t = await salon(); const to = "+447911123456", a = await appt(t, to);
     const sms = vi.spyOn(MockProvider.prototype, "send"); const email = vi.spyOn(MockEmailProvider.prototype, "send");

@@ -17,6 +17,18 @@ const available = (id: string) => ledger.getAvailableBalance(withTenant(id));
 afterEach(() => vi.restoreAllMocks());
 afterAll(async () => { await prisma.tenant.deleteMany({ where: { id: { in: ids } } }); });
 describe.skipIf(!process.env.DATABASE_URL)("T116 durable campaigns and reservations (real DB)", () => {
+  it("unapproved legacy sender cancels pending campaign and releases hold without refund", async () => {
+    const id = await fixture(), key = crypto.randomUUID();
+    await run(id, key, { maxRecipients: 0 });
+    await prisma.tenant.update({ where: { id }, data: { smsSenderName: "BANKA" } });
+    const provider = vi.spyOn(MockProvider.prototype, "send");
+    await run(id, key);
+    expect(await available(id)).toBe(12);
+    expect(await ledger.getBalance(withTenant(id))).toBe(12);
+    expect((await prisma.campaign.findFirstOrThrow({ where: { tenantId: id } })).status).toBe("cancelled");
+    expect(await prisma.messageLog.count({ where: { tenantId: id } })).toBe(0);
+    expect(provider).not.toHaveBeenCalled();
+  });
   it("same request key never replays a completed audience; changed payload conflicts", async () => {
     const id = await fixture(), key = crypto.randomUUID(); const provider = vi.spyOn(MockProvider.prototype, "send");
     const one = await run(id, key), two = await run(id, key);

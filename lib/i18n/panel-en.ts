@@ -222,7 +222,7 @@ export const panelEn: Record<keyof typeof panelTr, string> = {
   "camp.sessionError": "Campaign details could not be saved for this session. Sending was not started; check your browser storage settings.",
   "set.messages": "Messages",
   "set.sender": "SMS sender name",
-  "set.senderHint": "Up to 11 ASCII characters with at least one letter; default if empty.",
+  "set.senderHint": "Use the header approved by the operator for this salon and provider; up to 11 ASCII characters with a letter. Default if empty.",
   "set.errSender": "Up to 11 characters with at least one A–Z letter; digits, spaces, dots and hyphens allowed.",
   "set.allowedCallingCodes": "Allowed SMS country calling codes",
   "set.allowedCallingCodesHint": "Separate calling codes with commas (for example, 90, 44). This applies to appointment and verification SMS; the daily limit uses UTC days. Maximum 6 segments per phone per day across salons. An empty list disables these SMS; booking remains available.",
