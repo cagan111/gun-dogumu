@@ -17,12 +17,14 @@ describe.skipIf(!HAS_DB)("OTP kötüye kullanım koruması (gerçek PostgreSQL)"
     return { tenantId: t.id, phone, slug: t.slug };
   }
   afterAll(async () => { if (db) { await db.prisma.tenant.deleteMany({ where: { id: { in: ids } } }); await db.prisma.$disconnect(); } });
-  it("eşzamanlı ve anlık yeniden istek tek SMS üretir; 60sn sonra yenilenebilir", async () => {
+  it("eşzamanlı ve anlık yeniden istek tek SMS üretir; geçerli kod süresince korunur, süre sonunda yenilenebilir", async () => {
     const s = await salon(); let calls = 0;
     const send = async () => { calls++; };
     await Promise.all([otp.requestOtp(s.tenantId, s.phone, { now, send }), otp.requestOtp(s.tenantId, s.phone, { now, send })]);
     expect(calls).toBe(1);
     await otp.requestOtp(s.tenantId, s.phone, { now: new Date(+now + 61_000), send });
+    expect(calls).toBe(1);
+    await otp.requestOtp(s.tenantId, s.phone, { now: new Date(+now + otp.OTP_TTL_MS + 1), send });
     expect(calls).toBe(2);
   });
   it("kayıtlı teslim hatası ve kayıtsız numara aynı 200 yanıtına dönüşür", async () => {

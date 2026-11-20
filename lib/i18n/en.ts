@@ -190,7 +190,7 @@ export const en: Dict = {
   "mine.phone": "Phone",
   "mine.sendCode": "Send code",
   "mine.sending": "Sending…",
-  "mine.codeIntro": "Enter the 6-digit code sent to {phone}.",
+  "mine.codeIntro": "Enter the 6-digit code you received by SMS ({phone}). Your previous code remains valid until it expires.",
   "mine.code": "Verification code",
   "mine.verify": "Verify",
   "mine.changePhone": "Change number",

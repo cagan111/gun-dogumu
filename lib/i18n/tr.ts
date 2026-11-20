@@ -194,7 +194,7 @@ export const tr = {
   "mine.phone": "Telefon",
   "mine.sendCode": "Kod gönder",
   "mine.sending": "Gönderiliyor…",
-  "mine.codeIntro": "{phone} numarasına gönderilen 6 haneli kodu girin.",
+  "mine.codeIntro": "SMS ile aldığınız 6 haneli kodu girin ({phone}). Önceki kodunuz süresi bitene kadar geçerlidir.",
   "mine.code": "Doğrulama kodu",
   "mine.verify": "Doğrula",
   "mine.changePhone": "Numarayı değiştir",

@@ -18,6 +18,8 @@ export const OTP_REQUESTS_PER_HOUR = 5;
 export const OTP_RESEND_WAIT_MS = 60_000;
 /** UTC günü başına salonun OTP bütçesi; başarısız girişimler de rezervasyonu tüketir. */
 export const OTP_DAILY_SEGMENT_CAP = 30;
+/** Aynı telefon günlük salon OTP bütçesinin tamamını tüketemesin. */
+export const OTP_DAILY_REQUESTS_PER_PHONE = 3;
 
 /** TR/EN arasında ayar değişse de ayrılan bütçe gönderimi kapsasın. */
 export function otpReservedSegments(): number {
@@ -112,6 +114,8 @@ export async function requestOtp(
     // Bütçe + bekleme süresi çoklu web süreçlerinde de aynı kilit altında.
     // Tenant kilidi alt tablo INSERT'lerinden önce alınmalı (FK deadlock önlemi).
     await lockTenant(tx, tenantId);
+    const usable = await tx.otp.findFirst({ where: { phone, usedAt: null, expiresAt: { gt: now }, attempts: { lt: OTP_MAX_ATTEMPTS } }, select: { id: true } });
+    if (usable) return false;
     const latest = await tx.otp.findFirst({ where: { phone }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], select: { createdAt: true } });
     if (latest && now.getTime() - latest.createdAt.getTime() < OTP_RESEND_WAIT_MS) return false;
     const dayStart = new Date(now); dayStart.setUTCHours(0, 0, 0, 0);
@@ -121,6 +125,10 @@ export async function requestOtp(
     // Eski kayıtlardaki 0 rezervasyon ilk gün tavanı delmesin; güncel en yüksek
     // OTP maliyetiyle sayılır (eski başarısız girişimler de muhafazakâr sayılır).
     const legacyCount = await tx.otp.count({ where: { createdAt: { gte: dayStart, lt: dayEnd }, reservedSegments: 0 } });
+    const phoneDay = { phone, createdAt: { gte: dayStart, lt: dayEnd } };
+    const phoneBudget = await tx.otp.aggregate({ where: phoneDay, _sum: { reservedSegments: true } });
+    const phoneLegacy = await tx.otp.count({ where: { ...phoneDay, reservedSegments: 0 } });
+    if ((phoneBudget._sum.reservedSegments ?? 0) + phoneLegacy * segments + segments > OTP_DAILY_REQUESTS_PER_PHONE * segments) return false;
     if ((budget._sum.reservedSegments ?? 0) + legacyCount * segments + segments > OTP_DAILY_SEGMENT_CAP) return false;
     await tx.otp.updateMany({ where: { phone, usedAt: null }, data: { usedAt: now } });
     await tx.otp.create({
