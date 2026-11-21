@@ -2,6 +2,7 @@
 export const JOB = {
   otpRequest: "request-otp",
   campaign: "campaign-recovery",
+  reviewRecovery: "review-recovery",
   confirmation: "send-confirmation",
   reminder: "send-reminder",
   notice: "send-notice",

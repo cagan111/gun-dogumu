@@ -35,3 +35,5 @@ Tenant kapsamlı veri erişiminin desteklediği işlemler ve güvenilir SQL yard
 Doğrulanmış pazarlama tercihi ve eski izinlerin geçişi: [MARKETING-CONSENT](docs/MARKETING-CONSENT.md).
 
 Docker/Caddy kurulumu için oturum sırrından farklı, en az 32 karakter rastgele `PROXY_SHARED_SECRET` doldurulmalıdır. Compose proxy güvenini açar; doğrudan başlatmada güven varsayılan kapalıdır. Ayrıntı: [PROXY-TRUST](docs/PROXY-TRUST.md).
+
+Varsayılan kapalı Google yorum daveti ve worker gönderim koşulları: [REVIEW-INVITES](docs/REVIEW-INVITES.md).

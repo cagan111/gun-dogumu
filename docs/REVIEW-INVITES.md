@@ -1,6 +1,6 @@
-# Yorum daveti — T105a/b1 altyapı
+# Yorum daveti — T105a/b hazır, panel T105c açık
 
-T105 henüz tamamlanmadı. API ayarları, ilk tamamlanma zamanı ve uygun ilk geçişle atomik intent hazırdır. Otomatik yorum SMS’i, yeni worker/kuyruk işi veya panel kontrolü henüz yoktur. `reviewInviteEnabled=true` bu aşamada saklanan tercihtir; teslim/gönderim sonucu değildir.
+T105 henüz tamamlanmadı; panel kontrolü T105c açıktır. API ayarları, ilk tamamlanma intent’i, atomik gönderim ve periyodik worker hazırdır. Varsayılan kapalı tercih owner API ile açıldıysa, uygun intent’ler yeni worker çalışırken otomatik değerlendirilir; enabled=true tek başına teslim garantisi değildir. Aşağıdaki b1/b2a tarihli notlar ara teslimleri anlatır; güncel worker durumu 21 Kasım T105b2b bölümündedir.
 
 ## Ayarlar
 
@@ -19,9 +19,9 @@ Appointment.completedAt ilk gerçek `completed` durum geçişinde sunucu zamanı
 
 Migration `20261120100000_review_invite_settings` yalnız yerel test DB’sine uygulandı; yeni uygulamadan önce uygulanması gerekir. Üretim deploy yapılmadı.
 
-## Açık T105b/c
+## Açık T105c
 
-T105b2, varolan intent için worker/kuyruk onarımı, max(completedAt, endsAt) sonrası gecikme/sessiz saat, güncel verified marketing consent, iptal/yeniden açılma, salon ayarı/askı, URL, kredi ve gönderim anı kontrollerini tamamlamalıdır. Eski tamamlanmaları otomatik tarayıp pazarlama gönderimine çevirmek bu temel ayarla yetkilendirilmez. T112 delivery_unknown için kör replay/ikinci iade yok; T142 ülke ve immutable telefon/tenant bütçeleri randevu bağlantılı davetlere de uygulanır. T116 kampanya hold/debit yolu burada yeniden kullanılmaz; çift debit/refund yapılmaz. Aynı randevu için ayar/URL/durum değişikliği yeni gönderim hakkı sayılmaz; exactly-once teslim iddiası kurulmaz.
+T105b, mevcut kalıcı intent için worker onarımı, max(completedAt, endsAt) sonrası gecikme/sessiz saat, güncel verified marketing consent, iptal/yeniden açılma, salon ayarı/askı, URL, kredi ve gönderim anı kontrollerini uygular. Eski tamamlanmaları otomatik tarayıp pazarlama gönderimine çevirmek bu temel ayarla yetkilendirilmez. T112 delivery_unknown için kör replay/ikinci iade yok; T142 ülke ve immutable telefon/tenant bütçeleri randevu bağlantılı davetlere de uygulanır. T116 kampanya hold/debit yolu burada yeniden kullanılmaz; çift debit/refund yapılmaz. Aynı randevu için ayar/URL/durum değişikliği yeni gönderim hakkı sayılmaz; exactly-once teslim iddiası kurulmaz.
 
 T105c panel TR+EN açık opt-in/Google URL ve gönderim maliyeti açıklamasını ekler. İşleyici hazır olmadan kullanıcı arayüzünde teslim/gönderim vaadi sunulmaz.
 
@@ -50,3 +50,15 @@ MessageLog, tek debit ve pending→processing/messageId aynı transaction’da o
 Bu parça otomatik worker/cron/pg-boss review işi bağlamaz. T105b2b pending tarama, kuyruk boşluğu onarımı ve tüketici yaşam döngüsünü tamamlamalıdır; T105b2/T105 parent ve panel T105c açıktır. API’de enabled=true saklı tercihtir, otomatik SMS vaadi değildir. Yeni migration/deploy/merge/gerçek SMS veya audit ölçümü yoktur; gerçek video ve takvim yetki kararı hâlâ eksiktir.
 
 Doğrulama: eski göndericide yeni ilk beş DB testi5FAIL→fix; final12yeni gerçek-DB/mock-provider regresyonu ve CI419/419 PASS. Transaction fault yalnız kendi UUID intent UPDATE trigger’ında üretilip finally kaldırıldı; MessageLog/debit/claim rollback birlikte doğrulandı, gerçek DB servisi kesilmedi. Eşzamanlı tekdebit, claim→optout/reoptin/configoff-on/reopen iptali, senderrevoke/noFallback, mevcut URL/askı/phone/Atnull, country/tenantbudget, quiet/due/expiry, postmarker norecall, unknown/expiredlease tekrefund+noreplay test edildi. Tek GPT-6 Luna iki salt-okunur inceleme yaptı; son incelemede somut engel yok. Final pnpm run ci419/419 + pnpm build + gerçek Caddy15e2e (review-settings/calendar-feed/nul-search/http-inputs/csp/proxy-limits/proxy-uri-logs/logout-failure/session-revocation/login-dos/otp-queue/booking/panel/flow/isolation) PASS. Sender doğrulaması Vitest+gerçek DB+mock provider düzeyindedir; mevcut tarayıcı paketi regresyondur, sürekli review worker/pg-boss consumer testi değildir. Sıradaki T105b2b→T105c; T105parent açık.
+
+
+## 21 Kasım — T105b2b periyodik yorum worker’ı
+Kalıcı ReviewInvitation tablosu işin kaynağıdır: completion sonrasında ayrı intent enqueue edilmez. Gerçek jobs/worker açılışında ve dakikalık review-recovery pg-boss işinde due pending kayıtlar taranır. İş payload’ı boş JSON’dur; telefon/URL/mesaj kuyrukta çoğaltılmaz. Varsayılan25, iç limit1..100 aday; system discovery sonrası tüm okuma/claim/yazma tenant-kapsamlıdır. B2a sabit anahtar/claim/current provider kapıları, T142 bütçeleri ve T112 tek iade/noReplay korunur. Processing/terminal kayıtlar yeniden gönderilmez. MessageLog kesinti uzlaştırması mevcut message-recovery worker’ında kalır.
+
+Sessiz saat/vade ertelemesi veya satırdaki geçici hata yalnız hâlâ pending kaydın updatedAt değerini ilerletir; oldest-first tarama aynı ertelenen grubun diğer due kayıtları sürekli tıkamasını önler. Due/expiry/snapshot değişmez; hata bilgisi/payload loglanmaz, yalnız aggregate checked/sent/errors raporlanır. Kalıcı MessageLog varken hâlâ pending kalan bozuk/legacy duplicate intent existing_attempt ile kapatılır; yeni deneme hakkı verilmez. İş yükü altında tam dakika teslim/expiry garantisi veya exactly-once iddiası yoktur.
+
+B2a notundaki “worker bağlı değil” tarihsel durum bu teslimle değişir: reviewInviteEnabled varsayılan false kalır; API’de açık tercihi ve uygun ilk completion intent’i bulunan kayıtlar, yeni worker çalışıyorsa otomatik değerlendirilir. Ayar paneli T105c hâlâ açık. Yeni migration gerekmez; app/worker birlikte güncel sürüme geçirilmeden cutover yapılmış sayılmaz. Bu çalışma deploy/merge/gerçek SMS/audit ölçümü yapmaz; gerçek video ve ortak personel takvimi kararı bekler.
+
+Doğrulama: yeni worker modülü yokken import FAIL→uygulama; beş yeni gerçek DB testi (enqueue’siz intent/concurrent sweep, quiet→expiry, bounded fairness, provider unknown noReplay/tekrefund, scoped PG UPDATE fault→rollback/retry) geçti. Fault yalnız kendi UUID intent’inde ve finally temizlendi; DB servisi kesilmedi. Gerçek sürekli TSX consumer testi ayrı rastgele pg-boss şeması ve tek fixture tenant ile üretimde kullanılan startReviewWorker fonksiyonunu çalıştırır: future intent bekler, cron kaydı boş JSON/minütlük kalır, açıkça enqueue edilen işi gerçek consumer tüketir; stop/restart sonrası ayrıca enqueue edilmeyen committed intent bulunur, iki intent için iki mock MessageLog/debit. Test dakika sınırında cron wake-up süresini veya tüm global worker handler’larını birlikte ölçmez. Kendi process grupları/DB şeması/tenant temizlenir.
+
+Final pnpm run ci424/424 + pnpm build + gerçek Caddy16e2e PASS (yeni review-worker + önceki15; booking/panel/flow/isolation dahil). Tek GPT-6 Luna salt-okunur kaynak incelemesinde somut engel yok. T105b2b/T105b2/T105b[x]; parentT105, panelT105c nedeniyle açık. Sonraki T105c→T124..129. Yeni uygulama migration’ı/deploy/merge/gerçek SMS/audit ölçümü yok; gerçek video ve eski takvim kararı hâlâ eksik.

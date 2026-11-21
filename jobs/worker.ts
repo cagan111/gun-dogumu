@@ -25,6 +25,8 @@ async function main() {
   await boss.work(JOB.monthlyCredits, wrap(JOB.monthlyCredits, () => h.handleMonthlyCredits()));
   await h.handleMessageRecovery();
   await h.handleCampaignRecovery();
+  const { startReviewWorker } = await import("./review-worker");
+  await startReviewWorker(boss);
   await boss.work(JOB.campaign, wrap(JOB.campaign, (d: Parameters<typeof h.handleCampaignRecovery>[0]) => h.handleCampaignRecovery(d)));
   await boss.schedule(JOB.campaign, "* * * * *", {}, { tz: "Asia/Famagusta" });
   await boss.work(JOB.messageRecovery, wrap(JOB.messageRecovery, () => h.handleMessageRecovery()));

@@ -150,11 +150,11 @@ Biçim: `- [ ] T-NNN | sahip: claude|codex|- | açıklama`. Başlamadan sahip ya
   - [x] T104b: owner Personel penceresi TR+EN oluşturma/tek seferlik URL gösterimi/kopyalama/döndürme/iptal; CI400/build ve genişletilmiş gerçek Caddy14e2e geçti. Harici Google/Apple hesap aboneliği denenmedi.
 - [ ] T-105 | sahip: codex | Google yorum isteği SMS'i (varsayılan kapalı)
   - [x] T105a: default-off API ayarları/Google direct URL/tenant-lock invariant+audit/ilk completedAt; CI402/build/gerçek Caddy15e2e.
-  - [ ] T105b: kalıcı tek davet intent/worker, gecikme/sessiz saat ve current consent/status/URL/kota/startDispatch kontrolleri.
+  - [x] T105b: kalıcı tek davet intent/worker, gecikme/sessiz saat ve current consent/status/URL/kota/startDispatch kontrolleri.
     - [x] T105b1: ilk uygun completion ile atomik tek snapshot/2saatdue/24saatbekleme metadata; pendingreopen/optout/configchange kalıcıskip; CI407/build/Caddy15e2e.
-    - [ ] T105b2: worker/recovery/claim/startDispatch currentgates, expiry/quiet, SMSbudget ve T112 tekrefund/unknownnoReplay.
+    - [x] T105b2: worker/recovery/claim/startDispatch currentgates, expiry/quiet, SMSbudget ve T112 tekrefund/unknownnoReplay.
       - [x] T105b2a: atomik intent+MessageLog+debit claim, güncel provider sınırı, unstarted iptal/tek iade ve terminal recovery metadata; CI419/build/gerçek Caddy15e2e PASS (sender12DB/mock; otomatik tüketici değil).
-      - [ ] T105b2b: periyodik pending tarama/pg-boss worker, kuyruk boşluğu onarımı ve gerçek tüketici yaşam döngüsü; otomatik gönderim henüz bağlı değil.
+      - [x] T105b2b: worker açılışı + dakikalık boş-payload pg-boss taraması; bounded pending/fairness, enqueue boşluğu yok; ayrı şemada gerçek sürekli TSX tüketicisi/yeniden açılış testi; CI424/build/Caddy16e2e PASS.
   - [ ] T105c: worker hazırken panel TR+EN açık opt-in/URL/maliyet akışı.
 - [ ] T-106 | sahip: codex | Panel PWA + yeni randevu bildirimi
 
