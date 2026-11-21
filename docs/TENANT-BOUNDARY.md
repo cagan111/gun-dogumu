@@ -14,3 +14,5 @@ Gerekli kilit sorguları `lib/db.ts` içindeki sabit amaçlı helper'lardadır. 
 Doğrulama: T118 ilk sekiz saf test eski kaynakta başarısız; runtime DB testleri raw/unsafe, transaction, delegate parent, global model kapsamı, nested mutation ve bağlı kilit uyuşmazlığını kapsar. Son çalıştırma sonuçları REVIEW/CODEX_CHECKPOINT ve PR tesliminde kayıtlıdır.
 
 Son Luna incelemesi: User varsayılan okuması ve Staff.user include passwordHash taşıyabileceğinden User scoped istemciden tamamen kaldırıldı; auth/admin global prisma kullanır. User/nested-user erişimi reddedilir. Subscription sistem satır kilidi de sabit lockTenantRow helperına taşındı.
+
+T124b2b1 lockMoveResources yalnız sabit Service/Staff SELECT FOR UPDATE kullanır; tenantId+id filtreleri ve raw(client,tenantId) bağlı-kimlik kontrolü korunur. Serbest sorgu/metin veya yeni global kapsam açılmaz.

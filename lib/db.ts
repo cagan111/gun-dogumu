@@ -36,6 +36,12 @@ function raw(client:SqlClient,tenantId?:string):SqlClient{
 }
 /** Fixed SQL only; callers cannot supply query text. Also usable by trusted system transactions. */
 export async function lockTenantRow(client:SqlClient,tenantId:string){await raw(client,tenantId).$queryRaw`SELECT id FROM "Tenant" WHERE id = ${tenantId} FOR UPDATE`;}
+/** Tenant -> Service -> Staff row locks: serialize move eligibility with legacy catalog writers. */
+export async function lockMoveResources(client:SqlClient,tenantId:string,serviceId:string,staffId:string){
+ const db=raw(client,tenantId);
+ await db.$queryRaw`SELECT id FROM "Service" WHERE "tenantId" = ${tenantId} AND id = ${serviceId} FOR UPDATE`;
+ await db.$queryRaw`SELECT id FROM "Staff" WHERE "tenantId" = ${tenantId} AND id = ${staffId} FOR UPDATE`;
+}
 export async function lockTenantKey(client:SqlClient,tenantId:string,key:string){await raw(client,tenantId).$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${key==='monthly'?'monthly:'+tenantId:tenantId+':'+key}))::text`;}
 /** Platform-wide safety budget: intentionally global; never returns recipient data. */
 export async function lockSmsRecipient(client:SqlClient,phone:string){await raw(client).$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${"kr-sms-safety:"+phone},0))::text`;}

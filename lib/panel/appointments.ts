@@ -1,4 +1,5 @@
-import { serviceQuoteSchema } from "../service-quote";
+import { lockMoveResources } from "../db";
+import { baseQuoteTerms, serviceQuoteSchema } from "../service-quote";
 import { z } from "zod";
 import { lockTenant } from "../ledger";
 import { prepareReviewInvitation, skipPendingReviewInvitations } from "../messaging/review-intent";
@@ -91,59 +92,68 @@ export const moveSchema = z.object({
 /** Randevuyu taşır: yeni saat/personel için müsaitlik (kendisi hariç) yeniden doğrulanır; çakışma → 409. */
 export async function moveAppointment(ctx: PanelCtx, id: string, input: z.output<typeof moveSchema>) {
   assertWritable(ctx);
-  const appt = await ctx.db.appointment.findFirst({ where: { id } });
-  if (!appt) throw new NotFoundError("Randevu");
-  if (!ACTIVE.includes(appt.status as (typeof ACTIVE)[number])) throw new AlreadyClosedError();
-  const staffId = input.staffId ?? appt.staffId;
-  const durMs = appt.endsAt.getTime() - appt.startsAt.getTime();
-  const bufMs = appt.blockedUntil.getTime() - appt.endsAt.getTime();
-  const tz = await tenantTz(ctx);
+  await ctx.db.$transaction(async (tx) => {
+    await lockTenant(tx, ctx.tenantId);
+    const tenant = await tx.tenant.findUnique({ where: { id: ctx.tenantId }, select: { status: true, timeZone: true } });
+    if (!tenant) throw new NotFoundError("Salon");
+    assertWritable({ tenantStatus: tenant.status });
+    const appt = await tx.appointment.findFirst({ where: { id } });
+    if (!appt) throw new NotFoundError("Randevu");
+    if (!ACTIVE.includes(appt.status as (typeof ACTIVE)[number])) throw new AlreadyClosedError();
+    const staffId = input.staffId ?? appt.staffId;
+    await lockMoveResources(tx, ctx.tenantId, appt.serviceId, staffId);
+    const durMs = appt.endsAt.getTime() - appt.startsAt.getTime();
+    const bufMs = appt.blockedUntil.getTime() - appt.endsAt.getTime();
+    if (!Number.isInteger(durMs / 60_000) || durMs < 5 * 60_000 || durMs > 600 * 60_000 || !Number.isInteger(bufMs / 60_000) || bufMs < 0 || bufMs > 240 * 60_000) throw new ConflictError("appointment", "Randevu süre kaydı geçersiz");
+    const tz = tenant.timeZone;
+    const service = await tx.service.findFirst({ where: { id: appt.serviceId, active: true } });
+    if (!service) throw new SlotUnavailableError();
 
-  const staff = await ctx.db.staff.findFirst({ where: { id: staffId, active: true } });
-  if (!staff) throw new NotFoundError("Personel");
-  if (staffId !== appt.staffId) {
-    const link = await ctx.db.serviceStaff.findFirst({ where: { serviceId: appt.serviceId, staffId } });
+    const staff = await tx.staff.findFirst({ where: { id: staffId, active: true } });
+    if (!staff) throw new NotFoundError("Personel");
+    const link = await tx.serviceStaff.findFirst({ where: { serviceId: appt.serviceId, staffId } });
     if (!link) throw new SlotUnavailableError();
-  }
+    if (!baseQuoteTerms(service, staff, link)) throw new ConflictError("appointment", "Personel koşulları henüz etkin değil");
 
-  const local = utcToLocal(input.startsAt, tz);
-  const range = dayRangeUtc(local.date, tz);
-  const winFrom = dayRangeUtc(addDays(local.date, -1), tz).start;
-  const winTo = dayRangeUtc(addDays(local.date, 1), tz).end;
-  const [hours, timeOff, busy] = await Promise.all([
-    ctx.db.workingHours.findMany({ where: { staffId } }),
-    ctx.db.timeOff.findMany({ where: { staffId, startsAt: { lt: winTo }, endsAt: { gt: winFrom } } }),
-    ctx.db.appointment.findMany({
-      where: { staffId, id: { not: id }, status: { in: [...ACTIVE] }, startsAt: { lt: winTo }, blockedUntil: { gt: winFrom } },
-      select: { staffId: true, startsAt: true, blockedUntil: true },
-    }),
-  ]);
-  const sa: StaffAvailabilityInput = {
-    id: staffId,
-    workingHours: hours.map((h) => ({ weekday: h.weekday, startMin: h.startMin, endMin: h.endMin, breaks: breaksOf(h.breaks) })),
-    timeOff: timeOff.map((t) => ({ startsAt: t.startsAt, endsAt: t.endsAt })),
-  };
-  const base = {
-    tenant: { timeZone: tz, slotMinutes: 5, minLeadMinutes: 0, maxAdvanceDays: 0 },
-    service: { durationMin: Math.round(durMs / 60_000), bufferMin: Math.round(bufMs / 60_000) },
-    staff: [sa], date: local.date, now: range.start,
-  };
-  const t = input.startsAt.getTime();
-  if (!computeAvailability({ ...base, busy }).some((s) => s.start.getTime() === t)) {
-    const fits = computeAvailability({ ...base, busy: [] }).some((s) => s.start.getTime() === t);
-    throw fits ? new SlotTakenError() : new SlotUnavailableError();
-  }
-  const endsAt = new Date(t + durMs);
-  try {
-    const r = await ctx.db.appointment.updateMany({
-      where: { id, status: { in: [...ACTIVE] } },
-      data: { staffId, startsAt: input.startsAt, endsAt, blockedUntil: new Date(endsAt.getTime() + bufMs) },
-    });
-    if (r.count === 0) throw new AlreadyClosedError();
-  } catch (e) {
-    if (isOverlapError(e)) throw new SlotTakenError();
-    throw e;
-  }
+    const local = utcToLocal(input.startsAt, tz);
+    const range = dayRangeUtc(local.date, tz);
+    const winFrom = dayRangeUtc(addDays(local.date, -1), tz).start;
+    const winTo = dayRangeUtc(addDays(local.date, 1), tz).end;
+    const [hours, timeOff, busy] = await Promise.all([
+      tx.workingHours.findMany({ where: { staffId } }),
+      tx.timeOff.findMany({ where: { staffId, startsAt: { lt: winTo }, endsAt: { gt: winFrom } } }),
+      tx.appointment.findMany({
+        where: { staffId, id: { not: id }, status: { in: [...ACTIVE] }, startsAt: { lt: winTo }, blockedUntil: { gt: winFrom } },
+        select: { staffId: true, startsAt: true, blockedUntil: true },
+      }),
+    ]);
+    const sa: StaffAvailabilityInput = {
+      id: staffId,
+      workingHours: hours.map((h) => ({ weekday: h.weekday, startMin: h.startMin, endMin: h.endMin, breaks: breaksOf(h.breaks) })),
+      timeOff: timeOff.map((t) => ({ startsAt: t.startsAt, endsAt: t.endsAt })),
+    };
+    const base = {
+      tenant: { timeZone: tz, slotMinutes: 5, minLeadMinutes: 0, maxAdvanceDays: 0 },
+      service: { durationMin: durMs / 60_000, bufferMin: bufMs / 60_000 },
+      staff: [sa], date: local.date, now: range.start,
+    };
+    const t = input.startsAt.getTime();
+    if (!computeAvailability({ ...base, busy }).some((s) => s.start.getTime() === t)) {
+      const fits = computeAvailability({ ...base, busy: [] }).some((s) => s.start.getTime() === t);
+      throw fits ? new SlotTakenError() : new SlotUnavailableError();
+    }
+    const endsAt = new Date(t + durMs);
+    try {
+      const r = await tx.appointment.updateMany({
+        where: { id, status: appt.status, serviceId: appt.serviceId, priceTry: appt.priceTry, staffId: appt.staffId, startsAt: appt.startsAt, endsAt: appt.endsAt, blockedUntil: appt.blockedUntil },
+        data: { staffId, startsAt: input.startsAt, endsAt, blockedUntil: new Date(endsAt.getTime() + bufMs) },
+      });
+      if (r.count === 0) throw new ConflictError("appointment", "Randevu eşzamanlı olarak değiştirildi");
+    } catch (e) {
+      if (isOverlapError(e)) throw new SlotTakenError();
+      throw e;
+    }
+  });
   await appointmentChanged(id, "moved");
   return getAppointment(ctx, id);
 }

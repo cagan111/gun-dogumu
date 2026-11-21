@@ -322,3 +322,5 @@ Final pnpm run ci435/435 + üretim build + gerçek Caddy16e2e PASS. Flow’a ger
 - 2026-11-21 — T124c1 müşteri slot seçiminde ilk doğrulanmış kesin personel teklifi bağlanır; müşteri son onaydan önce bu uzmanı/süreyi/iki haneli fiyatı görür. Public UI quote echo eder, eski API istemcileri için quote optional kalır; farklı personel koşulları ve panel/writer/taşıma ayrı entegrasyondur.
 
 - 2026-11-21 — Client quote Zod object eval probe CSP ihlali nedeniyle browser-only jitless config şema inşasından önce etkin; tarayıcı Zod JIT hız yolu kapalı, server config ve strict CSP değişmedi.
+
+- 2026-11-21 — T124b2b1 taşıma aynı anlaşılmış fiyat/süre/tamponu personel değişse de korur; aktif hizmet/hedef personel/uygunluk zorunlu. Tenant→Service→Staff row-lock sırası legacy catalog pasifleştirmeleriyle sıralar. Hook postcommit best-effort kalır; müşteri beklenen-version sözleşmesi T126’ya aittir.

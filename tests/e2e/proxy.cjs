@@ -18,7 +18,7 @@ async function run(name,env){const child=start(process.execPath,[`tests/e2e/${na
  await ready('http://localhost:3413/api/health');
  let aborted=false;try{await(await fetch('http://localhost:3413/abort',{headers:{'x-kr-proxy-token':secret,authorization:'Bearer kr-auth-marker',cookie:'kr=kr-cookie-marker'}})).text()}catch{aborted=true}assert.equal(aborted,true,'fixture must cause runtime proxy warning');
  const env={...process.env,BASE_URL:BASE,DIRECT_BASE_URL:"http://127.0.0.1:3401"};delete env.PROXY_SHARED_SECRET;
- for(const name of ['review-worker','review-settings','calendar-feed','nul-search','http-inputs','csp','proxy-limits','proxy-uri-logs','logout-failure','session-revocation','login-dos','otp-queue','booking-quote','booking','panel','flow','isolation'])await run(name,env);
+ for(const name of ['review-worker','review-settings','calendar-feed','nul-search','http-inputs','csp','proxy-limits','proxy-uri-logs','logout-failure','session-revocation','login-dos','otp-queue','move-terms','booking-quote','booking','panel','flow','isolation'])await run(name,env);
  const logs=fs.readFileSync(path.join(dir,'caddy.log'),'utf8');assert.ok(logs.includes('aborting with incomplete response'),'must inspect a real runtime warning');for(const value of [secret,'kr-auth-marker','kr-cookie-marker','kr-token-marker'])assert.equal(logs.includes(value),false,'Proxy log leaked a credential marker');
  console.log('PASS real Caddy overwrites forged IP/token headers; private headers absent from access and forced runtime-warning logs');
  }finally{stop()}})().catch(e=>{console.error(e.name,e.message,`private fixture directory: ${dir}`);process.exitCode=1});

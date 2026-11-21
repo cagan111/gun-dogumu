@@ -55,7 +55,7 @@ const BASE = process.env.BASE_URL || 'http://localhost:3000';
    const response=page.waitForResponse(r=>r.url().includes('/slots?')&&r.ok());
    await page.locator('button.w-16').nth(11).click(); await response;
    offer=await selectTime(); await next(); await confirm();
-   await page.getByRole('alert').waitFor(); assert.equal(posted.length,2); assert.deepEqual(posted[1].quote,offer);
+   await page.getByText(lang==='tr'?'Bir sorun oluştu. Lütfen tekrar deneyin.':'Something went wrong. Please try again.',{exact:true}).waitFor(); assert.equal(posted.length,2); assert.deepEqual(posted[1].quote,offer);
    assert.equal(await page.evaluate(()=>Object.keys(localStorage).some(k=>/quote/i.test(k))),false);
    // A rolling/stale slots response without offers must not enable legacy-price booking.
    await page.route('**/api/public/*/slots?*', async route => {
