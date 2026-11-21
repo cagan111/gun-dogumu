@@ -1,6 +1,6 @@
-# Yorum daveti — T105a/b hazır, panel T105c açık
+# Yorum daveti — T105 tamam
 
-T105 henüz tamamlanmadı; panel kontrolü T105c açıktır. API ayarları, ilk tamamlanma intent’i, atomik gönderim ve periyodik worker hazırdır. Varsayılan kapalı tercih owner API ile açıldıysa, uygun intent’ler yeni worker çalışırken otomatik değerlendirilir; enabled=true tek başına teslim garantisi değildir. Aşağıdaki b1/b2a tarihli notlar ara teslimleri anlatır; güncel worker durumu 21 Kasım T105b2b bölümündedir.
+API ayarları, ilk uygun completion intent’i, atomik gönderim, periyodik worker ve owner paneli hazırdır. Varsayılan kapalı tercih `/panel/ayarlar` üzerinden açıkça kaydedilir. Uygun intent’ler güncel worker çalışırken otomatik değerlendirilir; enabled=true teslim garantisi değildir. Tarihli b1/b2a notları ara teslimlerdir; güncel panel davranışı 21 Kasım T105c bölümündedir.
 
 ## Ayarlar
 
@@ -19,11 +19,11 @@ Appointment.completedAt ilk gerçek `completed` durum geçişinde sunucu zamanı
 
 Migration `20261120100000_review_invite_settings` yalnız yerel test DB’sine uygulandı; yeni uygulamadan önce uygulanması gerekir. Üretim deploy yapılmadı.
 
-## Açık T105c
+## Panel ayarı (T105c)
 
 T105b, mevcut kalıcı intent için worker onarımı, max(completedAt, endsAt) sonrası gecikme/sessiz saat, güncel verified marketing consent, iptal/yeniden açılma, salon ayarı/askı, URL, kredi ve gönderim anı kontrollerini uygular. Eski tamamlanmaları otomatik tarayıp pazarlama gönderimine çevirmek bu temel ayarla yetkilendirilmez. T112 delivery_unknown için kör replay/ikinci iade yok; T142 ülke ve immutable telefon/tenant bütçeleri randevu bağlantılı davetlere de uygulanır. T116 kampanya hold/debit yolu burada yeniden kullanılmaz; çift debit/refund yapılmaz. Aynı randevu için ayar/URL/durum değişikliği yeni gönderim hakkı sayılmaz; exactly-once teslim iddiası kurulmaz.
 
-T105c panel TR+EN açık opt-in/Google URL ve gönderim maliyeti açıklamasını ekler. İşleyici hazır olmadan kullanıcı arayüzünde teslim/gönderim vaadi sunulmaz.
+Owner paneli TR+EN açık opt-in, Google URL ve segment bazlı maliyet açıklamasını sunar. Tercih ayrı iki alanlı PATCH ile kaydedilir; genel ayar kaydı bu tercihi değiştirmez. Sayfayı yeniden yüklemek kayıtlı tercihi gösterir; yalnız başarılı yanıt kaydedildi mesajı üretir.
 
 Testler: şema pozitif alan ekleme eski kodda FAIL; gerçek DB owner/partial merge yarışları/defaultoff/ilk timestamp/MemoryQueue, stale auth→suspension regresyonu FAIL→fix; gerçek Auth.js+HTTP ayarlar/status akışı ve tüm booking/panel/flow/isolation paketi. MemoryQueue sürekli worker veya pg-boss davet tüketimi testi değildir. Gerçek Google hesabı veya SMS gönderimi yoktur.
 
@@ -62,3 +62,15 @@ B2a notundaki “worker bağlı değil” tarihsel durum bu teslimle değişir: 
 Doğrulama: yeni worker modülü yokken import FAIL→uygulama; beş yeni gerçek DB testi (enqueue’siz intent/concurrent sweep, quiet→expiry, bounded fairness, provider unknown noReplay/tekrefund, scoped PG UPDATE fault→rollback/retry) geçti. Fault yalnız kendi UUID intent’inde ve finally temizlendi; DB servisi kesilmedi. Gerçek sürekli TSX consumer testi ayrı rastgele pg-boss şeması ve tek fixture tenant ile üretimde kullanılan startReviewWorker fonksiyonunu çalıştırır: future intent bekler, cron kaydı boş JSON/minütlük kalır, açıkça enqueue edilen işi gerçek consumer tüketir; stop/restart sonrası ayrıca enqueue edilmeyen committed intent bulunur, iki intent için iki mock MessageLog/debit. Test dakika sınırında cron wake-up süresini veya tüm global worker handler’larını birlikte ölçmez. Kendi process grupları/DB şeması/tenant temizlenir.
 
 Final pnpm run ci424/424 + pnpm build + gerçek Caddy16e2e PASS (yeni review-worker + önceki15; booking/panel/flow/isolation dahil). Tek GPT-6 Luna salt-okunur kaynak incelemesinde somut engel yok. T105b2b/T105b2/T105b[x]; parentT105, panelT105c nedeniyle açık. Sonraki T105c→T124..129. Yeni uygulama migration’ı/deploy/merge/gerçek SMS/audit ölçümü yok; gerçek video ve eski takvim kararı hâlâ eksik.
+
+
+## 21 Kasım — T105c sahip paneli
+/panel/ayarlar içinde yalnız owner’a görünen ayrı TR+EN yorum formu: API’den gelen gerçek tercih yüklenene dek kontrol gösterilmez, checkbox kendiliğinden açılmaz. URL eklemek opt-in değildir; yalnız iki review alanı ayrı PATCH ile kaydedilir, genel ayar kaydı bu alanları taşımaz. Paylaşılan Google URL doğrulayıcısı/trim/blank→null; enabled+blank ve geçersiz URL istemcide yerelleştirilmiş alan hatası verir. Sunucu doğrulaması ve rol sınırı devam eder. Bekleyen istek/salon askısı alanları kapatır. Mevcut tema tokenları ve Card/Field/Button kullanılır.
+
+Metinler doğrulanmış pazarlama tercihini, ilk uygun completion’ı, geç olan bitiş/tamamlanmadan en az2saat gecikmeyi, sessiz saat/kota kontrollerini, segment bazlı kredi ve yetersiz kredide fallback olmamasını açıklar. Geçmiş randevulara toplu gönderim/teslim garantisi yok; kapatma veya URL değişikliği başlamamış intent’i kalıcı kapatır, başlamış gönderim geri çağrılamaz.
+
+Tek Luna incelemesi dil değişiminin load effect cleanup üzerinden PATCH’i iptal edebildiğini buldu. Held gerçek PATCH + dil geçişi regresyonu düzeltme öncesi ui-locale-pending aşamasında FAIL oldu. GET effect yalnız açık retry ile çalışır; dil geçişi canlı formu/süregelen mutation’ı korur. Hata kodları render sırasında güncel dille çevrilir; raw server mesajı gösterilmez. Yalnız2xx saved sonucu verir. Sunucuda commit olup yanıtı kaybolan istekte belirsizlik uyarısı ve reload ile kayıtlı tercihi kontrol akışı vardır. Unmount/reload abort sunucuda rollback değildir; tam sayfa navigasyonunda sonucu yeniden okumak gerekir. İkinci Luna salt-okunur incelemesinde somut engel kalmadı.
+
+Final doğrulama: 1ffeba0 build’de UI form eksikliği FAIL; ilk UI build’inde held-PATCH/dil geçişi aşaması FAIL→effect ayrımı düzeltildi. Son genişletilmiş review-settings gerçek Chromium/Caddy akışı TR defaultoff/invalid URL/client no-write, yalnız2alan PATCH, persist/reload, disable+blanknull, genelSave tercihkoruma, heldPATCH→English pending fence→2xx, EN375px fit, committed-response-loss→uncertain/actualDBtrue/reload, servervalidation TR→EN/rawmessageyok, suspendedreadonly+423, staffhidden+403 ve önceki completion/intent API kontrollerini geçirir. Response-loss uyarısı kart seviyesinde olduğundan test seçicisi düzeltildi; mobil dil değişimi gerçek Menü üzerinden yapılır. Assertion/timeout gevşetilmedi. OwnUUID fixture finally temizlenir; global review worker veya gerçek Google hesabı/SMS çalıştırılmaz.
+
+Final üretim build + gerçek Caddy16e2e PASS (review-worker/review-settings/calendar-feed/nul-search/http-inputs/csp/proxy-limits/proxy-uri-logs/logout-failure/session-revocation/login-dos/otp-queue/booking/panel/flow/isolation). Son e2e test düzenlemeleri sonrası tam pnpm run ci424/424 yeniden PASS. Tek GPT-6 Luna iki salt-okunur inceleme; son somut engel yok. T105c/T105[x], sıradaki bağımsız T124→125..129. Yeni migration/deploy/merge/gerçekSMS/audit ölçümü yok; gerçek video ve T147 ortak takvim kararı eksik.

@@ -1,5 +1,6 @@
 "use client";
 
+import { ReviewSettings } from "./review-settings";
 import { isValidSmsSender } from "@/lib/sms-sender";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -36,7 +37,7 @@ export function SettingsView() {
       <h2 className="text-xl font-extrabold">{t("nav.settings")}</h2>
       <PublicLink slug={tenant.slug} />
       <SmsCard />
-      {isOwner ? <><Campaign /><SettingsForm /></> : <Alert tone="info">{t("ownerOnly")}</Alert>}
+      {isOwner ? <><Campaign /><ReviewSettings /><SettingsForm /></> : <Alert tone="info">{t("ownerOnly")}</Alert>}
     </div>
   );
 }

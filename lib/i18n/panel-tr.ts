@@ -1,5 +1,20 @@
 /** Salon paneli + süper-admin metinleri (tr). tr.ts içine yayılır; en karşılığı panel-en.ts. */
 export const panelTr = {
+  "review.retry": "Yeniden dene",
+  "review.title": "Google yorum daveti",
+  "review.enable": "Tamamlanan randevular için yorum daveti SMS’ini aç",
+  "review.url": "Google yorum bağlantısı",
+  "review.urlHint": "Google işletmenize ait doğrudan bağlantıyı girin. Bağlantı eklemek SMS gönderimini kendiliğinden açmaz.",
+  "review.explain": "Varsayılan kapalıdır. Yalnız açıkken ilk kez tamamlanan randevular için, doğrulanmış pazarlama izni olan müşteriler değerlendirilir. Randevu bitişi ve tamamlanmanın geç olanından en az 2 saat sonra; sessiz saat, güncel izin ve kota kontrolleriyle tek davet denenir. Geçmiş randevulara toplu gönderim yapılmaz.",
+  "review.cost": "Gönderim SMS bakiyesinden segment kadar kredi kullanır; dil ve bağlantı uzunluğu birden fazla segment gerektirebilir. Kredi yetersizse SMS ve alternatif kanal gönderilmez. Teslim garantisi verilmez.",
+  "review.disableHint": "Kapatmak veya bağlantıyı değiştirmek başlamamış davetleri kalıcı iptal eder; yeniden açmak bunları canlandırmaz. Başlamış gönderim geri çağrılamaz. Bağlantıyı silmek için önce kapatın.",
+  "review.required": "Açmak için geçerli bir Google yorum bağlantısı girin.",
+  "review.invalid": "Doğrudan Google yorum bağlantısı kullanın (g.page/r/…/review veya search.google.com/local/writereview).",
+  "review.save": "Yorum ayarlarını kaydet",
+  "review.saving": "Kaydediliyor…",
+  "review.saved": "Yorum ayarları kaydedildi.",
+  "review.uncertain": "Kaydetme sonucu doğrulanamadı. Sayfayı yeniden yükleyip kayıtlı tercihi kontrol edin.",
+
   "panel.logoutError": "Çıkış doğrulanamadı. Oturumlarınız hâlâ açık olabilir; lütfen yeniden deneyin.",
   "common.cancel": "Vazgeç",
   "common.save": "Kaydet",

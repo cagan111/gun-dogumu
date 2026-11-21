@@ -1,12 +1,53 @@
-/** T105a/b1 configuration/completion/intent API; no invitation worker is enabled. */
+/** T105 settings UI/API regression; this harness does not start the global worker. */
 const assert=require('node:assert/strict');const {execFileSync}=require('node:child_process');const {existsSync}=require('node:fs');const {chromium}=require('playwright');
 const pnpm=process.env.KR_PNPM||(existsSync('/tmp/kr-pnpm')?'/tmp/kr-pnpm':'pnpm'),BASE=process.env.BASE_URL||'http://localhost:3400';
-function fixture(mode,data){const code=`try{process.loadEnvFile('.env')}catch{};import{createCalendarFixture,cleanupCalendarFixture,setCalendarFixtureConsent,inspectCalendarFixtureReview}from './tests/fixtures/calendar-feed';const p=process.env.KR_REV_MODE==='create'?createCalendarFixture():process.env.KR_REV_MODE==='consent'?setCalendarFixtureConsent(JSON.parse(process.env.KR_REV_FIXTURE)):process.env.KR_REV_MODE==='inspect'?inspectCalendarFixtureReview(JSON.parse(process.env.KR_REV_FIXTURE)):cleanupCalendarFixture(JSON.parse(process.env.KR_REV_FIXTURE));p.then(x=>{console.log(JSON.stringify(x??null));process.exit(0)}).catch(()=>process.exit(1));`;return JSON.parse(execFileSync(pnpm,['exec','tsx','-e',code],{env:{...process.env,KR_REV_MODE:mode,KR_REV_FIXTURE:JSON.stringify(data)},encoding:'utf8',timeout:30000}).trim().split('\n').at(-1));}
+function fixture(mode,data){const code=`try{process.loadEnvFile('.env')}catch{};import{createCalendarFixture,cleanupCalendarFixture,setCalendarFixtureConsent,inspectCalendarFixtureReview,setCalendarFixtureStatus}from './tests/fixtures/calendar-feed';const p=process.env.KR_REV_MODE==='create'?createCalendarFixture():process.env.KR_REV_MODE==='consent'?setCalendarFixtureConsent(JSON.parse(process.env.KR_REV_FIXTURE)):process.env.KR_REV_MODE==='inspect'?inspectCalendarFixtureReview(JSON.parse(process.env.KR_REV_FIXTURE)):process.env.KR_REV_MODE==='suspend'?setCalendarFixtureStatus(JSON.parse(process.env.KR_REV_FIXTURE),'suspended'):process.env.KR_REV_MODE==='activate'?setCalendarFixtureStatus(JSON.parse(process.env.KR_REV_FIXTURE),'active'):cleanupCalendarFixture(JSON.parse(process.env.KR_REV_FIXTURE));p.then(x=>{console.log(JSON.stringify(x??null));process.exit(0)}).catch(()=>process.exit(1));`;return JSON.parse(execFileSync(pnpm,['exec','tsx','-e',code],{env:{...process.env,KR_REV_MODE:mode,KR_REV_FIXTURE:JSON.stringify(data)},encoding:'utf8',timeout:30000}).trim().split('\n').at(-1));}
 async function login(context,email){const page=await context.newPage();await page.goto(`${BASE}/giris`);await page.locator('input[name="email"]').fill(email);await page.locator('input[name="password"]').fill('CalendarFixture123!');await page.getByRole('button',{name:'Giriş yap',exact:true}).click();await page.waitForURL(u=>u.pathname.startsWith('/panel'));return page;}
+let stage="fixture", releaseHeld;
 (async()=>{let f,browser;try{
- f=fixture('create');browser=await chromium.launch({executablePath:process.env.CHROMIUM_EXECUTABLE_PATH});const ctx=await browser.newContext({locale:'tr-TR'});await login(ctx,f.email);
+ f=fixture('create');browser=await chromium.launch({executablePath:process.env.CHROMIUM_EXECUTABLE_PATH});const ctx=await browser.newContext({locale:'tr-TR'});const page=await login(ctx,f.email);
  const settings=`${BASE}/api/panel/settings`,status=`${BASE}/api/panel/appointments/${f.appointmentId}/status`,url='https://g.page/r/C_fixture-1/review';
  assert.equal((await ctx.request.get(settings)).status(),200);assert.equal((await(await ctx.request.get(settings)).json()).reviewInviteEnabled,false);
+ stage='ui-default';await page.goto(`${BASE}/panel/ayarlar`);
+ const form=page.getByRole('form',{name:'Google yorum daveti'});await form.waitFor({state:'visible',timeout:5000});
+ const toggle=form.getByRole('checkbox'),field=form.getByLabel('Google yorum bağlantısı',{exact:true}),save=form.getByRole('button',{name:'Yorum ayarlarını kaydet',exact:true});
+ assert.equal(await toggle.isChecked(),false);assert.equal(await field.inputValue(),'');
+ let writes=0;page.on('request',r=>{if(r.url()===settings&&r.method()==='PATCH')writes++});
+ await toggle.check();await save.click();await form.getByText('Açmak için geçerli bir Google yorum bağlantısı girin.',{exact:true}).waitFor();assert.equal(writes,0);
+ await field.fill('https://evil.example/review');await save.click();await form.getByText('Doğrudan Google yorum bağlantısı kullanın (g.page/r/…/review veya search.google.com/local/writereview).',{exact:true}).waitFor();assert.equal(writes,0);
+ await toggle.uncheck();await field.fill(url);assert.equal(await toggle.isChecked(),false);
+ async function saveReview(){const [r]=await Promise.all([page.waitForResponse(r=>r.url()===settings&&r.request().method()==='PATCH'),save.click()]);assert.equal(r.status(),200);assert.deepEqual(Object.keys(r.request().postDataJSON()).sort(),['reviewInviteEnabled','reviewInviteUrl']);await form.getByText('Yorum ayarları kaydedildi.',{exact:true}).waitFor();}
+ await saveReview();assert.equal((await(await ctx.request.get(settings)).json()).reviewInviteEnabled,false);
+ await toggle.check();await saveReview();await page.reload();await form.waitFor();assert.equal(await toggle.isChecked(),true);assert.equal(await field.inputValue(),url);
+ const [generalResponse]=await Promise.all([page.waitForResponse(r=>r.url()===settings&&r.request().method()==='PATCH'),page.getByRole('button',{name:'Kaydet',exact:true}).last().click()]);assert.equal(generalResponse.status(),200);assert.equal('reviewInviteEnabled' in generalResponse.request().postDataJSON(),false);assert.equal('reviewInviteUrl' in generalResponse.request().postDataJSON(),false);assert.equal((await(await ctx.request.get(settings)).json()).reviewInviteEnabled,true);
+ await field.fill('');await save.click();await form.getByText('Açmak için geçerli bir Google yorum bağlantısı girin.',{exact:true}).waitFor();
+ await toggle.uncheck();await saveReview();await page.reload();assert.equal(await toggle.isChecked(),false);assert.equal(await field.inputValue(),'');
+ stage='ui-locale-pending';
+ await field.fill(url);await toggle.check();
+ let enter,release;const entered=new Promise(r=>enter=r),hold=new Promise(r=>{release=r;releaseHeld=r;});
+ const held=async route=>{if(route.request().method()!=='PATCH')return route.continue();enter();await hold;const response=await route.fetch();await route.fulfill({response});};
+ await page.route(settings,held);await save.click();await entered;
+ await ctx.addCookies([{name:'lang',value:'en',url:BASE}]);await page.getByRole('button',{name:'English',exact:true}).click();
+ const enForm=page.getByRole('form',{name:'Google review invitations'});await enForm.waitFor();
+ assert.equal(await enForm.getByRole('checkbox').isDisabled(),true,'locale change must keep pending mutation fenced');assert.equal(await enForm.getByRole('checkbox').isChecked(),true);
+ release();await enForm.getByText('Review settings saved.',{exact:true}).waitFor();await page.unroute(settings,held);
+ await page.setViewportSize({width:375,height:812});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+ assert.equal(await enForm.getByRole('checkbox').isChecked(),true);
+ await ctx.addCookies([{name:'lang',value:'tr',url:BASE}]);await page.reload();
+ await toggle.uncheck();await field.fill('');await saveReview();
+ stage='ui-response-loss';
+ await field.fill(url);await toggle.check();
+ const lost=async route=>{if(route.request().method()!=='PATCH')return route.continue();await route.fetch();await route.abort('failed');};
+ await page.route(settings,lost);await save.click();await page.getByText('Kaydetme sonucu doğrulanamadı. Sayfayı yeniden yükleyip kayıtlı tercihi kontrol edin.',{exact:true}).waitFor();
+ assert.equal(await form.getByText('Yorum ayarları kaydedildi.',{exact:true}).count(),0);assert.equal((await(await ctx.request.get(settings)).json()).reviewInviteEnabled,true);
+ await page.unroute(settings,lost);await page.reload();assert.equal(await toggle.isChecked(),true);await toggle.uncheck();await field.fill('');await saveReview();
+ stage='ui-server-validation';await field.fill(url);
+ const invalid=async route=>{if(route.request().method()!=='PATCH')return route.continue();await route.fulfill({status:400,contentType:'application/json',body:JSON.stringify({error:{code:'validation',message:'PRIVATE_VALIDATION'}})});};
+ await page.route(settings,invalid);await save.click();await form.getByText('Doğrudan Google yorum bağlantısı kullanın (g.page/r/…/review veya search.google.com/local/writereview).',{exact:true}).waitFor();assert.equal(await page.getByText('PRIVATE_VALIDATION').count(),0);
+ await page.getByLabel('Menü',{exact:true}).click();
+ await ctx.addCookies([{name:'lang',value:'en',url:BASE}]);await page.getByRole('button',{name:'English',exact:true}).click();await enForm.getByText('Use a direct Google review link (g.page/r/…/review or search.google.com/local/writereview).',{exact:true}).waitFor();
+ await page.unroute(settings,invalid);await ctx.addCookies([{name:'lang',value:'tr',url:BASE}]);await page.reload();
+ stage='api-existing';
  assert.equal((await ctx.request.patch(settings,{data:{reviewInviteEnabled:true}})).status(),400);
  for(const bad of ['https://google.com/url?q=https://evil.example','https://g.page.evil.example/r/id/review','https://g.page/r/id/review#evil'])assert.equal((await ctx.request.patch(settings,{data:{reviewInviteUrl:bad}})).status(),400);
  assert.equal((await ctx.request.patch(settings,{data:{reviewInviteEnabled:true,reviewInviteUrl:url}})).status(),200);
@@ -19,6 +60,7 @@ async function login(context,email){const page=await context.newPage();await pag
  result=await ctx.request.post(status,{data:{status:'completed'}});assert.equal((await result.json()).completedAt,first);
  snapshot=fixture('inspect',f);assert.equal(snapshot.rows.length,1);assert.equal(snapshot.rows[0].id,intentId);assert.equal(snapshot.rows[0].status,'skipped');assert.equal(snapshot.rows[0].finishedReason,'appointment_changed');assert.equal(snapshot.messages,0);assert.equal(snapshot.ledgerRows,0);
  assert.equal((await ctx.request.patch(settings,{data:{reviewInviteEnabled:false,reviewInviteUrl:null}})).status(),200);
- const staff=await browser.newContext({locale:'tr-TR'});await login(staff,f.staffEmail);assert.equal((await staff.request.patch(settings,{data:{reviewInviteEnabled:true,reviewInviteUrl:url}})).status(),403);
- console.log('PASS review settings default-off/Google-only/owner/first-completion API');
-}finally{if(browser)await browser.close();if(f)fixture('cleanup',f);}})().catch(()=>{console.error('Review settings HTTP regression failed; private fixture data omitted');process.exitCode=1;});
+ stage='ui-suspended';fixture('suspend',f);await page.reload();await form.waitFor();assert.equal(await toggle.isDisabled(),true);assert.equal(await save.isDisabled(),true);assert.equal((await ctx.request.patch(settings,{data:{reviewInviteEnabled:true,reviewInviteUrl:url}})).status(),423);fixture('activate',f);await page.reload();assert.equal(await toggle.isDisabled(),false);
+ stage='ui-staff';const staff=await browser.newContext({locale:'tr-TR'});const staffPage=await login(staff,f.staffEmail);await staffPage.goto(`${BASE}/panel/ayarlar`);assert.equal(await staffPage.getByRole('form',{name:'Google yorum daveti'}).count(),0);assert.equal((await staff.request.patch(settings,{data:{reviewInviteEnabled:true,reviewInviteUrl:url}})).status(),403);
+ console.log('PASS review settings TR/EN mobile UI/defaultoff/isolated save/locale-pending/network uncertainty/server validation/suspended/staff + API intent regressions');
+}finally{releaseHeld?.();if(browser)await browser.close();if(f)fixture('cleanup',f);}})().catch(e=>{console.error('Review settings regression failed at '+stage+'; '+e.name+'; '+(String(e.stack).match(/review-settings.cjs:\d+:\d+/)?.[0]??'unknown location')+'; private fixture data omitted');process.exitCode=1;});

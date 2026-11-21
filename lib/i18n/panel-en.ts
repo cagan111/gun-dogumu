@@ -2,6 +2,21 @@ import type { panelTr } from "./panel-tr";
 
 /** Panel + super-admin strings (en). Must mirror panel-tr.ts. */
 export const panelEn: Record<keyof typeof panelTr, string> = {
+  "review.retry": "Try again",
+  "review.title": "Google review invitations",
+  "review.enable": "Enable review invitation SMS for completed appointments",
+  "review.url": "Google review link",
+  "review.urlHint": "Enter the direct link for your Google business. Adding a link does not enable SMS automatically.",
+  "review.explain": "Off by default. Only appointments first completed while enabled are considered, for customers with verified marketing consent. One invitation is attempted at least 2 hours after the later of completion and appointment end, subject to quiet hours, current consent and quotas. Past appointments are not sent bulk invitations.",
+  "review.cost": "Sending uses SMS credits per segment; language and link length may require multiple segments. Insufficient credit means no SMS or fallback channel. Delivery is not guaranteed.",
+  "review.disableHint": "Disabling or changing the link permanently cancels invitations that have not started; enabling again does not revive them. Started delivery cannot be recalled. Disable before clearing the link.",
+  "review.required": "Enter a valid Google review link before enabling.",
+  "review.invalid": "Use a direct Google review link (g.page/r/…/review or search.google.com/local/writereview).",
+  "review.save": "Save review settings",
+  "review.saving": "Saving…",
+  "review.saved": "Review settings saved.",
+  "review.uncertain": "The save result could not be confirmed. Reload the page to check the stored preference.",
+
   "panel.logoutError": "Sign out could not be confirmed. Your sessions may still be active; please try again.",
   "common.cancel": "Cancel",
   "common.save": "Save",
