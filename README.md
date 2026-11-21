@@ -37,3 +37,5 @@ Doğrulanmış pazarlama tercihi ve eski izinlerin geçişi: [MARKETING-CONSENT]
 Docker/Caddy kurulumu için oturum sırrından farklı, en az 32 karakter rastgele `PROXY_SHARED_SECRET` doldurulmalıdır. Compose proxy güvenini açar; doğrudan başlatmada güven varsayılan kapalıdır. Ayrıntı: [PROXY-TRUST](docs/PROXY-TRUST.md).
 
 Varsayılan kapalı Google yorum daveti ve worker gönderim koşulları: [REVIEW-INVITES](docs/REVIEW-INVITES.md).
+
+Personel bazlı süre/fiyat temeli (T124a; rezervasyonda henüz etkin değil): [STAFF-SERVICE-TERMS](docs/STAFF-SERVICE-TERMS.md).

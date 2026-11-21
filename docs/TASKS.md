@@ -187,6 +187,8 @@ Biçim: `- [ ] T-NNN | sahip: claude|codex|- | açıklama`. Başlamadan sahip ya
 Önce mevcut güvenlik sırası T112→T113→T114→T115→T116→T117→T118; ardından T104/T105 ve aşağıdaki işler. Aynı özellik için ikinci uygulama açılmaz; mevcut ServiceStaff/panel taşıma kodu genişletilir. Ayrıntılar docs/PRODUCT_NEXT.md.
 - [x] T-123 | sahip: codex | Claude6988228345: ana sayfa KVKK ifadesini KKTC için nötr kişisel veri ifadesine çevir (TR+EN); T112 teslimiyle
 - [ ] T-124 | sahip: codex | Personel bazlı hizmet uygunluğu ve gerekiyorsa süre/fiyat farklarını mevcut rezervasyon motoruna bağla; fiyat snapshot, mesai/çakışma ve tenant testleri
+  - [x] T124a: mevcut ServiceStaff üstünde nullable fark alanları/DB aralıkları ve saf kimlik+tenant kontrollü decimal koşul çözümleyici; henüz rezervasyonda/UI’da etkin değil; CI429/build/Caddy16e2e PASS, STAFF-SERVICE-TERMS.md.
+  - [ ] T124b/c: ortak teklif/public+panel oluşturma/taşıma+snapshot+rapor ve TR+EN UI; müşteri onayı, bağ koruma/yazma yetkisi, yarış ve DST testleri.
 - [ ] T-125 | sahip: codex | Bekleme listesi: açık rıza, süre sonu, iptal, boşluk için idempotent davet; rezervasyon önceliği iddiası yok, SMS mock
 - [ ] T-126 | sahip: codex | Müşterinin güvenli bağlantıdan randevu taşıması: iptal/taşıma süresi kuralı, atomik çakışma kontrolü, hatırlatmaların yenilenmesi, paralel/izolasyon testleri
 - [ ] T-127 | sahip: codex | Gerçek izinli berber videosu ve salon fotoğrafları; lisans/izin kaydı, mobil bütçe, hareket/veri tasarrufu; erişim/varlık yoksa açık eksik bırak

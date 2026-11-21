@@ -186,6 +186,9 @@ model Service {
 }
 
 model ServiceStaff {
+  /// Null inherits the salon service default; not activated in booking until T124b.
+  durationMinOverride Int?
+  priceTryOverride Decimal? @db.Decimal(10, 2)
   tenantId  String
   tenant    Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   serviceId String
