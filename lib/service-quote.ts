@@ -1,6 +1,9 @@
 /** Client-confirmed quote is an expectation, not an authorization token or slot hold. */
 import { z } from "zod";
 import { effectiveServiceTerms, servicePriceText } from "./service-terms";
+// Zod object construction probes eval unless JIT is disabled before construction.
+// Browser CSP forbids eval; server validation keeps its existing configuration.
+if (typeof window !== "undefined") z.config({ jitless: true });
 export const serviceQuoteSchema = z.object({
   serviceId: z.string().min(1).max(64), staffId: z.string().min(1).max(64).refine(v => v !== "any"),
   startsAt: z.string().datetime({ offset: true }).transform(v => new Date(v).toISOString()),

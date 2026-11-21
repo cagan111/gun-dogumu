@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { serviceQuoteSchema, type ServiceQuote } from "@/lib/service-quote";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Field, Spinner } from "@/components/ui/field";
 import { Button, buttonClass } from "@/components/ui/button";
@@ -10,7 +11,7 @@ import { addDays } from "@/lib/time";
 
 interface Service { id: string; nameTr: string; nameEn: string | null; durationMin: number; priceTry: number; staffIds: string[] }
 interface Staff { id: string; name: string; photoUrl: string | null }
-interface Slot { startsAt: string; time: string; staffIds: string[] }
+interface Slot { startsAt: string; time: string; staffIds: string[]; offers: ServiceQuote[] }
 interface Props { slug: string; salonName: string; timeZone: string; today: string; maxAdvanceDays: number; services: Service[]; staff: Staff[] }
 interface Done { cancelUrl: string; startsAt: string }
 
@@ -36,6 +37,9 @@ export function BookingFlow({ slug, salonName, timeZone, today, maxAdvanceDays, 
   const [date, setDate] = useState(today);
   const [slots, setSlots] = useState<Slot[] | null>(null);
   const [slot, setSlot] = useState<Slot | null>(null);
+  const [quote, setQuote] = useState<ServiceQuote | null>(null);
+  const slotsGeneration = useRef(0);
+  const submitting = useRef(false);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("+90 ");
   const [email, setEmail] = useState("");
@@ -44,6 +48,7 @@ export function BookingFlow({ slug, salonName, timeZone, today, maxAdvanceDays, 
   const [submitted, setSubmitted] = useState(false);
   const [serverErrors, setServerErrors] = useState<Record<string, string>>({});
   const [banner, setBanner] = useState<string | null>(null);
+  const [termsChanged, setTermsChanged] = useState(false);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState<Done | null>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -52,26 +57,41 @@ export function BookingFlow({ slug, salonName, timeZone, today, maxAdvanceDays, 
   const svcName = (s: Service) => (locale === "en" && s.nameEn ? s.nameEn : s.nameTr);
   const eligibleStaff = useMemo(() => (service ? staff.filter((s) => service.staffIds.includes(s.id)) : []), [service, staff]);
   const days = useMemo(() => Array.from({ length: maxAdvanceDays }, (_, i) => addDays(today, i)), [today, maxAdvanceDays]);
-  const staffLabel = staffId === "any" ? t("b.staff.any") : (staff.find((s) => s.id === staffId)?.name ?? "");
+  const staffLabel = quote ? (staff.find(s => s.id === quote.staffId)?.name ?? "") : staffId === "any" ? t("b.staff.any") : (staff.find((s) => s.id === staffId)?.name ?? "");
+
+  const quotePrice = quote ? `${new Intl.NumberFormat(locale === "tr" ? "tr-TR" : "en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(quote.priceTry))} TL` : "";
 
   // adım değişince başlığa odaklan (ekran okuyucu + klavye)
   useEffect(() => { headingRef.current?.focus(); window.scrollTo({ top: 0 }); }, [step, done]);
 
+  function resetSlots() {
+    ++slotsGeneration.current; setSlots(null); setSlot(null); setQuote(null);
+  }
+
   const loadSlots = useCallback(async (signal?: AbortSignal) => {
     if (!service) return;
-    setSlots(null);
+    const generation = ++slotsGeneration.current;
+    setSlots(null); setSlot(null); setQuote(null);
     try {
       const qs = new URLSearchParams({ serviceId: service.id, staffId, date });
       const res = await fetch(`/api/public/${slug}/slots?${qs}`, { signal, cache: "no-store" });
       if (!res.ok) throw new Error(String(res.status));
       const j = (await res.json()) as { slots: Slot[] };
-      setSlots(j.slots);
+      if (signal?.aborted || generation !== slotsGeneration.current) return;
+      // Missing/malformed offers cannot silently fall back to catalog prices.
+      const safeSlots = j.slots.filter(s => Array.isArray(s.offers)).map(s => ({ ...s, offers: s.offers.flatMap(raw => {
+        const parsed = serviceQuoteSchema.safeParse(raw);
+        if (!parsed.success) return [];
+        const q = parsed.data;
+        return q.serviceId === service.id && q.startsAt === s.startsAt && s.staffIds.includes(q.staffId) && staff.some(p => p.id === q.staffId) && (staffId === "any" || q.staffId === staffId) ? [q] : [];
+      }) })).filter(s => s.offers.length > 0);
+      setSlots(safeSlots);
     } catch (e) {
-      if ((e as Error).name === "AbortError") return;
+      if (signal?.aborted || generation !== slotsGeneration.current || (e as Error).name === "AbortError") return;
       setSlots([]);
       setBanner(t("common.genericError"));
     }
-  }, [service, staffId, date, slug, t]);
+  }, [service, staffId, date, slug, staff, t]);
 
   useEffect(() => {
     if (step !== 3) return;
@@ -108,16 +128,17 @@ export function BookingFlow({ slug, salonName, timeZone, today, maxAdvanceDays, 
   }
 
   async function submit() {
-    if (!service || !slot || !validateDetails()) return;
-    setBusy(true); setBanner(null); setServerErrors({});
-    // "Fark etmez" ise slotun ilk uygun personeli; sunucu yarışta yeniden atar
-    const chosen = staffId === "any" ? "any" : staffId;
+    if (submitting.current || !service || !slot || !quote || !validateDetails()) return;
+    submitting.current = true;
+    setBusy(true); setBanner(null); setTermsChanged(false); setServerErrors({});
+    // The displayed exact offer is frozen for this request; no alternate-staff fallback.
+    const chosen = quote.staffId;
     try {
       const res = await fetch(`/api/public/${slug}/appointments`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          serviceId: service.id, staffId: chosen, startsAt: slot.startsAt,
+          serviceId: service.id, staffId: chosen, startsAt: slot.startsAt, quote,
           customer: { name: name.trim(), phone: phone.trim(), ...(email.trim() ? { email: email.trim() } : {}), locale },
           kvkkAccepted: true, marketingConsent: false,
         }),
@@ -130,9 +151,9 @@ export function BookingFlow({ slug, salonName, timeZone, today, maxAdvanceDays, 
       const j = (await res.json().catch(() => ({}))) as { error?: { code?: string } };
       const code = j.error?.code;
       if (res.status === 409 || code === "slot_taken") {
-        setBanner(t("b.err.slotTaken")); setSlot(null); setStep(3); // slotlar adım 3 efektiyle tazelenir
+        if (code === "conflict") setTermsChanged(true); else setBanner(t("b.err.slotTaken")); setSlot(null); setQuote(null); setStep(3); // slotlar adım 3 efektiyle tazelenir
       } else if (res.status === 422) {
-        setBanner(t("b.err.unavailable")); setSlot(null); setStep(3);
+        setBanner(t("b.err.unavailable")); setSlot(null); setQuote(null); setStep(3);
       } else if (res.status === 423) {
         window.location.reload();
       } else if (res.status === 429) {
@@ -146,22 +167,22 @@ export function BookingFlow({ slug, salonName, timeZone, today, maxAdvanceDays, 
     } catch {
       setBanner(t("common.genericError"));
     } finally {
-      setBusy(false);
+      submitting.current = false; setBusy(false);
     }
   }
 
-  const canNext = step === 1 ? !!service : step === 2 ? true : step === 3 ? !!slot : true;
+  const canNext = step === 1 ? !!service : step === 2 ? true : step === 3 ? !!slot && !!quote : true;
   function next() {
-    setBanner(null);
+    setBanner(null); setTermsChanged(false);
     if (step < STEPS) setStep(step + 1);
   }
   function back() {
-    setBanner(null);
+    setBanner(null); setTermsChanged(false);
     if (step > 1) setStep(step - 1);
   }
 
   /* ───────── başarı ekranı ───────── */
-  if (done && service && slot) {
+  if (done && service && slot && quote) {
     const full = typeof window !== "undefined" ? `${window.location.origin}${done.cancelUrl}` : done.cancelUrl;
     return (
       <main className="mx-auto max-w-2xl px-4 py-8">
@@ -177,7 +198,8 @@ export function BookingFlow({ slug, salonName, timeZone, today, maxAdvanceDays, 
             <Row k={t("b.summary.service")} v={svcName(service)} />
             <Row k={t("b.summary.staff")} v={staffLabel} />
             <Row k={t("b.summary.when")} v={formatWhen(slot.startsAt, locale, timeZone)} />
-            <Row k={t("b.summary.total")} v={formatPrice(service.priceTry, locale)} />
+            <Row k={t("b.summary.duration")} v={t("common.minutes", { n: quote.durationMin })} />
+            <Row k={t("b.summary.total")} v={quotePrice} />
           </dl>
           <p className="mt-5 text-sm text-slate-700">{t("b.success.cancelHint")}</p>
           <a href={done.cancelUrl} data-testid="cancel-link" className={buttonClass("primary", "mt-2 w-full")}>{t("b.success.cancelLink")}</a>
@@ -203,7 +225,7 @@ export function BookingFlow({ slug, salonName, timeZone, today, maxAdvanceDays, 
       </div>
       <h2 ref={headingRef} tabIndex={-1} className="booking-step-heading display-heading text-2xl font-semibold">{titles[step - 1]}</h2>
       {step === 1 ? <p className="mt-1 text-sm text-slate-700">{t("b.service.sub")}</p> : null}
-      {banner ? <Alert className="mt-3">{banner}</Alert> : null}
+      {termsChanged || banner ? <Alert className="mt-3">{termsChanged ? t("b.err.quoteChanged") : banner}</Alert> : null}
 
       {/* Adım 1 – hizmet */}
       {step === 1 ? (
@@ -216,7 +238,7 @@ export function BookingFlow({ slug, salonName, timeZone, today, maxAdvanceDays, 
                 <button
                   type="button"
                   aria-pressed={sel}
-                  onClick={() => { setService(s); if (staffId !== "any" && !s.staffIds.includes(staffId)) setStaffId("any"); setSlot(null); }}
+                  onClick={() => { setService(s); if (staffId !== "any" && !s.staffIds.includes(staffId)) setStaffId("any"); resetSlots(); }}
                   className={cn("booking-option flex w-full min-h-16 items-center justify-between gap-3 rounded-lg border bg-surface p-4 text-left transition", sel ? "border-brand" : "border-line hover:border-olive")}
                 >
                   <span>
@@ -235,12 +257,12 @@ export function BookingFlow({ slug, salonName, timeZone, today, maxAdvanceDays, 
       {step === 2 ? (
         <ul className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
           <li>
-            <StaffCard selected={staffId === "any"} onClick={() => { setStaffId("any"); setSlot(null); }} title={t("b.staff.any")} sub={t("b.staff.anySub")}
+            <StaffCard selected={staffId === "any"} onClick={() => { setStaffId("any"); resetSlots(); }} title={t("b.staff.any")} sub={t("b.staff.anySub")}
               avatar={<span aria-hidden className="grid h-14 w-14 place-items-center staff-portrait bg-sand text-xl text-olive">★</span>} />
           </li>
           {eligibleStaff.map((s) => (
             <li key={s.id}>
-              <StaffCard selected={staffId === s.id} onClick={() => { setStaffId(s.id); setSlot(null); }} title={s.name} avatar={<Avatar name={s.name} photoUrl={s.photoUrl} />} />
+              <StaffCard selected={staffId === s.id} onClick={() => { setStaffId(s.id); resetSlots(); }} title={s.name} avatar={<Avatar name={s.name} photoUrl={s.photoUrl} />} />
             </li>
           ))}
         </ul>
@@ -260,7 +282,7 @@ export function BookingFlow({ slug, salonName, timeZone, today, maxAdvanceDays, 
                   type="button"
                   aria-pressed={sel}
                   aria-label={p.long}
-                  onClick={() => { setDate(d); setSlot(null); }}
+                  onClick={() => { if (date !== d) { setDate(d); resetSlots(); } }}
                   className={cn("flex min-h-20 w-16 shrink-0 flex-col items-center justify-center booking-option rounded-xl border text-sm", sel ? "border-brand" : "border-line bg-surface hover:border-olive")}
                 >
                   <span className="text-xs font-medium opacity-90">{d === today ? t("b.date.today") : p.weekday}</span>
@@ -287,7 +309,7 @@ export function BookingFlow({ slug, salonName, timeZone, today, maxAdvanceDays, 
                           key={s.startsAt}
                           type="button"
                           aria-pressed={slot?.startsAt === s.startsAt}
-                          onClick={() => setSlot(s)}
+                          onClick={() => { setSlot(s); setQuote(s.offers[0] ?? null); }}
                           className={cn("booking-option min-h-11 rounded-lg border text-sm font-semibold", slot?.startsAt === s.startsAt ? "border-brand" : "border-line bg-surface hover:border-olive")}
                         >
                           {s.time}
@@ -303,15 +325,16 @@ export function BookingFlow({ slug, salonName, timeZone, today, maxAdvanceDays, 
       ) : null}
 
       {/* Adım 4 – bilgiler */}
-      {step === 4 && service && slot ? (
+      {step === 4 && service && slot && quote ? (
         <form id="booking-form" className="mt-4 space-y-4" noValidate onSubmit={(e) => { e.preventDefault(); void submit(); }}>
-          <section aria-label={t("b.summary.title")} className="rounded-lg border border-line bg-surface p-4 text-sm">
+          <section data-quote-price={quote.priceTry} aria-label={t("b.summary.title")} className="rounded-lg border border-line bg-surface p-4 text-sm">
             <p className="font-semibold">{salonName}</p>
             <dl className="mt-2 divide-y divide-slate-100">
               <Row k={t("b.summary.service")} v={svcName(service)} />
               <Row k={t("b.summary.staff")} v={staffLabel} />
               <Row k={t("b.summary.when")} v={formatWhen(slot.startsAt, locale, timeZone)} />
-              <Row k={t("b.summary.total")} v={formatPrice(service.priceTry, locale)} />
+              <Row k={t("b.summary.duration")} v={t("common.minutes", { n: quote.durationMin })} />
+              <Row k={t("b.summary.total")} v={quotePrice} />
             </dl>
           </section>
           <Field label={t("b.details.name")} name="name" autoComplete="name" value={name} onChange={(e) => { setName(e.target.value); if (serverErrors.name) setServerErrors({}); }} onBlur={() => touch("name")} error={errors.name} required />

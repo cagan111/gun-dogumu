@@ -318,3 +318,7 @@ Doğrulama: eski kodda yeni paket5FAIL/1PASS (partial varsayılanlar/rename rese
 Final pnpm run ci435/435 + üretim build + gerçek Caddy16e2e PASS. Flow’a gerçek owner HTTP kontrolleri eklendi: yalnıznamePATCH ve explicit aynı staff listesi45dk/0fiyat linkini korur; POST/PATCH1.001→400 ve ekstraService oluşmaz; kendi fixture override’ları finally null’a dönmeden mevcut public booking akışına geçilmez. Önceki flow/booking/panel/isolation assertion’ları korunur. Tek GPT-6 Luna salt-okunur incelemede blokaj yok. T124b1[x]; T124parent/b2/c teklif/aktivasyon/UI/DST-race testleri açık. Yeni migration/deploy/merge/realSMS/dependency audit ölçümü yok; gerçekvideo/T147takvimkararı bekler.
 
 - 2026-11-21 — T124b2a quote istemci beklentisidir; sunucu kilit altında güncel fiyat/süreyi doğrular ve quoted any kesin personeli bağlar. Base-only/optional geçişte eski UI kabul edilir; farklı personel override aktivasyonu ve zorunlu müşteri onayı sonraki teslimdir.
+
+- 2026-11-21 — T124c1 müşteri slot seçiminde ilk doğrulanmış kesin personel teklifi bağlanır; müşteri son onaydan önce bu uzmanı/süreyi/iki haneli fiyatı görür. Public UI quote echo eder, eski API istemcileri için quote optional kalır; farklı personel koşulları ve panel/writer/taşıma ayrı entegrasyondur.
+
+- 2026-11-21 — Client quote Zod object eval probe CSP ihlali nedeniyle browser-only jitless config şema inşasından önce etkin; tarayıcı Zod JIT hız yolu kapalı, server config ve strict CSP değişmedi.
