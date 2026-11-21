@@ -192,6 +192,7 @@ Biçim: `- [ ] T-NNN | sahip: claude|codex|- | açıklama`. Başlamadan sahip ya
   - [x] T124b2a: base-only slot offers + optional strict quote/public-panel create doğrulaması, exact-person any ve fresh askı kapısı; CI444/build/Caddy16e2e PASS, personel farkı/UI aktivasyonu yok.
   - [x] T124c1 | sahip: Codex: müşteri base quote özeti/echo, kesin personel ve iki haneli fiyat/süre, conflict yeniden seçim, TR+EN mobil tarayıcı sözleşmesi; browser Zod jitless/CSP korunur; CI444/build/Caddy17e2e PASS.
   - [x] T124b2b1 | sahip: Codex: taşıma snapshot politikası/Tenant→Service→Staff kilidi/fresh uygunluk/CAS;10DBtesti/CI454/build/Caddy18e2e PASS.
+  - [x] T124b2b2 | sahip: Codex: iç saf perstaff teklif müsaitliği/UTC union;5saf test/CI459/build/mevcutCaddy18e2e PASS; canlı aktivasyon yok.
   - [ ] T124b2/c: kalan efektif personel müsaitliği/oluşturma, panel teklif UI/override yazma API, zorunlu quote geçişi ve rapor/tam aktivasyon testleri; mevcut snapshot taşıma politikası b2b1 ile korunur.
 - [ ] T-125 | sahip: codex | Bekleme listesi: açık rıza, süre sonu, iptal, boşluk için idempotent davet; rezervasyon önceliği iddiası yok, SMS mock
 - [ ] T-126 | sahip: codex | Müşterinin güvenli bağlantıdan randevu taşıması: iptal/taşıma süresi kuralı, atomik çakışma kontrolü, hatırlatmaların yenilenmesi, paralel/izolasyon testleri
