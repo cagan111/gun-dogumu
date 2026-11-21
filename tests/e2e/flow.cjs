@@ -78,6 +78,26 @@ const PASSWORD = "sifre12345";
     await page.getByText("Saç Kesimi").first().waitFor();
     assert.equal(await prisma.serviceStaff.count({ where: { service: { tenantId: tenant.id } } }), 1, "hizmet personele bağlı");
     step("panelde hizmet eklendi (Saç Kesimi)");
+    // T124b1: actual PATCH parsing must preserve omitted links and existing override columns.
+    const catalogService = await prisma.service.findFirstOrThrow({ where: { tenantId: tenant.id } });
+    const catalogLink = await prisma.serviceStaff.findFirstOrThrow({ where: { tenantId: tenant.id, serviceId: catalogService.id } });
+    const catalogUrl = `${BASE}/api/panel/services/${catalogService.id}`;
+    try {
+      await prisma.serviceStaff.update({ where: { serviceId_staffId: { serviceId: catalogService.id, staffId: catalogLink.staffId } }, data: { durationMinOverride: 45, priceTryOverride: '0' } });
+      assert.equal((await ctx.request.patch(catalogUrl, { data: { nameTr: 'Saç Kesimi' } })).status(), 200);
+      assert.equal((await ctx.request.patch(catalogUrl, { data: { staffIds: [catalogLink.staffId] } })).status(), 200);
+      assert.equal((await ctx.request.patch(catalogUrl, { data: { priceTry: 1.001 } })).status(), 400);
+      assert.equal((await ctx.request.post(`${BASE}/api/panel/services`, { data: { nameTr: 'Invalid precision', durationMin: 30, priceTry: 1.001 } })).status(), 400);
+      const kept = await prisma.serviceStaff.findUniqueOrThrow({ where: { serviceId_staffId: { serviceId: catalogService.id, staffId: catalogLink.staffId } } });
+      assert.equal(kept.durationMinOverride, 45); assert.equal(kept.priceTryOverride.toString(), '0');
+      assert.equal((await prisma.service.findUniqueOrThrow({ where: { id: catalogService.id } })).priceTry.toString(), '450');
+      assert.equal(await prisma.service.count({ where: { tenantId: tenant.id } }), 1);
+    } finally {
+      // Override activation is a later task; restore this owned fixture before the public booking flow.
+      await prisma.serviceStaff.updateMany({ where: { tenantId: tenant.id, serviceId: catalogService.id }, data: { durationMinOverride: null, priceTryOverride: null } });
+    }
+    step('catalog HTTP partial PATCH/link preservation and pre-DB price precision checked');
+
 
     // ── 3) müşteri herkese açık sayfadan randevu alır (yeni, çerezsiz bağlam)
     const cctx = await browser.newContext({ viewport: { width: 375, height: 812 }, locale: "tr-TR" });

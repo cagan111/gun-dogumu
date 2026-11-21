@@ -1,3 +1,5 @@
+import { servicePriceText } from "../service-terms";
+import { writeAudit } from "../audit";
 import { lockTenantRow } from "../db";
 import { z } from "zod";
 import { PlanLimitError, ValidationError } from "../errors";
@@ -13,17 +15,25 @@ const id = z.string().min(1).max(64);
 
 /* ───────────── Hizmetler ───────────── */
 
+const serviceBuffer = z.number().int().min(0).max(240);
+const serviceActive = z.boolean();
+const serviceOrder = z.number().int().min(0).max(10_000);
+const serviceStaffIds = z.array(id).max(200);
 export const serviceSchema = z.object({
   nameTr: z.string().trim().min(1).max(100),
   nameEn: z.string().trim().max(100).nullish(),
   durationMin: z.number().int().min(5).max(600),
-  priceTry: z.number().min(0).max(100_000),
-  bufferMin: z.number().int().min(0).max(240).default(0),
-  active: z.boolean().default(true),
-  sortOrder: z.number().int().min(0).max(10_000).default(0),
-  staffIds: z.array(id).max(200).default([]),
+  priceTry: z.number().min(0).max(100_000).refine(v => { try { servicePriceText(v); return true; } catch { return false; } }, "invalid_price_precision"),
+  bufferMin: serviceBuffer.default(0),
+  active: serviceActive.default(true),
+  sortOrder: serviceOrder.default(0),
+  staffIds: serviceStaffIds.default([]),
 });
-export const servicePatchSchema = serviceSchema.partial();
+// Zod 4 applies defaults inside optional fields: PATCH must override those wrappers.
+export const servicePatchSchema = serviceSchema.partial().extend({
+  bufferMin: serviceBuffer.optional(), active: serviceActive.optional(),
+  sortOrder: serviceOrder.optional(), staffIds: serviceStaffIds.optional(),
+});
 
 function outService<T extends { priceTry: unknown; staff: { staffId: string }[] }>(s: T) {
   const { priceTry, staff, ...rest } = s;
@@ -35,23 +45,28 @@ export async function listServices(ctx: PanelCtx) {
   return rows.map((r) => outService(r));
 }
 
-async function assertStaffIds(ctx: PanelCtx, ids: string[]) {
+async function assertStaffIds(db: Pick<PanelCtx["db"], "staff">, ids: string[]) {
   if (ids.length === 0) return;
-  const n = await ctx.db.staff.count({ where: { id: { in: ids } } });
+  const n = await db.staff.count({ where: { id: { in: ids } } });
   if (n !== new Set(ids).size) throw new NotFoundError("Personel");
 }
 
 export async function createService(ctx: PanelCtx, input: z.output<typeof serviceSchema>) {
   assertOwner(ctx);
   assertWritable(ctx);
-  await assertStaffIds(ctx, input.staffIds);
+  input = serviceSchema.parse(input);
   const { staffIds, ...data } = input;
   const row = await ctx.db.$transaction(async (tx) => {
-    const s = await tx.service.create({ data: { ...data, nameEn: data.nameEn ?? null, priceTry: data.priceTry.toFixed(2) } as never });
+    await lockTenantRow(tx, ctx.tenantId);
+    const tenant = await tx.tenant.findUnique({ where: { id: ctx.tenantId }, select: { status: true } });
+    if (!tenant) throw new NotFoundError("Salon");
+    assertWritable({ tenantStatus: tenant.status });
+    await assertStaffIds(tx, staffIds);
+    const s = await tx.service.create({ data: { ...data, nameEn: data.nameEn ?? null, priceTry: servicePriceText(data.priceTry) } as never });
     if (staffIds.length) await tx.serviceStaff.createMany({ data: [...new Set(staffIds)].map((staffId) => ({ serviceId: s.id, staffId })) as never });
+    await writeAudit(tx, { actorId: ctx.user.id, actorRole: ctx.user.role, tenantId: ctx.tenantId, action: "service.create", details: { id: s.id } });
     return s;
   });
-  await auditPanel(ctx, "service.create", { id: row.id });
   return getService(ctx, row.id);
 }
 
@@ -64,18 +79,25 @@ export async function getService(ctx: PanelCtx, sid: string) {
 export async function updateService(ctx: PanelCtx, sid: string, input: z.output<typeof servicePatchSchema>) {
   assertOwner(ctx);
   assertWritable(ctx);
-  const cur = await ctx.db.service.findFirst({ where: { id: sid } });
-  if (!cur) throw new NotFoundError("Hizmet");
-  if (input.staffIds) await assertStaffIds(ctx, input.staffIds);
+  input = servicePatchSchema.parse(input);
   const { staffIds, priceTry, ...rest } = input;
   await ctx.db.$transaction(async (tx) => {
-    await tx.service.updateMany({ where: { id: sid }, data: { ...rest, ...(priceTry !== undefined ? { priceTry: priceTry.toFixed(2) } : {}) } });
-    if (staffIds) {
-      await tx.serviceStaff.deleteMany({ where: { serviceId: sid } });
-      if (staffIds.length) await tx.serviceStaff.createMany({ data: [...new Set(staffIds)].map((staffId) => ({ serviceId: sid, staffId })) as never });
+    await lockTenantRow(tx, ctx.tenantId);
+    const tenant = await tx.tenant.findUnique({ where: { id: ctx.tenantId }, select: { status: true } });
+    if (!tenant) throw new NotFoundError("Salon");
+    assertWritable({ tenantStatus: tenant.status });
+    if (!(await tx.service.findFirst({ where: { id: sid }, select: { id: true } }))) throw new NotFoundError("Hizmet");
+    if (staffIds !== undefined) await assertStaffIds(tx, staffIds);
+    await tx.service.updateMany({ where: { id: sid }, data: { ...rest, ...(priceTry !== undefined ? { priceTry: servicePriceText(priceTry) } : {}) } });
+    if (staffIds !== undefined) {
+      const keep = [...new Set(staffIds)];
+      const current = await tx.serviceStaff.findMany({ where: { serviceId: sid }, select: { staffId: true } });
+      await tx.serviceStaff.deleteMany({ where: { serviceId: sid, ...(keep.length ? { staffId: { notIn: keep } } : {}) } });
+      const added = keep.filter(staffId => !current.some(l => l.staffId === staffId));
+      if (added.length) await tx.serviceStaff.createMany({ data: added.map(staffId => ({ serviceId: sid, staffId })) as never });
     }
+    await writeAudit(tx, { actorId: ctx.user.id, actorRole: ctx.user.role, tenantId: ctx.tenantId, action: "service.update", details: { id: sid, fields: Object.keys(input) } });
   });
-  await auditPanel(ctx, "service.update", { id: sid, fields: Object.keys(input) });
   return getService(ctx, sid);
 }
 

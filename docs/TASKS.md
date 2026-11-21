@@ -188,7 +188,8 @@ Biçim: `- [ ] T-NNN | sahip: claude|codex|- | açıklama`. Başlamadan sahip ya
 - [x] T-123 | sahip: codex | Claude6988228345: ana sayfa KVKK ifadesini KKTC için nötr kişisel veri ifadesine çevir (TR+EN); T112 teslimiyle
 - [ ] T-124 | sahip: codex | Personel bazlı hizmet uygunluğu ve gerekiyorsa süre/fiyat farklarını mevcut rezervasyon motoruna bağla; fiyat snapshot, mesai/çakışma ve tenant testleri
   - [x] T124a: mevcut ServiceStaff üstünde nullable fark alanları/DB aralıkları ve saf kimlik+tenant kontrollü decimal koşul çözümleyici; henüz rezervasyonda/UI’da etkin değil; CI429/build/Caddy16e2e PASS, STAFF-SERVICE-TERMS.md.
-  - [ ] T124b/c: ortak teklif/public+panel oluşturma/taşıma+snapshot+rapor ve TR+EN UI; müşteri onayı, bağ koruma/yazma yetkisi, yarış ve DST testleri.
+  - [x] T124b1: catalog PATCH eksik alan/default ayrımı, bağı koruyarak staffIds farkı, DB öncesi fiyat hassasiyeti, tenant kilidi/fresh askı ve atomik audit; CI435/build/Caddy16e2e PASS.
+  - [ ] T124b2/c: ortak teklif/public+panel oluşturma/taşıma+snapshot+rapor ve TR+EN UI; müşteri onayı, override yazma API, yarış ve DST testleri.
 - [ ] T-125 | sahip: codex | Bekleme listesi: açık rıza, süre sonu, iptal, boşluk için idempotent davet; rezervasyon önceliği iddiası yok, SMS mock
 - [ ] T-126 | sahip: codex | Müşterinin güvenli bağlantıdan randevu taşıması: iptal/taşıma süresi kuralı, atomik çakışma kontrolü, hatırlatmaların yenilenmesi, paralel/izolasyon testleri
 - [ ] T-127 | sahip: codex | Gerçek izinli berber videosu ve salon fotoğrafları; lisans/izin kaydı, mobil bütçe, hareket/veri tasarrufu; erişim/varlık yoksa açık eksik bırak

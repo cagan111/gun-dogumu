@@ -6,7 +6,7 @@ type EligibilityTerms = { tenantId: string; serviceId: string; staffId: string; 
 
 function invalid(): never { throw new Error("invalid_service_terms"); }
 /** Decimal text avoids a floating-point price/rounding contract in clients. */
-function price(value: Money): string {
+export function servicePriceText(value: Money): string {
   const text = String(value);
   if (!/^(?:0|[1-9]\d{0,5})(?:\.\d{1,2})?$/.test(text)) invalid();
   const [whole, fraction = ""] = text.split(".");
@@ -20,5 +20,5 @@ export function effectiveServiceTerms(service: ServiceTerms, staff: StaffTerms, 
   const durationMin = link.durationMinOverride ?? service.durationMin;
   if (!Number.isInteger(durationMin) || durationMin < 5 || durationMin > 600) invalid();
   if (!Number.isInteger(service.bufferMin) || service.bufferMin < 0 || service.bufferMin > 240) invalid();
-  return { durationMin, bufferMin: service.bufferMin, priceTry: price(link.priceTryOverride ?? service.priceTry) };
+  return { durationMin, bufferMin: service.bufferMin, priceTry: servicePriceText(link.priceTryOverride ?? service.priceTry) };
 }
