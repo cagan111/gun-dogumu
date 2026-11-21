@@ -1,3 +1,4 @@
+import { baseQuoteTerms, makeServiceQuote, matchesServiceQuote, serviceQuoteSchema, type ServiceQuote } from "./service-quote";
 import { lockTenantKey, lockTenantRow } from "./db";
 import { randomBytes } from "node:crypto";
 import { Prisma } from "@prisma/client";
@@ -34,6 +35,7 @@ export class AlreadyClosedError extends BookingError {
 export interface CreateAppointmentInput {
   tenantId: string;
   serviceId: string;
+  quote?: ServiceQuote;
   /** Personel id'si ya da "any" (fark etmez). */
   staffId: string | "any";
   startsAt: Date;
@@ -76,11 +78,17 @@ async function attempt(db: TenantDb, input: CreateAppointmentInput) {
   const now = input.now ?? new Date();
   const phone = normalizePhone(input.customer.phone);
   if (!phone) throw new InvalidPhoneError();
+  const conflict = () => new BookingError("conflict", "Hizmet koşulları değişti; yeniden seçip onaylayın");
+  const quote = input.quote ? serviceQuoteSchema.safeParse(input.quote) : null;
+  if (quote && (!quote.success || quote.data.serviceId !== input.serviceId || quote.data.startsAt !== input.startsAt.toISOString() || (input.staffId !== "any" && quote.data.staffId !== input.staffId))) throw conflict();
+  const requestedStaff = quote?.success ? quote.data.staffId : input.staffId;
+
 
   return db.$transaction(async (tx) => {
     await lockTenantRow(tx, input.tenantId);
     const tenant = await tx.tenant.findUnique({ where: { id: input.tenantId } });
     if (!tenant) throw new NotFoundError("Salon");
+    if (tenant.status === "suspended") throw new BookingError("suspended", "Salon geçici olarak kapalı");
     const tz = tenant.timeZone;
 
     // Hizmet ve personel bu salona ait olmalı (tx, tenantId ile kapsanmıştır)
@@ -88,9 +96,9 @@ async function attempt(db: TenantDb, input: CreateAppointmentInput) {
     if (!service) throw new NotFoundError("Hizmet");
     const links = await tx.serviceStaff.findMany({ where: { serviceId: service.id, staff: { active: true } } });
     const eligibleIds = links.map((l) => l.staffId);
-    if (input.staffId !== "any" && !eligibleIds.includes(input.staffId)) throw new NotFoundError("Personel");
+    if (requestedStaff !== "any" && !eligibleIds.includes(requestedStaff)) throw quote ? conflict() : new NotFoundError("Personel");
     const staffRows = await tx.staff.findMany({
-      where: { id: { in: input.staffId === "any" ? eligibleIds : [input.staffId] }, active: true },
+      where: { id: { in: requestedStaff === "any" ? eligibleIds : [requestedStaff] }, active: true },
       orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
     });
     if (staffRows.length === 0) throw new NotFoundError("Personel");
@@ -135,15 +143,20 @@ async function attempt(db: TenantDb, input: CreateAppointmentInput) {
 
     // "Fark etmez": o gün en az randevusu olan personel (eşitlikte sıra/sortOrder)
     let chosen = free.staffIds[0] as string;
-    if (input.staffId === "any" && free.staffIds.length > 1) {
+    if (requestedStaff === "any" && free.staffIds.length > 1) {
       const counts = new Map(free.staffIds.map((id) => [id, 0]));
       for (const b of busyRows) {
         if (b.startsAt >= range.start && b.startsAt < range.end && counts.has(b.staffId)) counts.set(b.staffId, (counts.get(b.staffId) ?? 0) + 1);
       }
       chosen = [...free.staffIds].sort((a, b) => (counts.get(a) ?? 0) - (counts.get(b) ?? 0) || staffIds.indexOf(a) - staffIds.indexOf(b))[0] as string;
-    } else if (input.staffId !== "any") {
-      chosen = input.staffId;
+    } else if (requestedStaff !== "any") {
+      chosen = requestedStaff;
     }
+
+    const chosenStaff = staffRows.find(s => s.id === chosen)!;
+    const chosenLink = links.find(l => l.staffId === chosen)!;
+    const terms = baseQuoteTerms(service, chosenStaff, chosenLink);
+    if (!terms || (quote && !matchesServiceQuote(input.quote, makeServiceQuote(service.id, chosen, input.startsAt, terms)))) throw conflict();
 
     const c = input.customer;
     // A phone number supplied by an anonymous booking is not proof of consent.
@@ -170,7 +183,7 @@ async function attempt(db: TenantDb, input: CreateAppointmentInput) {
 /** Randevu oluşturur. Çift rezervasyonu DB exclusion constraint'i garanti eder → SlotTakenError. */
 export async function createAppointment(db: TenantDb, input: CreateAppointmentInput) {
   // "Fark etmez"de yarışı kaybeden, başka boş personel olabileceği için yeniden denenir
-  const tries = input.staffId === "any" ? 3 : 1;
+  const tries = input.staffId === "any" && !input.quote ? 3 : 1;
   for (let i = 1; ; i++) {
     try {
       const a = await attempt(db, input);

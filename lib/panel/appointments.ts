@@ -1,3 +1,4 @@
+import { serviceQuoteSchema } from "../service-quote";
 import { z } from "zod";
 import { lockTenant } from "../ledger";
 import { prepareReviewInvitation, skipPendingReviewInvitations } from "../messaging/review-intent";
@@ -59,6 +60,7 @@ export async function getAppointment(ctx: PanelCtx, id: string) {
 }
 
 export const createSchema = z.object({
+  quote: serviceQuoteSchema.optional(),
   serviceId: z.string().min(1).max(64),
   staffId: z.string().min(1).max(64).default("any"),
   startsAt: z.string().datetime({ offset: true }).transform((v) => new Date(v)),
@@ -75,7 +77,7 @@ export const createSchema = z.object({
 export async function createPanelAppointment(ctx: PanelCtx, input: z.output<typeof createSchema>, now: Date = new Date()) {
   assertWritable(ctx);
   const a = await createAppointment(ctx.db, {
-    tenantId: ctx.tenantId, serviceId: input.serviceId, staffId: input.staffId, startsAt: input.startsAt,
+    tenantId: ctx.tenantId, serviceId: input.serviceId, staffId: input.staffId, startsAt: input.startsAt, quote: input.quote,
     customer: input.customer, source: input.source, note: input.note ?? null, now, bypassLeadRules: true,
   });
   return getAppointment(ctx, a.id);

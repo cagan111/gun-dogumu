@@ -1,7 +1,8 @@
+import { baseQuoteTerms, makeServiceQuote, serviceQuoteSchema, type ServiceQuote } from "./service-quote";
 import { z } from "zod";
 import { prisma, withTenant } from "./db";
 import { computeAvailability, type StaffAvailabilityInput } from "./availability";
-import { createAppointment, NotFoundError } from "./booking";
+import { createAppointment, NotFoundError, BookingError } from "./booking";
 import { SuspendedError } from "./errors";
 import { phoneSchema } from "./phone";
 import { addDays, dayRangeUtc, isValidDate, utcToLocal } from "./time";
@@ -84,7 +85,13 @@ export async function getSlots(slug: string, q: z.infer<typeof slotsQuerySchema>
     where: { id: { in: q.staffId === "any" ? eligible : [q.staffId] }, active: true },
     orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
   });
-  if (staffRows.length === 0) return { date: q.date, timeZone: t.timeZone, slots: [] as { startsAt: string; time: string; staffIds: string[] }[] };
+  if (staffRows.length === 0) return { date: q.date, timeZone: t.timeZone, slots: [] as { startsAt: string; time: string; staffIds: string[]; offers: ServiceQuote[] }[] };
+  const quoteTerms = new Map<string, NonNullable<ReturnType<typeof baseQuoteTerms>>>();
+  for (const person of staffRows) {
+    const terms = baseQuoteTerms(service, person, links.find(l => l.staffId === person.id)!);
+    if (!terms) throw new BookingError("conflict", "Personel koşulları henüz etkin değil");
+    quoteTerms.set(person.id, terms);
+  }
   const ids = staffRows.map((s) => s.id);
 
   const winFrom = dayRangeUtc(addDays(q.date, -1), t.timeZone).start;
@@ -110,11 +117,12 @@ export async function getSlots(slug: string, q: z.infer<typeof slotsQuerySchema>
   return {
     date: q.date,
     timeZone: t.timeZone,
-    slots: slots.map((s) => ({ startsAt: s.start.toISOString(), time: hhmm(utcToLocal(s.start, t.timeZone).minutes), staffIds: s.staffIds })),
+    slots: slots.map((s) => ({ startsAt: s.start.toISOString(), time: hhmm(utcToLocal(s.start, t.timeZone).minutes), staffIds: s.staffIds, offers: s.staffIds.map(id => makeServiceQuote(service.id, id, s.start, quoteTerms.get(id)!)) })),
   };
 }
 
 export const publicBookingSchema = z.object({
+  quote: serviceQuoteSchema.optional(),
   serviceId: z.string().min(1).max(64),
   staffId: z.string().min(1).max(64),
   startsAt: z.string().datetime({ offset: true }).transform((v) => new Date(v)),
@@ -135,6 +143,7 @@ export async function bookPublic(slug: string, input: PublicBookingInput, now: D
   const appt = await createAppointment(withTenant(t.id), {
     tenantId: t.id,
     serviceId: input.serviceId,
+    quote: input.quote,
     staffId: input.staffId,
     startsAt: input.startsAt,
     customer: { ...input.customer, marketingConsent: input.marketingConsent, kvkkAccepted: input.kvkkAccepted },

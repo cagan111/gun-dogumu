@@ -189,6 +189,7 @@ Biçim: `- [ ] T-NNN | sahip: claude|codex|- | açıklama`. Başlamadan sahip ya
 - [ ] T-124 | sahip: codex | Personel bazlı hizmet uygunluğu ve gerekiyorsa süre/fiyat farklarını mevcut rezervasyon motoruna bağla; fiyat snapshot, mesai/çakışma ve tenant testleri
   - [x] T124a: mevcut ServiceStaff üstünde nullable fark alanları/DB aralıkları ve saf kimlik+tenant kontrollü decimal koşul çözümleyici; henüz rezervasyonda/UI’da etkin değil; CI429/build/Caddy16e2e PASS, STAFF-SERVICE-TERMS.md.
   - [x] T124b1: catalog PATCH eksik alan/default ayrımı, bağı koruyarak staffIds farkı, DB öncesi fiyat hassasiyeti, tenant kilidi/fresh askı ve atomik audit; CI435/build/Caddy16e2e PASS.
+  - [x] T124b2a: base-only slot offers + optional strict quote/public-panel create doğrulaması, exact-person any ve fresh askı kapısı; CI444/build/Caddy16e2e PASS, personel farkı/UI aktivasyonu yok.
   - [ ] T124b2/c: ortak teklif/public+panel oluşturma/taşıma+snapshot+rapor ve TR+EN UI; müşteri onayı, override yazma API, yarış ve DST testleri.
 - [ ] T-125 | sahip: codex | Bekleme listesi: açık rıza, süre sonu, iptal, boşluk için idempotent davet; rezervasyon önceliği iddiası yok, SMS mock
 - [ ] T-126 | sahip: codex | Müşterinin güvenli bağlantıdan randevu taşıması: iptal/taşıma süresi kuralı, atomik çakışma kontrolü, hatırlatmaların yenilenmesi, paralel/izolasyon testleri

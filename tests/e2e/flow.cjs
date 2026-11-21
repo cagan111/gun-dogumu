@@ -97,6 +97,19 @@ const PASSWORD = "sifre12345";
       await prisma.serviceStaff.updateMany({ where: { tenantId: tenant.id, serviceId: catalogService.id }, data: { durationMinOverride: null, priceTryOverride: null } });
     }
     step('catalog HTTP partial PATCH/link preservation and pre-DB price precision checked');
+    // T124b2a: exact, public base offer must reach both booking adapters unchanged.
+    const offerDate = new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10);
+    const offerResponse = await ctx.request.get(`${BASE}/api/public/${SLUG}/slots`, { params: { serviceId: catalogService.id, staffId: 'any', date: offerDate } });
+    assert.equal(offerResponse.status(), 200);
+    const offered = (await offerResponse.json()).slots[0].offers[0];
+    assert.equal(offered.staffId, catalogLink.staffId); assert.equal(offered.priceTry, '450.00'); assert.equal(offered.durationMin, 30);
+    const wrongQuote = { serviceId: catalogService.id, staffId: 'any', startsAt: offered.startsAt, quote: { ...offered, priceTry: '0.00' }, customer: { name: 'Quote guard', phone: '+905331234567' }, kvkkAccepted: true };
+    assert.equal((await ctx.request.post(`${BASE}/api/public/${SLUG}/appointments`, { data: wrongQuote })).status(), 409);
+    assert.equal((await ctx.request.post(`${BASE}/api/panel/appointments`, { data: wrongQuote })).status(), 409);
+    assert.equal(await prisma.appointment.count({ where: { tenantId: tenant.id } }), 0);
+    assert.equal(await prisma.customer.count({ where: { tenantId: tenant.id } }), 0);
+    step('public base offer and public/panel changed-quote rejection before writes checked');
+
 
 
     // ── 3) müşteri herkese açık sayfadan randevu alır (yeni, çerezsiz bağlam)
