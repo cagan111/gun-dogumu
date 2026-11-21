@@ -1,3 +1,4 @@
+import { reviewGate, reviewKey, renderReviewInvitation, skipReview, ReviewClaimDuplicate } from "./review-dispatch";
 /**
  * Mesaj gönderimi: segment sayısı kadar kredi düşümü MessageLog satırıyla AYNI transaction'da yapılır;
  * sağlayıcı hatasında iade edilir. Kredi yetmezse WhatsApp (Salon+ ve yapılandırılmışsa) → e-posta → atla.
@@ -30,6 +31,8 @@ export interface SendInput {
   appointmentId?: string | null;
   /** Internal durable campaign claim. HTTP callers cannot supply this directly. */
   campaignRecipientId?: string;
+  /** Internal durable review claim; never accepted from HTTP. */
+  reviewInvitationId?: string;
   idempotencyKey?: string | null;
   /** Kredi yetmezse: WhatsApp (varsayılan açık) ve/veya e-posta. */
   fallback?: { whatsapp?: boolean; email?: string | null; subject?: string };
@@ -82,6 +85,10 @@ async function logFree(input: SendInput, channel: Channel, recipient: string, pr
 
 export async function sendMessage(input: SendInput): Promise<SendOutcome> {
   const { tenantId } = input;
+  const review = input.template === "review_invite" || !!input.reviewInvitationId;
+  if (review && (!input.reviewInvitationId || input.template !== "review_invite" || input.reason !== "notification" || !input.appointmentId || input.campaignRecipientId || input.logContent !== undefined || input.idempotencyKey !== reviewKey(input.appointmentId))) throw new ValidationError("Geçersiz yorum daveti");
+  const began = Date.now();
+  const clock = () => review ? new Date(+(input.now ?? new Date(began)) + Date.now() - began) : input.now ?? new Date();
   const key = input.idempotencyKey ?? null;
   if (key && (await prisma.messageLog.findUnique({ where: { idempotencyKey: key }, select: { id: true } }))) {
     return { status: "duplicate", segments: 0 };
@@ -89,7 +96,7 @@ export async function sendMessage(input: SendInput): Promise<SendOutcome> {
   const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { plan: true, smsProvider: true, smsSenderName: true } });
   if (!tenant) throw new ValidationError("Salon bulunamadı", "tenantId");
   const sms = getSmsProvider(tenant.smsProvider, input.deps);
-  if (!approvedSmsSender(tenantId, sms.name, tenant.smsSenderName, input.deps?.env ?? process.env)) {
+  if (!review && !approvedSmsSender(tenantId, sms.name, tenant.smsSenderName, input.deps?.env ?? process.env)) {
     return { status: "skipped", segments: 0, reason: "sms_sender_not_approved" };
   }
   const segments = smsSegments(input.text, sms.segmentProfile).segments;
@@ -105,7 +112,8 @@ export async function sendMessage(input: SendInput): Promise<SendOutcome> {
   }
 
   // 1) kredi düşümü + MessageLog (queued) tek transaction
-  const lease = messageLease(input.now ?? new Date());
+  let reservedAt = input.now ?? new Date();
+  const lease = messageLease(reservedAt);
   let logId: string | null;
   try {
     logId = await withTenant(tenantId).$transaction(async (tx) => {
@@ -113,35 +121,58 @@ export async function sendMessage(input: SendInput): Promise<SendOutcome> {
       // Recipient lock first across salons; then canonical tenant/FK lock order.
       if (restricted) await lockSmsRecipient(tx, input.to);
       await lockTenant(tx, tenantId);
-      if (restricted) await checkSmsPolicy(tx, tenantId, input.to, segments, input.now ?? new Date());
+      if (review) {
+        reservedAt = clock();
+        Object.assign(lease, messageLease(reservedAt));
+        const intent = await tx.reviewInvitation.findFirst({ where: { id: input.reviewInvitationId! } });
+        if (!intent || intent.appointmentId !== input.appointmentId || intent.recipient !== input.to) throw new ValidationError("Geçersiz yorum daveti");
+        if (intent.status !== "pending" || intent.messageId) throw new ReviewClaimDuplicate();
+        const gate = await reviewGate(tx, tenantId, intent, reservedAt);
+        if (gate.reason) {
+          if (!["not_due", "quiet_hours"].includes(gate.reason)) await skipReview(tx, intent.id, gate.reason);
+          return null;
+        }
+        if (input.text !== renderReviewInvitation(gate.tenant!.name, gate.customer!.locale, intent.reviewUrl)) throw new ValidationError("Geçersiz yorum daveti metni");
+        if (gate.tenant!.smsProvider !== tenant.smsProvider || gate.tenant!.smsSenderName !== tenant.smsSenderName) return null;
+        if (!approvedSmsSender(tenantId, sms.name, gate.tenant!.smsSenderName, input.deps?.env ?? process.env)) { await skipReview(tx, intent.id, "sms_sender_not_approved"); return null; }
+        if (await getAvailableBalance(tx, tenantId) < segments) { await skipReview(tx, intent.id, "insufficient_credits"); return null; }
+      }
+      if (restricted) {
+        try { await checkSmsPolicy(tx, tenantId, input.to, segments, review ? reservedAt : clock()); }
+        catch (e) {
+          if (review && e instanceof SmsPolicyBlocked) { await skipReview(tx, input.reviewInvitationId!, e.reason); return null; }
+          throw e;
+        }
+      }
       if (input.campaignRecipientId) {
         if (input.reason !== "campaign" || input.template !== "campaign" || input.appointmentId) throw new ValidationError("Geçersiz kampanya gönderimi");
         if (!(await consumeCampaignHold(tx, tenantId, input.campaignRecipientId, { to: input.to, text: input.text, segments, provider: sms.name, key }))) return null;
       }
       const log = await tx.messageLog.create({
-        data: { channel: "sms", recipient: input.to, template: input.template, content: input.logContent ?? input.text, provider: sms.name, status: "queued", ...lease, cost: segments, smsSafetySegments: restricted ? segments : 0, createdAt: input.now ?? new Date(), idempotencyKey: key, appointmentId: input.appointmentId ?? null } as never,
+        data: { channel: "sms", recipient: input.to, template: input.template, content: input.logContent ?? input.text, provider: sms.name, status: "queued", ...lease, cost: segments, smsSafetySegments: restricted ? segments : 0, createdAt: reservedAt, idempotencyKey: key, appointmentId: input.appointmentId ?? null } as never,
       });
       await debitTx(tx, tenantId, segments, { reason: input.reason, messageId: log.id, note: input.template });
       if (input.campaignRecipientId) await tx.campaignRecipient.update({ where: { id: input.campaignRecipientId }, data: { messageId: log.id } });
+      if (review) await tx.reviewInvitation.update({ where: { id: input.reviewInvitationId! }, data: { status: "processing", messageId: log.id } });
       return log.id;
     });
   } catch (e) {
-    if (isUniqueViolation(e) || e instanceof CampaignClaimDuplicate) return { status: "duplicate", segments: 0 };
+    if (isUniqueViolation(e) || e instanceof CampaignClaimDuplicate || e instanceof ReviewClaimDuplicate) return { status: "duplicate", segments: 0 };
     if (e instanceof SmsPolicyBlocked) return { status: "skipped", segments, reason: e.reason };
     if (e instanceof InsufficientCreditsError) {
-      if (input.campaignRecipientId) return { status: "skipped", segments, reason: "reservation_unavailable" };
+      if (input.campaignRecipientId || review) return { status: "skipped", segments, reason: "reservation_unavailable" };
       return fallback(input, tenant.plan, segments);
     }
     throw e;
   }
 
-  if (!logId) return { status: "skipped", segments, reason: "campaign_recipient_skipped" };
+  if (!logId) return { status: "skipped", segments, reason: review ? "review_not_claimed" : "campaign_recipient_skipped" };
   await input.hooks?.afterReserved?.();
   // Dispatch marker fences workers whose reservation was already recovered.
-  if (!(await startDispatch(tenantId, logId, lease.leaseOwner, input.now ?? new Date()))) return { status: "failed", messageId: logId, segments, reason: "lease_lost" };
+  if (!(await startDispatch(tenantId, logId, lease.leaseOwner, clock(), review ? { sender: tenant.smsSenderName, deps: input.deps } : undefined))) return { status: "failed", messageId: logId, segments, reason: "lease_lost" };
   const res = await dispatch(() => sms.send(input.to, input.text, { sender: tenant.smsSenderName }));
   await input.hooks?.afterDispatch?.();
-  const won = await finish(input, logId, lease.leaseOwner, res.ok ? "sent" : "failed", res);
+  const won = await finish({ ...input, now: clock() }, logId, lease.leaseOwner, res.ok ? "sent" : "failed", res);
   if (!won) return { status: "failed", channel: "sms", messageId: logId, segments, reason: "lease_lost" };
   if (!res.ok) logger.warn({ tenantId, provider: sms.name }, "SMS gönderilemedi, kredi iade edildi");
   return { status: res.ok ? "sent" : "failed", channel: "sms", messageId: logId, segments, ...(res.ok ? {} : { reason: res.error }) };

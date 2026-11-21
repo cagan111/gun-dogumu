@@ -1,3 +1,7 @@
+import { reviewGate, reviewKey, skipReview, finishReviewMessage } from "./review-dispatch";
+import { getSmsProvider } from "./registry";
+import { approvedSmsSender } from "./sender-policy";
+import type { ProviderDeps } from "./types";
 /** A queued reservation is owned for two minutes. Recovery never replays message content. */
 import { randomUUID } from "node:crypto";
 import type { MessageStatus } from "@prisma/client";
@@ -8,12 +12,30 @@ export const PROVIDER_TIMEOUT_MS = 30_000;
 export function messageLease(now: Date) {
   return { leaseOwner: randomUUID(), leaseUntil: new Date(+now + MESSAGE_LEASE_MS) };
 }
-export async function startDispatch(tenantId: string, id: string, owner: string, now: Date): Promise<boolean> {
+export async function startDispatch(tenantId: string, id: string, owner: string, now: Date, review?: { sender: string | null; deps?: Partial<ProviderDeps> }): Promise<boolean> {
+  const began = Date.now();
   return withTenant(tenantId).$transaction(async tx => {
     await lockTenant(tx, tenantId);
+    if (review) now = new Date(+now + Date.now() - began);
     const where = { id, status: "queued" as const, leaseOwner: owner, leaseUntil: { gt: now }, dispatchStartedAt: null };
     const row = await tx.messageLog.findFirst({ where });
     if (!row) return false;
+    if (row.template === "review_invite") {
+      const intent = await tx.reviewInvitation.findFirst({ where: { messageId: id } });
+      const gate = intent ? await reviewGate(tx, tenantId, intent, now) : null;
+      const tenant = gate?.tenant;
+      let reason = !intent || intent.status !== "processing" ? intent?.finishedReason ?? "review_not_processing" : gate?.reason;
+      if (!reason && (row.channel !== "sms" || row.appointmentId !== intent!.appointmentId || row.recipient !== intent!.recipient || row.idempotencyKey !== reviewKey(intent!.appointmentId))) reason = "review_scope_invalid";
+      if (!reason && (!review || !tenant || tenant.smsSenderName !== review.sender || getSmsProvider(tenant.smsProvider, review.deps).name !== row.provider || !approvedSmsSender(tenantId, row.provider, tenant.smsSenderName, review.deps?.env ?? process.env))) reason = "sms_sender_not_approved";
+      if (reason) {
+        const cancelled = await tx.messageLog.updateMany({ where, data: { status: "failed", providerResult: reason, cost: 0, leaseOwner: null, leaseUntil: null } });
+        if (cancelled.count === 1) {
+          if (row.cost > 0) await refundTx(tx, tenantId, row.cost, { messageId: id, note: "yorum daveti iptal" });
+          if (intent) await skipReview(tx, intent.id, reason);
+        }
+        return false;
+      }
+    }
     if (row.channel === "sms" && row.template === "campaign") {
       const recipient = await tx.campaignRecipient.findFirst({ where: { messageId: id }, include: { campaign: true } });
       const customer = await tx.customer.findFirst({ where: { ...(recipient ? { id: recipient.customerId } : {}), phone: row.recipient, marketingConsent: true } });
@@ -42,6 +64,7 @@ export async function settleMessage(tenantId: string, id: string, owner: string,
     });
     if (r.count !== 1) return false;
     if (status === "failed" && row.channel === "sms" && row.cost > 0) await refundTx(tx, tenantId, row.cost, { messageId: id, note: `iade:${row.template}` });
+    if (row.template === "review_invite") await finishReviewMessage(tx, id, status === "sent" ? "sent" : result.error ?? "failed");
     return true;
   });
 }
@@ -61,6 +84,7 @@ export async function reconcileQueuedMessages(now: Date = new Date(), limit = 10
       } });
       if (r.count !== 1) return 0;
       if (current.channel === "sms" && current.cost > 0) await refundTx(tx, row.tenantId, current.cost, { messageId: current.id, note: "kesinti uzlaştırma" });
+      if (current.template === "review_invite") await finishReviewMessage(tx, current.id, unknown ? "delivery_unknown" : "interrupted_before_dispatch");
       return 1;
     });
   }

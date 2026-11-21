@@ -21,5 +21,11 @@ export async function prepareReviewInvitation(tx: LedgerTx, tenantId: string, ap
   });
 }
 export async function skipPendingReviewInvitations(tx: LedgerTx, filter: { appointmentId?: string; customerId?: string }, reason: "appointment_changed" | "consent_withdrawn" | "settings_disabled" | "url_changed") {
+  // Claimed but unstarted attempts are irreversibly stopped too. Dispatch/recovery owns the refund.
+  const processing = await tx.reviewInvitation.findMany({ where: { ...filter, status: "processing" } });
+  for (const intent of processing) {
+    const message = intent.messageId ? await tx.messageLog.findFirst({ where: { id: intent.messageId } }) : null;
+    if (!message || (message.status === "queued" && !message.dispatchStartedAt)) await tx.reviewInvitation.updateMany({ where: { id: intent.id, status: "processing" }, data: { status: "skipped", finishedReason: reason } });
+  }
   return tx.reviewInvitation.updateMany({ where: { ...filter, status: "pending" }, data: { status: "skipped", finishedReason: reason } });
 }
